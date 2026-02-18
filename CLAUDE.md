@@ -72,3 +72,16 @@ src/
 - Card panels: `bg-slate-800/50 border-slate-700 rounded-xl`
 - Tab bar: `bg-slate-900` with `bg-slate-600` active state
 - Text: `text-white` headings, `text-slate-300` body, `text-slate-400` secondary
+
+## Plans
+
+All implementation plans live in `docs/plans/` as Markdown files. When generating a plan:
+
+- Place the file in `docs/plans/<descriptive-name>.md`
+- Include a **Context** section explaining the problem and intended outcome
+- Include an **Implementation Tasks** section with checkboxes (`- [ ]`) for each discrete task
+- Tasks should be specific enough for another agent to execute independently
+- Include a **Files to Create/Modify** table listing all affected files
+- Include a **Verification** section or task describing how to test the changes end-to-end
+- Mark tasks as completed (`- [x]`) as they are finished
+- Commit the plan file before beginning implementation
