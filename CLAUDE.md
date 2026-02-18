@@ -17,6 +17,20 @@ npm run lint       # Run ESLint
 npm test           # Run tests (once a test framework is configured)
 ```
 
+### Docker
+
+The app is containerized with a multi-stage Dockerfile (`node:20-alpine`, standalone output). Use docker-compose for local or production runs:
+
+```bash
+docker compose up              # Build & start (foreground, logs visible)
+docker compose up -d           # Build & start (detached/background)
+docker compose up --build      # Force rebuild after code changes
+docker compose down            # Stop and remove containers
+docker compose logs -f         # Tail logs from running container
+```
+
+The app is served on port **3000** (`http://localhost:3000`).
+
 ## Architecture
 
 ```
