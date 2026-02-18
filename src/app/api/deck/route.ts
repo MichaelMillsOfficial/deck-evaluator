@@ -1,12 +1,6 @@
 import type { NextRequest } from "next/server";
 import type { DeckData } from "@/lib/types";
 import {
-  isMoxfieldUrl,
-  extractMoxfieldDeckId,
-  fetchMoxfieldDeck,
-  normalizeMoxfieldSection,
-} from "@/lib/moxfield";
-import {
   isArchidektUrl,
   extractArchidektDeckId,
   fetchArchidektDeck,
@@ -34,27 +28,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
 
   try {
-    if (isMoxfieldUrl(trimmedUrl)) {
-      const deckId = extractMoxfieldDeckId(trimmedUrl);
-      if (!deckId) {
-        return Response.json(
-          { error: "Could not extract Moxfield deck ID from URL" },
-          { status: 400 }
-        );
-      }
-
-      const raw = await fetchMoxfieldDeck(deckId);
-      const deckData: DeckData = {
-        name: raw.name,
-        source: "moxfield",
-        url: trimmedUrl,
-        commanders: normalizeMoxfieldSection(raw.commanders ?? {}, 1),
-        mainboard: normalizeMoxfieldSection(raw.mainboard ?? {}),
-        sideboard: normalizeMoxfieldSection(raw.sideboard ?? {}),
-      };
-
-      return Response.json(deckData);
-    } else if (isArchidektUrl(trimmedUrl)) {
+    if (isArchidektUrl(trimmedUrl)) {
       const deckId = extractArchidektDeckId(trimmedUrl);
       if (!deckId) {
         return Response.json(
@@ -81,7 +55,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       return Response.json(
         {
           error:
-            "Unsupported deck URL. Please provide a Moxfield or Archidekt deck URL.",
+            "Unsupported deck URL. Only Archidekt URLs are supported. For Moxfield decks, use the \"Paste Decklist\" tab to paste your exported decklist.",
         },
         { status: 422 }
       );

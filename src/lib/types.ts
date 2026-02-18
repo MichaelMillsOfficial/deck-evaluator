@@ -5,7 +5,7 @@ export interface DeckCard {
 
 export interface DeckData {
   name: string;
-  source: "moxfield" | "archidekt";
+  source: "moxfield" | "archidekt" | "text";
   url: string;
   commanders: DeckCard[];
   mainboard: DeckCard[];

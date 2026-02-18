@@ -38,16 +38,50 @@ export default function HomePage() {
     }
   };
 
+  const handleParseDeck = async (text: string) => {
+    setLoading(true);
+    setError(null);
+    setDeckData(null);
+
+    try {
+      const res = await fetch("/api/deck-parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setError(json.error ?? `Request failed with status ${res.status}`);
+        return;
+      }
+
+      setDeckData(json as DeckData);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center px-4 py-16">
       <div className="mb-10 text-center">
         <h1 className="text-3xl font-bold tracking-tight">Deck Evaluator</h1>
         <p className="mt-2 text-sm text-gray-500">
-          Paste a public Moxfield or Archidekt deck URL to view your decklist.
+          Import an Archidekt deck URL or paste a decklist from any source.
         </p>
       </div>
 
-      <DeckInput onSubmit={handleFetchDeck} loading={loading} />
+      <DeckInput
+        onSubmitUrl={handleFetchDeck}
+        onSubmitText={handleParseDeck}
+        loading={loading}
+      />
 
       {loading && (
         <p className="mt-8 text-sm text-gray-400 animate-pulse">
