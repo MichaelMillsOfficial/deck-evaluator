@@ -9,19 +9,19 @@ function DeckSection({ title, cards }: { title: string; cards: DeckCard[] }) {
 
   return (
     <div className="mb-6">
-      <h2 className="mb-2 border-b border-gray-200 pb-1 text-sm font-semibold uppercase tracking-wide text-gray-500">
+      <h2 className="mb-2 border-b border-slate-700 pb-1 text-sm font-semibold uppercase tracking-wide text-slate-400">
         {title}{" "}
-        <span className="text-xs font-normal text-gray-400">
+        <span className="text-xs font-normal text-slate-500">
           ({totalCards})
         </span>
       </h2>
       <ul className="space-y-0.5">
         {cards.map((card) => (
           <li key={card.name} className="flex items-baseline gap-2 text-sm">
-            <span className="w-6 shrink-0 text-right font-mono text-gray-500">
+            <span className="w-6 shrink-0 text-right font-mono text-slate-500">
               {card.quantity}
             </span>
-            <span>{card.name}</span>
+            <span className="text-slate-200">{card.name}</span>
           </li>
         ))}
       </ul>
@@ -36,16 +36,16 @@ export default function DeckList({ deck }: { deck: DeckData }) {
     deck.sideboard.reduce((s, c) => s + c.quantity, 0);
 
   return (
-    <div className="w-full max-w-2xl">
+    <div className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-6">
       <div className="mb-6">
-        <h1 className="text-xl font-bold">{deck.name}</h1>
-        <p className="mt-0.5 text-xs text-gray-400">
+        <h1 className="text-xl font-bold text-white">{deck.name}</h1>
+        <p className="mt-0.5 text-xs text-slate-400">
           via{" "}
           <a
             href={deck.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="capitalize text-blue-500 hover:underline"
+            className="capitalize text-purple-400 hover:underline"
           >
             {deck.source}
           </a>
