@@ -46,6 +46,7 @@ export default function DeckList({ deck }: { deck: DeckData }) {
 
   return (
     <section
+      data-testid="deck-display"
       aria-label={`Deck: ${deck.name}`}
       className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-6"
     >

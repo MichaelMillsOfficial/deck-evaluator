@@ -14,7 +14,9 @@ npm run dev        # Start development server
 npm run build      # Production build
 npm run start      # Run production server
 npm run lint       # Run ESLint
-npm test           # Run tests (once a test framework is configured)
+npm test           # Run Playwright E2E tests (headless)
+npm run test:headed  # Run tests with visible browser
+npm run test:ui      # Open Playwright interactive UI
 ```
 
 ### Docker
@@ -72,6 +74,50 @@ src/
 - Card panels: `bg-slate-800/50 border-slate-700 rounded-xl`
 - Tab bar: `bg-slate-900` with `bg-slate-600` active state
 - Text: `text-white` headings, `text-slate-300` body, `text-slate-400` secondary
+
+## Testing
+
+This project uses **Playwright** for end-to-end testing. Tests live in the `e2e/` directory and run against the Next.js dev server (started automatically via the `webServer` config in `playwright.config.ts`).
+
+### Running Tests
+
+```bash
+npm test                           # Run all tests headless
+npm run test:headed                # Run with a visible browser
+npm run test:ui                    # Interactive Playwright UI
+npx playwright test e2e/deck-import.spec.ts  # Run a single test file
+```
+
+### Test Structure
+
+```
+e2e/
+├── fixtures.ts              # DeckPage page-object, sample decklists, custom test export
+├── deck-import.spec.ts      # Manual decklist import user flows
+├── tab-navigation.spec.ts   # Tab switching, Load Example, form state persistence
+├── deck-display.spec.ts     # Rendered deck sections, card counts, source label
+└── api-deck-parse.spec.ts   # POST /api/deck-parse API contract tests
+```
+
+### Writing Tests
+
+- **Import `test` and `expect` from `./fixtures`** (not from `@playwright/test` directly) to get the `deckPage` fixture automatically.
+- **Use `deckPage` methods** (`goto()`, `fillDecklist()`, `submitImport()`, `waitForDeckDisplay()`) to express tests as user intent.
+- **Use `deckPage.deckDisplay`** to scope assertions to the rendered deck panel and avoid strict-mode violations with the textarea.
+- **Add new page-object methods to `DeckPage`** in `fixtures.ts` when new UI elements are introduced.
+- **API tests** can use Playwright's `request` fixture directly with `@playwright/test` imports.
+- Focus on **functional behavior**, not styling or visual assertions.
+
+### TDD Workflow
+
+**All new features must follow test-driven development:**
+
+1. **Write failing tests first** — before implementing any feature, add tests in `e2e/` that describe the expected behavior. Run `npm test` to confirm they fail.
+2. **Implement the feature** — write the minimum code to make the tests pass.
+3. **Refactor** — clean up while keeping tests green.
+4. **All tests must pass before committing** — run `npm test` and verify 0 failures before every commit.
+
+When working on a feature, the test file should be created or updated _before_ the implementation code. This ensures the test suite always describes the intended behavior and catches regressions.
 
 ## Plans
 
