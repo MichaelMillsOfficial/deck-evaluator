@@ -28,7 +28,10 @@ export function parseDecklist(text: string): DeckData {
 
     const zoneMatch = line.match(ZONE_LINE);
     if (zoneMatch) {
-      currentZone = ZONE_HEADERS[zoneMatch[1].toLowerCase()];
+      const mapped = ZONE_HEADERS[zoneMatch[1].toLowerCase()];
+      if (mapped) {
+        currentZone = mapped;
+      }
       continue;
     }
 

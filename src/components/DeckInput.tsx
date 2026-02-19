@@ -5,8 +5,8 @@ import { useState, type FormEvent } from "react";
 type ImportTab = "manual" | "moxfield" | "archidekt";
 
 interface DeckInputProps {
-  onSubmitUrl: (url: string) => void;
-  onSubmitText: (text: string) => void;
+  onSubmitUrl: (url: string) => void | Promise<void>;
+  onSubmitText: (text: string) => void | Promise<void>;
   loading: boolean;
 }
 
@@ -31,7 +31,6 @@ const tabs: { key: ImportTab; label: string }[] = [
 ];
 
 export default function DeckInput({
-  onSubmitUrl,
   onSubmitText,
   loading,
 }: DeckInputProps) {
@@ -53,9 +52,33 @@ export default function DeckInput({
     setFormat("Commander");
   };
 
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const tabKeys = tabs.map((t) => t.key);
+    const currentIndex = tabKeys.indexOf(activeTab);
+    let newIndex = currentIndex;
+
+    if (e.key === "ArrowRight") {
+      newIndex = (currentIndex + 1) % tabs.length;
+    } else if (e.key === "ArrowLeft") {
+      newIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    } else if (e.key === "Home") {
+      newIndex = 0;
+    } else if (e.key === "End") {
+      newIndex = tabs.length - 1;
+    } else {
+      return;
+    }
+
+    e.preventDefault();
+    setActiveTab(tabKeys[newIndex]);
+
+    const nextButton = document.getElementById(`tab-${tabKeys[newIndex]}`);
+    nextButton?.focus();
+  };
+
   const placeholders: Record<ImportTab, string> = {
     manual:
-      "1 Sol Ring\n1 Command Tower\nCOMMANDER:\n1 Atraxa, Praetors' Voice",
+      "COMMANDER:\n1 Atraxa, Praetors' Voice\n\n1 Sol Ring\n1 Command Tower",
     moxfield:
       "Paste your Moxfield export here...\n\n1 Sol Ring\n1 Command Tower",
     archidekt:
@@ -63,18 +86,31 @@ export default function DeckInput({
   };
 
   return (
-    <div className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+    <section
+      aria-label="Deck import"
+      className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-6"
+    >
       {/* Tab bar */}
-      <div className="mb-6 flex rounded-lg bg-slate-900 p-1">
+      <div
+        role="tablist"
+        aria-label="Deck import method"
+        className="mb-6 flex rounded-lg bg-slate-900 p-1"
+      >
         {tabs.map((tab) => (
           <button
             key={tab.key}
+            id={`tab-${tab.key}`}
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            aria-controls={`tabpanel-${tab.key}`}
+            tabIndex={activeTab === tab.key ? 0 : -1}
             type="button"
             onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            onKeyDown={handleTabKeyDown}
+            className={`flex-1 min-h-[44px] rounded-md px-3 py-2.5 sm:px-4 sm:py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 ${
               activeTab === tab.key
                 ? "bg-slate-600 text-white"
-                : "text-slate-400 hover:text-slate-200"
+                : "text-slate-300 hover:text-white"
             }`}
             disabled={loading}
           >
@@ -83,79 +119,101 @@ export default function DeckInput({
         ))}
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        {/* Deck Name */}
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-300">
-            Deck Name
-          </label>
-          <input
-            type="text"
-            value={deckName}
-            onChange={(e) => setDeckName(e.target.value)}
-            placeholder="Enter deck name"
-            className="w-full rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={loading}
-          />
-        </div>
-
-        {/* Format (manual tab only) */}
-        {activeTab === "manual" && (
+      <div
+        role="tabpanel"
+        id={`tabpanel-${activeTab}`}
+        aria-labelledby={`tab-${activeTab}`}
+      >
+        <form
+          onSubmit={handleSubmit}
+          aria-busy={loading}
+          className="flex flex-col gap-4"
+        >
+          {/* Deck Name */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">
-              Format
+            <label
+              htmlFor="deck-name"
+              className="mb-1 block text-sm font-medium text-slate-300"
+            >
+              Deck Name
             </label>
             <input
+              id="deck-name"
               type="text"
-              value={format}
-              onChange={(e) => setFormat(e.target.value)}
-              placeholder="e.g. Commander, Standard, Modern"
-              className="w-full rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              value={deckName}
+              onChange={(e) => setDeckName(e.target.value)}
+              placeholder="Enter deck name"
+              className="w-full rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-white placeholder-slate-400 focus:border-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={loading}
             />
           </div>
-        )}
 
-        {/* Decklist textarea */}
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-300">
-            Decklist
-          </label>
-          <textarea
-            value={textValue}
-            onChange={(e) => setTextValue(e.target.value)}
-            placeholder={placeholders[activeTab]}
-            rows={10}
-            className="w-full rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 font-mono text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={loading}
-            required
-            aria-label="Decklist text"
-          />
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center justify-between">
-          <div>
-            {activeTab === "manual" && (
-              <button
-                type="button"
-                onClick={loadExample}
-                disabled={loading}
-                className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          {/* Format (manual tab only) */}
+          {activeTab === "manual" && (
+            <div>
+              <label
+                htmlFor="deck-format"
+                className="mb-1 block text-sm font-medium text-slate-300"
               >
-                Load Example
-              </button>
-            )}
+                Format
+              </label>
+              <input
+                id="deck-format"
+                type="text"
+                value={format}
+                onChange={(e) => setFormat(e.target.value)}
+                placeholder="e.g. Commander, Standard, Modern"
+                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-white placeholder-slate-400 focus:border-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={loading}
+              />
+            </div>
+          )}
+
+          {/* Decklist textarea */}
+          <div>
+            <label
+              htmlFor="decklist"
+              className="mb-1 block text-sm font-medium text-slate-300"
+            >
+              Decklist
+            </label>
+            <textarea
+              id="decklist"
+              value={textValue}
+              onChange={(e) => setTextValue(e.target.value)}
+              placeholder={placeholders[activeTab]}
+              rows={10}
+              className="w-full rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 font-mono text-sm text-white placeholder-slate-400 focus:border-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={loading}
+              required
+            />
           </div>
-          <button
-            type="submit"
-            disabled={loading || !textValue.trim()}
-            className="rounded-lg bg-purple-600 px-6 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Loading..." : "Import Deck"}
-          </button>
-        </div>
-      </form>
-    </div>
+
+          {/* Actions */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              {activeTab === "manual" && (
+                <button
+                  type="button"
+                  onClick={loadExample}
+                  disabled={loading}
+                  className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Load Example
+                </button>
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={loading || !textValue.trim()}
+              aria-label={loading ? "Importing deck, please wait" : "Import deck"}
+              className="rounded-lg bg-purple-600 px-6 py-2 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Loading..." : "Import Deck"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
   );
 }

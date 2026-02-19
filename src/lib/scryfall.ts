@@ -29,6 +29,7 @@ export async function fetchCardByName(
     {
       headers: { Accept: "application/json" },
       cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
     }
   );
 

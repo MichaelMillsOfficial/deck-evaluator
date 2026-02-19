@@ -30,6 +30,7 @@ export async function fetchArchidektDeck(
   const res = await fetch(`https://archidekt.com/api/decks/${deckId}/`, {
     headers: { Accept: "application/json" },
     cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!res.ok) {
@@ -51,8 +52,11 @@ export function normalizeArchidektCards(raw: ArchidektApiResponse): {
   const sideboard: DeckCard[] = [];
 
   for (const entry of raw.cards) {
+    const name = entry.card?.oracleCard?.name;
+    if (!name) continue;
+
     const card: DeckCard = {
-      name: entry.card.oracleCard.name,
+      name,
       quantity: entry.quantity,
     };
 
