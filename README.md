@@ -55,6 +55,31 @@ src/
     └── decklist-parser.ts       # Text-based decklist parser
 ```
 
+## Testing
+
+The project uses [Playwright](https://playwright.dev/) for end-to-end testing. Tests live in the `e2e/` directory and cover user flows, component interactions, and API routes.
+
+```bash
+npm test                # Run all tests headless
+npm run test:headed     # Run with a visible browser
+npm run test:ui         # Open the interactive Playwright UI
+```
+
+The dev server starts automatically when you run tests (configured via `webServer` in `playwright.config.ts`).
+
+### Test files
+
+| File | Coverage |
+|------|----------|
+| `e2e/deck-import.spec.ts` | Manual decklist import, button states, loading indicator |
+| `e2e/tab-navigation.spec.ts` | Tab switching, form persistence, Load Example flow |
+| `e2e/deck-display.spec.ts` | Rendered deck sections, card counts, source label |
+| `e2e/api-deck-parse.spec.ts` | `POST /api/deck-parse` — valid input, error cases, zone parsing |
+
+### TDD workflow
+
+New features should follow test-driven development: write failing tests in `e2e/` first, implement to make them pass, then refactor. All tests must pass before merging.
+
 ## Tech Stack
 
 - **Framework** — Next.js 16 (App Router)
@@ -70,3 +95,6 @@ src/
 | `npm run build` | Production build |
 | `npm run start` | Run production server |
 | `npm run lint` | Run ESLint |
+| `npm test` | Run Playwright E2E tests |
+| `npm run test:headed` | Run tests with visible browser |
+| `npm run test:ui` | Open Playwright interactive UI |
