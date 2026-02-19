@@ -206,7 +206,6 @@ export default function DeckInput({
             <button
               type="submit"
               disabled={loading || !textValue.trim()}
-              aria-label={loading ? "Importing deck, please wait" : "Import deck"}
               className="rounded-lg bg-purple-600 px-6 py-2 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Loading..." : "Import Deck"}

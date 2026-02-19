@@ -81,10 +81,8 @@ test.describe("Deck Display", () => {
     await deckPage.submitImport();
     await deckPage.waitForDeckDisplay();
 
-    // The source link should say "text"
-    await expect(
-      deckPage.deckDisplay.getByRole("link", { name: "text" })
-    ).toBeVisible();
+    // Text-sourced decks have no URL, so source is rendered as plain text (not a link)
+    await expect(deckPage.deckDisplay.getByText("text")).toBeVisible();
   });
 
   test("does not render sideboard section when no sideboard cards", async ({

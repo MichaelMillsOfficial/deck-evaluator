@@ -46,12 +46,12 @@ export class DeckPage {
 
   /** Click a specific import tab by label text */
   async selectTab(tab: "Manual Import" | "Moxfield" | "Archidekt") {
-    await this.page.getByRole("button", { name: tab }).click();
+    await this.page.getByRole("tab", { name: tab }).click();
   }
 
   /** Fill the decklist textarea */
   async fillDecklist(text: string) {
-    await this.page.getByLabel("Decklist text").fill(text);
+    await this.page.getByLabel("Decklist").fill(text);
   }
 
   /** Fill the deck name field */
@@ -81,7 +81,7 @@ export class DeckPage {
 
   /** Return the textarea locator */
   get decklistTextarea() {
-    return this.page.getByLabel("Decklist text");
+    return this.page.getByLabel("Decklist");
   }
 
   /** Return the deck name input locator */
