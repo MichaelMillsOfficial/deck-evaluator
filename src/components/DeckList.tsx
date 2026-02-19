@@ -36,7 +36,7 @@ export default function DeckList({ deck }: { deck: DeckData }) {
     deck.sideboard.reduce((s, c) => s + c.quantity, 0);
 
   return (
-    <div className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+    <div data-testid="deck-display" className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-6">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-white">{deck.name}</h1>
         <p className="mt-0.5 text-xs text-slate-400">
