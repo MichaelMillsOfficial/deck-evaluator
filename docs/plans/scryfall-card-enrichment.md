@@ -187,19 +187,71 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
   - This renders below the already-visible basic decklist
   - If enrichment fails, show a dismissible warning banner: "Could not load card details. The basic decklist is still available."
 
-### Phase 4: Verification & Polish
+### Phase 4: Accessibility Audit & Alignment
 
-- [ ] **4.1 Full E2E test pass**
-  - Run `npm test` — all existing and new tests must pass
+- [ ] **4.1 Audit all new components against WCAG 2.1 AA**
+  - Review every new and modified component (`ManaCost`, `EnrichedCardRow`, `DeckList`, `DeckImportSection`) for compliance with WCAG 2.1 Level AA success criteria. Specific checks:
+
+  **Focus Management**
+  - When enrichment completes and the table replaces the `<ul>`, focus must not be lost. If the user had focus inside the deck display, it must remain on a logical element (e.g. the first card row) after the DOM swap.
+  - Disclosure buttons in `EnrichedCardRow` must receive visible focus rings (use existing `focus-visible:ring-2 focus-visible:ring-purple-400` pattern from `DeckInput.tsx`)
+  - Tab order through the enriched table must be logical: column headers are not focusable, disclosure buttons are reachable in document order, expanded detail rows are in the tab sequence only when visible
+
+  **Color Contrast**
+  - Mana pip symbols must meet 3:1 contrast ratio against the `bg-slate-800/50` card panel background (WCAG 1.4.11 Non-text Contrast)
+  - Verify each pip color: {W} amber/gold on slate, {U} blue on slate, {B} dark on slate (may need a border/outline for visibility), {R} red on slate, {G} green on slate, {C} gray on slate
+  - The {B} (black) pip specifically needs a visible border or ring — a dark circle on a dark background will be invisible without one
+  - Text inside generic mana pips (the number) must meet 4.5:1 contrast against the pip background color
+
+  **ARIA Live Regions**
+  - The "Loading card details..." status message must use `role="status"` with `aria-live="polite"` so screen readers announce enrichment progress without interrupting the user (matches the existing pattern on the "Fetching deck..." message in `DeckImportSection.tsx`)
+  - The dismissible "Could not load card details" warning must use `role="alert"` (matches the existing error alert pattern)
+  - When enrichment completes successfully, announce it to screen readers via a visually-hidden live region: "Card details loaded" (brief, non-intrusive)
+
+  **Reduced Motion**
+  - The "Loading card details..." pulse animation (`animate-pulse`) must respect `prefers-reduced-motion: reduce` — either disable the animation entirely or replace with a static indicator
+  - Add `motion-reduce:animate-none` (Tailwind) to any animated elements
+  - The transition from `<ul>` to `<table>` when enrichment loads should not animate — it should be an instant swap
+
+  **Keyboard Navigation**
+  - Disclosure buttons must respond to Enter and Space to toggle (native `<button>` behavior — verify no `onClick`-only handlers on non-button elements)
+  - Escape key while a card detail row is expanded should collapse it and return focus to the disclosure button
+  - Arrow keys are NOT required for table navigation (tables use Tab, not arrow keys, unless implementing a grid pattern)
+
+  **Screen Reader Testing**
+  - The enriched `<table>` must announce column headers when navigating cells (verify `<th scope="col">` is correctly associated)
+  - Disclosure button must announce: "[card name], collapsed/expanded" depending on state
+  - Expanded detail row content must be reachable immediately after the disclosure button in reading order
+  - `ManaCost` must announce the full `aria-label` (e.g. "Mana cost: 2 generic, white, blue") and NOT announce individual pip text
+
+  **Touch Targets**
+  - Disclosure buttons must meet minimum 44×44px touch target size (WCAG 2.5.8) — particularly important since they appear in compact table rows
+  - If the button text alone is too small, expand the clickable area with padding or a larger hit area via CSS
+
+- [ ] **4.2 Write E2E accessibility tests in `e2e/deck-enrichment.spec.ts`**
+  - Test: disclosure button has correct `aria-expanded` value before and after click
+  - Test: expanded detail row has matching `id` referenced by `aria-controls`
+  - Test: "Loading card details..." element has `role="status"`
+  - Test: enrichment error warning has `role="alert"`
+  - Test: `ManaCost` container has `aria-label` and child pips have `aria-hidden="true"`
+  - Test: keyboard navigation — Tab reaches disclosure buttons, Enter/Space toggles expansion, Escape collapses
+
+### Phase 5: Verification & Polish
+
+- [ ] **5.1 Full E2E test pass**
+  - Run `npm test` — all existing and new tests must pass (including accessibility tests from 4.2)
   - Run `npm run build` — production build must succeed
 
-- [ ] **4.2 Manual verification**
+- [ ] **5.2 Manual verification**
   - Import example Atraxa decklist → basic list renders immediately → enriched data appears within 1-2 seconds
   - Verify Sol Ring: `{1}` mana cost, "Artifact" type line
   - Verify Atraxa: `{G}{W}{U}{B}` mana cost, "Legendary Creature — Phyrexian Angel Horror"
   - Click a card name → details expand with oracle text
   - Test with Scryfall mock failure → basic decklist shows, warning displayed
-  - Test on mobile viewport → disclosure buttons work on touch
+  - Test on mobile viewport → disclosure buttons work on touch, meet 44×44px touch targets
+  - **Screen reader walkthrough:** Use VoiceOver (macOS) to navigate the full enrichment flow — import deck, hear loading status, navigate enriched table, expand card details, hear oracle text
+  - **Keyboard-only walkthrough:** Complete the entire flow without a mouse — import, tab to deck display, expand/collapse card details, dismiss warning
+  - **Reduced motion test:** Enable `prefers-reduced-motion: reduce` in browser devtools → verify no pulse animations, instant DOM transitions
 
 ---
 
@@ -224,15 +276,25 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
 
 ## Verification
 
+### Functional
 1. Import the example Atraxa decklist via "Load Example" → basic card list renders immediately
 2. After 1-2 seconds, enriched data appears: mana cost symbols, type lines visible for each card
 3. Verify Sol Ring shows `{1}` mana cost, "Artifact" type line
 4. Verify Atraxa shows `{G}{W}{U}{B}` mana cost, "Legendary Creature — Phyrexian Angel Horror"
 5. Click card name → oracle text and metadata expand
-6. Verify all E2E tests pass: `npm test`
-7. Verify build succeeds: `npm run build`
-8. Test with a large deck (99-card Commander deck) to verify batching and rate limiting work correctly
-9. Test enrichment failure scenario: mock Scryfall down → basic decklist shows with warning
+6. Test with a large deck (99-card Commander deck) to verify batching and rate limiting work correctly
+7. Test enrichment failure scenario: mock Scryfall down → basic decklist shows with warning
+
+### Accessibility
+8. Screen reader (VoiceOver): full flow announces loading status, table headers, card details on expand
+9. Keyboard-only: Tab navigates to disclosure buttons, Enter/Space toggles, Escape collapses
+10. Color contrast: all mana pips visible on dark background, {B} pip has visible border
+11. Touch targets: disclosure buttons meet 44×44px minimum on mobile
+12. Reduced motion: no animations when `prefers-reduced-motion: reduce` is enabled
+
+### CI
+13. Verify all E2E tests pass: `npm test`
+14. Verify build succeeds: `npm run build`
 
 ---
 
@@ -274,7 +336,13 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
 - No in-memory `Map` cache for this phase. The Docker deployment uses a long-lived Node process where module-level caching would work, but defer this to avoid complexity. HTTP-level caching via Next.js is sufficient for now.
 
 ### Accessibility Summary
-- `ManaCost` container: `aria-label` with full color names; all pip elements `aria-hidden="true"`
-- `EnrichedCardRow`: disclosure button with `aria-expanded` and `aria-controls` for card details
-- `DeckSection` (enriched): `<table>` with `<th scope="col">` column headers
-- Form re-enables immediately after parse; enrichment loading does not gate user interaction
+
+Phase 4 is a dedicated WCAG 2.1 AA audit pass. Key patterns established across the implementation:
+
+- **`ManaCost`**: Container `aria-label` with full color names (e.g. "2 generic, white, blue"); all pip elements `aria-hidden="true"`; {B} pip uses visible border for contrast on dark backgrounds
+- **`EnrichedCardRow`**: Disclosure `<button>` with `aria-expanded` and `aria-controls`; Escape collapses and returns focus; 44×44px minimum touch target
+- **`DeckSection` (enriched)**: `<table>` with `<th scope="col">` column headers for screen reader cell association
+- **Loading states**: `role="status"` + `aria-live="polite"` on "Loading card details..."; `role="alert"` on error warnings; visually-hidden completion announcement
+- **Focus management**: Focus preserved during `<ul>` → `<table>` DOM swap; visible focus rings on all interactive elements (existing purple ring pattern)
+- **Reduced motion**: `motion-reduce:animate-none` on pulse animations; instant DOM transitions (no animation)
+- **Form interaction**: Form re-enables immediately after parse; enrichment loading does not gate user interaction
