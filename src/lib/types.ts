@@ -40,3 +40,32 @@ export interface ArchidektApiResponse {
   name: string;
   cards: ArchidektCard[];
 }
+
+// Enriched card data (from Scryfall)
+export interface ManaPips {
+  W: number;
+  U: number;
+  B: number;
+  R: number;
+  G: number;
+  C: number;
+}
+
+export interface EnrichedCard {
+  name: string;
+  manaCost: string;
+  cmc: number;
+  colorIdentity: string[];
+  colors: string[];
+  typeLine: string;
+  supertypes: string[];
+  subtypes: string[];
+  oracleText: string;
+  keywords: string[];
+  power: string | null;
+  toughness: string | null;
+  loyalty: string | null;
+  rarity: string;
+  imageUris: { small: string; normal: string; large: string } | null;
+  manaPips: ManaPips;
+}
