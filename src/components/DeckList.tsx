@@ -70,13 +70,13 @@ function DeckSectionEnriched({
           ({totalCards})
         </span>
       </h3>
-      <table className="w-full text-sm" data-testid={`enriched-${title.toLowerCase()}`} aria-labelledby={sectionId}>
+      <table className="w-full text-sm table-auto" data-testid={`enriched-${title.toLowerCase()}`} aria-labelledby={sectionId}>
         <thead>
           <tr className="text-left text-xs text-slate-500 uppercase tracking-wide">
-            <th scope="col" className="pb-1 pr-2 w-10 text-right">Qty</th>
-            <th scope="col" className="pb-1 px-2 w-24">Cost</th>
+            <th scope="col" className="pb-1 pr-2 whitespace-nowrap text-right">Qty</th>
+            <th scope="col" className="pb-1 px-2 whitespace-nowrap">Cost</th>
             <th scope="col" className="pb-1 px-2">Name</th>
-            <th scope="col" className="pb-1 pl-2 hidden sm:table-cell">Type</th>
+            <th scope="col" className="pb-1 pl-2 whitespace-nowrap hidden sm:table-cell">Type</th>
           </tr>
         </thead>
         <tbody>
@@ -94,13 +94,13 @@ function DeckSectionEnriched({
             // Fallback for cards not in the map
             return (
               <tr key={card.name} className="border-b border-slate-700/50">
-                <td className="py-1.5 pr-2 text-right font-mono text-slate-400 w-10">
+                <td className="py-1.5 pr-2 text-right font-mono text-slate-400 whitespace-nowrap">
                   <span className="sr-only">{card.quantity}x </span>
                   {card.quantity}
                 </td>
-                <td className="py-1.5 px-2 w-24" />
+                <td className="py-1.5 px-2 whitespace-nowrap" />
                 <td className="py-1.5 px-2 text-slate-200">{card.name}</td>
-                <td className="py-1.5 pl-2 hidden sm:table-cell" />
+                <td className="py-1.5 pl-2 whitespace-nowrap hidden sm:table-cell" />
               </tr>
             );
           })}

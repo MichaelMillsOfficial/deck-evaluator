@@ -1,5 +1,7 @@
 "use client";
 
+import ManaSymbol from "@/components/ManaSymbol";
+
 const PIP_REGEX = /\{([^}]+)\}/g;
 
 const COLOR_NAMES: Record<string, string> = {
@@ -9,15 +11,6 @@ const COLOR_NAMES: Record<string, string> = {
   R: "red",
   G: "green",
   C: "colorless",
-};
-
-const PIP_COLORS: Record<string, string> = {
-  W: "bg-amber-300 text-amber-900",
-  U: "bg-blue-500 text-white",
-  B: "bg-gray-900 text-gray-300 ring-1 ring-gray-600",
-  R: "bg-red-600 text-white",
-  G: "bg-green-600 text-white",
-  C: "bg-gray-500 text-white",
 };
 
 function getAriaLabel(manaCost: string): string {
@@ -47,19 +40,6 @@ function getAriaLabel(manaCost: string): string {
   return `Mana cost: ${parts.join(", ")}`;
 }
 
-function getPipStyle(symbol: string): string {
-  if (symbol in PIP_COLORS) return PIP_COLORS[symbol];
-  // Generic/numeric or special — use gray
-  return "bg-gray-600 text-white";
-}
-
-function getPipDisplay(symbol: string): string {
-  if (symbol in COLOR_NAMES) return symbol;
-  if (/^([WUBRG])\/([WUBRG])$/.test(symbol)) return symbol;
-  if (/^([WUBRG])\/P$/.test(symbol)) return symbol.split("/")[0];
-  return symbol;
-}
-
 export default function ManaCost({ cost }: { cost: string }) {
   if (!cost) return null;
 
@@ -77,13 +57,7 @@ export default function ManaCost({ cost }: { cost: string }) {
       className="inline-flex items-center gap-0.5"
     >
       {pips.map(({ symbol, key }) => (
-        <span
-          key={key}
-          aria-hidden="true"
-          className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold leading-none ${getPipStyle(symbol)}`}
-        >
-          {getPipDisplay(symbol)}
-        </span>
+        <ManaSymbol key={key} symbol={symbol} />
       ))}
     </span>
   );

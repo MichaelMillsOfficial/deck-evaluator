@@ -189,9 +189,116 @@ test.describe("Deck Enrichment", () => {
     await solRingButton.click();
     await expect(solRingButton).toHaveAttribute("aria-expanded", "true");
 
-    // Oracle text should be visible
-    await expect(page.getByText("{T}: Add {C}{C}.")).toBeVisible();
+    // Oracle text detail row should be visible via aria-controls
+    const controlsId = await solRingButton.getAttribute("aria-controls");
+    const detailRow = page.locator(`#${controlsId}`);
+    await expect(detailRow).toBeVisible();
     await expect(page.getByText("Rarity: uncommon")).toBeVisible();
+  });
+
+  test("chevron is visible on disclosure button and rotates when expanded", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+
+    await page.route("**/api/deck-enrich", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_ENRICH_RESPONSE),
+      })
+    );
+
+    await deckPage.goto();
+    await deckPage.fillDecklist("1 Sol Ring");
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    const solRingButton = page.getByRole("button", { name: "Sol Ring" });
+    const chevron = solRingButton.locator("[data-testid='expand-chevron']");
+    await expect(chevron).toBeVisible();
+
+    // Not rotated when collapsed
+    await expect(chevron).not.toHaveClass(/rotate-90/);
+
+    // Rotated when expanded
+    await solRingButton.click();
+    await expect(chevron).toHaveClass(/rotate-90/);
+  });
+
+  test("mana cost symbols render as img tags with Scryfall SVG src", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+
+    await page.route("**/api/deck-enrich", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_ENRICH_RESPONSE),
+      })
+    );
+
+    await deckPage.goto();
+    await deckPage.fillDecklist("1 Sol Ring");
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    const manaCost = page.locator('[aria-label="Mana cost: 1 generic"]');
+    await expect(manaCost).toBeVisible({ timeout: 10_000 });
+
+    const img = manaCost.locator("img");
+    await expect(img).toHaveCount(1);
+    await expect(img).toHaveAttribute(
+      "src",
+      "https://svgs.scryfall.io/card-symbols/1.svg"
+    );
+  });
+
+  test("oracle text symbols render as img tags in expanded detail", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+
+    await page.route("**/api/deck-enrich", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_ENRICH_RESPONSE),
+      })
+    );
+
+    await deckPage.goto();
+    await deckPage.fillDecklist("1 Sol Ring");
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    // Expand Sol Ring details
+    const solRingButton = page.getByRole("button", { name: "Sol Ring" });
+    await solRingButton.click();
+
+    const controlsId = await solRingButton.getAttribute("aria-controls");
+    const detailRow = page.locator(`#${controlsId}`);
+
+    // Oracle text should contain img tags for {T}, {C}, {C}
+    const oracleImgs = detailRow.locator("img");
+    await expect(oracleImgs).toHaveCount(3);
+    await expect(oracleImgs.nth(0)).toHaveAttribute(
+      "src",
+      "https://svgs.scryfall.io/card-symbols/T.svg"
+    );
+    await expect(oracleImgs.nth(1)).toHaveAttribute(
+      "src",
+      "https://svgs.scryfall.io/card-symbols/C.svg"
+    );
   });
 });
 
@@ -569,14 +676,16 @@ test.describe("Deck Enrichment — Accessibility", () => {
     await solRingButton.focus();
 
     // Enter toggles expansion
+    const controlsId = await solRingButton.getAttribute("aria-controls");
+    const detailRow = page.locator(`#${controlsId}`);
     await page.keyboard.press("Enter");
     await expect(solRingButton).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByText("{T}: Add {C}{C}.")).toBeVisible();
+    await expect(detailRow).toBeVisible();
 
     // Escape collapses
     await page.keyboard.press("Escape");
     await expect(solRingButton).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByText("{T}: Add {C}{C}.")).not.toBeVisible();
+    await expect(detailRow).not.toBeVisible();
 
     // Space also toggles
     await page.keyboard.press("Space");
