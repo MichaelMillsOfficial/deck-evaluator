@@ -47,12 +47,12 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
 
 ### Phase 1: Types & Data Layer
 
-- [ ] **1.1 Define `EnrichedCard` and related types in `src/lib/types.ts`**
+- [x] **1.1 Define `EnrichedCard` and related types in `src/lib/types.ts`**
   - `ManaPips` type: `{ W: number; U: number; B: number; R: number; G: number; C: number }`
   - `EnrichedCard` type with fields: `name`, `manaCost` (string, e.g. `{2}{W}{U}`), `cmc` (number), `colorIdentity` (string[]), `colors` (string[]), `typeLine` (string), `supertypes` (string[], parsed from typeLine — e.g. "Legendary"), `subtypes` (string[], parsed from typeLine — e.g. "Human", "Wizard"), `oracleText` (string), `keywords` (string[]), `power` (string | null), `toughness` (string | null), `loyalty` (string | null), `rarity` (string), `imageUris` ({ small: string; normal: string; large: string } | null), `manaPips` (ManaPips)
   - No `EnrichedDeckData` type — frontend state holds `DeckData` and `Record<string, EnrichedCard>` independently
 
-- [ ] **1.2 Write tests for `parseManaPips()` and `parseTypeLine()`, then implement in `src/lib/mana.ts`** (TDD)
+- [x] **1.2 Write tests for `parseManaPips()` and `parseTypeLine()`, then implement in `src/lib/mana.ts`** (TDD)
   - **Write tests first** covering:
     - Mana cost strings: `{W}`, `{2}{B}{B}`, `{X}{R}{G}`, `{0}`, hybrid mana `{W/U}`, Phyrexian `{B/P}`, empty string `""`
     - Type line parsing: `"Legendary Creature — Human Wizard"`, `"Artifact"`, `"Enchantment — Aura"`, `"Basic Land — Island"`, `"Legendary Planeswalker — Jace"`
@@ -61,7 +61,7 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
     - `parseTypeLine(typeLine: string): { supertypes: string[]; cardType: string; subtypes: string[] }` — splits on ` — ` (em dash) and categorizes known supertypes (Legendary, Basic, Snow, World, Ongoing, Host)
   - Pure functions, no React dependency
 
-- [ ] **1.3 Expand Scryfall client in `src/lib/scryfall.ts`**
+- [x] **1.3 Expand Scryfall client in `src/lib/scryfall.ts`**
   - Expand `ScryfallCard` interface to include: `keywords`, `power`, `toughness`, `loyalty`, `rarity`, `card_faces` (array of face objects for DFCs)
   - Add `fetchCardCollection(names: string[]): Promise<{ data: ScryfallCard[]; not_found: string[] }>`:
     - Uses Scryfall's `POST /cards/collection` endpoint (max 75 identifiers per request)
@@ -75,7 +75,7 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
     - **DFC handling:** If `mana_cost` is undefined and `card_faces` exists, fall back to `card_faces[0].mana_cost`, `card_faces[0].oracle_text`, `card_faces[0].image_uris`
     - Calls `parseManaPips()` and `parseTypeLine()`
 
-- [ ] **1.4 Add `images.remotePatterns` to `next.config.ts`**
+- [x] **1.4 Add `images.remotePatterns` to `next.config.ts`**
   - Add `cards.scryfall.io` as an allowed remote image host for `next/image`:
     ```typescript
     images: {
@@ -85,7 +85,7 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
 
 ### Phase 2: API Endpoint
 
-- [ ] **2.1 Write API contract tests for `POST /api/deck-enrich`, then implement** (TDD)
+- [x] **2.1 Write API contract tests for `POST /api/deck-enrich`, then implement** (TDD)
   - **Write tests first** in `e2e/api-deck-enrich.spec.ts`:
     - Valid input: returns enriched card data keyed by name
     - Empty array: returns 400
@@ -115,7 +115,7 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
 
 ### Phase 3: Frontend Integration
 
-- [ ] **3.1 Write E2E tests for enrichment UI flow, then implement** (TDD)
+- [x] **3.1 Write E2E tests for enrichment UI flow, then implement** (TDD)
   - **Write tests first** in `e2e/deck-enrichment.spec.ts`:
     - **Mock Scryfall calls** via `page.route()` intercepts with fixture data (`MOCK_ENRICHED_RESPONSE` constant in `e2e/fixtures.ts`)
     - Test: import a decklist → basic decklist renders immediately
@@ -124,7 +124,7 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
     - Test: enrichment failure gracefully falls back to basic display with dismissible warning
     - Test: form re-enables immediately after deck data loads (enrichment does not gate form interaction)
 
-- [ ] **3.2 Update `DeckImportSection.tsx` to request enrichment**
+- [x] **3.2 Update `DeckImportSection.tsx` to request enrichment**
   - After receiving `DeckData` from the parse/fetch API, make a second call to `POST /api/deck-enrich` with all unique card names from commanders + mainboard + sideboard
   - New state: `const [cardMap, setCardMap] = useState<Record<string, EnrichedCard> | null>(null)`
   - New state: `const [enrichLoading, setEnrichLoading] = useState(false)`
@@ -133,7 +133,7 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
   - Show "Loading card details..." status while `enrichLoading` is true
   - If enrichment fails, show a dismissible warning: "Could not load card details" — do not block the basic deck display
 
-- [ ] **3.3 Create `ManaCost` component in `src/components/ManaCost.tsx`**
+- [x] **3.3 Create `ManaCost` component in `src/components/ManaCost.tsx`**
   - Renders a mana cost string like `{2}{W}{U}` as a row of small mana symbols (16×16 or 20×20 circles)
   - Color mapping: {W} = amber/gold, {U} = blue, {B} = gray-900/black, {R} = red, {G} = green, {C} = gray
   - Generic mana (numbers) rendered as gray circles with the number inside
@@ -148,7 +148,7 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
     </span>
     ```
 
-- [ ] **3.4 Create `EnrichedCardRow` component in `src/components/EnrichedCardRow.tsx`**
+- [x] **3.4 Create `EnrichedCardRow` component in `src/components/EnrichedCardRow.tsx`**
   - Renders as a `<tr>` with `<td>` cells (used inside a `<table>` — see Task 3.5)
   - Columns: quantity | ManaCost | card name | type line
   - **Expandable disclosure pattern** (not hover tooltip) for detailed info:
@@ -174,7 +174,7 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
   - Works on touch, keyboard navigable, screen reader accessible
   - Follow existing design system: slate backgrounds, purple accents, `text-sm`
 
-- [ ] **3.5 Update `DeckList.tsx` to use enriched data**
+- [x] **3.5 Update `DeckList.tsx` to use enriched data**
   - Accept optional `cardMap: Record<string, EnrichedCard> | null` prop
   - In `DeckSection`, when `cardMap` is available, render as a `<table>` with proper `<thead>` / `<th scope="col">` / `<tbody>` structure:
     - Column headers: "Qty", "Cost", "Name", "Type"
@@ -182,14 +182,14 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
   - When `cardMap` is null/loading, fall back to existing `<ul>` simple display (no layout thrash)
   - Use `card.name` as the React key (not `${card.name}-${index}`) — the parser guarantees uniqueness within a section
 
-- [ ] **3.6 Add enrichment loading states**
+- [x] **3.6 Add enrichment loading states**
   - In `DeckImportSection`, show "Loading card details..." with subtle pulse animation while `enrichLoading` is true
   - This renders below the already-visible basic decklist
   - If enrichment fails, show a dismissible warning banner: "Could not load card details. The basic decklist is still available."
 
 ### Phase 4: Accessibility Audit & Alignment
 
-- [ ] **4.1 Audit all new components against WCAG 2.1 AA**
+- [x] **4.1 Audit all new components against WCAG 2.1 AA**
   - Review every new and modified component (`ManaCost`, `EnrichedCardRow`, `DeckList`, `DeckImportSection`) for compliance with WCAG 2.1 Level AA success criteria. Specific checks:
 
   **Focus Management**
@@ -228,7 +228,7 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
   - Disclosure buttons must meet minimum 44×44px touch target size (WCAG 2.5.8) — particularly important since they appear in compact table rows
   - If the button text alone is too small, expand the clickable area with padding or a larger hit area via CSS
 
-- [ ] **4.2 Write E2E accessibility tests in `e2e/deck-enrichment.spec.ts`**
+- [x] **4.2 Write E2E accessibility tests in `e2e/deck-enrichment.spec.ts`**
   - Test: disclosure button has correct `aria-expanded` value before and after click
   - Test: expanded detail row has matching `id` referenced by `aria-controls`
   - Test: "Loading card details..." element has `role="status"`
@@ -238,11 +238,11 @@ This plan has been reviewed by three specialist agents (frontend, Next.js, API d
 
 ### Phase 5: Verification & Polish
 
-- [ ] **5.1 Full E2E test pass**
+- [x] **5.1 Full E2E test pass**
   - Run `npm test` — all existing and new tests must pass (including accessibility tests from 4.2)
   - Run `npm run build` — production build must succeed
 
-- [ ] **5.2 Manual verification**
+- [x] **5.2 Manual verification**
   - Import example Atraxa decklist → basic list renders immediately → enriched data appears within 1-2 seconds
   - Verify Sol Ring: `{1}` mana cost, "Artifact" type line
   - Verify Atraxa: `{G}{W}{U}{B}` mana cost, "Legendary Creature — Phyrexian Angel Horror"

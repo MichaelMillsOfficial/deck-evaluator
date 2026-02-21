@@ -1,8 +1,15 @@
 "use client";
 
-import type { DeckCard, DeckData } from "@/lib/types";
+import type { DeckCard, DeckData, EnrichedCard } from "@/lib/types";
+import EnrichedCardRow from "@/components/EnrichedCardRow";
 
-function DeckSection({ title, cards }: { title: string; cards: DeckCard[] }) {
+function DeckSectionSimple({
+  title,
+  cards,
+}: {
+  title: string;
+  cards: DeckCard[];
+}) {
   if (cards.length === 0) return null;
 
   const totalCards = cards.reduce((sum, c) => sum + c.quantity, 0);
@@ -16,9 +23,9 @@ function DeckSection({ title, cards }: { title: string; cards: DeckCard[] }) {
         </span>
       </h3>
       <ul className="space-y-0.5">
-        {cards.map((card, index) => (
+        {cards.map((card) => (
           <li
-            key={`${card.name}-${index}`}
+            key={card.name}
             className="flex items-baseline gap-2 text-sm min-w-0"
           >
             <span
@@ -38,7 +45,93 @@ function DeckSection({ title, cards }: { title: string; cards: DeckCard[] }) {
   );
 }
 
-export default function DeckList({ deck }: { deck: DeckData }) {
+function DeckSectionEnriched({
+  title,
+  cards,
+  cardMap,
+}: {
+  title: string;
+  cards: DeckCard[];
+  cardMap: Record<string, EnrichedCard>;
+}) {
+  if (cards.length === 0) return null;
+
+  const totalCards = cards.reduce((sum, c) => sum + c.quantity, 0);
+  const sectionId = `section-${title.toLowerCase()}`;
+
+  return (
+    <div className="mb-6">
+      <h3
+        id={sectionId}
+        className="mb-2 border-b border-slate-700 pb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
+      >
+        {title}{" "}
+        <span className="text-xs font-normal text-slate-400">
+          ({totalCards})
+        </span>
+      </h3>
+      <table className="w-full text-sm" data-testid={`enriched-${title.toLowerCase()}`} aria-labelledby={sectionId}>
+        <thead>
+          <tr className="text-left text-xs text-slate-500 uppercase tracking-wide">
+            <th scope="col" className="pb-1 pr-2 w-10 text-right">Qty</th>
+            <th scope="col" className="pb-1 px-2 w-24">Cost</th>
+            <th scope="col" className="pb-1 px-2">Name</th>
+            <th scope="col" className="pb-1 pl-2 hidden sm:table-cell">Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cards.map((card) => {
+            const enriched = cardMap[card.name];
+            if (enriched) {
+              return (
+                <EnrichedCardRow
+                  key={card.name}
+                  card={enriched}
+                  quantity={card.quantity}
+                />
+              );
+            }
+            // Fallback for cards not in the map
+            return (
+              <tr key={card.name} className="border-b border-slate-700/50">
+                <td className="py-1.5 pr-2 text-right font-mono text-slate-400 w-10">
+                  <span className="sr-only">{card.quantity}x </span>
+                  {card.quantity}
+                </td>
+                <td className="py-1.5 px-2 w-24" />
+                <td className="py-1.5 px-2 text-slate-200">{card.name}</td>
+                <td className="py-1.5 pl-2 hidden sm:table-cell" />
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DeckSection({
+  title,
+  cards,
+  cardMap,
+}: {
+  title: string;
+  cards: DeckCard[];
+  cardMap?: Record<string, EnrichedCard> | null;
+}) {
+  if (cardMap) {
+    return <DeckSectionEnriched title={title} cards={cards} cardMap={cardMap} />;
+  }
+  return <DeckSectionSimple title={title} cards={cards} />;
+}
+
+interface DeckListProps {
+  deck: DeckData;
+  cardMap?: Record<string, EnrichedCard> | null;
+  enrichLoading?: boolean;
+}
+
+export default function DeckList({ deck, cardMap, enrichLoading }: DeckListProps) {
   const totalCards =
     deck.commanders.reduce((s, c) => s + c.quantity, 0) +
     deck.mainboard.reduce((s, c) => s + c.quantity, 0) +
@@ -72,9 +165,28 @@ export default function DeckList({ deck }: { deck: DeckData }) {
         </p>
       </div>
 
-      <DeckSection title="Commander" cards={deck.commanders} />
-      <DeckSection title="Mainboard" cards={deck.mainboard} />
-      <DeckSection title="Sideboard" cards={deck.sideboard} />
+      {enrichLoading && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-4 flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-500/10 px-4 py-3 text-sm text-purple-300"
+        >
+          <svg
+            className="h-4 w-4 animate-spin motion-reduce:hidden"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Enriching card data...
+        </div>
+      )}
+
+      <DeckSection title="Commander" cards={deck.commanders} cardMap={cardMap} />
+      <DeckSection title="Mainboard" cards={deck.mainboard} cardMap={cardMap} />
+      <DeckSection title="Sideboard" cards={deck.sideboard} cardMap={cardMap} />
     </section>
   );
 }
