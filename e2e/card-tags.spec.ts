@@ -20,6 +20,7 @@ function makeCard(overrides: Partial<EnrichedCard> = {}): EnrichedCard {
     rarity: "common",
     imageUris: null,
     manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    flavorName: null,
     ...overrides,
   };
 }

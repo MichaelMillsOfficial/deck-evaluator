@@ -49,6 +49,11 @@ export default function EnrichedCardRow({
               className="min-h-[44px] text-left text-slate-200 hover:text-purple-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
             >
               {card.name}
+              {card.flavorName && (
+                <span className="block text-xs text-slate-400">
+                  ({card.flavorName})
+                </span>
+              )}
             </button>
             <CardTags card={card} />
           </div>

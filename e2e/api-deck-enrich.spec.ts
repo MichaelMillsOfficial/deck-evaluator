@@ -141,6 +141,63 @@ test.describe("POST /api/deck-enrich", () => {
     expect(body.cards["Sol Ring"]).toBeDefined();
   });
 
+  test("resolves DFC cards by front face name", async ({ request }) => {
+    // "Esika, God of the Tree" is the front face of "Esika, God of the Tree // The Prismatic Bridge"
+    const response = await request.post(API_URL, {
+      data: { cardNames: ["Esika, God of the Tree"] },
+    });
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+
+    // Should be keyed by the requested front-face name
+    const esika = body.cards["Esika, God of the Tree"];
+    expect(esika).toBeDefined();
+    expect(esika.name).toBe("Esika, God of the Tree // The Prismatic Bridge");
+    expect(esika.typeLine).toContain("Legendary");
+
+    // Should NOT appear in notFound
+    expect(body.notFound).not.toContain("Esika, God of the Tree");
+  });
+
+  test("resolves Universes Beyond flavor names via fallback lookup", async ({
+    request,
+  }) => {
+    // "Air Shoes" is the flavor name for "Swiftfoot Boots" (Universes Beyond / Sonic crossover)
+    const response = await request.post(API_URL, {
+      data: { cardNames: ["Air Shoes", "Sol Ring"] },
+    });
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+
+    // Air Shoes should be keyed by its requested name
+    const airShoes = body.cards["Air Shoes"];
+    expect(airShoes).toBeDefined();
+    expect(airShoes.name).toBe("Swiftfoot Boots");
+    expect(airShoes.flavorName).toBe("Air Shoes");
+    expect(airShoes.typeLine).toContain("Artifact");
+
+    // Air Shoes should NOT appear in notFound
+    expect(body.notFound).not.toContain("Air Shoes");
+
+    // Sol Ring should also be found normally
+    expect(body.cards["Sol Ring"]).toBeDefined();
+  });
+
+  test("populates flavorName field for flavor name lookups", async ({
+    request,
+  }) => {
+    const response = await request.post(API_URL, {
+      data: { cardNames: ["Sol Ring"] },
+    });
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    // Regular cards should have flavorName as null
+    expect(body.cards["Sol Ring"].flavorName).toBeNull();
+  });
+
   test("returns 400 when all names are empty after filtering", async ({
     request,
   }) => {

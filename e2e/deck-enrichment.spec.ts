@@ -20,6 +20,7 @@ const MOCK_ENRICH_RESPONSE = {
       rarity: "uncommon",
       imageUris: null,
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      flavorName: null,
     },
     "Command Tower": {
       name: "Command Tower",
@@ -39,6 +40,7 @@ const MOCK_ENRICH_RESPONSE = {
       rarity: "common",
       imageUris: null,
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      flavorName: null,
     },
   },
   notFound: [],
@@ -97,7 +99,7 @@ test.describe("Deck Enrichment", () => {
     await expect(deckPage.deckDisplay.getByText("Sol Ring")).toBeVisible();
 
     // Loading card details indicator should be shown
-    await expect(page.getByText("Loading card details...")).toBeVisible();
+    await expect(page.getByText("Enriching card data...")).toBeVisible();
   });
 
   test("form re-enables immediately after deck data loads", async ({
@@ -212,6 +214,7 @@ const MOCK_TAGS_RESPONSE = {
       rarity: "uncommon",
       imageUris: null,
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      flavorName: null,
     },
     "Swords to Plowshares": {
       name: "Swords to Plowshares",
@@ -231,6 +234,7 @@ const MOCK_TAGS_RESPONSE = {
       rarity: "uncommon",
       imageUris: null,
       manaPips: { W: 1, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      flavorName: null,
     },
     Counterspell: {
       name: "Counterspell",
@@ -249,6 +253,7 @@ const MOCK_TAGS_RESPONSE = {
       rarity: "uncommon",
       imageUris: null,
       manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
+      flavorName: null,
     },
     "Command Tower": {
       name: "Command Tower",
@@ -268,6 +273,7 @@ const MOCK_TAGS_RESPONSE = {
       rarity: "common",
       imageUris: null,
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      flavorName: null,
     },
   },
   notFound: [],
@@ -519,7 +525,7 @@ test.describe("Deck Enrichment — Accessibility", () => {
     await deckPage.waitForDeckDisplay();
 
     const loadingStatus = page.locator(
-      'text="Loading card details..."'
+      'text="Enriching card data..."'
     );
     await expect(loadingStatus).toBeVisible();
     await expect(loadingStatus).toHaveAttribute("role", "status");

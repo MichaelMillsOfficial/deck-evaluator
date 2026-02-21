@@ -84,8 +84,19 @@ export async function POST(request: Request): Promise<Response> {
 
     const cards: Record<string, EnrichedCard> = {};
     for (const card of scryfallCards) {
+      // Try full name, then front face of DFC (before " // "), then flavor name
+      const frontFaceName = card.name.includes(" // ")
+        ? card.name.split(" // ")[0]
+        : undefined;
       const requestedName =
-        requestedByLower.get(card.name.toLowerCase()) ?? card.name;
+        requestedByLower.get(card.name.toLowerCase()) ??
+        (frontFaceName
+          ? requestedByLower.get(frontFaceName.toLowerCase())
+          : undefined) ??
+        (card.flavor_name
+          ? requestedByLower.get(card.flavor_name.toLowerCase())
+          : undefined) ??
+        card.name;
       cards[requestedName] = normalizeToEnrichedCard(card);
     }
 

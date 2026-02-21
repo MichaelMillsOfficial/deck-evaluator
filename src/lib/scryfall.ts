@@ -35,6 +35,7 @@ export interface ScryfallCard {
     large: string;
   };
   card_faces?: ScryfallCardFace[];
+  flavor_name?: string;
 }
 
 export async function fetchCardByName(
@@ -103,6 +104,28 @@ export async function fetchCardCollection(
       );
       allNotFound.push(...batches[i]);
     }
+  }
+
+  // Fallback: retry not-found names via /cards/named?exact=
+  // This resolves flavor names (Universes Beyond reprints) that
+  // the collection endpoint doesn't match.
+  if (allNotFound.length > 0) {
+    const remaining: string[] = [];
+    for (let i = 0; i < allNotFound.length; i++) {
+      if (i > 0) await delay(BATCH_DELAY_MS);
+      try {
+        const card = await fetchCardByName(allNotFound[i]);
+        if (card) {
+          allCards.push(card);
+        } else {
+          remaining.push(allNotFound[i]);
+        }
+      } catch {
+        remaining.push(allNotFound[i]);
+      }
+    }
+    allNotFound.length = 0;
+    allNotFound.push(...remaining);
   }
 
   return { data: allCards, not_found: allNotFound };
@@ -192,5 +215,6 @@ export function normalizeToEnrichedCard(card: ScryfallCard): EnrichedCard {
       ? { small: imageUris.small, normal: imageUris.normal, large: imageUris.large }
       : null,
     manaPips: parseManaPips(manaCost),
+    flavorName: card.flavor_name ?? null,
   };
 }

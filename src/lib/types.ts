@@ -68,4 +68,5 @@ export interface EnrichedCard {
   rarity: string;
   imageUris: { small: string; normal: string; large: string } | null;
   manaPips: ManaPips;
+  flavorName: string | null;
 }

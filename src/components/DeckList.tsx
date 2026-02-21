@@ -128,9 +128,10 @@ function DeckSection({
 interface DeckListProps {
   deck: DeckData;
   cardMap?: Record<string, EnrichedCard> | null;
+  enrichLoading?: boolean;
 }
 
-export default function DeckList({ deck, cardMap }: DeckListProps) {
+export default function DeckList({ deck, cardMap, enrichLoading }: DeckListProps) {
   const totalCards =
     deck.commanders.reduce((s, c) => s + c.quantity, 0) +
     deck.mainboard.reduce((s, c) => s + c.quantity, 0) +
@@ -163,6 +164,25 @@ export default function DeckList({ deck, cardMap }: DeckListProps) {
           {totalCards} cards
         </p>
       </div>
+
+      {enrichLoading && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-4 flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-500/10 px-4 py-3 text-sm text-purple-300"
+        >
+          <svg
+            className="h-4 w-4 animate-spin motion-reduce:hidden"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Enriching card data...
+        </div>
+      )}
 
       <DeckSection title="Commander" cards={deck.commanders} cardMap={cardMap} />
       <DeckSection title="Mainboard" cards={deck.mainboard} cardMap={cardMap} />

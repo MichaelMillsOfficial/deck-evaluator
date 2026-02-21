@@ -159,18 +159,7 @@ export default function DeckImportSection() {
           className="mt-10 focus:outline-none"
           aria-label="Deck import results"
         >
-          <DeckList deck={deckData} cardMap={cardMap} />
-
-          {enrichLoading && (
-            <p
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-              className="mt-4 text-center text-sm text-slate-400 animate-pulse motion-reduce:animate-none"
-            >
-              Loading card details...
-            </p>
-          )}
+          <DeckList deck={deckData} cardMap={cardMap} enrichLoading={enrichLoading} />
 
           {enrichError && !enrichLoading && (
             <div
