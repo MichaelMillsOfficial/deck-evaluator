@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import DeckInput from "@/components/DeckInput";
-import DeckList from "@/components/DeckList";
+import DeckViewTabs from "@/components/DeckViewTabs";
 
 export default function DeckImportSection() {
   const [deckData, setDeckData] = useState<DeckData | null>(null);
@@ -159,7 +159,7 @@ export default function DeckImportSection() {
           className="mt-10 focus:outline-none"
           aria-label="Deck import results"
         >
-          <DeckList deck={deckData} cardMap={cardMap} enrichLoading={enrichLoading} />
+          <DeckViewTabs deck={deckData} cardMap={cardMap} enrichLoading={enrichLoading} />
 
           {enrichError && !enrichLoading && (
             <div

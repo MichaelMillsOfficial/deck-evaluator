@@ -116,6 +116,31 @@ export class DeckPage {
   get errorAlert() {
     return this.page.locator('[class*="red"]');
   }
+
+  /** Click a deck view tab (Deck List or Analysis) */
+  async selectDeckViewTab(tab: "Deck List" | "Analysis") {
+    await this.page
+      .getByRole("tablist", { name: "Deck view" })
+      .getByRole("tab", { name: tab })
+      .click();
+  }
+
+  /** Wait for the analysis panel to appear */
+  async waitForAnalysisPanel() {
+    await this.page
+      .getByRole("heading", { name: "Mana Curve" })
+      .waitFor({ timeout: 15_000 });
+  }
+
+  /** Locator for the analysis panel */
+  get analysisPanel() {
+    return this.page.locator("#tabpanel-deck-analysis");
+  }
+
+  /** Locator for the deck view tabs container */
+  get deckViewTabs() {
+    return this.page.getByTestId("deck-view-tabs");
+  }
 }
 
 // ---------------------------------------------------------------------------
