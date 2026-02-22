@@ -20,6 +20,7 @@ const MOCK_ENRICH_RESPONSE = {
       rarity: "uncommon",
       imageUris: null,
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: ["C"],
       flavorName: null,
     },
     "Command Tower": {
@@ -40,6 +41,7 @@ const MOCK_ENRICH_RESPONSE = {
       rarity: "common",
       imageUris: null,
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
     },
   },
@@ -321,6 +323,7 @@ const MOCK_TAGS_RESPONSE = {
       rarity: "uncommon",
       imageUris: null,
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: ["C"],
       flavorName: null,
     },
     "Swords to Plowshares": {
@@ -341,6 +344,7 @@ const MOCK_TAGS_RESPONSE = {
       rarity: "uncommon",
       imageUris: null,
       manaPips: { W: 1, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: [],
       flavorName: null,
     },
     Counterspell: {
@@ -360,6 +364,7 @@ const MOCK_TAGS_RESPONSE = {
       rarity: "uncommon",
       imageUris: null,
       manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: [],
       flavorName: null,
     },
     "Command Tower": {
@@ -380,6 +385,7 @@ const MOCK_TAGS_RESPONSE = {
       rarity: "common",
       imageUris: null,
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
     },
   },
