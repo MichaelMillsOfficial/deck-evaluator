@@ -19,6 +19,7 @@ const MOCK_ANALYSIS_RESPONSE = {
       rarity: "uncommon",
       imageUris: null,
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: ["C"],
       flavorName: null,
     },
     "Counterspell": {
@@ -38,6 +39,7 @@ const MOCK_ANALYSIS_RESPONSE = {
       rarity: "uncommon",
       imageUris: null,
       manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: [],
       flavorName: null,
     },
     "Cultivate": {
@@ -58,6 +60,7 @@ const MOCK_ANALYSIS_RESPONSE = {
       rarity: "common",
       imageUris: null,
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+      producedMana: [],
       flavorName: null,
     },
     "Command Tower": {
@@ -78,6 +81,7 @@ const MOCK_ANALYSIS_RESPONSE = {
       rarity: "common",
       imageUris: null,
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
     },
   },
@@ -225,12 +229,8 @@ test.describe("Deck Analysis — Mana Curve Content", () => {
     ).toBeVisible();
 
     // Chart wrapper should have role="img" with aria-label
-    const chartWrapper = page.locator('[role="img"]');
+    const chartWrapper = page.getByRole("img", { name: /mana curve/i });
     await expect(chartWrapper).toBeVisible();
-    await expect(chartWrapper).toHaveAttribute(
-      "aria-label",
-      /mana curve/i
-    );
   });
 
   test("switching back to Deck List shows deck-display", async ({
@@ -465,5 +465,74 @@ test.describe("Deck Analysis — Type Filters", () => {
     await expect(subtitle).toHaveText(
       "2 of 3 non-land spells by converted mana cost"
     );
+  });
+});
+
+test.describe("Deck Analysis — Color Distribution", () => {
+  test.beforeEach(async ({ deckPage }) => {
+    const { page } = deckPage;
+    await page.route("**/api/deck-enrich", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_ANALYSIS_RESPONSE),
+      })
+    );
+    await deckPage.goto();
+    await deckPage.fillDecklist(
+      "1 Sol Ring\n1 Counterspell\n1 Cultivate\n1 Command Tower"
+    );
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Analysis");
+  });
+
+  test("Color Distribution heading visible on Analysis tab", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await expect(
+      page.getByRole("heading", { name: "Color Distribution" })
+    ).toBeVisible();
+  });
+
+  test("color distribution chart has role=img with accessible label", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const chart = page.locator('[role="img"][aria-label*="color distribution" i]');
+    await expect(chart).toBeVisible();
+  });
+
+  test("stat pills visible with land count, avg CMC, and colorless sources", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await expect(page.getByTestId("stat-land-count")).toBeVisible();
+    await expect(page.getByTestId("stat-avg-cmc")).toBeVisible();
+    await expect(page.getByTestId("stat-colorless-sources")).toBeVisible();
+  });
+
+  test("land count stat shows correct value from mock data", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    // Mock has 1 Command Tower (land) + 3 non-land = 4 total
+    const landStat = page.getByTestId("stat-land-count");
+    await expect(landStat).toContainText("1");
+  });
+
+  test("colorless sources stat shows correct value", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    // Mock has Sol Ring producing colorless
+    const stat = page.getByTestId("stat-colorless-sources");
+    await expect(stat).toContainText("1");
   });
 });

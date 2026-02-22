@@ -8,8 +8,14 @@ import {
   CARD_TYPES,
   type CardType,
 } from "@/lib/mana-curve";
+import {
+  computeColorDistribution,
+  computeManaBaseMetrics,
+} from "@/lib/color-distribution";
 import ManaCurveChart from "@/components/ManaCurveChart";
 import TypeFilterBar from "@/components/TypeFilterBar";
+import ColorDistributionChart from "@/components/ColorDistributionChart";
+import ManaBaseStats from "@/components/ManaBaseStats";
 
 interface DeckAnalysisProps {
   deck: DeckData;
@@ -43,6 +49,16 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
   const curveData = useMemo(
     () => computeManaCurve(deck, cardMap, enabledTypes),
     [deck, cardMap, enabledTypes]
+  );
+
+  const colorDistribution = useMemo(
+    () => computeColorDistribution(deck, cardMap),
+    [deck, cardMap]
+  );
+
+  const metrics = useMemo(
+    () => computeManaBaseMetrics(deck, cardMap),
+    [deck, cardMap]
   );
 
   const filteredSpells = curveData.reduce(
@@ -86,6 +102,20 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
           />
         </div>
         <ManaCurveChart data={curveData} totalSpells={filteredSpells} />
+      </section>
+
+      <section aria-labelledby="color-distribution-heading">
+        <h3
+          id="color-distribution-heading"
+          className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
+        >
+          Color Distribution
+        </h3>
+        <p className="mb-4 text-xs text-slate-400">
+          Mana sources versus pip demand by color
+        </p>
+        <ManaBaseStats metrics={metrics} />
+        <ColorDistributionChart data={colorDistribution} />
       </section>
     </div>
   );
