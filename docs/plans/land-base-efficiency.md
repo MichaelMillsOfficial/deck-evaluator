@@ -34,57 +34,57 @@ From Scryfall-enriched cards we have:
 
 ### Phase 1: Core Logic (`src/lib/land-base-efficiency.ts`)
 
-- [ ] Create `src/lib/land-base-efficiency.ts` with types and main computation function
-- [ ] Implement `classifyLandEntry` — categorize each land as untapped / conditional / tapped based on oracle text patterns:
+- [x] Create `src/lib/land-base-efficiency.ts` with types and main computation function
+- [x] Implement `classifyLandEntry` — categorize each land as untapped / conditional / tapped based on oracle text patterns:
   - Untapped: basic lands, no ETB-tapped text
   - Conditional: "enters the battlefield tapped unless", shock lands ("you may pay 2 life"), fast lands ("if you control two or fewer other lands")
   - Tapped: "enters the battlefield tapped" with no conditional clause
-- [ ] Implement `computeUntappedRatio` — returns score 0–100 based on (untapped + 0.5×conditional) / totalLands
-- [ ] Implement `computeColorCoverage` — compare source counts per color against pip demand; return weighted score based on how well each color is covered
-- [ ] Implement `computeLandDropConsistency` — hypergeometric probability of drawing N lands in opening 7 + N-1 draws for turns 1–4; score based on hitting target thresholds
-- [ ] Implement `computeManaFixingQuality` — ratio of multi-color-producing lands to total lands; scale 0–100
-- [ ] Implement `computeBasicLandRatio` — evaluate basic count relative to deck color count and fetch/search effects
-- [ ] Implement `computeLandBaseEfficiency` — aggregate all factors with weights into a single 0–100 score; return score + individual factor results
-- [ ] Export types: `LandClassification`, `LandBaseEfficiencyResult`, `EfficiencyFactor`
+- [x] Implement `computeUntappedRatio` — returns score 0–100 based on (untapped + 0.5×conditional) / totalLands
+- [x] Implement `computeColorCoverage` — compare source counts per color against pip demand; return weighted score based on how well each color is covered
+- [x] Implement `computeLandDropConsistency` — hypergeometric probability of drawing N lands in opening 7 + N-1 draws for turns 1–4; score based on hitting target thresholds
+- [x] Implement `computeManaFixingQuality` — ratio of multi-color-producing lands to total lands; scale 0–100
+- [x] Implement `computeBasicLandRatio` — evaluate basic count relative to deck color count and fetch/search effects
+- [x] Implement `computeLandBaseEfficiency` — aggregate all factors with weights into a single 0–100 score; return score + individual factor results
+- [x] Export types: `LandClassification`, `LandBaseEfficiencyResult`, `EfficiencyFactor`
 
 ### Phase 2: Tests (`e2e/land-base-efficiency.spec.ts`)
 
-- [ ] Write unit tests for `classifyLandEntry`:
+- [x] Write unit tests for `classifyLandEntry`:
   - Basic lands → untapped
   - Lands with "enters the battlefield tapped" → tapped
   - Shock lands → conditional (untapped)
   - Check lands → conditional
   - Lands with no ETB text → untapped
-- [ ] Write unit tests for `computeUntappedRatio` with known land sets
-- [ ] Write unit tests for `computeColorCoverage` with balanced and imbalanced mana bases
-- [ ] Write unit tests for `computeLandDropConsistency` with various land counts (30, 35, 37, 40)
-- [ ] Write unit tests for `computeManaFixingQuality` — all basics vs. all duals
-- [ ] Write unit tests for `computeBasicLandRatio`
-- [ ] Write unit tests for `computeLandBaseEfficiency` — verify weighted aggregation and score ranges
+- [x] Write unit tests for `computeUntappedRatio` with known land sets
+- [x] Write unit tests for `computeColorCoverage` with balanced and imbalanced mana bases
+- [x] Write unit tests for `computeLandDropConsistency` with various land counts (30, 35, 37, 40)
+- [x] Write unit tests for `computeManaFixingQuality` — all basics vs. all duals
+- [x] Write unit tests for `computeBasicLandRatio`
+- [x] Write unit tests for `computeLandBaseEfficiency` — verify weighted aggregation and score ranges
 
 ### Phase 3: UI Component (`src/components/LandBaseEfficiency.tsx`)
 
-- [ ] Create `LandBaseEfficiency` component that receives `LandBaseEfficiencyResult` as props
-- [ ] Render overall confidence score with color-coded badge (green/yellow/orange/red based on score range)
-- [ ] Render circular or bar progress indicator for overall score
-- [ ] Render each factor as a row with: factor name, individual score (0–100), a small progress bar, and a brief description/tooltip
-- [ ] Add a summary sentence describing the overall mana base quality
-- [ ] Style consistently with existing Analysis tab sections (slate theme, purple accents)
-- [ ] Ensure accessibility: proper ARIA labels, semantic HTML, keyboard navigable
+- [x] Create `LandBaseEfficiency` component that receives `LandBaseEfficiencyResult` as props
+- [x] Render overall confidence score with color-coded badge (green/yellow/orange/red based on score range)
+- [x] Render circular or bar progress indicator for overall score
+- [x] Render each factor as a row with: factor name, individual score (0–100), a small progress bar, and a brief description/tooltip
+- [x] Add a summary sentence describing the overall mana base quality
+- [x] Style consistently with existing Analysis tab sections (slate theme, purple accents)
+- [x] Ensure accessibility: proper ARIA labels, semantic HTML, keyboard navigable
 
 ### Phase 4: UI Integration Tests (`e2e/land-base-efficiency-ui.spec.ts`)
 
-- [ ] Write test: "Land Base Efficiency section appears in Analysis tab"
-- [ ] Write test: "displays overall efficiency score"
-- [ ] Write test: "displays all five factor rows with scores"
-- [ ] Write test: "score badge has correct color for score range"
-- [ ] Write test: "section is accessible with proper ARIA structure"
+- [x] Write test: "Land Base Efficiency section appears in Analysis tab"
+- [x] Write test: "displays overall efficiency score"
+- [x] Write test: "displays all five factor rows with scores"
+- [x] Write test: "score badge has correct color for score range"
+- [x] Write test: "section is accessible with proper ARIA structure"
 
 ### Phase 5: Integration into DeckAnalysis
 
-- [ ] Import and call `computeLandBaseEfficiency` in `DeckAnalysis.tsx`
-- [ ] Add `LandBaseEfficiency` component as a new section after Color Distribution
-- [ ] Pass computed result and any needed props
+- [x] Import and call `computeLandBaseEfficiency` in `DeckAnalysis.tsx`
+- [x] Add `LandBaseEfficiency` component as a new section after Color Distribution
+- [x] Pass computed result and any needed props
 
 ## Files to Create/Modify
 

@@ -13,10 +13,12 @@ import {
   computeManaBaseMetrics,
   resolveCommanderIdentity,
 } from "@/lib/color-distribution";
+import { computeLandBaseEfficiency } from "@/lib/land-base-efficiency";
 import ManaCurveChart from "@/components/ManaCurveChart";
 import TypeFilterBar from "@/components/TypeFilterBar";
 import ColorDistributionChart from "@/components/ColorDistributionChart";
 import ManaBaseStats from "@/components/ManaBaseStats";
+import LandBaseEfficiency from "@/components/LandBaseEfficiency";
 
 interface DeckAnalysisProps {
   deck: DeckData;
@@ -65,6 +67,11 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
 
   const commanderIdentity = useMemo(
     () => resolveCommanderIdentity(deck, cardMap),
+    [deck, cardMap]
+  );
+
+  const landEfficiency = useMemo(
+    () => computeLandBaseEfficiency(deck, cardMap),
     [deck, cardMap]
   );
 
@@ -129,6 +136,8 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
           onToggleColorless={() => setShowColorless((prev) => !prev)}
         />
       </section>
+
+      <LandBaseEfficiency result={landEfficiency} />
     </div>
   );
 }
