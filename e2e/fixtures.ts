@@ -54,11 +54,6 @@ export class DeckPage {
     await this.page.getByLabel("Decklist").fill(text);
   }
 
-  /** Fill the deck name field */
-  async fillDeckName(name: string) {
-    await this.page.getByPlaceholder("Enter deck name").fill(name);
-  }
-
   /** Click the Import Deck submit button */
   async submitImport() {
     await this.page.getByRole("button", { name: "Import Deck" }).click();
@@ -82,18 +77,6 @@ export class DeckPage {
   /** Return the textarea locator */
   get decklistTextarea() {
     return this.page.getByLabel("Decklist");
-  }
-
-  /** Return the deck name input locator */
-  get deckNameInput() {
-    return this.page.getByPlaceholder("Enter deck name");
-  }
-
-  /** Return the format input locator (manual tab only) */
-  get formatInput() {
-    return this.page.getByPlaceholder(
-      "e.g. Commander, Standard, Modern"
-    );
   }
 
   /** Wait for the deck list panel to appear after a successful import */
