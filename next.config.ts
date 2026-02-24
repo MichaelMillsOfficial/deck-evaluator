@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 import { execSync } from "child_process";
 
+function fetchTags(): void {
+  try {
+    execSync("git fetch --tags", { encoding: "utf-8", stdio: "ignore" });
+  } catch {
+    // ignore — may not have network access during build
+  }
+}
+
 function getGitTag(): string {
   try {
     return execSync("git describe --tags --always", { encoding: "utf-8" }).trim();
@@ -16,6 +24,8 @@ function getReleaseVersion(): string {
     return "alpha";
   }
 }
+
+fetchTags();
 
 const nextConfig: NextConfig = {
   env: {
