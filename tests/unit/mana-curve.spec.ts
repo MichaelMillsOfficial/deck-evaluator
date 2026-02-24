@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { computeManaCurve, extractCardType } from "../src/lib/mana-curve";
-import type { DeckData, EnrichedCard } from "../src/lib/types";
+import { computeManaCurve, extractCardType } from "../../src/lib/mana-curve";
+import type { DeckData, EnrichedCard } from "../../src/lib/types";
 
 function makeDeck(overrides: Partial<DeckData> = {}): DeckData {
   return {

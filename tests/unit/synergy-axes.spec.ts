@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { SYNERGY_AXES, getAxisById } from "../src/lib/synergy-axes";
-import type { EnrichedCard } from "../src/lib/types";
+import { SYNERGY_AXES, getAxisById } from "../../src/lib/synergy-axes";
+import type { EnrichedCard } from "../../src/lib/types";
 
 /** Helper to build a minimal EnrichedCard for testing axis detectors */
 function mockCard(overrides: Partial<EnrichedCard> = {}): EnrichedCard {
