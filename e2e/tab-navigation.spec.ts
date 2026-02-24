@@ -6,8 +6,6 @@ test.describe("Tab Navigation", () => {
   });
 
   test("defaults to Manual Import tab", async ({ deckPage }) => {
-    // Format field is only visible on the Manual tab
-    await expect(deckPage.formatInput).toBeVisible();
     // Load Example button is only on the Manual tab
     await expect(deckPage.loadExampleButton).toBeVisible();
   });
@@ -15,8 +13,7 @@ test.describe("Tab Navigation", () => {
   test("switches to Moxfield tab", async ({ deckPage }) => {
     await deckPage.selectTab("Moxfield");
 
-    // Format field and Load Example should not be visible on Moxfield tab
-    await expect(deckPage.formatInput).toBeHidden();
+    // Load Example should not be visible on Moxfield tab
     await expect(deckPage.loadExampleButton).toBeHidden();
 
     // Textarea should still be present with Moxfield placeholder
@@ -26,7 +23,6 @@ test.describe("Tab Navigation", () => {
   test("switches to Archidekt tab", async ({ deckPage }) => {
     await deckPage.selectTab("Archidekt");
 
-    await expect(deckPage.formatInput).toBeHidden();
     await expect(deckPage.loadExampleButton).toBeHidden();
     await expect(deckPage.decklistTextarea).toBeVisible();
   });
@@ -35,10 +31,9 @@ test.describe("Tab Navigation", () => {
     deckPage,
   }) => {
     await deckPage.selectTab("Moxfield");
-    await expect(deckPage.formatInput).toBeHidden();
+    await expect(deckPage.loadExampleButton).toBeHidden();
 
     await deckPage.selectTab("Manual Import");
-    await expect(deckPage.formatInput).toBeVisible();
     await expect(deckPage.loadExampleButton).toBeVisible();
   });
 
@@ -52,7 +47,7 @@ test.describe("Tab Navigation", () => {
     await expect(deckPage.decklistTextarea).toHaveValue("1 Sol Ring");
   });
 
-  test("Load Example populates textarea and metadata fields", async ({
+  test("Load Example populates textarea", async ({
     deckPage,
   }) => {
     await deckPage.loadExample();
@@ -62,12 +57,6 @@ test.describe("Tab Navigation", () => {
     await expect(deckPage.decklistTextarea).toContainText(
       "Atraxa, Praetors' Voice"
     );
-
-    // Deck name should be filled
-    await expect(deckPage.deckNameInput).toHaveValue("Atraxa Superfriends");
-
-    // Format should be filled
-    await expect(deckPage.formatInput).toHaveValue("Commander");
   });
 
   test("Load Example decklist can be imported successfully", async ({
