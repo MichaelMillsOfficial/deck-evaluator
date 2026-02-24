@@ -82,9 +82,14 @@ test.describe("Deck Enrichment", () => {
   }) => {
     const { page } = deckPage;
 
-    // Delay enrichment response to test progressive loading
+    // Hold enrichment until we assert the loading indicator.
+    // This avoids timing flakiness from a fixed delay.
+    let releaseEnrichment: (() => void) | null = null;
     await page.route("**/api/deck-enrich", async (route) => {
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise<void>((resolve) => {
+        releaseEnrichment = resolve;
+        setTimeout(resolve, 5_000);
+      });
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -102,6 +107,9 @@ test.describe("Deck Enrichment", () => {
 
     // Loading card details indicator should be shown
     await expect(page.getByText("Enriching card data...")).toBeVisible();
+
+    // Release so the test completes cleanly
+    releaseEnrichment?.();
   });
 
   test("form re-enables immediately after deck data loads", async ({
@@ -109,9 +117,13 @@ test.describe("Deck Enrichment", () => {
   }) => {
     const { page } = deckPage;
 
-    // Delay enrichment so it's still loading after deck parses
+    // Hold enrichment until we assert the form state.
+    let releaseEnrichment: (() => void) | null = null;
     await page.route("**/api/deck-enrich", async (route) => {
-      await new Promise((r) => setTimeout(r, 3000));
+      await new Promise<void>((resolve) => {
+        releaseEnrichment = resolve;
+        setTimeout(resolve, 5_000);
+      });
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -127,6 +139,9 @@ test.describe("Deck Enrichment", () => {
     // Form should be re-enabled even though enrichment is still loading
     await expect(deckPage.importButton).toBeEnabled();
     await expect(page.locator("textarea#decklist")).toBeEnabled();
+
+    // Release so the test completes cleanly
+    releaseEnrichment?.();
   });
 
   test("enrichment failure shows warning but keeps basic decklist", async ({
@@ -622,9 +637,13 @@ test.describe("Deck Enrichment — Accessibility", () => {
   }) => {
     const { page } = deckPage;
 
-    // Override to delay enrichment
+    // Hold enrichment until we assert the loading element
+    let releaseEnrichment: (() => void) | null = null;
     await page.route("**/api/deck-enrich", async (route) => {
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise<void>((resolve) => {
+        releaseEnrichment = resolve;
+        setTimeout(resolve, 5_000);
+      });
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -642,6 +661,9 @@ test.describe("Deck Enrichment — Accessibility", () => {
     );
     await expect(loadingStatus).toBeVisible();
     await expect(loadingStatus).toHaveAttribute("role", "status");
+
+    // Release so the test completes cleanly
+    releaseEnrichment?.();
   });
 
   test("enrichment error warning has role=alert", async ({ deckPage }) => {
