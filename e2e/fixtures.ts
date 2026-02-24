@@ -100,8 +100,8 @@ export class DeckPage {
     return this.page.locator('[class*="red"]');
   }
 
-  /** Click a deck view tab (Deck List or Analysis) */
-  async selectDeckViewTab(tab: "Deck List" | "Analysis") {
+  /** Click a deck view tab (Deck List, Analysis, or Synergy) */
+  async selectDeckViewTab(tab: "Deck List" | "Analysis" | "Synergy") {
     await this.page
       .getByRole("tablist", { name: "Deck view" })
       .getByRole("tab", { name: tab })
@@ -123,6 +123,20 @@ export class DeckPage {
   /** Locator for the deck view tabs container */
   get deckViewTabs() {
     return this.page.getByTestId("deck-view-tabs");
+  }
+
+  /** Locator for the synergy analysis section */
+  get synergySection() {
+    return this.page.locator(
+      'section[aria-labelledby="synergy-heading"]'
+    );
+  }
+
+  /** Wait for the synergy section to appear on the Analysis tab */
+  async waitForSynergySection() {
+    await this.page
+      .getByRole("heading", { name: "Card Synergy" })
+      .waitFor({ timeout: 15_000 });
   }
 }
 

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { parseManaPips, parseTypeLine } from "../src/lib/mana";
+import { parseManaPips, parseTypeLine } from "../../src/lib/mana";
 
 test.describe("parseManaPips", () => {
   test("parses single colored pip", () => {

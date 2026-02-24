@@ -14,9 +14,11 @@ npm run dev        # Start development server
 npm run build      # Production build
 npm run start      # Run production server
 npm run lint       # Run ESLint
-npm test           # Run Playwright E2E tests (headless)
-npm run test:headed  # Run tests with visible browser
-npm run test:ui      # Open Playwright interactive UI
+npm test             # Run all tests (e2e + unit)
+npm run test:e2e     # Run only browser/API e2e tests
+npm run test:unit    # Run only pure function unit tests (fast, no dev server)
+npm run test:headed  # Run e2e tests with visible browser
+npm run test:ui      # Open Playwright interactive e2e UI
 ```
 
 ### Docker
@@ -104,26 +106,36 @@ This project uses **Playwright** for end-to-end testing. Tests live in the `e2e/
 ### Running Tests
 
 ```bash
-npm test                           # Run all tests headless
-npm run test:headed                # Run with a visible browser
-npm run test:ui                    # Interactive Playwright UI
-npx playwright test e2e/deck-import.spec.ts  # Run a single test file
+npm test                           # Run all tests (e2e + unit)
+npm run test:e2e                   # Run only browser/API e2e tests
+npm run test:unit                  # Run only pure function unit tests (fast)
+npm run test:headed                # Run e2e with a visible browser
+npm run test:ui                    # Interactive Playwright e2e UI
+npx playwright test --config playwright.config.ts e2e/deck-import.spec.ts  # Single e2e file
+npx playwright test --config playwright.unit.config.ts tests/unit/mana-parsers.spec.ts  # Single unit file
 ```
 
 ### Test Structure
 
 ```
-e2e/
-├── fixtures.ts                 # DeckPage page-object, sample decklists, custom test export
-├── deck-import.spec.ts         # Manual decklist import user flows
-├── tab-navigation.spec.ts      # Tab switching, Load Example, form state persistence
-├── deck-display.spec.ts        # Rendered deck sections, card counts, source label
-├── api-deck-parse.spec.ts      # POST /api/deck-parse API contract tests
-├── api-deck-enrich.spec.ts     # POST /api/deck-enrich API contract tests
-├── deck-enrichment.spec.ts     # Enriched card UI: symbols, chevrons, expand/collapse
-├── card-tags.spec.ts           # Heuristic card tag rendering
-├── mana-parsers.spec.ts        # Unit tests for mana cost parsing
-└── oracle-parser.spec.ts       # Unit tests for oracle text tokenizer
+e2e/                                # Browser & API tests (require dev server)
+├── fixtures.ts                     # DeckPage page-object, sample decklists, custom test export
+├── deck-import.spec.ts             # Manual decklist import user flows
+├── tab-navigation.spec.ts          # Tab switching, Load Example, form state persistence
+├── deck-display.spec.ts            # Rendered deck sections, card counts, source label
+├── api-deck-parse.spec.ts          # POST /api/deck-parse API contract tests
+├── api-deck-enrich.spec.ts         # POST /api/deck-enrich API contract tests
+├── deck-enrichment.spec.ts         # Enriched card UI: symbols, chevrons, expand/collapse
+└── ...
+tests/unit/                         # Pure function tests (no browser, no dev server)
+├── mana-parsers.spec.ts            # Mana cost & type line parsing
+├── oracle-parser.spec.ts           # Oracle text tokenizer
+├── card-tags.spec.ts               # Heuristic card tag generation
+├── mana-curve.spec.ts              # Mana curve computation
+├── color-distribution.spec.ts      # Color distribution & mana base metrics
+├── known-combos.spec.ts            # Known combo registry & detection
+├── synergy-axes.spec.ts            # Synergy axis detectors
+└── synergy-engine.spec.ts          # Synergy engine scoring
 ```
 
 ### Writing Tests
@@ -133,7 +145,7 @@ e2e/
 - **Use `deckPage.deckDisplay`** to scope assertions to the rendered deck panel and avoid strict-mode violations with the textarea.
 - **Add new page-object methods to `DeckPage`** in `fixtures.ts` when new UI elements are introduced.
 - **API tests** can use Playwright's `request` fixture directly with `@playwright/test` imports.
-- **Pure utility tests** (e.g., `oracle-parser.spec.ts`, `mana-parsers.spec.ts`) import functions directly from `src/lib/` and do not need the `deckPage` fixture.
+- **Pure utility tests** live in `tests/unit/` and import functions directly from `src/lib/`. They run under `playwright.unit.config.ts` (no browser, no dev server) and do not need the `deckPage` fixture.
 - Focus on **functional behavior**, not styling or visual assertions.
 
 ### TDD Workflow

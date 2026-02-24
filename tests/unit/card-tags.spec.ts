@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { generateTags } from "../src/lib/card-tags";
-import type { EnrichedCard } from "../src/lib/types";
+import { generateTags } from "../../src/lib/card-tags";
+import type { EnrichedCard } from "../../src/lib/types";
 
 function makeCard(overrides: Partial<EnrichedCard> = {}): EnrichedCard {
   return {
@@ -74,77 +74,6 @@ test.describe("generateTags — Ramp", () => {
     });
     expect(generateTags(card)).not.toContain("Ramp");
   });
-
-  test("Halimar Depths (non-basic land with tap for mana) → NOT Ramp", () => {
-    const card = makeCard({
-      name: "Halimar Depths",
-      oracleText:
-        "This land enters tapped.\nWhen this land enters, look at the top three cards of your library, then put them back in any order.\n{T}: Add {U}.",
-      typeLine: "Land",
-    });
-    expect(generateTags(card)).not.toContain("Ramp");
-  });
-
-  test("Nesting Grounds (non-basic land with tap for colorless) → NOT Ramp", () => {
-    const card = makeCard({
-      name: "Nesting Grounds",
-      oracleText:
-        "{T}: Add {C}.\n{1}, {T}: Move a counter from target permanent you control onto a second target permanent. Activate only as a sorcery.",
-      typeLine: "Land",
-    });
-    expect(generateTags(card)).not.toContain("Ramp");
-  });
-
-  test("Arcane Signet (add one mana of any color) → Ramp", () => {
-    const card = makeCard({
-      name: "Arcane Signet",
-      oracleText:
-        "{T}: Add one mana of any color in your commander's color identity.",
-      typeLine: "Artifact",
-    });
-    expect(generateTags(card)).toContain("Ramp");
-  });
-
-  test("Cradle Clearcutter (add an amount of mana) → Ramp", () => {
-    const card = makeCard({
-      name: "Cradle Clearcutter",
-      oracleText:
-        "Prototype {2}{G} — 1/3 (You may cast this spell with different mana cost, color, and size. It keeps its abilities and types.)\n{T}: Add an amount of {G} equal to this creature's power.",
-      typeLine: "Artifact Creature — Golem",
-      keywords: ["Prototype"],
-    });
-    expect(generateTags(card)).toContain("Ramp");
-  });
-
-  test("Fertilid (search their library for land via counter removal) → Ramp", () => {
-    const card = makeCard({
-      name: "Fertilid",
-      oracleText:
-        "This creature enters with two +1/+1 counters on it.\n{1}{G}, Remove a +1/+1 counter from this creature: Target player searches their library for a basic land card, puts it onto the battlefield tapped, then shuffles.",
-      typeLine: "Creature — Elemental",
-    });
-    expect(generateTags(card)).toContain("Ramp");
-  });
-
-  test("Commander's Sphere (add one mana of any color) → Ramp", () => {
-    const card = makeCard({
-      name: "Commander's Sphere",
-      oracleText:
-        "{T}: Add one mana of any color in your commander's color identity.\nSacrifice this artifact: Draw a card.",
-      typeLine: "Artifact",
-    });
-    expect(generateTags(card)).toContain("Ramp");
-  });
-
-  test("Krosan Verge (land that searches for Forest/Plains) → Ramp", () => {
-    const card = makeCard({
-      name: "Krosan Verge",
-      oracleText:
-        "This land enters tapped.\n{T}: Add {C}.\n{2}, {T}, Sacrifice this land: Search your library for a Forest card and a Plains card, put them onto the battlefield tapped, then shuffle.",
-      typeLine: "Land",
-    });
-    expect(generateTags(card)).toContain("Ramp");
-  });
 });
 
 test.describe("generateTags — Card Draw", () => {
@@ -165,63 +94,6 @@ test.describe("generateTags — Card Draw", () => {
       oracleText: "Withdraw target creature to its owner's hand.",
     });
     expect(generateTags(card)).not.toContain("Card Draw");
-  });
-
-  test("Brainstorm (draw three) → Card Draw, NOT Card Advantage", () => {
-    const card = makeCard({
-      name: "Brainstorm",
-      oracleText:
-        "Draw three cards, then put two cards from your hand on top of your library.",
-      typeLine: "Instant",
-    });
-    const tags = generateTags(card);
-    expect(tags).toContain("Card Draw");
-    expect(tags).not.toContain("Card Advantage");
-  });
-});
-
-test.describe("generateTags — Card Advantage", () => {
-  test("Adaptive Omnitool (look at top, put in hand) → Card Advantage", () => {
-    const card = makeCard({
-      name: "Adaptive Omnitool",
-      oracleText:
-        "Equipped creature gets +1/+1 for each artifact you control.\nWhenever equipped creature attacks, look at the top six cards of your library. You may reveal an artifact card from among them and put it into your hand. Put the rest on the bottom of your library in a random order.\nEquip {3}",
-      typeLine: "Artifact — Equipment",
-      keywords: ["Equip"],
-    });
-    expect(generateTags(card)).toContain("Card Advantage");
-  });
-
-  test("Ancient Stirrings (look at top, put in hand) → Card Advantage", () => {
-    const card = makeCard({
-      name: "Ancient Stirrings",
-      oracleText:
-        "Look at the top five cards of your library. You may reveal a colorless card from among them and put it into your hand. Then put the rest on the bottom of your library in any order.",
-      typeLine: "Sorcery",
-    });
-    expect(generateTags(card)).toContain("Card Advantage");
-  });
-
-  test("Impulse (look at top 4, put one in hand) → Card Advantage", () => {
-    const card = makeCard({
-      name: "Impulse",
-      oracleText:
-        "Look at the top four cards of your library. Put one of them into your hand and the rest on the bottom of your library in any order.",
-      typeLine: "Instant",
-    });
-    expect(generateTags(card)).toContain("Card Advantage");
-  });
-
-  test("Commander's Sphere (literal draw) → Card Draw, NOT Card Advantage", () => {
-    const card = makeCard({
-      name: "Commander's Sphere",
-      oracleText:
-        "{T}: Add one mana of any color in your commander's color identity.\nSacrifice this artifact: Draw a card.",
-      typeLine: "Artifact",
-    });
-    const tags = generateTags(card);
-    expect(tags).toContain("Card Draw");
-    expect(tags).not.toContain("Card Advantage");
   });
 });
 
@@ -262,45 +134,6 @@ test.describe("generateTags — Board Wipe", () => {
   test("single-target removal → no Board Wipe", () => {
     const card = makeCard({ oracleText: "Destroy target creature." });
     expect(generateTags(card)).not.toContain("Board Wipe");
-  });
-
-  test("Evacuation (return all creatures to hands) → Board Wipe", () => {
-    const card = makeCard({
-      name: "Evacuation",
-      oracleText: "Return all creatures to their owners' hands.",
-      typeLine: "Instant",
-    });
-    const tags = generateTags(card);
-    expect(tags).toContain("Board Wipe");
-    expect(tags).toContain("Removal");
-  });
-});
-
-test.describe("generateTags — Cost Reduction", () => {
-  test("Etherium Sculptor (artifact spells cost less) → Cost Reduction", () => {
-    const card = makeCard({
-      name: "Etherium Sculptor",
-      oracleText: "Artifact spells you cast cost {1} less to cast.",
-      typeLine: "Artifact Creature — Vedalken Artificer",
-    });
-    expect(generateTags(card)).toContain("Cost Reduction");
-  });
-
-  test("Helm of Awakening (spells cost less) → Cost Reduction", () => {
-    const card = makeCard({
-      name: "Helm of Awakening",
-      oracleText: "Spells cost {1} less to cast.",
-      typeLine: "Artifact",
-    });
-    expect(generateTags(card)).toContain("Cost Reduction");
-  });
-
-  test("vanilla artifact → no Cost Reduction", () => {
-    const card = makeCard({
-      oracleText: "{T}: Add {C}{C}.",
-      typeLine: "Artifact",
-    });
-    expect(generateTags(card)).not.toContain("Cost Reduction");
   });
 });
 

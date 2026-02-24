@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { parseOracleText } from "../src/lib/oracle";
+import { parseOracleText } from "../../src/lib/oracle";
 
 test.describe("parseOracleText", () => {
   test("plain text with no symbols", () => {

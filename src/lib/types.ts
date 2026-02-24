@@ -71,3 +71,46 @@ export interface EnrichedCard {
   producedMana: string[];
   flavorName: string | null;
 }
+
+// Synergy analysis types
+
+/** How strongly a card participates in a synergy axis */
+export interface CardAxisScore {
+  axisId: string;
+  axisName: string;
+  relevance: number; // 0-1
+}
+
+/** A detected synergy relationship between cards */
+export interface SynergyPair {
+  cards: string[];
+  axisId: string | null; // null for known combos
+  type: "synergy" | "anti-synergy" | "combo";
+  strength: number; // 0-1
+  description: string;
+}
+
+/** Per-card synergy summary */
+export interface CardSynergyScore {
+  cardName: string;
+  score: number; // 0-100
+  axes: CardAxisScore[];
+  pairs: SynergyPair[];
+}
+
+/** Detected deck theme/strategy */
+export interface DeckTheme {
+  axisId: string;
+  axisName: string;
+  strength: number;
+  cardCount: number;
+}
+
+/** Full deck synergy analysis result */
+export interface DeckSynergyAnalysis {
+  cardScores: Record<string, CardSynergyScore>;
+  topSynergies: SynergyPair[];
+  antiSynergies: SynergyPair[];
+  knownCombos: SynergyPair[];
+  deckThemes: DeckTheme[];
+}
