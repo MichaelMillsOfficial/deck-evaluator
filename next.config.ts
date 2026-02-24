@@ -1,19 +1,14 @@
 import type { NextConfig } from "next";
 import { execSync } from "child_process";
-
-function fetchTags(): void {
-  try {
-    execSync("git fetch --tags", { encoding: "utf-8", stdio: "ignore" });
-  } catch {
-    // ignore — may not have network access during build
-  }
-}
+import { readFileSync } from "fs";
 
 function getGitTag(): string {
   try {
     return execSync("git describe --tags --always", { encoding: "utf-8" }).trim();
   } catch {
-    return "unknown";
+    // Vercel provides the commit SHA as an env var
+    const sha = process.env.VERCEL_GIT_COMMIT_SHA;
+    return sha ? sha.slice(0, 7) : "unknown";
   }
 }
 
@@ -21,11 +16,15 @@ function getReleaseVersion(): string {
   try {
     return execSync("git describe --tags --abbrev=0", { encoding: "utf-8" }).trim();
   } catch {
-    return "alpha";
+    // Vercel shallow clones omit tags — fall back to package.json version
+    try {
+      const pkg = JSON.parse(readFileSync("package.json", "utf-8"));
+      return `v${pkg.version}`;
+    } catch {
+      return "alpha";
+    }
   }
 }
-
-fetchTags();
 
 const nextConfig: NextConfig = {
   env: {
