@@ -14,19 +14,10 @@ function getGitTag(): string {
 
 function getReleaseVersion(): string {
   try {
-    return execSync("git describe --tags --abbrev=0", { encoding: "utf-8" }).trim();
+    const pkg = JSON.parse(readFileSync("package.json", "utf-8"));
+    return `v${pkg.version}`;
   } catch {
-    // Vercel shallow clones omit tags — try RELEASE_VERSION env var (set by GitHub Actions)
-    if (process.env.RELEASE_VERSION) {
-      return process.env.RELEASE_VERSION;
-    }
-    // Last resort: fall back to package.json version
-    try {
-      const pkg = JSON.parse(readFileSync("package.json", "utf-8"));
-      return `v${pkg.version}`;
-    } catch {
-      return "alpha";
-    }
+    return "alpha";
   }
 }
 
