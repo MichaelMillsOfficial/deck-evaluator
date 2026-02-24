@@ -1,6 +1,6 @@
 export default function Footer() {
   const gitTag = process.env.NEXT_PUBLIC_GIT_TAG ?? "unknown";
-  const releaseVersion = process.env.NEXT_PUBLIC_RELEASE_VERSION ?? “v0.0.1a";
+  const releaseVersion = process.env.NEXT_PUBLIC_RELEASE_VERSION ?? "v0.0.1a";
 
   return (
     <footer className="border-t border-slate-700 bg-slate-900/50">
