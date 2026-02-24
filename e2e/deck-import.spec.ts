@@ -65,9 +65,15 @@ test.describe("Deck Import — Manual Text Input", () => {
     deckPage,
     page,
   }) => {
-    // Delay the API response so the loading state is reliably visible
+    // Hold the API response until we've asserted the loading state.
+    // This avoids timing flakiness from a fixed-duration delay.
+    let releaseRoute: (() => void) | null = null;
     await page.route("**/api/deck-parse", async (route) => {
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise<void>((resolve) => {
+        releaseRoute = resolve;
+        // Safety net: auto-resolve after 5s to prevent hanging
+        setTimeout(resolve, 5_000);
+      });
       await route.continue();
     });
 
@@ -78,5 +84,8 @@ test.describe("Deck Import — Manual Text Input", () => {
     await expect(
       page.getByRole("button", { name: "Loading..." })
     ).toBeVisible();
+
+    // Release the route so the test completes cleanly
+    releaseRoute?.();
   });
 });

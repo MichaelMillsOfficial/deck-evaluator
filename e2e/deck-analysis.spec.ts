@@ -299,9 +299,16 @@ test.describe("Deck Analysis — Tab Availability", () => {
   }) => {
     const { page } = deckPage;
 
-    // Delay enrichment to observe disabled state
+    // Delay enrichment to observe disabled state.
+    // Use a generous delay so the disabled assertion runs before the response
+    // arrives, even on slow CI machines.
+    let fulfillEnrichment: (() => void) | null = null;
     await page.route("**/api/deck-enrich", async (route) => {
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise<void>((resolve) => {
+        fulfillEnrichment = resolve;
+        // Auto-resolve after 5s as safety net
+        setTimeout(resolve, 5_000);
+      });
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -321,6 +328,9 @@ test.describe("Deck Analysis — Tab Availability", () => {
 
     // Should be disabled while loading
     await expect(analysisTab).toBeDisabled();
+
+    // Release the enrichment response
+    fulfillEnrichment?.();
 
     // Wait for enrichment to complete, then it should be enabled
     await expect(analysisTab).toBeEnabled({ timeout: 10_000 });
