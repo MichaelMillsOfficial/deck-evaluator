@@ -18,6 +18,7 @@ import ManaCurveChart from "@/components/ManaCurveChart";
 import TypeFilterBar from "@/components/TypeFilterBar";
 import ColorDistributionChart from "@/components/ColorDistributionChart";
 import ManaBaseStats from "@/components/ManaBaseStats";
+import CommanderSection from "@/components/CommanderSection";
 import LandBaseEfficiency from "@/components/LandBaseEfficiency";
 
 interface DeckAnalysisProps {
@@ -96,6 +97,8 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
 
   return (
     <div className="space-y-6">
+      <CommanderSection deck={deck} cardMap={cardMap} />
+
       <section aria-labelledby="mana-curve-heading">
         <h3
           id="mana-curve-heading"
