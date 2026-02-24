@@ -124,6 +124,20 @@ export class DeckPage {
   get deckViewTabs() {
     return this.page.getByTestId("deck-view-tabs");
   }
+
+  /** Locator for the synergy analysis section */
+  get synergySection() {
+    return this.page.locator(
+      'section[aria-labelledby="synergy-heading"]'
+    );
+  }
+
+  /** Wait for the synergy section to appear on the Analysis tab */
+  async waitForSynergySection() {
+    await this.page
+      .getByRole("heading", { name: "Card Synergy" })
+      .waitFor({ timeout: 15_000 });
+  }
 }
 
 // ---------------------------------------------------------------------------

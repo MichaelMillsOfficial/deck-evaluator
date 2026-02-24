@@ -13,10 +13,12 @@ import {
   computeManaBaseMetrics,
   resolveCommanderIdentity,
 } from "@/lib/color-distribution";
+import { analyzeDeckSynergy } from "@/lib/synergy-engine";
 import ManaCurveChart from "@/components/ManaCurveChart";
 import TypeFilterBar from "@/components/TypeFilterBar";
 import ColorDistributionChart from "@/components/ColorDistributionChart";
 import ManaBaseStats from "@/components/ManaBaseStats";
+import SynergySection from "@/components/SynergySection";
 
 interface DeckAnalysisProps {
   deck: DeckData;
@@ -65,6 +67,11 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
 
   const commanderIdentity = useMemo(
     () => resolveCommanderIdentity(deck, cardMap),
+    [deck, cardMap]
+  );
+
+  const synergyAnalysis = useMemo(
+    () => analyzeDeckSynergy(deck, cardMap),
     [deck, cardMap]
   );
 
@@ -128,6 +135,19 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
           showColorless={showColorless}
           onToggleColorless={() => setShowColorless((prev) => !prev)}
         />
+      </section>
+
+      <section aria-labelledby="synergy-heading">
+        <h3
+          id="synergy-heading"
+          className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
+        >
+          Card Synergy
+        </h3>
+        <p className="mb-4 text-xs text-slate-400">
+          Synergy analysis, known combos, and anti-synergy warnings
+        </p>
+        <SynergySection analysis={synergyAnalysis} />
       </section>
     </div>
   );
