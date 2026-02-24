@@ -115,4 +115,96 @@ test.describe("POST /api/deck-parse", () => {
     expect(body.sideboard).toHaveLength(1);
     expect(body.sideboard[0].name).toBe("Lurrus of the Dream-Den");
   });
+
+  test("infers single trailing card after blank line as commander", async ({
+    request,
+  }) => {
+    const response = await request.post(API_URL, {
+      data: {
+        text: "1 Sol Ring\n1 Counterspell\n\nSIDEBOARD:\n1 Rest in Peace\n\n1 Atraxa, Praetors' Voice",
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.commanders).toHaveLength(1);
+    expect(body.commanders[0].name).toBe("Atraxa, Praetors' Voice");
+    // Should be removed from sideboard
+    expect(
+      body.sideboard.find(
+        (c: { name: string }) => c.name === "Atraxa, Praetors' Voice"
+      )
+    ).toBeUndefined();
+    expect(body.sideboard).toHaveLength(1);
+    expect(body.mainboard).toHaveLength(2);
+  });
+
+  test("infers two trailing cards after blank line as partner commanders", async ({
+    request,
+  }) => {
+    const response = await request.post(API_URL, {
+      data: {
+        text: "1 Sol Ring\n1 Command Tower\n\n1 Thrasios, Triton Hero\n1 Tymna the Weaver",
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.commanders).toHaveLength(2);
+    expect(body.commanders.map((c: { name: string }) => c.name)).toContain(
+      "Thrasios, Triton Hero"
+    );
+    expect(body.commanders.map((c: { name: string }) => c.name)).toContain(
+      "Tymna the Weaver"
+    );
+    expect(body.mainboard).toHaveLength(2);
+  });
+
+  test("does not infer commander when trailing group has more than 2 cards", async ({
+    request,
+  }) => {
+    const response = await request.post(API_URL, {
+      data: {
+        text: "1 Sol Ring\n\n1 Card A\n1 Card B\n1 Card C",
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.commanders).toHaveLength(0);
+    // All cards stay in mainboard
+    expect(body.mainboard).toHaveLength(4);
+  });
+
+  test("does not infer commander when no blank line separates groups", async ({
+    request,
+  }) => {
+    const response = await request.post(API_URL, {
+      data: {
+        text: "1 Sol Ring\n1 Counterspell\n1 Cultivate",
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.commanders).toHaveLength(0);
+    expect(body.mainboard).toHaveLength(3);
+  });
+
+  test("skips commander inference when explicit COMMANDER header exists", async ({
+    request,
+  }) => {
+    const response = await request.post(API_URL, {
+      data: {
+        text: "COMMANDER:\n1 Atraxa, Praetors' Voice\n\nMAINBOARD:\n1 Sol Ring\n\n1 Lonely Card",
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    // Only the explicit commander, trailing card stays in mainboard
+    expect(body.commanders).toHaveLength(1);
+    expect(body.commanders[0].name).toBe("Atraxa, Praetors' Voice");
+    expect(body.mainboard).toHaveLength(2);
+  });
 });

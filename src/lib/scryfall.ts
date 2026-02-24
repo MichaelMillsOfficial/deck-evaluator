@@ -8,6 +8,7 @@ const BATCH_DELAY_MS = 100;
 export interface ScryfallCardFace {
   mana_cost?: string;
   oracle_text?: string;
+  produced_mana?: string[];
   image_uris?: {
     small: string;
     normal: string;
@@ -35,6 +36,7 @@ export interface ScryfallCard {
     large: string;
   };
   card_faces?: ScryfallCardFace[];
+  produced_mana?: string[];
   flavor_name?: string;
 }
 
@@ -215,6 +217,7 @@ export function normalizeToEnrichedCard(card: ScryfallCard): EnrichedCard {
       ? { small: imageUris.small, normal: imageUris.normal, large: imageUris.large }
       : null,
     manaPips: parseManaPips(manaCost),
+    producedMana: card.produced_mana ?? frontFace?.produced_mana ?? [],
     flavorName: card.flavor_name ?? null,
   };
 }
