@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures";
 
+/** Standard format mock — no commanders, all 5 colors may appear */
 const MOCK_ANALYSIS_RESPONSE = {
   cards: {
     "Sol Ring": {
@@ -82,6 +83,135 @@ const MOCK_ANALYSIS_RESPONSE = {
       imageUris: null,
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["W", "U", "B", "R", "G"],
+      flavorName: null,
+    },
+  },
+  notFound: [],
+};
+
+/** Commander format mock — G/U commander, chart should only show Green and Blue */
+const MOCK_COMMANDER_RESPONSE = {
+  cards: {
+    "Ezuri, Stalker of Spheres": {
+      name: "Ezuri, Stalker of Spheres",
+      manaCost: "{1}{G}{U}",
+      cmc: 3,
+      colorIdentity: ["G", "U"],
+      colors: ["G", "U"],
+      typeLine: "Legendary Creature — Phyrexian Elf Warrior",
+      supertypes: ["Legendary"],
+      subtypes: ["Phyrexian", "Elf", "Warrior"],
+      oracleText: "Whenever a creature with a +1/+1 counter on it enters under your control, draw a card.",
+      keywords: [],
+      power: "3",
+      toughness: "3",
+      loyalty: null,
+      rarity: "mythic",
+      imageUris: null,
+      manaPips: { W: 0, U: 1, B: 0, R: 0, G: 1, C: 0 },
+      producedMana: [],
+      flavorName: null,
+    },
+    "Sol Ring": {
+      name: "Sol Ring",
+      manaCost: "{1}",
+      cmc: 1,
+      colorIdentity: [],
+      colors: [],
+      typeLine: "Artifact",
+      supertypes: [],
+      subtypes: [],
+      oracleText: "{T}: Add {C}{C}.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "uncommon",
+      imageUris: null,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: ["C"],
+      flavorName: null,
+    },
+    "Counterspell": {
+      name: "Counterspell",
+      manaCost: "{U}{U}",
+      cmc: 2,
+      colorIdentity: ["U"],
+      colors: ["U"],
+      typeLine: "Instant",
+      supertypes: [],
+      subtypes: [],
+      oracleText: "Counter target spell.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "uncommon",
+      imageUris: null,
+      manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: [],
+      flavorName: null,
+    },
+    "Cultivate": {
+      name: "Cultivate",
+      manaCost: "{2}{G}",
+      cmc: 3,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      typeLine: "Sorcery",
+      supertypes: [],
+      subtypes: [],
+      oracleText:
+        "Search your library for up to two basic land cards, reveal those cards, put one onto the battlefield tapped and the other into your hand, then shuffle.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "common",
+      imageUris: null,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+      producedMana: [],
+      flavorName: null,
+    },
+    "Command Tower": {
+      name: "Command Tower",
+      manaCost: "",
+      cmc: 0,
+      colorIdentity: [],
+      colors: [],
+      typeLine: "Land",
+      supertypes: [],
+      subtypes: [],
+      oracleText:
+        "{T}: Add one mana of any color in your commander's color identity.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "common",
+      imageUris: null,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: ["W", "U", "B", "R", "G"],
+      flavorName: null,
+    },
+    "Breeding Pool": {
+      name: "Breeding Pool",
+      manaCost: "",
+      cmc: 0,
+      colorIdentity: ["G", "U"],
+      colors: [],
+      typeLine: "Land — Forest Island",
+      supertypes: [],
+      subtypes: ["Forest", "Island"],
+      oracleText: "({T}: Add {G} or {U}.)\nAs Breeding Pool enters, you may pay 2 life. If you don't, it enters tapped.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "rare",
+      imageUris: null,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: ["G", "U"],
       flavorName: null,
     },
   },
@@ -468,7 +598,7 @@ test.describe("Deck Analysis — Type Filters", () => {
   });
 });
 
-test.describe("Deck Analysis — Color Distribution", () => {
+test.describe("Deck Analysis — Color Distribution (Standard)", () => {
   test.beforeEach(async ({ deckPage }) => {
     const { page } = deckPage;
     await page.route("**/api/deck-enrich", (route) =>
@@ -534,5 +664,97 @@ test.describe("Deck Analysis — Color Distribution", () => {
     // Mock has Sol Ring producing colorless
     const stat = page.getByTestId("stat-colorless-sources");
     await expect(stat).toContainText("1");
+  });
+
+  test("shows all five color columns when no commander", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const chartSection = page.locator(
+      'section[aria-labelledby="color-distribution-heading"]'
+    );
+    // No commander → all 5 colors shown on x-axis
+    await expect(chartSection.locator("text").filter({ hasText: "White" })).toBeVisible();
+    await expect(chartSection.locator("text").filter({ hasText: "Blue" })).toBeVisible();
+    await expect(chartSection.locator("text").filter({ hasText: "Black" })).toBeVisible();
+    await expect(chartSection.locator("text").filter({ hasText: "Red" })).toBeVisible();
+    await expect(chartSection.locator("text").filter({ hasText: "Green" })).toBeVisible();
+  });
+});
+
+test.describe("Deck Analysis — Color Distribution (Commander)", () => {
+  test.beforeEach(async ({ deckPage }) => {
+    const { page } = deckPage;
+    await page.route("**/api/deck-enrich", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_COMMANDER_RESPONSE),
+      })
+    );
+    await deckPage.goto();
+    // Use COMMANDER: zone header so parser puts Ezuri in commanders array
+    await deckPage.fillDecklist(
+      "COMMANDER:\n1 Ezuri, Stalker of Spheres\n\n1 Sol Ring\n1 Counterspell\n1 Cultivate\n1 Command Tower\n1 Breeding Pool"
+    );
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Analysis");
+  });
+
+  test("shows only commander identity colors (Green and Blue for G/U)", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const chartSection = page.locator(
+      'section[aria-labelledby="color-distribution-heading"]'
+    );
+    // G/U commander → only Green and Blue shown
+    await expect(chartSection.locator("text").filter({ hasText: "Blue" })).toBeVisible();
+    await expect(chartSection.locator("text").filter({ hasText: "Green" })).toBeVisible();
+    // Non-identity colors should not appear
+    await expect(chartSection.locator("text").filter({ hasText: "White" })).toHaveCount(0);
+    await expect(chartSection.locator("text").filter({ hasText: "Black" })).toHaveCount(0);
+    await expect(chartSection.locator("text").filter({ hasText: "Red" })).toHaveCount(0);
+  });
+
+  test("Command Tower scoped to commander identity colors only", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    // Command Tower produces WUBRG but should be scoped to G/U
+    // The chart should only show Green and Blue source bars
+    const chartSection = page.locator(
+      'section[aria-labelledby="color-distribution-heading"]'
+    );
+    await expect(chartSection.locator("text").filter({ hasText: "Green" })).toBeVisible();
+    await expect(chartSection.locator("text").filter({ hasText: "Blue" })).toBeVisible();
+    // Verify stat pills still work with commander deck
+    await expect(page.getByTestId("stat-land-count")).toBeVisible();
+    await expect(page.getByTestId("stat-avg-cmc")).toBeVisible();
+    await expect(page.getByTestId("stat-colorless-sources")).toBeVisible();
+  });
+
+  test("colorless toggle button is visible and functional", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const toggle = page.getByTestId("toggle-colorless");
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+    // Colorless label should now appear in the chart
+    const chartSection = page.locator(
+      'section[aria-labelledby="color-distribution-heading"]'
+    );
+    await expect(chartSection.locator("text").filter({ hasText: "Colorless" })).toBeVisible();
   });
 });

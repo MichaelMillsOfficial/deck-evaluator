@@ -11,6 +11,7 @@ import {
 import {
   computeColorDistribution,
   computeManaBaseMetrics,
+  resolveCommanderIdentity,
 } from "@/lib/color-distribution";
 import ManaCurveChart from "@/components/ManaCurveChart";
 import TypeFilterBar from "@/components/TypeFilterBar";
@@ -26,6 +27,7 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
   const [enabledTypes, setEnabledTypes] = useState<Set<CardType>>(
     () => new Set(CARD_TYPES)
   );
+  const [showColorless, setShowColorless] = useState(false);
 
   const typeCounts = useMemo(() => {
     const counts = Object.fromEntries(
@@ -58,6 +60,11 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
 
   const metrics = useMemo(
     () => computeManaBaseMetrics(deck, cardMap),
+    [deck, cardMap]
+  );
+
+  const commanderIdentity = useMemo(
+    () => resolveCommanderIdentity(deck, cardMap),
     [deck, cardMap]
   );
 
@@ -115,7 +122,12 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
           Mana sources versus pip demand by color
         </p>
         <ManaBaseStats metrics={metrics} />
-        <ColorDistributionChart data={colorDistribution} />
+        <ColorDistributionChart
+          data={colorDistribution}
+          commanderIdentity={commanderIdentity}
+          showColorless={showColorless}
+          onToggleColorless={() => setShowColorless((prev) => !prev)}
+        />
       </section>
     </div>
   );
