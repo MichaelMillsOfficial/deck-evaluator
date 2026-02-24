@@ -35,8 +35,6 @@ export default function DeckInput({
   loading,
 }: DeckInputProps) {
   const [activeTab, setActiveTab] = useState<ImportTab>("manual");
-  const [deckName, setDeckName] = useState("");
-  const [format, setFormat] = useState("");
   const [textValue, setTextValue] = useState("");
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -48,8 +46,6 @@ export default function DeckInput({
 
   const loadExample = () => {
     setTextValue(EXAMPLE_DECKLIST);
-    setDeckName("Atraxa Superfriends");
-    setFormat("Commander");
   };
 
   const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -129,46 +125,6 @@ export default function DeckInput({
           aria-busy={loading}
           className="flex flex-col gap-4"
         >
-          {/* Deck Name */}
-          <div>
-            <label
-              htmlFor="deck-name"
-              className="mb-1 block text-sm font-medium text-slate-300"
-            >
-              Deck Name
-            </label>
-            <input
-              id="deck-name"
-              type="text"
-              value={deckName}
-              onChange={(e) => setDeckName(e.target.value)}
-              placeholder="Enter deck name"
-              className="w-full rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-white placeholder-slate-400 focus:border-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={loading}
-            />
-          </div>
-
-          {/* Format (manual tab only) */}
-          {activeTab === "manual" && (
-            <div>
-              <label
-                htmlFor="deck-format"
-                className="mb-1 block text-sm font-medium text-slate-300"
-              >
-                Format
-              </label>
-              <input
-                id="deck-format"
-                type="text"
-                value={format}
-                onChange={(e) => setFormat(e.target.value)}
-                placeholder="e.g. Commander, Standard, Modern"
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-white placeholder-slate-400 focus:border-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={loading}
-              />
-            </div>
-          )}
-
           {/* Decklist textarea */}
           <div>
             <label
