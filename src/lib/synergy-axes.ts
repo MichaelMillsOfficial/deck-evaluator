@@ -39,7 +39,10 @@ const GY_KEYWORDS = new Set([
 ]);
 
 // --- Graveyard Hate ---
-const GY_HATE_EXILE_RE = /exile.+?(?:card|all).+?(?:from.+?)?graveyard/i;
+// Only match global graveyard exile — "all graveyards" or "each opponent's graveyard"
+// NOT "target card from a graveyard" or "target player's graveyard"
+const GY_HATE_EXILE_RE =
+  /exile.+?(?:all cards from all graveyards|each opponent'?s graveyard)/i;
 const GY_HATE_INSTEAD_RE = /graveyard.+?exile it instead/i;
 const GY_HATE_CANT_RE = /cards? in.+?graveyard.+?can't/i;
 

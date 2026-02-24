@@ -149,19 +149,46 @@ test.describe("Graveyard axis", () => {
 });
 
 test.describe("GraveyardHate axis", () => {
-  test("detects exile graveyard effects", () => {
-    const axis = getAxisById("graveyardHate")!;
-    const card = mockCard({
-      oracleText: "Exile all cards from target player's graveyard.",
-    });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-
-  test("detects Rest in Peace style effects", () => {
+  test("detects Rest in Peace style global exile (all graveyards)", () => {
     const axis = getAxisById("graveyardHate")!;
     const card = mockCard({
       oracleText:
         "When Rest in Peace enters the battlefield, exile all cards from all graveyards.\nIf a card or token would be put into a graveyard from anywhere, exile it instead.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("detects exile each opponent's graveyard", () => {
+    const axis = getAxisById("graveyardHate")!;
+    const card = mockCard({
+      oracleText: "Exile each opponent's graveyard.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("does NOT detect targeted exile (exile target card from a graveyard)", () => {
+    const axis = getAxisById("graveyardHate")!;
+    const card = mockCard({
+      oracleText: "Exile target card from a graveyard. You gain 2 life.",
+    });
+    // GY_HATE_EXILE_RE should not match targeted effects
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("does NOT detect targeted player graveyard exile", () => {
+    const axis = getAxisById("graveyardHate")!;
+    const card = mockCard({
+      oracleText: "Exile all cards from target player's graveyard.",
+    });
+    // Targeting a single player is not global enough
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("detects exile-instead replacement effects", () => {
+    const axis = getAxisById("graveyardHate")!;
+    const card = mockCard({
+      oracleText:
+        "If a card or token would be put into a graveyard from anywhere, exile it instead.",
     });
     expect(axis.detect(card)).toBeGreaterThan(0);
   });

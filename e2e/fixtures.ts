@@ -100,8 +100,8 @@ export class DeckPage {
     return this.page.locator('[class*="red"]');
   }
 
-  /** Click a deck view tab (Deck List or Analysis) */
-  async selectDeckViewTab(tab: "Deck List" | "Analysis") {
+  /** Click a deck view tab (Deck List, Analysis, or Synergy) */
+  async selectDeckViewTab(tab: "Deck List" | "Analysis" | "Synergy") {
     await this.page
       .getByRole("tablist", { name: "Deck view" })
       .getByRole("tab", { name: tab })

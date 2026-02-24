@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
+import { analyzeDeckSynergy } from "@/lib/synergy-engine";
 import DeckList from "@/components/DeckList";
 import DeckAnalysis from "@/components/DeckAnalysis";
+import SynergySection from "@/components/SynergySection";
 
 interface DeckViewTabsProps {
   deck: DeckData;
@@ -11,11 +13,12 @@ interface DeckViewTabsProps {
   enrichLoading: boolean;
 }
 
-type ViewTab = "list" | "analysis";
+type ViewTab = "list" | "analysis" | "synergy";
 
 const tabs: { key: ViewTab; label: string }[] = [
   { key: "list", label: "Deck List" },
   { key: "analysis", label: "Analysis" },
+  { key: "synergy", label: "Synergy" },
 ];
 
 export default function DeckViewTabs({
@@ -26,6 +29,11 @@ export default function DeckViewTabs({
   const [activeTab, setActiveTab] = useState<ViewTab>("list");
 
   const analysisDisabled = !cardMap || enrichLoading;
+
+  const synergyAnalysis = useMemo(
+    () => (cardMap ? analyzeDeckSynergy(deck, cardMap) : null),
+    [deck, cardMap]
+  );
 
   const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
     const tabKeys = tabs.map((t) => t.key);
@@ -46,9 +54,13 @@ export default function DeckViewTabs({
 
     e.preventDefault();
 
-    // Skip disabled tabs
+    // Skip disabled tabs (both analysis and synergy need cardMap)
     const targetTab = tabs[newIndex];
-    if (targetTab.key === "analysis" && analysisDisabled) return;
+    if (
+      (targetTab.key === "analysis" || targetTab.key === "synergy") &&
+      analysisDisabled
+    )
+      return;
 
     setActiveTab(tabKeys[newIndex]);
     const nextButton = document.getElementById(
@@ -66,7 +78,9 @@ export default function DeckViewTabs({
       >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
-          const isDisabled = tab.key === "analysis" && analysisDisabled;
+          const isDisabled =
+            (tab.key === "analysis" || tab.key === "synergy") &&
+            analysisDisabled;
           return (
             <button
               key={tab.key}
@@ -114,6 +128,28 @@ export default function DeckViewTabs({
       >
         {activeTab === "analysis" && cardMap && !enrichLoading && (
           <DeckAnalysis deck={deck} cardMap={cardMap} />
+        )}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="tabpanel-deck-synergy"
+        aria-labelledby="tab-deck-synergy"
+        hidden={activeTab !== "synergy"}
+      >
+        {activeTab === "synergy" && cardMap && synergyAnalysis && (
+          <section aria-labelledby="synergy-heading">
+            <h3
+              id="synergy-heading"
+              className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
+            >
+              Card Synergy
+            </h3>
+            <p className="mb-4 text-xs text-slate-400">
+              Synergy analysis, known combos, and anti-synergy warnings
+            </p>
+            <SynergySection analysis={synergyAnalysis} cardMap={cardMap} />
+          </section>
         )}
       </div>
     </div>

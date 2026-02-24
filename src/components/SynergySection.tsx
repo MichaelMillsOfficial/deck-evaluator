@@ -1,6 +1,6 @@
 "use client";
 
-import type { DeckSynergyAnalysis } from "@/lib/types";
+import type { DeckSynergyAnalysis, EnrichedCard } from "@/lib/types";
 import DeckThemes from "@/components/DeckThemes";
 import SynergyStats from "@/components/SynergyStats";
 import SynergyPairList from "@/components/SynergyPairList";
@@ -8,9 +8,10 @@ import CardSynergyTable from "@/components/CardSynergyTable";
 
 interface SynergySectionProps {
   analysis: DeckSynergyAnalysis;
+  cardMap: Record<string, EnrichedCard>;
 }
 
-export default function SynergySection({ analysis }: SynergySectionProps) {
+export default function SynergySection({ analysis, cardMap }: SynergySectionProps) {
   // Separate combos from heuristic synergies for display
   const heuristicSynergies = analysis.topSynergies.filter(
     (p) => p.type !== "combo"
@@ -28,6 +29,7 @@ export default function SynergySection({ analysis }: SynergySectionProps) {
           variant="synergy"
           title="Known Combos"
           testId="synergy-pairs"
+          cardMap={cardMap}
         />
       )}
 
@@ -37,6 +39,7 @@ export default function SynergySection({ analysis }: SynergySectionProps) {
           variant="synergy"
           title={combos.length > 0 ? "Top Synergies" : "Known Combos & Synergies"}
           testId={combos.length > 0 ? "heuristic-synergies" : "synergy-pairs"}
+          cardMap={cardMap}
         />
       )}
 
@@ -57,6 +60,7 @@ export default function SynergySection({ analysis }: SynergySectionProps) {
         variant="anti-synergy"
         title="Anti-Synergy Warnings"
         testId="anti-synergy-pairs"
+        cardMap={cardMap}
       />
 
       {analysis.antiSynergies.length === 0 && (
