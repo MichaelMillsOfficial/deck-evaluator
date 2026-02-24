@@ -159,6 +159,44 @@ tests/unit/                         # Pure function tests (no browser, no dev se
 
 When working on a feature, the test file should be created or updated _before_ the implementation code. This ensures the test suite always describes the intended behavior and catches regressions.
 
+## Skills (Slash Commands)
+
+Skills live in `.claude/commands/` and are invoked with `/skill-name`. They fall into two categories:
+
+### Code-Pattern Skills
+
+These enforce consistent patterns when adding new code to the codebase:
+
+| Skill | Purpose | Invoked As |
+|-------|---------|------------|
+| `add-api-route` | Scaffold a new Next.js API route with validation patterns | `/add-api-route` |
+| `add-component` | Create a React component following dark theme + a11y patterns | `/add-component` |
+| `add-lib-module` | Create a pure TypeScript module in `src/lib/` | `/add-lib-module` |
+| `add-e2e-test` | Create or extend a Playwright e2e test | `/add-e2e-test` |
+| `add-card-tag` | Add a new heuristic card tag to `card-tags.ts` | `/add-card-tag` |
+| `add-synergy-axis` | Add a new synergy detection axis to `synergy-axes.ts` | `/add-synergy-axis` |
+| `add-known-combo` | Add a new combo to the known combo registry | `/add-known-combo` |
+| `write-plan` | Create an implementation plan in `docs/plans/` | `/write-plan` |
+| `run-tests` | Run tests and report results with diagnostics | `/run-tests` |
+
+### MTG Domain Knowledge Skills
+
+These provide Magic: The Gathering expertise for card analysis and deck evaluation:
+
+| Skill | Purpose | Invoked As |
+|-------|---------|------------|
+| `mtg-card-expert` | Card lookup via Scryfall, oracle text interpretation, play pattern analysis, card interaction reasoning | `/mtg-card-expert` |
+| `evaluate-detection` | Audit tag/synergy regex accuracy against real cards, find false positives/negatives | `/evaluate-detection` |
+| `review-deck-analysis` | Holistic deck evaluation tying together all analysis modules | `/review-deck-analysis` |
+
+### When to Use Which Skill
+
+- Adding a new feature? Start with `/write-plan`, then use the appropriate `add-*` skill for each piece
+- Need to understand a card's mechanics? Use `/mtg-card-expert`
+- Suspect tags or synergy detection is wrong for certain cards? Use `/evaluate-detection`
+- Want to validate that the analysis pipeline produces sensible results for a deck? Use `/review-deck-analysis`
+- Adding a new combo to the registry? Use `/add-known-combo`
+
 ## Plans
 
 All implementation plans live in `docs/plans/` as Markdown files. When generating a plan:
