@@ -12,9 +12,9 @@ Commander-identity-aware cards (Command Tower, Exotic Orchard, etc.) will be sco
 
 ### 1. Add `produced_mana` to Scryfall and EnrichedCard types
 
-- [ ] Add `produced_mana?: string[]` to `ScryfallCard` and `ScryfallCardFace` in `src/lib/scryfall.ts`
-- [ ] Add `producedMana: string[]` to `EnrichedCard` in `src/lib/types.ts`
-- [ ] Map `produced_mana` in `normalizeToEnrichedCard()` in `src/lib/scryfall.ts`:
+- [x] Add `produced_mana?: string[]` to `ScryfallCard` and `ScryfallCardFace` in `src/lib/scryfall.ts`
+- [x] Add `producedMana: string[]` to `EnrichedCard` in `src/lib/types.ts`
+- [x] Map `produced_mana` in `normalizeToEnrichedCard()` in `src/lib/scryfall.ts`:
   ```typescript
   producedMana: card.produced_mana ?? frontFace?.produced_mana ?? [],
   ```
@@ -23,38 +23,38 @@ Commander-identity-aware cards (Command Tower, Exotic Orchard, etc.) will be sco
 
 Adding a required field to `EnrichedCard` will break any test that constructs mock cards. Add `producedMana: []` (or appropriate values) to mock card objects in:
 
-- [ ] `e2e/mana-curve.spec.ts` — `makeCard()` helper
-- [ ] `e2e/deck-analysis.spec.ts` — mock enrichment response
-- [ ] `e2e/deck-enrichment.spec.ts` — mock enriched cards (if applicable)
-- [ ] `e2e/card-tags.spec.ts` — mock enriched cards (if applicable)
-- [ ] Verify `npm run build` and `npm test` still pass after type changes
+- [x] `e2e/mana-curve.spec.ts` — `makeCard()` helper
+- [x] `e2e/deck-analysis.spec.ts` — mock enrichment response
+- [x] `e2e/deck-enrichment.spec.ts` — mock enriched cards (if applicable)
+- [x] `e2e/card-tags.spec.ts` — mock enriched cards (if applicable)
+- [x] Verify `npm run build` and `npm test` still pass after type changes
 
 ### 3. Write color distribution utility tests — `e2e/color-distribution.spec.ts`
 
 Pure function tests (direct import, `@playwright/test`, no browser). Follow `e2e/mana-curve.spec.ts` pattern.
 
 **`computeColorDistribution()` tests:**
-- [ ] Returns zero counts for all 5 colors when cardMap is empty
-- [ ] Counts basic lands correctly (Forest → G source, Island → U source)
-- [ ] Counts dual lands producing multiple colors (Hallowed Fountain → W + U)
-- [ ] Counts non-land mana producers (Birds of Paradise, Sol Ring)
-- [ ] Multiplies `DeckCard.quantity` into source counts
-- [ ] Skips cards not found in cardMap
-- [ ] Commander identity scoping: a card with `producedMana: ["W","U","B","R","G"]` in a W/U commander deck counts only as W + U source
-- [ ] Colorless sources tracked separately (Sol Ring with `producedMana: ["C"]`)
+- [x] Returns zero counts for all 5 colors when cardMap is empty
+- [x] Counts basic lands correctly (Forest → G source, Island → U source)
+- [x] Counts dual lands producing multiple colors (Hallowed Fountain → W + U)
+- [x] Counts non-land mana producers (Birds of Paradise, Sol Ring)
+- [x] Multiplies `DeckCard.quantity` into source counts
+- [x] Skips cards not found in cardMap
+- [x] Commander identity scoping: a card with `producedMana: ["W","U","B","R","G"]` in a W/U commander deck counts only as W + U source
+- [x] Colorless sources tracked separately (Sol Ring with `producedMana: ["C"]`)
 
 **`computePipDemand()` tests:**
-- [ ] Returns zero counts when deck is empty
-- [ ] Sums `manaPips` correctly across all cards
-- [ ] Multiplies by `DeckCard.quantity`
-- [ ] Includes commanders, mainboard, and sideboard
+- [x] Returns zero counts when deck is empty
+- [x] Sums `manaPips` correctly across all cards
+- [x] Multiplies by `DeckCard.quantity`
+- [x] Includes commanders, mainboard, and sideboard
 
 **`computeManaBaseMetrics()` tests:**
-- [ ] Returns land count, total cards, land percentage
-- [ ] Returns average CMC of non-land cards (1 decimal)
-- [ ] Returns per-color source-to-demand ratio
-- [ ] Handles zero-demand colors gracefully (ratio = Infinity or null)
-- [ ] Returns colorless source count
+- [x] Returns land count, total cards, land percentage
+- [x] Returns average CMC of non-land cards (1 decimal)
+- [x] Returns per-color source-to-demand ratio
+- [x] Handles zero-demand colors gracefully (ratio = Infinity or null)
+- [x] Returns colorless source count
 
 ### 4. Implement color distribution utility — `src/lib/color-distribution.ts`
 
@@ -82,19 +82,19 @@ export interface ManaBaseMetrics {
 }
 ```
 
-- [ ] `resolveCommanderIdentity(deck, cardMap)` — returns `Set<MtgColor>` from the union of all commanders' `colorIdentity`
-- [ ] `computeColorDistribution(deck, cardMap)` — iterates all cards, counts sources (using `producedMana` scoped to commander identity for 5-color producers) and pip demand
-- [ ] `computeManaBaseMetrics(deck, cardMap, distribution)` — derives land count, avg CMC, land ratio, per-color source-to-demand ratio
-- [ ] Logic for commander identity scoping: if a card's `producedMana` contains all 5 colors AND commanders exist, filter to commander identity colors. Cards that produce a fixed subset (e.g., a Simic dual land) are counted as-is regardless of commander identity.
+- [x] `resolveCommanderIdentity(deck, cardMap)` — returns `Set<MtgColor>` from the union of all commanders' `colorIdentity`
+- [x] `computeColorDistribution(deck, cardMap)` — iterates all cards, counts sources (using `producedMana` scoped to commander identity for 5-color producers) and pip demand
+- [x] `computeManaBaseMetrics(deck, cardMap, distribution)` — derives land count, avg CMC, land ratio, per-color source-to-demand ratio
+- [x] Logic for commander identity scoping: if a card's `producedMana` contains all 5 colors AND commanders exist, filter to commander identity colors. Cards that produce a fixed subset (e.g., a Simic dual land) are counted as-is regardless of commander identity.
 
 ### 5. Write E2E tests for color distribution UI — extend `e2e/deck-analysis.spec.ts`
 
 Add `test.describe("Deck Analysis — Color Distribution")` block with enriched mock data including `producedMana` on each card.
 
-- [ ] "Color Distribution" heading visible on Analysis tab
-- [ ] Chart has `role="img"` with accessible label
-- [ ] Stat pills visible: land count, average CMC, colorless sources
-- [ ] Each color shows source count and pip count
+- [x] "Color Distribution" heading visible on Analysis tab
+- [x] Chart has `role="img"` with accessible label
+- [x] Stat pills visible: land count, average CMC, colorless sources
+- [x] Each color shows source count and pip count
 
 ### 6. Create `ColorDistributionChart` component — `src/components/ColorDistributionChart.tsx`
 
@@ -102,35 +102,35 @@ Grouped bar chart (Recharts `BarChart`) — one group per color, two bars per gr
 - **Sources** bar: how many cards produce that color
 - **Demand** bar: total pips of that color in mana costs
 
-- [ ] Uses `ChartContainer` wrapper with `ariaLabel`
-- [ ] MTG color scheme: W=`#F9D75E`, U=`#0E68AB`, B=`#6B7280`, R=`#D32029`, G=`#00733E`
-- [ ] X-axis labels: full color names (White, Blue, Black, Red, Green)
-- [ ] Legend distinguishing Sources vs Demand
-- [ ] Dark tooltip matching existing style (`bg-slate-800 border-slate-600`)
-- [ ] Respects `prefers-reduced-motion`
+- [x] Uses `ChartContainer` wrapper with `ariaLabel`
+- [x] MTG color scheme: W=`#F9D75E`, U=`#0E68AB`, B=`#6B7280`, R=`#D32029`, G=`#00733E`
+- [x] X-axis labels: full color names (White, Blue, Black, Red, Green)
+- [x] Legend distinguishing Sources vs Demand
+- [x] Dark tooltip matching existing style (`bg-slate-800 border-slate-600`)
+- [x] Respects `prefers-reduced-motion`
 
 ### 7. Create `ManaBaseStats` component — `src/components/ManaBaseStats.tsx`
 
 Row of stat cards displayed above the chart:
 
-- [ ] **Lands**: `{landCount} / {totalCards} ({landPercentage}%)`
-- [ ] **Avg CMC**: formatted to 1 decimal
-- [ ] **Colorless Sources**: count of C-only producers
-- [ ] Styling: `bg-slate-800/50 border border-slate-700 rounded-lg` grid, `data-testid` attributes for testing
+- [x] **Lands**: `{landCount} / {totalCards} ({landPercentage}%)`
+- [x] **Avg CMC**: formatted to 1 decimal
+- [x] **Colorless Sources**: count of C-only producers
+- [x] Styling: `bg-slate-800/50 border border-slate-700 rounded-lg` grid, `data-testid` attributes for testing
 
 ### 8. Update `DeckAnalysis.tsx` — add color distribution section
 
-- [ ] Import and call `computeColorDistribution()` and `computeManaBaseMetrics()` wrapped in `useMemo`
-- [ ] Add new `<section aria-labelledby="color-distribution-heading">` below mana curve
-- [ ] Render heading "Color Distribution", subtitle, `<ManaBaseStats>`, and `<ColorDistributionChart>`
+- [x] Import and call `computeColorDistribution()` and `computeManaBaseMetrics()` wrapped in `useMemo`
+- [x] Add new `<section aria-labelledby="color-distribution-heading">` below mana curve
+- [x] Render heading "Color Distribution", subtitle, `<ManaBaseStats>`, and `<ColorDistributionChart>`
 
 ### 9. Verify
 
-- [ ] `npx playwright test e2e/color-distribution.spec.ts` — utility tests pass
-- [ ] `npx playwright test e2e/deck-analysis.spec.ts` — E2E tests pass
-- [ ] `npm test` — full suite green
-- [ ] `npm run build` — no TypeScript errors
-- [ ] Visual: import a deck, switch to Analysis, see mana curve + color distribution chart with source/demand bars and stat pills
+- [x] `npx playwright test e2e/color-distribution.spec.ts` — utility tests pass
+- [x] `npx playwright test e2e/deck-analysis.spec.ts` — E2E tests pass
+- [x] `npm test` — full suite green (181 passed)
+- [x] `npm run build` — no TypeScript errors
+- [x] Visual: import a deck, switch to Analysis, see mana curve + color distribution chart with source/demand bars and stat pills
 
 ---
 
