@@ -1,0 +1,64 @@
+name: Sync Release Version to Vercel
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  sync-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract release tag
+        id: tag
+        run: echo "version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert RELEASE_VERSION env var on Vercel
+        run: |
+          # Check if the env var already exists
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+            "https://api.vercel.com/v9/projects/${{ secrets.VERCEL_PROJECT_ID }}/env?teamId=${{ secrets.VERCEL_ORG_ID }}&key=RELEASE_VERSION")
+
+          if [ "$STATUS" = "200" ]; then
+            # Find the env var ID and update it
+            ENV_ID=$(curl -s \
+              -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+              "https://api.vercel.com/v9/projects/${{ secrets.VERCEL_PROJECT_ID }}/env?teamId=${{ secrets.VERCEL_ORG_ID }}&key=RELEASE_VERSION" \
+              | jq -r '.envs[0].id // empty')
+
+            if [ -n "$ENV_ID" ]; then
+              curl -s -X PATCH \
+                -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+                -H "Content-Type: application/json" \
+                -d '{"value": "${{ steps.tag.outputs.version }}"}' \
+                "https://api.vercel.com/v9/projects/${{ secrets.VERCEL_PROJECT_ID }}/env/$ENV_ID?teamId=${{ secrets.VERCEL_ORG_ID }}"
+              echo "Updated RELEASE_VERSION to ${{ steps.tag.outputs.version }}"
+            else
+              # Env var key exists but no entries — create it
+              curl -s -X POST \
+                -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+                -H "Content-Type: application/json" \
+                -d '{"key": "RELEASE_VERSION", "value": "${{ steps.tag.outputs.version }}", "type": "plain", "target": ["production", "preview", "development"]}' \
+                "https://api.vercel.com/v9/projects/${{ secrets.VERCEL_PROJECT_ID }}/env?teamId=${{ secrets.VERCEL_ORG_ID }}"
+              echo "Created RELEASE_VERSION as ${{ steps.tag.outputs.version }}"
+            fi
+          else
+            # Env var doesn't exist — create it
+            curl -s -X POST \
+              -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d '{"key": "RELEASE_VERSION", "value": "${{ steps.tag.outputs.version }}", "type": "plain", "target": ["production", "preview", "development"]}' \
+              "https://api.vercel.com/v9/projects/${{ secrets.VERCEL_PROJECT_ID }}/env?teamId=${{ secrets.VERCEL_ORG_ID }}"
+            echo "Created RELEASE_VERSION as ${{ steps.tag.outputs.version }}"
+          fi
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Trigger production redeploy
+        run: vercel --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
