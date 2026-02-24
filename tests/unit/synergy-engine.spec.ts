@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { analyzeDeckSynergy } from "../src/lib/synergy-engine";
-import type { DeckData, EnrichedCard } from "../src/lib/types";
+import { analyzeDeckSynergy } from "../../src/lib/synergy-engine";
+import type { DeckData, EnrichedCard } from "../../src/lib/types";
 
 /** Helper to build a minimal EnrichedCard */
 function mockCard(overrides: Partial<EnrichedCard> = {}): EnrichedCard {

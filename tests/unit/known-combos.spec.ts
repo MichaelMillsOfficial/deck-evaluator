@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { KNOWN_COMBOS, findCombosInDeck } from "../src/lib/known-combos";
+import { KNOWN_COMBOS, findCombosInDeck } from "../../src/lib/known-combos";
 
 test.describe("KNOWN_COMBOS registry", () => {
   test("contains at least 15 combos", () => {

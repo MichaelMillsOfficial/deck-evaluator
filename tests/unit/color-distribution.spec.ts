@@ -4,8 +4,8 @@ import {
   computeManaBaseMetrics,
   resolveCommanderIdentity,
   MTG_COLORS,
-} from "../src/lib/color-distribution";
-import type { DeckData, EnrichedCard } from "../src/lib/types";
+} from "../../src/lib/color-distribution";
+import type { DeckData, EnrichedCard } from "../../src/lib/types";
 
 function makeDeck(overrides: Partial<DeckData> = {}): DeckData {
   return {
