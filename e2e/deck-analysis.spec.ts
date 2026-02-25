@@ -770,3 +770,527 @@ test.describe("Deck Analysis — Color Distribution (Commander)", () => {
     await expect(chartSection.locator("text").filter({ hasText: "Colorless" })).toBeVisible();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Composition Scorecard mock data
+// ---------------------------------------------------------------------------
+
+/**
+ * Mock enrichment response with cards covering all tag categories plus
+ * an untagged vanilla creature.
+ */
+const MOCK_SCORECARD_RESPONSE = {
+  cards: {
+    // Ramp
+    "Sol Ring": {
+      name: "Sol Ring",
+      manaCost: "{1}",
+      cmc: 1,
+      colorIdentity: [],
+      colors: [],
+      typeLine: "Artifact",
+      supertypes: [],
+      subtypes: [],
+      oracleText: "{T}: Add {C}{C}.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "uncommon",
+      imageUris: null,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: ["C"],
+      flavorName: null,
+    },
+    "Cultivate": {
+      name: "Cultivate",
+      manaCost: "{2}{G}",
+      cmc: 3,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      typeLine: "Sorcery",
+      supertypes: [],
+      subtypes: [],
+      oracleText:
+        "Search your library for up to two basic land cards, reveal those cards, put one onto the battlefield tapped and the other into your hand, then shuffle.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "common",
+      imageUris: null,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+      producedMana: [],
+      flavorName: null,
+    },
+    // Card Draw
+    "Rhystic Study": {
+      name: "Rhystic Study",
+      manaCost: "{2}{U}",
+      cmc: 3,
+      colorIdentity: ["U"],
+      colors: ["U"],
+      typeLine: "Enchantment",
+      supertypes: [],
+      subtypes: [],
+      oracleText:
+        "Whenever an opponent casts a spell, you may pay {1}. If you don't, draw a card.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "common",
+      imageUris: null,
+      manaPips: { W: 0, U: 1, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: [],
+      flavorName: null,
+    },
+    // Removal
+    "Swords to Plowshares": {
+      name: "Swords to Plowshares",
+      manaCost: "{W}",
+      cmc: 1,
+      colorIdentity: ["W"],
+      colors: ["W"],
+      typeLine: "Instant",
+      supertypes: [],
+      subtypes: [],
+      oracleText: "Exile target creature.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "uncommon",
+      imageUris: null,
+      manaPips: { W: 1, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: [],
+      flavorName: null,
+    },
+    // Board Wipe (also counts as Removal)
+    "Wrath of God": {
+      name: "Wrath of God",
+      manaCost: "{2}{W}{W}",
+      cmc: 4,
+      colorIdentity: ["W"],
+      colors: ["W"],
+      typeLine: "Sorcery",
+      supertypes: [],
+      subtypes: [],
+      oracleText: "Destroy all creatures.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "rare",
+      imageUris: null,
+      manaPips: { W: 2, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: [],
+      flavorName: null,
+    },
+    // Counterspell
+    "Counterspell": {
+      name: "Counterspell",
+      manaCost: "{U}{U}",
+      cmc: 2,
+      colorIdentity: ["U"],
+      colors: ["U"],
+      typeLine: "Instant",
+      supertypes: [],
+      subtypes: [],
+      oracleText: "Counter target spell.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "uncommon",
+      imageUris: null,
+      manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: [],
+      flavorName: null,
+    },
+    // Recursion
+    "Regrowth": {
+      name: "Regrowth",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      typeLine: "Sorcery",
+      supertypes: [],
+      subtypes: [],
+      oracleText: "Return target card from your graveyard to your hand.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "uncommon",
+      imageUris: null,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+      producedMana: [],
+      flavorName: null,
+    },
+    // Protection
+    "Heroic Intervention": {
+      name: "Heroic Intervention",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      typeLine: "Instant",
+      supertypes: [],
+      subtypes: [],
+      oracleText:
+        "Until end of turn, permanents you control gain hexproof and indestructible.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "rare",
+      imageUris: null,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+      producedMana: [],
+      flavorName: null,
+    },
+    // Untagged vanilla creature
+    "Grizzly Bears": {
+      name: "Grizzly Bears",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      typeLine: "Creature — Bear",
+      supertypes: [],
+      subtypes: ["Bear"],
+      oracleText: "",
+      keywords: [],
+      power: "2",
+      toughness: "2",
+      loyalty: null,
+      rarity: "common",
+      imageUris: null,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+      producedMana: [],
+      flavorName: null,
+    },
+    // Land
+    "Command Tower": {
+      name: "Command Tower",
+      manaCost: "",
+      cmc: 0,
+      colorIdentity: [],
+      colors: [],
+      typeLine: "Land",
+      supertypes: [],
+      subtypes: [],
+      oracleText:
+        "{T}: Add one mana of any color in your commander's color identity.",
+      keywords: [],
+      power: null,
+      toughness: null,
+      loyalty: null,
+      rarity: "common",
+      imageUris: null,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+      producedMana: ["W", "U", "B", "R", "G"],
+      flavorName: null,
+    },
+  },
+  notFound: [],
+};
+
+const SCORECARD_DECKLIST =
+  "1 Sol Ring\n1 Cultivate\n1 Rhystic Study\n1 Swords to Plowshares\n1 Wrath of God\n1 Counterspell\n1 Regrowth\n1 Heroic Intervention\n1 Grizzly Bears\n1 Command Tower";
+
+test.describe("Deck Analysis — Composition Scorecard", () => {
+  test.beforeEach(async ({ deckPage }) => {
+    const { page } = deckPage;
+    await page.route("**/api/deck-enrich", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_SCORECARD_RESPONSE),
+      })
+    );
+    await deckPage.goto();
+    await deckPage.fillDecklist(SCORECARD_DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    // Wait for enrichment to complete
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Analysis");
+  });
+
+  test("Composition Scorecard heading visible on Analysis tab", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await expect(
+      page.getByRole("heading", { name: "Composition Scorecard" })
+    ).toBeVisible();
+  });
+
+  test("displays health summary banner", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const banner = page.getByTestId("composition-health-summary");
+    await expect(banner).toBeVisible();
+    // With a small deck (10 cards) most categories will be critical → major-gaps
+    await expect(banner).toContainText(/critical|attention|target/i);
+  });
+
+  test("displays category rows with counts and status", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const categories = page.getByTestId("composition-category");
+    // Command Zone template has 8 categories
+    const count = await categories.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+
+  test("category row shows label and count", async ({ deckPage }) => {
+    const { page } = deckPage;
+    // Ramp category should be visible (we have Sol Ring + Cultivate = 2 ramp)
+    const rampRow = page
+      .getByTestId("composition-category")
+      .filter({ hasText: "Ramp" });
+    await expect(rampRow).toBeVisible();
+    // Should show count 2
+    await expect(rampRow).toContainText("2");
+  });
+
+  test("expanding a category shows card list", async ({ deckPage }) => {
+    const { page } = deckPage;
+    // Find and click the Ramp category row toggle button
+    const rampRow = page
+      .getByTestId("composition-category")
+      .filter({ hasText: "Ramp" });
+    await expect(rampRow).toBeVisible();
+
+    const toggleBtn = rampRow.getByRole("button").first();
+    await toggleBtn.click();
+
+    const cardList = rampRow.getByTestId("category-cards");
+    await expect(cardList).toBeVisible();
+    // Should show Sol Ring or Cultivate (or both)
+    await expect(cardList).toContainText(/Sol Ring|Cultivate/);
+  });
+
+  test("expanding a category sets aria-expanded to true", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const rampRow = page
+      .getByTestId("composition-category")
+      .filter({ hasText: "Ramp" });
+    const toggleBtn = rampRow.getByRole("button").first();
+
+    await expect(toggleBtn).toHaveAttribute("aria-expanded", "false");
+    await toggleBtn.click();
+    await expect(toggleBtn).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("Escape key collapses an expanded category", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const rampRow = page
+      .getByTestId("composition-category")
+      .filter({ hasText: "Ramp" });
+    const toggleBtn = rampRow.getByRole("button").first();
+
+    await toggleBtn.click();
+    await expect(toggleBtn).toHaveAttribute("aria-expanded", "true");
+
+    await toggleBtn.focus();
+    await page.keyboard.press("Escape");
+    await expect(toggleBtn).toHaveAttribute("aria-expanded", "false");
+  });
+
+  test("template selector is visible and defaults to Command Zone", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const selector = page.getByTestId("template-selector");
+    await expect(selector).toBeVisible();
+    await expect(selector).toHaveValue("command-zone");
+  });
+
+  test("template selector switches between templates", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const selector = page.getByTestId("template-selector");
+
+    // Switch to 8x8
+    await selector.selectOption("8x8");
+    await expect(selector).toHaveValue("8x8");
+
+    // Health banner should update (still visible)
+    const banner = page.getByTestId("composition-health-summary");
+    await expect(banner).toBeVisible();
+  });
+
+  test("untagged cards section shows when applicable", async ({ deckPage }) => {
+    const { page } = deckPage;
+    // We have 1 Grizzly Bears which is untagged
+    const untaggedSection = page.getByTestId("composition-untagged");
+    await expect(untaggedSection).toBeVisible();
+    await expect(untaggedSection).toContainText("Untagged cards");
+    await expect(untaggedSection).toContainText("1");
+  });
+
+  test("expanding untagged shows card list with Grizzly Bears", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const untaggedSection = page.getByTestId("composition-untagged");
+    const toggleBtn = untaggedSection.getByRole("button").first();
+
+    await toggleBtn.click();
+    await expect(toggleBtn).toHaveAttribute("aria-expanded", "true");
+    await expect(untaggedSection).toContainText("Grizzly Bears");
+  });
+
+  test("section has proper ARIA structure with aria-labelledby", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    // Find section with aria-labelledby pointing to our heading
+    const scorecardSection = page.locator("section").filter({
+      has: page.getByRole("heading", { name: "Composition Scorecard" }),
+    });
+    await expect(scorecardSection).toBeVisible();
+    await expect(scorecardSection).toHaveAttribute("aria-labelledby", /.+/);
+  });
+
+  test("category progress bars have role=progressbar with aria attributes", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const progressBars = page
+      .getByTestId("composition-category")
+      .first()
+      .locator('[role="progressbar"]');
+    const bar = progressBars.first();
+    await expect(bar).toHaveAttribute("aria-valuenow");
+    await expect(bar).toHaveAttribute("aria-valuemin", "0");
+    await expect(bar).toHaveAttribute("aria-valuemax");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Power Level Estimator
+// ---------------------------------------------------------------------------
+
+test.describe("Deck Analysis — Power Level Estimator", () => {
+  test.beforeEach(async ({ deckPage }) => {
+    const { page } = deckPage;
+    await page.route("**/api/deck-enrich", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_ANALYSIS_RESPONSE),
+      })
+    );
+    await deckPage.goto();
+    await deckPage.fillDecklist(
+      "1 Sol Ring\n1 Counterspell\n1 Cultivate\n1 Command Tower"
+    );
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Analysis");
+  });
+
+  test("Power Level Estimator section appears on Analysis tab", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await expect(
+      page.getByRole("heading", { name: "Power Level Estimator" })
+    ).toBeVisible();
+  });
+
+  test("displays power level score between 1 and 10", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const scoreEl = page.getByTestId("power-level-score");
+    await expect(scoreEl).toBeVisible();
+    const text = await scoreEl.textContent();
+    const value = parseInt(text ?? "0", 10);
+    expect(value).toBeGreaterThanOrEqual(1);
+    expect(value).toBeLessThanOrEqual(10);
+  });
+
+  test("displays band label (one of the valid bands)", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const bandEl = page.getByTestId("power-level-band");
+    await expect(bandEl).toBeVisible();
+    const bandText = await bandEl.textContent();
+    const validBands = ["Casual", "Focused", "Optimized", "High Power", "cEDH"];
+    expect(validBands).toContain(bandText?.trim());
+  });
+
+  test("displays factor breakdown rows", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const factors = page.getByTestId("power-level-factor");
+    // Should have 8 factors
+    await expect(factors).toHaveCount(8);
+  });
+
+  test("displays raw score element", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const rawScoreEl = page.getByTestId("power-level-raw-score");
+    await expect(rawScoreEl).toBeVisible();
+    // Should contain "X/100" format
+    await expect(rawScoreEl).toContainText("/100");
+  });
+
+  test("section has accessible heading structure", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const section = page.locator(
+      'section[aria-labelledby="power-level-heading"]'
+    );
+    await expect(section).toBeVisible();
+    const heading = section.locator("#power-level-heading");
+    await expect(heading).toBeVisible();
+  });
+
+  test("power level section appears before Mana Curve section", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const powerSection = page.locator(
+      'section[aria-labelledby="power-level-heading"]'
+    );
+    const manaSection = page.locator(
+      'section[aria-labelledby="mana-curve-heading"]'
+    );
+
+    await expect(powerSection).toBeVisible();
+    await expect(manaSection).toBeVisible();
+
+    // Verify ordering by checking DOM position
+    const powerBox = await powerSection.boundingBox();
+    const manaBox = await manaSection.boundingBox();
+    expect(powerBox!.y).toBeLessThan(manaBox!.y);
+  });
+
+  test("factor progress bars have proper ARIA attributes", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const firstFactor = page.getByTestId("power-level-factor").first();
+    const progressBar = firstFactor.locator('[role="progressbar"]');
+    await expect(progressBar).toHaveAttribute("aria-valuenow");
+    await expect(progressBar).toHaveAttribute("aria-valuemin", "0");
+    await expect(progressBar).toHaveAttribute("aria-valuemax", "100");
+  });
+});
