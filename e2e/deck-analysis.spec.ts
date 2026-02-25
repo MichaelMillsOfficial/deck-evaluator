@@ -1178,3 +1178,112 @@ test.describe("Deck Analysis — Composition Scorecard", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Power Level Estimator
+// ---------------------------------------------------------------------------
+
+test.describe("Deck Analysis — Power Level Estimator", () => {
+  test.beforeEach(async ({ deckPage }) => {
+    const { page } = deckPage;
+    await page.route("**/api/deck-enrich", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_ANALYSIS_RESPONSE),
+      })
+    );
+    await deckPage.goto();
+    await deckPage.fillDecklist(
+      "1 Sol Ring\n1 Counterspell\n1 Cultivate\n1 Command Tower"
+    );
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Analysis");
+  });
+
+  test("Power Level Estimator section appears on Analysis tab", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await expect(
+      page.getByRole("heading", { name: "Power Level Estimator" })
+    ).toBeVisible();
+  });
+
+  test("displays power level score between 1 and 10", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const scoreEl = page.getByTestId("power-level-score");
+    await expect(scoreEl).toBeVisible();
+    const text = await scoreEl.textContent();
+    const score = parseInt(text ?? "0", 10);
+    expect(score).toBeGreaterThanOrEqual(1);
+    expect(score).toBeLessThanOrEqual(10);
+  });
+
+  test("displays band label (Casual/Focused/Optimized/High Power/cEDH)", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const bandEl = page.getByTestId("power-level-band");
+    await expect(bandEl).toBeVisible();
+    const text = await bandEl.textContent();
+    const validBands = ["Casual", "Focused", "Optimized", "High Power", "cEDH"];
+    expect(validBands).toContain(text?.trim());
+  });
+
+  test("displays factor breakdown rows", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const factors = page.getByTestId("power-level-factor");
+    await expect(factors).toHaveCount(8);
+  });
+
+  test("section has accessible heading structure", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const section = page.locator(
+      'section[aria-labelledby="power-level-heading"]'
+    );
+    await expect(section).toBeVisible();
+    const heading = section.getByRole("heading", {
+      name: "Power Level Estimator",
+    });
+    await expect(heading).toBeVisible();
+  });
+
+  test("raw score is visible", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const rawScoreEl = page.getByTestId("power-level-raw-score");
+    await expect(rawScoreEl).toBeVisible();
+    const text = await rawScoreEl.textContent();
+    const score = parseInt(text ?? "0", 10);
+    expect(score).toBeGreaterThanOrEqual(0);
+    expect(score).toBeLessThanOrEqual(100);
+  });
+
+  test("power level section appears before Mana Curve", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const powerSection = page.locator(
+      'section[aria-labelledby="power-level-heading"]'
+    );
+    const manaSection = page.locator(
+      'section[aria-labelledby="mana-curve-heading"]'
+    );
+    await expect(powerSection).toBeVisible();
+    await expect(manaSection).toBeVisible();
+
+    const powerBound = await powerSection.boundingBox();
+    const manaBound = await manaSection.boundingBox();
+    expect(powerBound).not.toBeNull();
+    expect(manaBound).not.toBeNull();
+    // Power level section should appear higher (smaller y) than Mana Curve
+    expect(powerBound!.y).toBeLessThan(manaBound!.y);
+  });
+});
