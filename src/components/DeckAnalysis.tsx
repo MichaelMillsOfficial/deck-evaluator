@@ -20,6 +20,7 @@ import ColorDistributionChart from "@/components/ColorDistributionChart";
 import ManaBaseStats from "@/components/ManaBaseStats";
 import CommanderSection from "@/components/CommanderSection";
 import LandBaseEfficiency from "@/components/LandBaseEfficiency";
+import HypergeometricCalculator from "@/components/HypergeometricCalculator";
 
 interface DeckAnalysisProps {
   deck: DeckData;
@@ -141,6 +142,8 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
       </section>
 
       <LandBaseEfficiency result={landEfficiency} />
+
+      <HypergeometricCalculator deck={deck} cardMap={cardMap} />
     </div>
   );
 }
