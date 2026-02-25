@@ -20,6 +20,7 @@ import ColorDistributionChart from "@/components/ColorDistributionChart";
 import ManaBaseStats from "@/components/ManaBaseStats";
 import CommanderSection from "@/components/CommanderSection";
 import LandBaseEfficiency from "@/components/LandBaseEfficiency";
+import DeckCompositionScorecard from "@/components/DeckCompositionScorecard";
 import HypergeometricCalculator from "@/components/HypergeometricCalculator";
 
 interface DeckAnalysisProps {
@@ -99,6 +100,8 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
   return (
     <div className="space-y-6">
       <CommanderSection deck={deck} cardMap={cardMap} />
+
+      <DeckCompositionScorecard deck={deck} cardMap={cardMap} />
 
       <section aria-labelledby="mana-curve-heading">
         <h3
