@@ -14,14 +14,12 @@ import {
   resolveCommanderIdentity,
 } from "@/lib/color-distribution";
 import { computeLandBaseEfficiency } from "@/lib/land-base-efficiency";
-import { computePowerLevel } from "@/lib/power-level";
 import ManaCurveChart from "@/components/ManaCurveChart";
 import TypeFilterBar from "@/components/TypeFilterBar";
 import ColorDistributionChart from "@/components/ColorDistributionChart";
 import ManaBaseStats from "@/components/ManaBaseStats";
 import CommanderSection from "@/components/CommanderSection";
 import LandBaseEfficiency from "@/components/LandBaseEfficiency";
-import PowerLevelEstimator from "@/components/PowerLevelEstimator";
 import DeckCompositionScorecard from "@/components/DeckCompositionScorecard";
 import HypergeometricCalculator from "@/components/HypergeometricCalculator";
 
@@ -80,11 +78,6 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
     [deck, cardMap]
   );
 
-  const powerLevel = useMemo(
-    () => computePowerLevel(deck, cardMap),
-    [deck, cardMap]
-  );
-
   const filteredSpells = curveData.reduce(
     (sum, b) => sum + b.permanents + b.nonPermanents,
     0
@@ -107,8 +100,6 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
   return (
     <div className="space-y-6">
       <CommanderSection deck={deck} cardMap={cardMap} />
-
-      <PowerLevelEstimator result={powerLevel} />
 
       <DeckCompositionScorecard deck={deck} cardMap={cardMap} />
 
