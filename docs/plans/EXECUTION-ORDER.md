@@ -30,15 +30,15 @@ Wave 2 (depends on Wave 1 completions):
 
 All Wave 1 features depend only on existing, shipped code. They can be implemented simultaneously with zero coordination between agents.
 
-| # | Feature | Plan File | New Files | Modified Files | Estimated Complexity |
-|---|---------|-----------|-----------|----------------|---------------------|
-| 1 | Deck Composition Scorecard | `deck-composition-scorecard.md` | 3 (lib, component, unit test) | 2 (DeckAnalysis, e2e) | Medium |
-| 2 | Power Level Estimator | `power-level-estimator.md` | 3 (lib, component, unit test) | 2 (DeckAnalysis, e2e) | Medium |
-| 3 | Opening Hand Simulator | `opening-hand-simulator.md` | 5 (lib, 3 components, unit test) | 3 (DeckViewTabs, e2e, fixtures) | High |
-| 4 | Hypergeometric Calculator | `hypergeometric-calculator.md` | 3 (lib, component, unit test) | 2 (DeckAnalysis, e2e) | Medium |
-| 5 | Moxfield Direct Import | `moxfield-direct-import.md` | 2 (unit test, e2e test) | 4 (moxfield.ts, types.ts, route.ts, DeckInput) | Medium |
-| 6 | Commander Spellbook Integration | `commander-spellbook-integration.md` | 4 (lib, route, component, unit test) | 5 (DeckImportSection, DeckViewTabs, SynergySection, SynergyStats, fixtures) | High |
-| 7 | Budget Analysis | `budget-analysis.md` | 5 (lib, 4 components) | 12+ (types.ts, scryfall.ts, EnrichedCardRow, DeckAnalysis, all test mocks) | High (mock update blast radius) |
+| # | Feature | Plan File | Status | New Files | Modified Files | Estimated Complexity |
+|---|---------|-----------|--------|-----------|----------------|---------------------|
+| 1 | Deck Composition Scorecard | `deck-composition-scorecard.md` | 🔄 In Progress | 3 (lib, component, unit test) | 2 (DeckAnalysis, e2e) | Medium |
+| 2 | Power Level Estimator | `power-level-estimator.md` | 🔄 In Progress | 3 (lib, component, unit test) | 2 (DeckAnalysis, e2e) | Medium |
+| 3 | Opening Hand Simulator | `opening-hand-simulator.md` | ⬚ Not Started | 5 (lib, 3 components, unit test) | 3 (DeckViewTabs, e2e, fixtures) | High |
+| 4 | Hypergeometric Calculator | `hypergeometric-calculator.md` | 🔄 In Progress | 3 (lib, component, unit test) | 2 (DeckAnalysis, e2e) | Medium |
+| 5 | Moxfield Direct Import | `moxfield-direct-import.md` | ⬚ Not Started | 2 (unit test, e2e test) | 4 (moxfield.ts, types.ts, route.ts, DeckInput) | Medium |
+| 6 | Commander Spellbook Integration | `commander-spellbook-integration.md` | ⬚ Not Started | 4 (lib, route, component, unit test) | 5 (DeckImportSection, DeckViewTabs, SynergySection, SynergyStats, fixtures) | High |
+| 7 | Budget Analysis | `budget-analysis.md` | ⬚ Not Started | 5 (lib, 4 components) | 12+ (types.ts, scryfall.ts, EnrichedCardRow, DeckAnalysis, all test mocks) | High (mock update blast radius) |
 
 ### Wave 1 Conflict Analysis
 
@@ -72,11 +72,11 @@ These files are modified by multiple Wave 1 features. Agents must coordinate mer
 
 ## Wave 2: Dependent Features (3 agents, after Wave 1)
 
-| # | Feature | Plan File | Hard Dependencies | Soft Dependencies |
-|---|---------|-----------|-------------------|-------------------|
-| 8 | Card Swap Suggestions | `card-swap-suggestions.md` | Deck Composition Scorecard (#1) | Synergy engine (exists) |
-| 9 | Deck Comparison | `deck-comparison.md` | None | All analysis modules (exist + new from Wave 1) |
-| 10 | Export/Share Reports | `export-share-reports.md` | None | All analysis modules (exist + new from Wave 1) |
+| # | Feature | Plan File | Status | Hard Dependencies | Soft Dependencies |
+|---|---------|-----------|--------|-------------------|-------------------|
+| 8 | Card Swap Suggestions | `card-swap-suggestions.md` | ⬚ Not Started | Deck Composition Scorecard (#1) | Synergy engine (exists) |
+| 9 | Deck Comparison | `deck-comparison.md` | ⬚ Not Started | None | All analysis modules (exist + new from Wave 1) |
+| 10 | Export/Share Reports | `export-share-reports.md` | ⬚ Not Started | None | All analysis modules (exist + new from Wave 1) |
 
 ### Wave 2 Dependency Details
 
@@ -121,18 +121,18 @@ Agent allocation:
 
 ## Plan File Index
 
-| Feature | Plan File | Wave |
-|---------|-----------|------|
-| Deck Composition Scorecard | `docs/plans/deck-composition-scorecard.md` | 1 |
-| Power Level Estimator | `docs/plans/power-level-estimator.md` | 1 |
-| Opening Hand Simulator | `docs/plans/opening-hand-simulator.md` | 1 |
-| Hypergeometric Calculator | `docs/plans/hypergeometric-calculator.md` | 1 |
-| Moxfield Direct Import | `docs/plans/moxfield-direct-import.md` | 1 |
-| Commander Spellbook Integration | `docs/plans/commander-spellbook-integration.md` | 1 |
-| Budget Analysis | `docs/plans/budget-analysis.md` | 1 |
-| Card Swap Suggestions | `docs/plans/card-swap-suggestions.md` | 2 |
-| Deck Comparison | `docs/plans/deck-comparison.md` | 2 |
-| Export/Share Reports | `docs/plans/export-share-reports.md` | 2 |
+| Feature | Plan File | Wave | Status |
+|---------|-----------|------|--------|
+| Deck Composition Scorecard | `docs/plans/deck-composition-scorecard.md` | 1 | 🔄 In Progress |
+| Power Level Estimator | `docs/plans/power-level-estimator.md` | 1 | 🔄 In Progress |
+| Opening Hand Simulator | `docs/plans/opening-hand-simulator.md` | 1 | ⬚ Not Started |
+| Hypergeometric Calculator | `docs/plans/hypergeometric-calculator.md` | 1 | 🔄 In Progress |
+| Moxfield Direct Import | `docs/plans/moxfield-direct-import.md` | 1 | ⬚ Not Started |
+| Commander Spellbook Integration | `docs/plans/commander-spellbook-integration.md` | 1 | ⬚ Not Started |
+| Budget Analysis | `docs/plans/budget-analysis.md` | 1 | ⬚ Not Started |
+| Card Swap Suggestions | `docs/plans/card-swap-suggestions.md` | 2 | ⬚ Not Started |
+| Deck Comparison | `docs/plans/deck-comparison.md` | 2 | ⬚ Not Started |
+| Export/Share Reports | `docs/plans/export-share-reports.md` | 2 | ⬚ Not Started |
 
 ## Already Implemented (No Work Needed)
 
