@@ -1,3 +1,7 @@
 {
-  "ignoreCommand": "bash scripts/ignore-build.sh"
+  "git": {
+    "deploymentEnabled": {
+      "master": false
+    }
+  }
 }

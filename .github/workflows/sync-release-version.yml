@@ -6,9 +6,26 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
-  sync-version:
+  deploy-production:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel production deploy
+        run: |
+          if [ -z "${{ secrets.VERCEL_DEPLOY_HOOK }}" ]; then
+            echo "::error::VERCEL_DEPLOY_HOOK secret is not set. Create a deploy hook in Vercel Project Settings > Git > Deploy Hooks (branch: master) and add the URL as a repository secret."
+            exit 1
+          fi
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}")
+          if [ "$RESPONSE" -ne 200 ] && [ "$RESPONSE" -ne 201 ]; then
+            echo "::error::Deploy hook returned HTTP $RESPONSE"
+            exit 1
+          fi
+          echo "Vercel production deploy triggered (HTTP $RESPONSE)"
+
+  bump-version:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,17 +36,38 @@ jobs:
         id: tag
         run: |
           TAG="${{ github.event.release.tag_name }}"
-          # Strip leading "v" if present (package.json stores bare semver)
           VERSION="${TAG#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Check if version already matches
+        id: check
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ "$CURRENT" = "${{ steps.tag.outputs.version }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "package.json already at v$CURRENT — skipping"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Update package.json version
+        if: steps.check.outputs.skip != 'true'
         run: npm version "${{ steps.tag.outputs.version }}" --no-git-tag-version
 
-      - name: Commit and push
+      - name: Create version bump PR
+        if: steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          BRANCH="chore/bump-version-${{ steps.tag.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
           git add package.json package-lock.json
           git commit -m "chore: bump version to ${{ github.event.release.tag_name }}"
-          git push
+          git push origin "$BRANCH"
+          gh pr create \
+            --base master \
+            --head "$BRANCH" \
+            --title "chore: bump version to ${{ github.event.release.tag_name }}" \
+            --body "Automated version bump from release ${{ github.event.release.tag_name }}."
