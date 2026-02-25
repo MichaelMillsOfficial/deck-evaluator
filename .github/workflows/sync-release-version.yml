@@ -32,6 +32,10 @@ jobs:
         with:
           ref: master
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Extract version from release tag
         id: tag
         run: |
@@ -52,22 +56,46 @@ jobs:
 
       - name: Update package.json version
         if: steps.check.outputs.skip != 'true'
-        run: npm version "${{ steps.tag.outputs.version }}" --no-git-tag-version
+        run: npm version "${{ steps.tag.outputs.version }}" --no-git-tag-version --allow-same-version
 
-      - name: Create version bump PR
+      - name: Configure git
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit version bump
+        if: steps.check.outputs.skip != 'true'
+        id: commit
+        run: |
+          BRANCH="chore/bump-version-${{ steps.tag.outputs.version }}"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          git checkout -b "$BRANCH"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to ${{ github.event.release.tag_name }}"
+
+      - name: Push branch
+        if: steps.check.outputs.skip != 'true'
+        run: git push --force origin "${{ steps.commit.outputs.branch }}"
+
+      - name: Create or update pull request
         if: steps.check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          BRANCH="chore/bump-version-${{ steps.tag.outputs.version }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH"
-          git add package.json package-lock.json
-          git commit -m "chore: bump version to ${{ github.event.release.tag_name }}"
-          git push origin "$BRANCH"
-          gh pr create \
-            --base master \
-            --head "$BRANCH" \
-            --title "chore: bump version to ${{ github.event.release.tag_name }}" \
-            --body "Automated version bump from release ${{ github.event.release.tag_name }}."
+          BRANCH="${{ steps.commit.outputs.branch }}"
+          TITLE="chore: bump version to ${{ github.event.release.tag_name }}"
+          BODY="Automated version bump from release ${{ github.event.release.tag_name }}."
+
+          # Check if a PR already exists for this branch
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already exists for branch $BRANCH — updating"
+            gh pr edit "$EXISTING_PR" --title "$TITLE" --body "$BODY"
+          else
+            gh pr create \
+              --base master \
+              --head "$BRANCH" \
+              --title "$TITLE" \
+              --body "$BODY"
+          fi
