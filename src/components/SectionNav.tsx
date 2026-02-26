@@ -12,13 +12,16 @@ export default function SectionNav({
   onSelectSection,
 }: SectionNavProps) {
   function handleClick(id: string) {
+    const wasExpanded = expandedSections.has(id);
     onSelectSection(id);
 
-    // Scroll to the panel after a short delay to allow expansion
-    requestAnimationFrame(() => {
-      const el = document.getElementById(`panel-${id}`);
-      el?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    // Only scroll when expanding, not when collapsing
+    if (!wasExpanded) {
+      requestAnimationFrame(() => {
+        const el = document.getElementById(`panel-${id}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
   }
 
   return (

@@ -38,11 +38,9 @@ export default function SynergySection({
 
   const handleSelectSection = useCallback(
     (id: string) => {
-      if (!expandedSections.has(id)) {
-        onToggleSection(id);
-      }
+      onToggleSection(id);
     },
-    [expandedSections, onToggleSection]
+    [onToggleSection]
   );
 
   return (
