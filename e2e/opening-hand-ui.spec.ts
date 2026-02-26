@@ -377,9 +377,14 @@ test.describe("Opening Hand Simulator", () => {
     await deckPage.selectDeckViewTab("Hands");
     await deckPage.waitForHandsPanel();
 
-    // Stat cards should be visible
+    // Stat cards should be visible once the async simulation finishes.
+    // The Monte Carlo simulation runs inside useEffect + requestAnimationFrame,
+    // so the component starts in a loading/shimmer state and only renders the
+    // real stat cards after the simulation completes.
     await expect(page.getByTestId("simulation-stats")).toBeVisible();
-    await expect(page.getByTestId("stat-keepable-rate")).toBeVisible();
+    await expect(page.getByTestId("stat-keepable-rate")).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.getByTestId("stat-avg-lands")).toBeVisible();
     await expect(page.getByTestId("stat-t1-play")).toBeVisible();
     await expect(page.getByTestId("stat-t2-play")).toBeVisible();
