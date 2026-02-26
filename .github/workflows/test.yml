@@ -3,6 +3,19 @@ name: Tests
 on:
   pull_request:
     branches: [master]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "e2e/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.ts"
+      - "tsconfig.json"
+      - "playwright.config.ts"
+      - "playwright.unit.config.ts"
+      - "postcss.config.mjs"
+      - "eslint.config.mjs"
 
 jobs:
   unit:
