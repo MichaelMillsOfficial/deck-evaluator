@@ -6,6 +6,7 @@ import { analyzeDeckSynergy } from "@/lib/synergy-engine";
 import DeckList from "@/components/DeckList";
 import DeckAnalysis from "@/components/DeckAnalysis";
 import SynergySection from "@/components/SynergySection";
+import HandSimulator from "@/components/HandSimulator";
 
 interface DeckViewTabsProps {
   deck: DeckData;
@@ -13,12 +14,13 @@ interface DeckViewTabsProps {
   enrichLoading: boolean;
 }
 
-type ViewTab = "list" | "analysis" | "synergy";
+type ViewTab = "list" | "analysis" | "synergy" | "hands";
 
 const tabs: { key: ViewTab; label: string }[] = [
   { key: "list", label: "Deck List" },
   { key: "analysis", label: "Analysis" },
   { key: "synergy", label: "Synergy" },
+  { key: "hands", label: "Hands" },
 ];
 
 export default function DeckViewTabs({
@@ -34,6 +36,7 @@ export default function DeckViewTabs({
   >({
     analysis: new Set<string>(),
     synergy: new Set<string>(),
+    hands: new Set<string>(),
   });
 
   const analysisDisabled = !cardMap || enrichLoading;
@@ -78,10 +81,10 @@ export default function DeckViewTabs({
 
     e.preventDefault();
 
-    // Skip disabled tabs (both analysis and synergy need cardMap)
+    // Skip disabled tabs (analysis, synergy, and hands need cardMap)
     const targetTab = tabs[newIndex];
     if (
-      (targetTab.key === "analysis" || targetTab.key === "synergy") &&
+      (targetTab.key === "analysis" || targetTab.key === "synergy" || targetTab.key === "hands") &&
       analysisDisabled
     )
       return;
@@ -103,7 +106,7 @@ export default function DeckViewTabs({
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
           const isDisabled =
-            (tab.key === "analysis" || tab.key === "synergy") &&
+            (tab.key === "analysis" || tab.key === "synergy" || tab.key === "hands") &&
             analysisDisabled;
           return (
             <button
@@ -183,6 +186,29 @@ export default function DeckViewTabs({
               expandedSections={expandedSections.synergy}
               onToggleSection={(id) => handleToggleSection("synergy", id)}
             />
+          </section>
+        )}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="tabpanel-deck-hands"
+        aria-labelledby="tab-deck-hands"
+        hidden={activeTab !== "hands"}
+      >
+        {activeTab === "hands" && cardMap && !enrichLoading && (
+          <section aria-labelledby="hands-heading">
+            <h3
+              id="hands-heading"
+              className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
+            >
+              Opening Hand Simulator
+            </h3>
+            <p className="mb-4 text-xs text-slate-400">
+              Draw sample opening hands, evaluate quality, and view aggregate
+              statistics
+            </p>
+            <HandSimulator deck={deck} cardMap={cardMap} />
           </section>
         )}
       </div>
