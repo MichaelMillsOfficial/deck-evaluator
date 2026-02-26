@@ -72,7 +72,7 @@ export default function CollapsiblePanel({
       </button>
 
       {expanded && (
-        <div id={contentId} className="px-4 pb-4">
+        <div id={contentId} className="px-4 pt-2 pb-5">
           {children}
         </div>
       )}

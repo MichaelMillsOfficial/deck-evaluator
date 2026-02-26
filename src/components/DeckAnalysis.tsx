@@ -125,12 +125,9 @@ export default function DeckAnalysis({
 
   const handleSelectSection = useCallback(
     (id: string) => {
-      // If not expanded, expand it
-      if (!expandedSections.has(id)) {
-        onToggleSection(id);
-      }
+      onToggleSection(id);
     },
-    [expandedSections, onToggleSection]
+    [onToggleSection]
   );
 
   return (
