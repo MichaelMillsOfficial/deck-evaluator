@@ -100,8 +100,8 @@ export class DeckPage {
     return this.page.locator('[class*="red"]');
   }
 
-  /** Click a deck view tab (Deck List, Analysis, or Synergy) */
-  async selectDeckViewTab(tab: "Deck List" | "Analysis" | "Synergy") {
+  /** Click a deck view tab (Deck List, Analysis, Synergy, or Hands) */
+  async selectDeckViewTab(tab: "Deck List" | "Analysis" | "Synergy" | "Hands") {
     await this.page
       .getByRole("tablist", { name: "Deck view" })
       .getByRole("tab", { name: tab })
@@ -152,6 +152,18 @@ export class DeckPage {
     await this.page
       .getByRole("heading", { name: "Card Synergy" })
       .waitFor({ timeout: 15_000 });
+  }
+
+  /** Wait for the hands panel to appear */
+  async waitForHandsPanel() {
+    await this.page
+      .getByTestId("hand-simulator")
+      .waitFor({ timeout: 15_000 });
+  }
+
+  /** Locator for the hands panel */
+  get handsPanel() {
+    return this.page.locator("#tabpanel-deck-hands");
   }
 }
 

@@ -51,79 +51,79 @@ No external APIs or new dependencies required. All computation is client-side.
 
 ### Phase 1: Core Simulation Logic (`src/lib/opening-hand.ts`)
 
-- [ ] Create `src/lib/opening-hand.ts` with types:
+- [x] Create `src/lib/opening-hand.ts` with types:
   - `HandCard` -- `{ name, quantity, enriched: EnrichedCard }`
   - `HandQualityFactors` -- `{ landCount, rampCount, playableTurns[], colorCoverage, curvePlayability }`
   - `HandQualityResult` -- `{ score, verdict: "Strong Keep"|"Keepable"|"Marginal"|"Mulligan", factors, reasoning[] }`
   - `DrawnHand` -- `{ cards: HandCard[], quality: HandQualityResult, mulliganNumber }`
   - `SimulationStats` -- `{ totalSimulations, keepableRate, avgLandsInOpener, avgScore, probT1Play, probT2Play, probT3Play, verdictDistribution }`
-- [ ] Implement `buildPool(deck, cardMap): HandCard[]` -- flatten commanders + mainboard (exclude sideboard), repeat for quantity, skip missing cardMap entries
-- [ ] Implement `drawHand(pool, count): HandCard[]` -- Fisher-Yates shuffle copy, return first `count` cards
-- [ ] Implement `evaluateHandQuality(hand, mulliganNumber, commanderIdentity): HandQualityResult`:
+- [x] Implement `buildPool(deck, cardMap): HandCard[]` -- flatten commanders + mainboard (exclude sideboard), repeat for quantity, skip missing cardMap entries
+- [x] Implement `drawHand(pool, count): HandCard[]` -- Fisher-Yates shuffle copy, return first `count` cards
+- [x] Implement `evaluateHandQuality(hand, mulliganNumber, commanderIdentity): HandQualityResult`:
   - **Land count** (35% weight): 2-4 ideal for 7 cards, adjust for mulligan count
   - **Ramp availability** (15%): At least 1 "Ramp" tagged card
   - **Curve playability** (30%): Can cast something turns 1-3 with available untapped lands
   - **Color coverage** (20%): Lands produce colors needed by spells in hand
-- [ ] Implement `getVerdict(score)`: 80-100 "Strong Keep", 60-79 "Keepable", 40-59 "Marginal", 0-39 "Mulligan"
-- [ ] Implement `generateReasoning(factors, mulliganNumber): string[]` -- human-readable bullet points
-- [ ] Implement `runSimulation(deck, cardMap, iterations=1000): SimulationStats` -- Monte Carlo aggregate
+- [x] Implement `getVerdict(score)`: 80-100 "Strong Keep", 60-79 "Keepable", 40-59 "Marginal", 0-39 "Mulligan"
+- [x] Implement `generateReasoning(factors, mulliganNumber): string[]` -- human-readable bullet points
+- [x] Implement `runSimulation(deck, cardMap, iterations=1000): SimulationStats` -- Monte Carlo aggregate
 
 ### Phase 2: Unit Tests (`tests/unit/opening-hand.spec.ts`)
 
-- [ ] `buildPool`: flattens quantities, includes commanders, excludes sideboard, skips missing cardMap, empty deck
-- [ ] `drawHand`: returns correct count, cards from pool, no mutation, handles pool < count
-- [ ] `evaluateHandQuality`: ideal hand = "Strong Keep", 0 lands = "Mulligan", 7 lands = "Mulligan", 1 land + ramp = "Marginal", wrong-color lands = low score, 6-card hand adjustments, 5-card hand adjustments
-- [ ] `getVerdict`: boundary values at 80, 60, 40
-- [ ] `generateReasoning`: returns string array, includes land/ramp/color assessments
-- [ ] `runSimulation`: correct iteration count, rate bounds, avg lands bounds, verdict distribution sums, all-land deck ≈ 0% keepable
+- [x] `buildPool`: flattens quantities, includes commanders, excludes sideboard, skips missing cardMap, empty deck
+- [x] `drawHand`: returns correct count, cards from pool, no mutation, handles pool < count
+- [x] `evaluateHandQuality`: ideal hand = "Strong Keep", 0 lands = "Mulligan", 7 lands = "Mulligan", 1 land + ramp = "Marginal", wrong-color lands = low score, 6-card hand adjustments, 5-card hand adjustments
+- [x] `getVerdict`: boundary values at 80, 60, 40
+- [x] `generateReasoning`: returns string array, includes land/ramp/color assessments
+- [x] `runSimulation`: correct iteration count, rate bounds, avg lands bounds, verdict distribution sums, all-land deck ≈ 0% keepable
 
 ### Phase 3: Hand Display Component (`src/components/HandDisplay.tsx`)
 
-- [ ] Card images in horizontal row using `imageUris.normal`, placeholder if null, ~146x204px
-- [ ] Quality verdict as color-coded badge (green/emerald/yellow/red)
-- [ ] Numeric score next to verdict
-- [ ] Reasoning bullets (`text-xs text-slate-400`)
-- [ ] Mulligan number indicator if > 0
-- [ ] Accessible: `alt` text on images, `aria-label` on container
+- [x] Card images in horizontal row using `imageUris.normal`, placeholder if null, ~146x204px
+- [x] Quality verdict as color-coded badge (green/emerald/yellow/red)
+- [x] Numeric score next to verdict
+- [x] Reasoning bullets (`text-xs text-slate-400`)
+- [x] Mulligan number indicator if > 0
+- [x] Accessible: `alt` text on images, `aria-label` on container
 
 ### Phase 4: Simulation Stats Component (`src/components/HandSimulationStats.tsx`)
 
-- [ ] Stat cards grid (`grid-cols-2 sm:grid-cols-4`): Keepable Rate, Avg Lands, T1 Play, T2 Play
-- [ ] Verdict distribution summary
-- [ ] `data-testid` attributes on each stat card
+- [x] Stat cards grid (`grid-cols-2 sm:grid-cols-4`): Keepable Rate, Avg Lands, T1 Play, T2 Play
+- [x] Verdict distribution summary
+- [x] `data-testid` attributes on each stat card
 
 ### Phase 5: Hands Tab Container (`src/components/HandSimulator.tsx`)
 
-- [ ] State: `currentHand`, `mulliganCount`, `simStats`
-- [ ] `useMemo` for `runSimulation(deck, cardMap, 1000)`
-- [ ] "Draw Hand" button (purple primary): draws 7, evaluates quality, resets mulligan
-- [ ] "Mulligan" button (outline): increments count, draws new 7, disabled after 3
-- [ ] "New Hand" button (secondary): equivalent to Draw Hand
-- [ ] Layout: stats at top → buttons → hand display
+- [x] State: `currentHand`, `mulliganCount`, `simStats`
+- [x] `useMemo` for `runSimulation(deck, cardMap, 1000)`
+- [x] "Draw Hand" button (purple primary): draws 7, evaluates quality, resets mulligan
+- [x] "Mulligan" button (outline): increments count, draws new 7, disabled after 3
+- [x] "New Hand" button (secondary): equivalent to Draw Hand
+- [x] Layout: stats at top → buttons → hand display
 
 ### Phase 6: Tab Integration (`src/components/DeckViewTabs.tsx`)
 
-- [ ] Add `"hands"` to `ViewTab` union type
-- [ ] Add `{ key: "hands", label: "Hands" }` to `tabs` array
-- [ ] Add tabpanel block: `id="tabpanel-deck-hands"`, render `HandSimulator` when active + cardMap ready
-- [ ] Disable when `analysisDisabled` is true
+- [x] Add `"hands"` to `ViewTab` union type
+- [x] Add `{ key: "hands", label: "Hands" }` to `tabs` array
+- [x] Add tabpanel block: `id="tabpanel-deck-hands"`, render `HandSimulator` when active + cardMap ready
+- [x] Disable when `analysisDisabled` is true
 
 ### Phase 7: E2E Tests (`e2e/opening-hand-ui.spec.ts`)
 
-- [ ] "Hands tab appears after deck import and enrichment"
-- [ ] "Hands tab disabled while enrichment loading"
-- [ ] "Draw Hand button produces hand with card images"
-- [ ] "Hand quality verdict displayed after drawing"
-- [ ] "Mulligan button draws new hand and increments count"
-- [ ] "Mulligan button disabled after 3 mulligans"
-- [ ] "New Hand button resets mulligan count"
-- [ ] "Simulation stats are visible"
-- [ ] "Tab accessible with proper ARIA attributes"
+- [x] "Hands tab appears after deck import and enrichment"
+- [x] "Hands tab disabled while enrichment loading"
+- [x] "Draw Hand button produces hand with card images"
+- [x] "Hand quality verdict displayed after drawing"
+- [x] "Mulligan button draws new hand and increments count"
+- [x] "Mulligan button disabled after 3 mulligans"
+- [x] "New Hand button resets mulligan count"
+- [x] "Simulation stats are visible"
+- [x] "Tab accessible with proper ARIA attributes"
 
 ### Phase 8: Fixture Updates (`e2e/fixtures.ts`)
 
-- [ ] Add `waitForHandsPanel()` method
-- [ ] Add `get handsPanel` locator for `#tabpanel-deck-hands`
+- [x] Add `waitForHandsPanel()` method
+- [x] Add `get handsPanel` locator for `#tabpanel-deck-hands`
 
 ---
 
