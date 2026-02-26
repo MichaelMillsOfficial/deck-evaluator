@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
+import type { SpellbookCombo } from "@/lib/commander-spellbook";
 import { analyzeDeckSynergy } from "@/lib/synergy-engine";
 import DeckList from "@/components/DeckList";
 import DeckAnalysis from "@/components/DeckAnalysis";
@@ -12,6 +13,11 @@ interface DeckViewTabsProps {
   deck: DeckData;
   cardMap: Record<string, EnrichedCard> | null;
   enrichLoading: boolean;
+  spellbookCombos: {
+    exactCombos: SpellbookCombo[];
+    nearCombos: SpellbookCombo[];
+  } | null;
+  spellbookLoading: boolean;
 }
 
 type ViewTab = "list" | "analysis" | "synergy" | "hands";
@@ -27,6 +33,8 @@ export default function DeckViewTabs({
   deck,
   cardMap,
   enrichLoading,
+  spellbookCombos,
+  spellbookLoading,
 }: DeckViewTabsProps) {
   const [activeTab, setActiveTab] = useState<ViewTab>("list");
 
@@ -191,6 +199,8 @@ export default function DeckViewTabs({
               cardMap={cardMap}
               expandedSections={expandedSections.synergy}
               onToggleSection={(id) => handleToggleSection("synergy", id)}
+              spellbookCombos={spellbookCombos}
+              spellbookLoading={spellbookLoading}
             />
           </section>
         )}

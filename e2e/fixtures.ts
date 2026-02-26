@@ -165,6 +165,16 @@ export class DeckPage {
   get handsPanel() {
     return this.page.locator("#tabpanel-deck-hands");
   }
+
+  /** Locator for the verified combos section */
+  get verifiedCombosSection() {
+    return this.page.getByTestId("verified-combos-section");
+  }
+
+  /** Locator for the near combos section */
+  get nearCombosSection() {
+    return this.page.getByTestId("near-combos-section");
+  }
 }
 
 // ---------------------------------------------------------------------------

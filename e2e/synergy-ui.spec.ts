@@ -219,6 +219,30 @@ const SYNERGY_DECKLIST = [
   "1 Command Tower",
 ].join("\n");
 
+/**
+ * Mock Commander Spellbook combo response matching the synergy decklist.
+ * The real API may be unavailable in CI (returns 403), so we mock it to
+ * ensure tests are deterministic and don't depend on external services.
+ */
+const MOCK_SPELLBOOK_COMBOS_RESPONSE = {
+  exactCombos: [
+    {
+      id: "spell-synergy-1",
+      cards: ["Thassa's Oracle", "Demonic Consultation"],
+      description:
+        "Cast Demonic Consultation naming a card not in your deck, exiling your library, then win with Thassa's Oracle ETB.",
+      produces: ["Win the game"],
+      missingCards: [],
+      templateRequirements: [],
+      manaNeeded: "{U}{U}{B}",
+      bracketTag: "4",
+      identity: "UB",
+      type: "exact" as const,
+    },
+  ],
+  nearCombos: [],
+};
+
 test.describe("Deck Analysis — Card Synergy", () => {
   test.beforeEach(async ({ deckPage }) => {
     const { page } = deckPage;
@@ -227,6 +251,14 @@ test.describe("Deck Analysis — Card Synergy", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify(MOCK_SYNERGY_RESPONSE),
+      })
+    );
+    // Mock Commander Spellbook API to avoid external dependency in CI
+    await page.route("**/api/deck-combos", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_SPELLBOOK_COMBOS_RESPONSE),
       })
     );
     await deckPage.goto();

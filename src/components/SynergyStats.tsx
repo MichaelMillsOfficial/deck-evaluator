@@ -5,6 +5,7 @@ import type { DeckSynergyAnalysis } from "@/lib/types";
 
 interface SynergyStatsProps {
   analysis: DeckSynergyAnalysis;
+  spellbookComboCount?: number | null;
 }
 
 type ExpandedCard = "avg" | "combos" | "anti" | null;
@@ -36,7 +37,10 @@ function Chevron({ expanded }: { expanded: boolean }) {
   );
 }
 
-export default function SynergyStats({ analysis }: SynergyStatsProps) {
+export default function SynergyStats({
+  analysis,
+  spellbookComboCount,
+}: SynergyStatsProps) {
   const [expanded, setExpanded] = useState<ExpandedCard>(null);
 
   const scores = Object.values(analysis.cardScores);
@@ -129,10 +133,12 @@ export default function SynergyStats({ analysis }: SynergyStatsProps) {
         >
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-              Known Combos
+              {spellbookComboCount != null ? "Verified Combos" : "Known Combos"}
             </p>
             <p className="mt-1 text-lg font-semibold text-white">
-              {analysis.knownCombos.length}
+              {spellbookComboCount != null
+                ? spellbookComboCount
+                : analysis.knownCombos.length}
             </p>
           </div>
           <Chevron expanded={expanded === "combos"} />
