@@ -8,8 +8,8 @@ import {
   computeBasicLandRatio,
   computeLandBaseEfficiency,
   type LandClassification,
-} from "../src/lib/land-base-efficiency";
-import type { DeckData, EnrichedCard, ManaPips } from "../src/lib/types";
+} from "../../src/lib/land-base-efficiency";
+import type { DeckData, EnrichedCard, ManaPips } from "../../src/lib/types";
 
 // ---------------------------------------------------------------------------
 // Helpers

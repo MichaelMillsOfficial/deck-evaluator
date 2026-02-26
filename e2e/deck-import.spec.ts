@@ -71,8 +71,8 @@ test.describe("Deck Import — Manual Text Input", () => {
     await page.route("**/api/deck-parse", async (route) => {
       await new Promise<void>((resolve) => {
         releaseRoute = resolve;
-        // Safety net: auto-resolve after 5s to prevent hanging
-        setTimeout(resolve, 5_000);
+        // Safety net: auto-resolve after 500ms to prevent hanging
+        setTimeout(resolve, 500);
       });
       await route.continue();
     });
