@@ -192,6 +192,7 @@ test.describe("Land Base Efficiency — UI", () => {
 
     await deckPage.selectDeckViewTab("Analysis");
     await deckPage.waitForAnalysisPanel();
+    await deckPage.expandAnalysisSection("land-efficiency");
 
     const section = deckPage.analysisPanel.locator(
       'section[aria-labelledby="land-efficiency-heading"]'
@@ -215,6 +216,7 @@ test.describe("Land Base Efficiency — UI", () => {
 
     await deckPage.selectDeckViewTab("Analysis");
     await deckPage.waitForAnalysisPanel();
+    await deckPage.expandAnalysisSection("land-efficiency");
 
     const scoreDisplay = deckPage.analysisPanel.getByTestId(
       "efficiency-overall-score"
@@ -237,6 +239,7 @@ test.describe("Land Base Efficiency — UI", () => {
 
     await deckPage.selectDeckViewTab("Analysis");
     await deckPage.waitForAnalysisPanel();
+    await deckPage.expandAnalysisSection("land-efficiency");
 
     const factorRows = deckPage.analysisPanel.locator(
       '[data-testid="efficiency-factor"]'
@@ -265,6 +268,7 @@ test.describe("Land Base Efficiency — UI", () => {
 
     await deckPage.selectDeckViewTab("Analysis");
     await deckPage.waitForAnalysisPanel();
+    await deckPage.expandAnalysisSection("land-efficiency");
 
     const badge = deckPage.analysisPanel.getByTestId("efficiency-score-label");
     await expect(badge).toBeVisible();
@@ -289,6 +293,7 @@ test.describe("Land Base Efficiency — UI", () => {
 
     await deckPage.selectDeckViewTab("Analysis");
     await deckPage.waitForAnalysisPanel();
+    await deckPage.expandAnalysisSection("land-efficiency");
 
     // The section should have aria-labelledby pointing to the heading
     const section = deckPage.analysisPanel.locator(

@@ -273,6 +273,7 @@ test.describe("Deck Analysis — Card Synergy", () => {
 
   test("deck theme pills render for a themed deck", async ({ deckPage }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("themes");
     const themes = page.getByTestId("deck-themes");
     await expect(themes).toBeVisible();
     // Should show at least one theme pill (Counters is expected)
@@ -282,6 +283,7 @@ test.describe("Deck Analysis — Card Synergy", () => {
 
   test("synergy stat cards show values", async ({ deckPage }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("synergy-stats");
     await expect(page.getByTestId("stat-avg-synergy")).toBeVisible();
     await expect(page.getByTestId("stat-combo-count")).toBeVisible();
     await expect(page.getByTestId("stat-anti-synergy-count")).toBeVisible();
@@ -291,6 +293,7 @@ test.describe("Deck Analysis — Card Synergy", () => {
     deckPage,
   }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("synergy-stats");
     const comboStat = page.getByTestId("stat-combo-count");
     // Should show at least "1" for the Thoracle combo
     await expect(comboStat).not.toContainText("0");
@@ -300,12 +303,14 @@ test.describe("Deck Analysis — Card Synergy", () => {
     deckPage,
   }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("synergy-stats");
     const antiStat = page.getByTestId("stat-anti-synergy-count");
     await expect(antiStat).not.toContainText("0");
   });
 
   test("top synergy pairs list is visible", async ({ deckPage }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("synergy-pairs");
     const synergyList = page.getByTestId("synergy-pairs");
     await expect(synergyList).toBeVisible();
   });
@@ -314,6 +319,7 @@ test.describe("Deck Analysis — Card Synergy", () => {
     deckPage,
   }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("anti-synergies");
     const antiList = page.getByTestId("anti-synergy-pairs");
     await expect(antiList).toBeVisible();
     // Should contain at least one warning item
@@ -325,6 +331,7 @@ test.describe("Deck Analysis — Card Synergy", () => {
     deckPage,
   }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("card-scores");
     const table = page.getByTestId("card-synergy-table");
     await expect(table).toBeVisible();
     // Should have score badges
@@ -336,6 +343,7 @@ test.describe("Deck Analysis — Card Synergy", () => {
     deckPage,
   }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("synergy-stats");
     const avgCard = page.getByTestId("stat-avg-synergy");
     const button = avgCard.getByRole("button");
     await expect(button).toHaveAttribute("aria-expanded", "false");
@@ -349,6 +357,7 @@ test.describe("Deck Analysis — Card Synergy", () => {
     deckPage,
   }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("synergy-stats");
     const comboCard = page.getByTestId("stat-combo-count");
     const button = comboCard.getByRole("button");
     await button.click();
@@ -360,6 +369,7 @@ test.describe("Deck Analysis — Card Synergy", () => {
     deckPage,
   }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("synergy-stats");
     const antiCard = page.getByTestId("stat-anti-synergy-count");
     const button = antiCard.getByRole("button");
     await button.click();
@@ -371,6 +381,7 @@ test.describe("Deck Analysis — Card Synergy", () => {
 
   test("stat card collapses on Escape key", async ({ deckPage }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("synergy-stats");
     const avgCard = page.getByTestId("stat-avg-synergy");
     const button = avgCard.getByRole("button");
     await button.click();
@@ -383,6 +394,7 @@ test.describe("Deck Analysis — Card Synergy", () => {
     deckPage,
   }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("synergy-pairs");
     // Find a synergy pair item and expand it
     const pairItem = page
       .getByTestId("synergy-pairs")
@@ -400,6 +412,7 @@ test.describe("Deck Analysis — Card Synergy", () => {
     deckPage,
   }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("synergy-pairs");
     const pairItem = page
       .getByTestId("synergy-pairs")
       .locator("[data-testid^='pair-item-']")
@@ -414,6 +427,7 @@ test.describe("Deck Analysis — Card Synergy", () => {
 
   test("pair item collapses on Escape key", async ({ deckPage }) => {
     const { page } = deckPage;
+    await deckPage.expandSynergySection("synergy-pairs");
     const pairItem = page
       .getByTestId("synergy-pairs")
       .locator("[data-testid^='pair-item-']")

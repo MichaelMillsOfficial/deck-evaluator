@@ -78,7 +78,7 @@ const SYNERGY_SECTIONS = [
 
 ### Phase 1: Write Tests (TDD)
 
-- [ ] 1.1 Create `e2e/collapsible-panels.spec.ts` with tests for the collapsible panel behavior
+- [x] 1.1 Create `e2e/collapsible-panels.spec.ts` with tests for the collapsible panel behavior
   - Test: Analysis tab sections are collapsed by default (content not visible, headers visible)
   - Test: Clicking a section header expands it (content becomes visible, aria-expanded=true)
   - Test: Clicking an expanded header collapses it
@@ -91,41 +91,41 @@ const SYNERGY_SECTIONS = [
 
 ### Phase 2: Implement Core Components
 
-- [ ] 2.1 Create `src/components/CollapsiblePanel.tsx`
+- [x] 2.1 Create `src/components/CollapsiblePanel.tsx`
   - Props: `id: string`, `title: string`, `summary?: React.ReactNode`, `expanded: boolean`, `onToggle: () => void`, `children: React.ReactNode`, `testId?: string`
   - ARIA: `aria-expanded`, `aria-controls`, `role="region"`, Escape key handler
   - Follow the chevron pattern from `CommanderSection.tsx`
 
-- [ ] 2.2 Create `src/components/SectionNav.tsx`
+- [x] 2.2 Create `src/components/SectionNav.tsx`
   - Props: `sections: { id: string; label: string }[]`, `expandedSections: Set<string>`, `onSelectSection: (id: string) => void`
   - Renders horizontal chip strip
   - Clicking a chip calls `onSelectSection` which will expand + scroll
 
 ### Phase 3: Integrate into Analysis Tab
 
-- [ ] 3.1 Modify `src/components/DeckViewTabs.tsx`
+- [x] 3.1 Modify `src/components/DeckViewTabs.tsx`
   - Add state: `const [expandedSections, setExpandedSections] = useState<Record<string, Set<string>>>({ analysis: new Set(), synergy: new Set() })`
   - Add toggle handler
   - Pass `expandedSections[tab]` and toggle handler to child components
 
-- [ ] 3.2 Modify `src/components/DeckAnalysis.tsx`
+- [x] 3.2 Modify `src/components/DeckAnalysis.tsx`
   - Accept new props: `expandedSections: Set<string>`, `onToggleSection: (id: string) => void`
   - Wrap each section in `CollapsiblePanel`
   - Add `SectionNav` at the top with `ANALYSIS_SECTIONS`
   - Add `ref` + `id` attributes to each panel for scroll-to behavior
 
-- [ ] 3.3 Modify `src/components/SynergySection.tsx`
+- [x] 3.3 Modify `src/components/SynergySection.tsx`
   - Accept new props: `expandedSections: Set<string>`, `onToggleSection: (id: string) => void`
   - Wrap each section in `CollapsiblePanel`
   - Add `SectionNav` at the top with `SYNERGY_SECTIONS`
 
 ### Phase 4: Fix Existing Tests
 
-- [ ] 4.1 Update `e2e/deck-analysis.spec.ts` — tests that assert content visibility will need to expand the relevant section first
-- [ ] 4.2 Update `e2e/synergy-ui.spec.ts` — same: expand synergy sections before asserting content
-- [ ] 4.3 Update `e2e/land-base-efficiency-ui.spec.ts` — expand land efficiency section
-- [ ] 4.4 Update `e2e/hypergeometric-ui.spec.ts` — expand hypergeometric section
-- [ ] 4.5 Update `e2e/fixtures.ts` — add helper methods:
+- [x] 4.1 Update `e2e/deck-analysis.spec.ts` — tests that assert content visibility will need to expand the relevant section first
+- [x] 4.2 Update `e2e/synergy-ui.spec.ts` — same: expand synergy sections before asserting content
+- [x] 4.3 Update `e2e/land-base-efficiency-ui.spec.ts` — expand land efficiency section
+- [x] 4.4 Update `e2e/hypergeometric-ui.spec.ts` — expand hypergeometric section
+- [x] 4.5 Update `e2e/fixtures.ts` — add helper methods:
   - `expandAnalysisSection(id: string)` — click the panel header to expand
   - `expandSynergySection(id: string)` — same for synergy tab
 

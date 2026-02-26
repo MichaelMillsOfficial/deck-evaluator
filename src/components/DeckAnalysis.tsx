@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import {
   computeManaCurve,
@@ -24,13 +24,32 @@ import LandBaseEfficiency from "@/components/LandBaseEfficiency";
 import DeckCompositionScorecard from "@/components/DeckCompositionScorecard";
 import HypergeometricCalculator from "@/components/HypergeometricCalculator";
 import PowerLevelEstimator from "@/components/PowerLevelEstimator";
+import CollapsiblePanel from "@/components/CollapsiblePanel";
+import SectionNav from "@/components/SectionNav";
+
+const ANALYSIS_SECTIONS = [
+  { id: "commander", label: "Commander" },
+  { id: "composition", label: "Composition" },
+  { id: "power-level", label: "Power Level" },
+  { id: "mana-curve", label: "Mana Curve" },
+  { id: "color-distribution", label: "Color Dist." },
+  { id: "land-efficiency", label: "Land Efficiency" },
+  { id: "hypergeometric", label: "Draw Odds" },
+] as const;
 
 interface DeckAnalysisProps {
   deck: DeckData;
   cardMap: Record<string, EnrichedCard>;
+  expandedSections: Set<string>;
+  onToggleSection: (id: string) => void;
 }
 
-export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
+export default function DeckAnalysis({
+  deck,
+  cardMap,
+  expandedSections,
+  onToggleSection,
+}: DeckAnalysisProps) {
   const [enabledTypes, setEnabledTypes] = useState<Set<CardType>>(
     () => new Set(CARD_TYPES)
   );
@@ -104,58 +123,123 @@ export default function DeckAnalysis({ deck, cardMap }: DeckAnalysisProps) {
     });
   }
 
+  const handleSelectSection = useCallback(
+    (id: string) => {
+      // If not expanded, expand it
+      if (!expandedSections.has(id)) {
+        onToggleSection(id);
+      }
+    },
+    [expandedSections, onToggleSection]
+  );
+
   return (
-    <div className="space-y-6">
-      <CommanderSection deck={deck} cardMap={cardMap} />
+    <div className="space-y-3">
+      <SectionNav
+        sections={ANALYSIS_SECTIONS}
+        expandedSections={expandedSections}
+        onSelectSection={handleSelectSection}
+      />
 
-      <DeckCompositionScorecard deck={deck} cardMap={cardMap} />
+      <CollapsiblePanel
+        id="commander"
+        title="Commander"
+        expanded={expandedSections.has("commander")}
+        onToggle={() => onToggleSection("commander")}
+      >
+        <CommanderSection deck={deck} cardMap={cardMap} />
+      </CollapsiblePanel>
 
-      <PowerLevelEstimator result={powerLevel} />
+      <CollapsiblePanel
+        id="composition"
+        title="Composition Scorecard"
+        expanded={expandedSections.has("composition")}
+        onToggle={() => onToggleSection("composition")}
+      >
+        <DeckCompositionScorecard deck={deck} cardMap={cardMap} />
+      </CollapsiblePanel>
 
-      <section aria-labelledby="mana-curve-heading">
-        <h3
-          id="mana-curve-heading"
-          className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
-        >
-          Mana Curve
-        </h3>
-        <p className="mb-4 text-xs text-slate-400" data-testid="curve-subtitle">
-          {allEnabled
-            ? `${totalAllSpells} non-land spells by converted mana cost`
-            : `${filteredSpells} of ${totalAllSpells} non-land spells by converted mana cost`}
-        </p>
-        <div className="mb-4">
-          <TypeFilterBar
-            enabledTypes={enabledTypes}
-            onToggle={handleToggle}
-            typeCounts={typeCounts}
+      <CollapsiblePanel
+        id="power-level"
+        title="Power Level Estimator"
+        expanded={expandedSections.has("power-level")}
+        onToggle={() => onToggleSection("power-level")}
+      >
+        <PowerLevelEstimator result={powerLevel} />
+      </CollapsiblePanel>
+
+      <CollapsiblePanel
+        id="mana-curve"
+        title="Mana Curve"
+        expanded={expandedSections.has("mana-curve")}
+        onToggle={() => onToggleSection("mana-curve")}
+      >
+        <section aria-labelledby="mana-curve-heading">
+          <h3
+            id="mana-curve-heading"
+            className="sr-only"
+          >
+            Mana Curve
+          </h3>
+          <p className="mb-4 text-xs text-slate-400" data-testid="curve-subtitle">
+            {allEnabled
+              ? `${totalAllSpells} non-land spells by converted mana cost`
+              : `${filteredSpells} of ${totalAllSpells} non-land spells by converted mana cost`}
+          </p>
+          <div className="mb-4">
+            <TypeFilterBar
+              enabledTypes={enabledTypes}
+              onToggle={handleToggle}
+              typeCounts={typeCounts}
+            />
+          </div>
+          <ManaCurveChart data={curveData} totalSpells={filteredSpells} />
+        </section>
+      </CollapsiblePanel>
+
+      <CollapsiblePanel
+        id="color-distribution"
+        title="Color Distribution"
+        expanded={expandedSections.has("color-distribution")}
+        onToggle={() => onToggleSection("color-distribution")}
+      >
+        <section aria-labelledby="color-distribution-heading">
+          <h3
+            id="color-distribution-heading"
+            className="sr-only"
+          >
+            Color Distribution
+          </h3>
+          <p className="mb-4 text-xs text-slate-400">
+            Mana sources versus pip demand by color
+          </p>
+          <ManaBaseStats metrics={metrics} />
+          <ColorDistributionChart
+            data={colorDistribution}
+            commanderIdentity={commanderIdentity}
+            showColorless={showColorless}
+            onToggleColorless={() => setShowColorless((prev) => !prev)}
           />
-        </div>
-        <ManaCurveChart data={curveData} totalSpells={filteredSpells} />
-      </section>
+        </section>
+      </CollapsiblePanel>
 
-      <section aria-labelledby="color-distribution-heading">
-        <h3
-          id="color-distribution-heading"
-          className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
-        >
-          Color Distribution
-        </h3>
-        <p className="mb-4 text-xs text-slate-400">
-          Mana sources versus pip demand by color
-        </p>
-        <ManaBaseStats metrics={metrics} />
-        <ColorDistributionChart
-          data={colorDistribution}
-          commanderIdentity={commanderIdentity}
-          showColorless={showColorless}
-          onToggleColorless={() => setShowColorless((prev) => !prev)}
-        />
-      </section>
+      <CollapsiblePanel
+        id="land-efficiency"
+        title="Land Base Efficiency"
+        expanded={expandedSections.has("land-efficiency")}
+        onToggle={() => onToggleSection("land-efficiency")}
+      >
+        <LandBaseEfficiency result={landEfficiency} />
+      </CollapsiblePanel>
 
-      <LandBaseEfficiency result={landEfficiency} />
-
-      <HypergeometricCalculator deck={deck} cardMap={cardMap} />
+      <CollapsiblePanel
+        id="hypergeometric"
+        title="Draw Probability"
+        expanded={expandedSections.has("hypergeometric")}
+        onToggle={() => onToggleSection("hypergeometric")}
+      >
+        <HypergeometricCalculator deck={deck} cardMap={cardMap} />
+      </CollapsiblePanel>
     </div>
   );
 }

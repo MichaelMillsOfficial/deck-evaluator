@@ -167,6 +167,7 @@ test.describe("Hypergeometric Calculator — UI", () => {
 
     await deckPage.selectDeckViewTab("Analysis");
     await deckPage.waitForAnalysisPanel();
+    await deckPage.expandAnalysisSection("hypergeometric");
   }
 
   test("Draw Probability section appears in Analysis tab", async ({

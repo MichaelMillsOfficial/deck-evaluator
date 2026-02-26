@@ -108,11 +108,26 @@ export class DeckPage {
       .click();
   }
 
-  /** Wait for the analysis panel to appear */
+  /** Wait for the analysis panel to appear (section nav is visible) */
   async waitForAnalysisPanel() {
     await this.page
-      .getByRole("heading", { name: "Mana Curve" })
+      .getByTestId("section-nav")
       .waitFor({ timeout: 15_000 });
+  }
+
+  /** Expand a collapsible section in the Analysis tab by its ID */
+  async expandAnalysisSection(id: string) {
+    const panel = this.page.getByTestId(`panel-${id}`);
+    const button = panel.locator("button").first();
+    const expanded = await button.getAttribute("aria-expanded");
+    if (expanded !== "true") {
+      await button.click();
+    }
+  }
+
+  /** Expand a collapsible section in the Synergy tab by its ID */
+  async expandSynergySection(id: string) {
+    return this.expandAnalysisSection(id);
   }
 
   /** Locator for the analysis panel */

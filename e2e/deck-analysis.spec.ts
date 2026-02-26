@@ -365,10 +365,9 @@ test.describe("Deck Analysis — Mana Curve Content", () => {
     ).toBeVisible({ timeout: 10_000 });
 
     await deckPage.selectDeckViewTab("Analysis");
+    await deckPage.expandAnalysisSection("mana-curve");
 
-    await expect(
-      page.getByRole("heading", { name: "Mana Curve" })
-    ).toBeVisible();
+    await expect(page.getByTestId("panel-mana-curve")).toBeVisible();
 
     // Chart wrapper should have role="img" with aria-label
     const chartWrapper = page.getByRole("img", { name: /mana curve/i });
@@ -391,9 +390,8 @@ test.describe("Deck Analysis — Mana Curve Content", () => {
     ).toBeVisible({ timeout: 10_000 });
 
     await deckPage.selectDeckViewTab("Analysis");
-    await expect(
-      page.getByRole("heading", { name: "Mana Curve" })
-    ).toBeVisible();
+    await deckPage.expandAnalysisSection("mana-curve");
+    await expect(page.getByTestId("panel-mana-curve")).toBeVisible();
 
     await deckPage.selectDeckViewTab("Deck List");
     await expect(deckPage.deckDisplay).toBeVisible();
@@ -517,6 +515,7 @@ test.describe("Deck Analysis — Type Filters", () => {
     ).toBeVisible({ timeout: 10_000 });
 
     await deckPage.selectDeckViewTab("Analysis");
+    await deckPage.expandAnalysisSection("mana-curve");
   });
 
   test("filter chips are visible on the Analysis tab", async ({
@@ -632,15 +631,14 @@ test.describe("Deck Analysis — Color Distribution (Standard)", () => {
     ).toBeVisible({ timeout: 10_000 });
 
     await deckPage.selectDeckViewTab("Analysis");
+    await deckPage.expandAnalysisSection("color-distribution");
   });
 
   test("Color Distribution heading visible on Analysis tab", async ({
     deckPage,
   }) => {
     const { page } = deckPage;
-    await expect(
-      page.getByRole("heading", { name: "Color Distribution" })
-    ).toBeVisible();
+    await expect(page.getByTestId("panel-color-distribution")).toBeVisible();
   });
 
   test("color distribution chart has role=img with accessible label", async ({
@@ -717,6 +715,7 @@ test.describe("Deck Analysis — Color Distribution (Commander)", () => {
     ).toBeVisible({ timeout: 10_000 });
 
     await deckPage.selectDeckViewTab("Analysis");
+    await deckPage.expandAnalysisSection("color-distribution");
   });
 
   test("shows only commander identity colors (Green and Blue for G/U)", async ({
@@ -1022,6 +1021,7 @@ test.describe("Deck Analysis — Composition Scorecard", () => {
     ).toBeVisible({ timeout: 10_000 });
 
     await deckPage.selectDeckViewTab("Analysis");
+    await deckPage.expandAnalysisSection("composition");
   });
 
   test("Composition Scorecard heading visible on Analysis tab", async ({
@@ -1204,6 +1204,7 @@ test.describe("Deck Analysis — Power Level Estimator", () => {
     ).toBeVisible({ timeout: 10_000 });
 
     await deckPage.selectDeckViewTab("Analysis");
+    await deckPage.expandAnalysisSection("power-level");
   });
 
   test("Power Level Estimator section appears on Analysis tab", async ({
@@ -1270,17 +1271,15 @@ test.describe("Deck Analysis — Power Level Estimator", () => {
     deckPage,
   }) => {
     const { page } = deckPage;
-    const powerSection = page.locator(
-      'section[aria-labelledby="power-level-heading"]'
-    );
-    const manaSection = page.locator(
-      'section[aria-labelledby="mana-curve-heading"]'
-    );
-    await expect(powerSection).toBeVisible();
-    await expect(manaSection).toBeVisible();
+    await deckPage.expandAnalysisSection("mana-curve");
 
-    const powerBound = await powerSection.boundingBox();
-    const manaBound = await manaSection.boundingBox();
+    const powerPanel = page.getByTestId("panel-power-level");
+    const manaPanel = page.getByTestId("panel-mana-curve");
+    await expect(powerPanel).toBeVisible();
+    await expect(manaPanel).toBeVisible();
+
+    const powerBound = await powerPanel.boundingBox();
+    const manaBound = await manaPanel.boundingBox();
     expect(powerBound).not.toBeNull();
     expect(manaBound).not.toBeNull();
     // Power level section should appear higher (smaller y) than Mana Curve
