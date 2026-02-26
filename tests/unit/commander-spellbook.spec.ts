@@ -3,6 +3,7 @@ import {
   buildSpellbookRequest,
   normalizeVariant,
   normalizeSpellbookResponse,
+  comboFitsIdentity,
 } from "../../src/lib/commander-spellbook";
 import type {
   SpellbookVariant,
@@ -666,5 +667,129 @@ test.describe("normalizeSpellbookResponse", () => {
 
     expect(result.nearCombos).toHaveLength(1);
     expect(result.nearCombos[0].missingCards).toEqual(["Card C", "Card D"]);
+  });
+
+  test("filters out near combos outside commander color identity", () => {
+    // UB combo (Thassa's Oracle + Demonic Consultation) — identity "UB"
+    const ubCombo = mockVariant({
+      id: "ub-combo",
+      identity: "UB",
+      uses: [
+        {
+          card: { id: 1, name: "Thassa's Oracle", oracleId: null, typeLine: "Creature", oracleText: "", manaValue: 2, identity: "U" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+        {
+          card: { id: 2, name: "Demonic Consultation", oracleId: null, typeLine: "Instant", oracleText: "", manaValue: 1, identity: "B" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+      ],
+    });
+
+    // Colorless combo (Sol Ring + Paradox Engine) — identity ""
+    const colorlessCombo = mockVariant({
+      id: "colorless-combo",
+      identity: "",
+      uses: [
+        {
+          card: { id: 3, name: "Sol Ring", oracleId: null, typeLine: "Artifact", oracleText: "", manaValue: 1, identity: "" },
+          zoneLocations: ["B"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+        {
+          card: { id: 4, name: "Paradox Engine", oracleId: null, typeLine: "Artifact", oracleText: "", manaValue: 5, identity: "" },
+          zoneLocations: ["B"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+      ],
+    });
+
+    const response: SpellbookFindMyCombosResponse = {
+      results: {
+        identity: "RG",
+        included: [],
+        almostIncluded: [ubCombo, colorlessCombo],
+        almostIncludedByAddingColors: [],
+        includedByChangingCommanders: [],
+        almostIncludedByChangingCommanders: [],
+        almostIncludedByAddingColorsAndChangingCommanders: [],
+      },
+    };
+    // Deck has Thassa's Oracle and Sol Ring — both combos have overlap
+    const deckCardNames = new Set(["Thassa's Oracle", "Sol Ring"]);
+    // Commander identity is RG — the UB combo should be filtered out
+    const result = normalizeSpellbookResponse(response, deckCardNames, "RG");
+
+    expect(result.nearCombos).toHaveLength(1);
+    expect(result.nearCombos[0].id).toBe("colorless-combo");
+  });
+
+  test("does not filter by color identity when no commander identity provided", () => {
+    const ubCombo = mockVariant({
+      id: "ub-combo",
+      identity: "UB",
+      uses: [
+        {
+          card: { id: 1, name: "Card A", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "U" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+        {
+          card: { id: 2, name: "Card B", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "B" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+      ],
+    });
+
+    const response: SpellbookFindMyCombosResponse = {
+      results: {
+        identity: "",
+        included: [],
+        almostIncluded: [ubCombo],
+        almostIncludedByAddingColors: [],
+        includedByChangingCommanders: [],
+        almostIncludedByChangingCommanders: [],
+        almostIncludedByAddingColorsAndChangingCommanders: [],
+      },
+    };
+    const deckCardNames = new Set(["Card A"]);
+    // No commander identity — should NOT filter by color
+    const result = normalizeSpellbookResponse(response, deckCardNames);
+
+    expect(result.nearCombos).toHaveLength(1);
+  });
+});
+
+test.describe("comboFitsIdentity", () => {
+  test("combo within commander identity returns true", () => {
+    expect(comboFitsIdentity("UB", "WUBRG")).toBe(true);
+    expect(comboFitsIdentity("R", "RG")).toBe(true);
+    expect(comboFitsIdentity("", "WU")).toBe(true); // colorless fits any
+  });
+
+  test("combo outside commander identity returns false", () => {
+    expect(comboFitsIdentity("UB", "RG")).toBe(false);
+    expect(comboFitsIdentity("WUBRG", "UB")).toBe(false);
+    expect(comboFitsIdentity("W", "UBR")).toBe(false);
+  });
+
+  test("colorless combo fits any identity", () => {
+    expect(comboFitsIdentity("", "")).toBe(true);
+    expect(comboFitsIdentity("", "WUBRG")).toBe(true);
   });
 });

@@ -100,9 +100,15 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const spellbookResponse = await fetchSpellbookCombos(spellbookRequest);
     const deckCardNames = new Set([...uniqueNames, ...commanders]);
+    // Pass commander identity so near combos outside the deck's color identity
+    // are filtered out. Only apply when commanders are specified (Commander format).
+    const commanderIdentity = commanders.length > 0
+      ? spellbookResponse.results.identity
+      : undefined;
     const normalized = normalizeSpellbookResponse(
       spellbookResponse,
-      deckCardNames
+      deckCardNames,
+      commanderIdentity
     );
 
     return Response.json(normalized);

@@ -196,19 +196,36 @@ const NEAR_COMBOS_CAP = 20;
 const NEAR_COMBOS_MAX_MISSING = 2;
 
 /**
+ * Check whether a combo's color identity fits within the commander's identity.
+ * Identity strings are like "WUBRG" (any subset). Returns true if every color
+ * in comboIdentity is present in commanderIdentity.
+ */
+export function comboFitsIdentity(
+  comboIdentity: string,
+  commanderIdentity: string
+): boolean {
+  for (const color of comboIdentity) {
+    if (!commanderIdentity.includes(color)) return false;
+  }
+  return true;
+}
+
+/**
  * Normalize the full Commander Spellbook API response into categorized combos.
  * - `included` variants become exactCombos
  * - `almostIncluded` variants become nearCombos
  * - Filters out variants with status "NW" (not working)
  * - Filters out near combos where no combo cards are in the deck
  * - Filters out near combos missing more than 2 cards
+ * - Filters out near combos outside the commander's color identity (when provided)
  * - Sorts exact by card count ascending
  * - Sorts near by missing count ascending, then card count ascending
  * - Caps near combos at 20 results
  */
 export function normalizeSpellbookResponse(
   response: SpellbookFindMyCombosResponse,
-  deckCardNames: Set<string>
+  deckCardNames: Set<string>,
+  commanderIdentity?: string
 ): { exactCombos: SpellbookCombo[]; nearCombos: SpellbookCombo[] } {
   const workingFilter = (v: SpellbookVariant) => v.status !== "NW";
 
@@ -227,6 +244,10 @@ export function normalizeSpellbookResponse(
       }
       // Only show combos missing at most 2 cards
       if (combo.missingCards.length > NEAR_COMBOS_MAX_MISSING) {
+        return false;
+      }
+      // Filter combos outside commander's color identity
+      if (commanderIdentity && !comboFitsIdentity(combo.identity, commanderIdentity)) {
         return false;
       }
       return true;
