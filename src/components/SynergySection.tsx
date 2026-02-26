@@ -1,27 +1,26 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type { DeckSynergyAnalysis, EnrichedCard } from "@/lib/types";
+import type { SpellbookCombo } from "@/lib/commander-spellbook";
 import DeckThemes from "@/components/DeckThemes";
 import SynergyStats from "@/components/SynergyStats";
 import SynergyPairList from "@/components/SynergyPairList";
 import CardSynergyTable from "@/components/CardSynergyTable";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import SectionNav from "@/components/SectionNav";
-
-const SYNERGY_SECTIONS = [
-  { id: "themes", label: "Themes" },
-  { id: "synergy-stats", label: "Stats" },
-  { id: "synergy-pairs", label: "Synergies" },
-  { id: "anti-synergies", label: "Anti-Synergies" },
-  { id: "card-scores", label: "Card Scores" },
-] as const;
+import VerifiedCombos, { NearCombos } from "@/components/VerifiedCombos";
 
 interface SynergySectionProps {
   analysis: DeckSynergyAnalysis;
   cardMap: Record<string, EnrichedCard>;
   expandedSections: Set<string>;
   onToggleSection: (id: string) => void;
+  spellbookCombos: {
+    exactCombos: SpellbookCombo[];
+    nearCombos: SpellbookCombo[];
+  } | null;
+  spellbookLoading: boolean;
 }
 
 export default function SynergySection({
@@ -29,12 +28,38 @@ export default function SynergySection({
   cardMap,
   expandedSections,
   onToggleSection,
+  spellbookCombos,
+  spellbookLoading,
 }: SynergySectionProps) {
   // Separate combos from heuristic synergies for display
   const heuristicSynergies = analysis.topSynergies.filter(
     (p) => p.type !== "combo"
   );
   const combos = analysis.topSynergies.filter((p) => p.type === "combo");
+
+  // Determine if spellbook has exact combos to adjust local combo label
+  const hasSpellbookExact =
+    spellbookCombos !== null && spellbookCombos.exactCombos.length > 0;
+  const hasNearCombos =
+    spellbookCombos !== null && spellbookCombos.nearCombos.length > 0;
+
+  // Build dynamic sections array: include verified/near combos panels
+  const synergySections = useMemo(() => {
+    const sections: { id: string; label: string }[] = [
+      { id: "themes", label: "Themes" },
+      { id: "synergy-stats", label: "Stats" },
+      { id: "verified-combos", label: "Verified Combos" },
+    ];
+    if (hasNearCombos || spellbookLoading) {
+      sections.push({ id: "near-combos", label: "Near Combos" });
+    }
+    sections.push(
+      { id: "synergy-pairs", label: "Synergies" },
+      { id: "anti-synergies", label: "Anti-Synergies" },
+      { id: "card-scores", label: "Card Scores" },
+    );
+    return sections;
+  }, [hasNearCombos, spellbookLoading]);
 
   const handleSelectSection = useCallback(
     (id: string) => {
@@ -43,10 +68,13 @@ export default function SynergySection({
     [onToggleSection]
   );
 
+  // Determine local combos section title
+  const localCombosTitle = hasSpellbookExact ? "Local Combos" : "Known Combos";
+
   return (
     <div className="space-y-3">
       <SectionNav
-        sections={SYNERGY_SECTIONS}
+        sections={synergySections}
         expandedSections={expandedSections}
         onSelectSection={handleSelectSection}
       />
@@ -66,8 +94,51 @@ export default function SynergySection({
         expanded={expandedSections.has("synergy-stats")}
         onToggle={() => onToggleSection("synergy-stats")}
       >
-        <SynergyStats analysis={analysis} />
+        <SynergyStats
+          analysis={analysis}
+          spellbookComboCount={spellbookCombos?.exactCombos.length ?? null}
+          spellbookNearComboCount={spellbookCombos?.nearCombos.length ?? null}
+        />
       </CollapsiblePanel>
+
+      <CollapsiblePanel
+        id="verified-combos"
+        title="Verified Combos"
+        summary={
+          spellbookCombos && !spellbookLoading
+            ? `${spellbookCombos.exactCombos.length} found`
+            : undefined
+        }
+        expanded={expandedSections.has("verified-combos")}
+        onToggle={() => onToggleSection("verified-combos")}
+      >
+        <VerifiedCombos
+          exactCombos={spellbookCombos?.exactCombos ?? []}
+          nearCombos={spellbookCombos?.nearCombos ?? []}
+          loading={spellbookLoading}
+          cardMap={cardMap}
+        />
+      </CollapsiblePanel>
+
+      {(hasNearCombos || spellbookLoading) && (
+        <CollapsiblePanel
+          id="near-combos"
+          title="Near Combos"
+          summary={
+            spellbookCombos && !spellbookLoading
+              ? `${spellbookCombos.nearCombos.length} found`
+              : undefined
+          }
+          expanded={expandedSections.has("near-combos")}
+          onToggle={() => onToggleSection("near-combos")}
+        >
+          <NearCombos
+            nearCombos={spellbookCombos?.nearCombos ?? []}
+            loading={spellbookLoading}
+            cardMap={cardMap}
+          />
+        </CollapsiblePanel>
+      )}
 
       <CollapsiblePanel
         id="synergy-pairs"
@@ -79,7 +150,7 @@ export default function SynergySection({
           <SynergyPairList
             pairs={combos}
             variant="synergy"
-            title="Known Combos"
+            title={localCombosTitle}
             testId="synergy-pairs"
             cardMap={cardMap}
           />

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
+import type { SpellbookCombo } from "@/lib/commander-spellbook";
 import DeckInput from "@/components/DeckInput";
 import DeckViewTabs from "@/components/DeckViewTabs";
 
@@ -14,8 +15,14 @@ export default function DeckImportSection() {
   );
   const [enrichLoading, setEnrichLoading] = useState(false);
   const [enrichError, setEnrichError] = useState<string | null>(null);
+  const [spellbookCombos, setSpellbookCombos] = useState<{
+    exactCombos: SpellbookCombo[];
+    nearCombos: SpellbookCombo[];
+  } | null>(null);
+  const [spellbookLoading, setSpellbookLoading] = useState(false);
   const deckResultRef = useRef<HTMLDivElement>(null);
   const enrichAbortRef = useRef<AbortController | null>(null);
+  const spellbookAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (deckData && deckResultRef.current) {
@@ -69,12 +76,65 @@ export default function DeckImportSection() {
     }
   }, []);
 
+  const fetchCombos = useCallback(async (deck: DeckData) => {
+    const allCards = [
+      ...deck.commanders,
+      ...deck.mainboard,
+    ];
+    const uniqueNames = [...new Set(allCards.map((c) => c.name))];
+
+    if (uniqueNames.length === 0) return;
+
+    // Abort any in-flight spellbook request
+    spellbookAbortRef.current?.abort();
+    const controller = new AbortController();
+    spellbookAbortRef.current = controller;
+
+    setSpellbookLoading(true);
+    setSpellbookCombos(null);
+
+    try {
+      const res = await fetch("/api/deck-combos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cardNames: uniqueNames,
+          commanders: deck.commanders.map((c) => c.name),
+        }),
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(30_000),
+        ]),
+      });
+
+      if (!res.ok) {
+        // Non-200 means validation error; just set null for fallback
+        setSpellbookCombos(null);
+        return;
+      }
+
+      const json = await res.json();
+      setSpellbookCombos({
+        exactCombos: json.exactCombos ?? [],
+        nearCombos: json.nearCombos ?? [],
+      });
+    } catch (err) {
+      // Don't update state for aborted requests
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      // Graceful fallback: null triggers local-only combos
+      setSpellbookCombos(null);
+    } finally {
+      setSpellbookLoading(false);
+    }
+  }, []);
+
   const handleImport = async (fetcher: () => Promise<Response>) => {
     setLoading(true);
     setError(null);
     setDeckData(null);
     setCardMap(null);
     setEnrichError(null);
+    setSpellbookCombos(null);
 
     try {
       const res = await fetcher();
@@ -87,8 +147,9 @@ export default function DeckImportSection() {
 
       const deck = json as DeckData;
       setDeckData(deck);
-      // Form re-enables immediately; enrichment is background
+      // Form re-enables immediately; enrichment and spellbook fetch are background
       enrichDeck(deck);
+      fetchCombos(deck);
     } catch (err) {
       setError(
         err instanceof Error
@@ -159,7 +220,13 @@ export default function DeckImportSection() {
           className="mt-10 focus:outline-none"
           aria-label="Deck import results"
         >
-          <DeckViewTabs deck={deckData} cardMap={cardMap} enrichLoading={enrichLoading} />
+          <DeckViewTabs
+            deck={deckData}
+            cardMap={cardMap}
+            enrichLoading={enrichLoading}
+            spellbookCombos={spellbookCombos}
+            spellbookLoading={spellbookLoading}
+          />
 
           {enrichError && !enrichLoading && (
             <div

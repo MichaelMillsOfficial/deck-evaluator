@@ -53,7 +53,7 @@ No new npm packages needed. No dependencies on unbuilt features.
 
 ### Phase 1: Commander Spellbook Types and Client (`src/lib/commander-spellbook.ts`)
 
-- [ ] Create `src/lib/commander-spellbook.ts` with API request/response types:
+- [x] Create `src/lib/commander-spellbook.ts` with API request/response types:
   - `SpellbookCardRequest` -- `{ card: string; quantity: number }`
   - `SpellbookDeckRequest` -- `{ main: SpellbookCardRequest[]; commanders: SpellbookCardRequest[] }`
   - `SpellbookCard` -- `{ id: number; name: string; oracleId: string | null; typeLine: string; oracleText: string; manaValue: number; identity: string }`
@@ -62,74 +62,74 @@ No new npm packages needed. No dependencies on unbuilt features.
   - `SpellbookTemplateInVariant` -- `{ template: { id: number; name: string; scryfallQuery: string | null }; zoneLocations: string[]; quantity: number }`
   - `SpellbookVariant` -- `{ id: string; status: string; uses: SpellbookCardInVariant[]; requires: SpellbookTemplateInVariant[]; produces: SpellbookFeature[]; identity: string; manaNeeded: string; manaValueNeeded: number; description: string; bracketTag: string; prices: { tcgplayer: string; cardkingdom: string; cardmarket: string } }`
   - `SpellbookFindMyCombosResponse` -- `{ results: { identity: string; included: SpellbookVariant[]; almostIncluded: SpellbookVariant[]; almostIncludedByAddingColors: SpellbookVariant[]; includedByChangingCommanders: SpellbookVariant[]; almostIncludedByChangingCommanders: SpellbookVariant[]; almostIncludedByAddingColorsAndChangingCommanders: SpellbookVariant[] } }`
-- [ ] Implement `buildSpellbookRequest(deck: DeckData): SpellbookDeckRequest` -- map commanders and mainboard to API format, exclude sideboard
-- [ ] Implement `fetchSpellbookCombos(request: SpellbookDeckRequest): Promise<SpellbookFindMyCombosResponse>` -- POST to `https://backend.commanderspellbook.com/find-my-combos/`, 15-second timeout, throw on non-200
-- [ ] Define normalized internal types:
+- [x] Implement `buildSpellbookRequest(deck: DeckData): SpellbookDeckRequest` -- map commanders and mainboard to API format, exclude sideboard
+- [x] Implement `fetchSpellbookCombos(request: SpellbookDeckRequest): Promise<SpellbookFindMyCombosResponse>` -- POST to `https://backend.commanderspellbook.com/find-my-combos/`, 15-second timeout, throw on non-200
+- [x] Define normalized internal types:
   - `SpellbookCombo` -- `{ id: string; cards: string[]; description: string; produces: string[]; missingCards: string[]; templateRequirements: string[]; manaNeeded: string; bracketTag: string; identity: string; type: "exact" | "near" }`
-- [ ] Implement `normalizeVariant(variant: SpellbookVariant, deckCardNames: Set<string>): SpellbookCombo` -- extract card names from `uses`, compute `missingCards` by diffing against deck card set, map `produces` to readable strings, determine `type` from missing count
-- [ ] Implement `normalizeSpellbookResponse(response: SpellbookFindMyCombosResponse, deckCardNames: Set<string>): { exactCombos: SpellbookCombo[]; nearCombos: SpellbookCombo[] }` -- normalize `included` as exact, normalize `almostIncluded` as near, sort exact by card count ascending, sort near by missing count ascending then card count ascending, cap near-combos at 20 results
+- [x] Implement `normalizeVariant(variant: SpellbookVariant, deckCardNames: Set<string>): SpellbookCombo` -- extract card names from `uses`, compute `missingCards` by diffing against deck card set, map `produces` to readable strings, determine `type` from missing count
+- [x] Implement `normalizeSpellbookResponse(response: SpellbookFindMyCombosResponse, deckCardNames: Set<string>): { exactCombos: SpellbookCombo[]; nearCombos: SpellbookCombo[] }` -- normalize `included` as exact, normalize `almostIncluded` as near, sort exact by card count ascending, sort near by missing count ascending then card count ascending, cap near-combos at 20 results
 
 ### Phase 2: Unit Tests (`tests/unit/commander-spellbook.spec.ts`)
 
-- [ ] `buildSpellbookRequest`: maps commanders to `commanders` array, mainboard to `main` array, excludes sideboard, handles empty commanders, handles quantity > 1
-- [ ] `normalizeVariant`: extracts card names, computes missing cards, maps feature names to produces array, sets type based on missing count (0 = exact, >0 = near), preserves combo ID and description
-- [ ] `normalizeSpellbookResponse`: separates included from almostIncluded, sorts exact combos by card count, sorts near combos by missing count then card count, caps near combos at 20, handles empty response
-- [ ] `normalizeVariant` with template requirements: includes template name in `templateRequirements` array
-- [ ] Edge cases: variant with 0 uses, variant with status "NW" (not working) filtered out, duplicate card names in uses handled
+- [x] `buildSpellbookRequest`: maps commanders to `commanders` array, mainboard to `main` array, excludes sideboard, handles empty commanders, handles quantity > 1
+- [x] `normalizeVariant`: extracts card names, computes missing cards, maps feature names to produces array, sets type based on missing count (0 = exact, >0 = near), preserves combo ID and description
+- [x] `normalizeSpellbookResponse`: separates included from almostIncluded, sorts exact combos by card count, sorts near combos by missing count then card count, caps near combos at 20, handles empty response
+- [x] `normalizeVariant` with template requirements: includes template name in `templateRequirements` array
+- [x] Edge cases: variant with 0 uses, variant with status "NW" (not working) filtered out, duplicate card names in uses handled
 
 ### Phase 3: API Route (`src/app/api/deck-combos/route.ts`)
 
-- [ ] Create `POST /api/deck-combos` route following `deck-enrich/route.ts` validation pattern
-- [ ] Validate request body: require `cardNames` (string array) and optional `commanders` (string array)
-- [ ] Deduplicate and clean card names (reuse same pattern as deck-enrich)
-- [ ] Build `SpellbookDeckRequest` from cleaned names
-- [ ] Call `fetchSpellbookCombos`, normalize response
-- [ ] Return `{ exactCombos: SpellbookCombo[], nearCombos: SpellbookCombo[] }`
-- [ ] On fetch failure: return `{ exactCombos: [], nearCombos: [], error: "Commander Spellbook unavailable" }` with status 200 (not 502) -- the route always succeeds, just with empty combos on API failure, enabling client-side fallback without error handling
-- [ ] Add `MAX_CARD_NAMES = 250` guard consistent with deck-enrich
+- [x] Create `POST /api/deck-combos` route following `deck-enrich/route.ts` validation pattern
+- [x] Validate request body: require `cardNames` (string array) and optional `commanders` (string array)
+- [x] Deduplicate and clean card names (reuse same pattern as deck-enrich)
+- [x] Build `SpellbookDeckRequest` from cleaned names
+- [x] Call `fetchSpellbookCombos`, normalize response
+- [x] Return `{ exactCombos: SpellbookCombo[], nearCombos: SpellbookCombo[] }`
+- [x] On fetch failure: return `{ exactCombos: [], nearCombos: [], error: "Commander Spellbook unavailable" }` with status 200 (not 502) -- the route always succeeds, just with empty combos on API failure, enabling client-side fallback without error handling
+- [x] Add `MAX_CARD_NAMES = 250` guard consistent with deck-enrich
 
 ### Phase 4: API E2E Tests (`e2e/api-deck-combos.spec.ts`)
 
-- [ ] `POST /api/deck-combos` with valid cardNames returns 200 with `exactCombos` and `nearCombos` arrays (shape validation only -- real API may return 0 combos)
-- [ ] `POST /api/deck-combos` with missing `cardNames` returns 400
-- [ ] `POST /api/deck-combos` with empty `cardNames` returns 400
-- [ ] `POST /api/deck-combos` with non-array `cardNames` returns 400
-- [ ] `POST /api/deck-combos` response shape: `exactCombos[].cards` is string array, `exactCombos[].description` is string, `exactCombos[].produces` is string array, `exactCombos[].type` is "exact"
-- [ ] `POST /api/deck-combos` with combo-known cards (e.g. `["Thassa's Oracle", "Demonic Consultation"]` + filler) returns at least 1 exact combo (integration test, may skip on network failure)
+- [x] `POST /api/deck-combos` with valid cardNames returns 200 with `exactCombos` and `nearCombos` arrays (shape validation only -- real API may return 0 combos)
+- [x] `POST /api/deck-combos` with missing `cardNames` returns 400
+- [x] `POST /api/deck-combos` with empty `cardNames` returns 400
+- [x] `POST /api/deck-combos` with non-array `cardNames` returns 400
+- [x] `POST /api/deck-combos` response shape: `exactCombos[].cards` is string array, `exactCombos[].description` is string, `exactCombos[].produces` is string array, `exactCombos[].type` is "exact"
+- [x] `POST /api/deck-combos` with combo-known cards (e.g. `["Thassa's Oracle", "Demonic Consultation"]` + filler) returns at least 1 exact combo (integration test, may skip on network failure)
 
 ### Phase 5: Client-Side Combo Fetching in `DeckImportSection.tsx`
 
-- [ ] Add state: `spellbookCombos: { exactCombos: SpellbookCombo[]; nearCombos: SpellbookCombo[] } | null`, `spellbookLoading: boolean`
-- [ ] Add `fetchSpellbookCombos` callback (parallels `enrichDeck` pattern): fires after deck import alongside enrichment, uses `AbortController`, 15-second timeout, on failure sets combos to null (triggers fallback in UI)
-- [ ] Call `fetchSpellbookCombos` inside `handleImport` alongside `enrichDeck` -- both fire concurrently after deck is parsed
-- [ ] Pass `spellbookCombos` and `spellbookLoading` as new props through `DeckViewTabs` to `SynergySection`
+- [x] Add state: `spellbookCombos: { exactCombos: SpellbookCombo[]; nearCombos: SpellbookCombo[] } | null`, `spellbookLoading: boolean`
+- [x] Add `fetchSpellbookCombos` callback (parallels `enrichDeck` pattern): fires after deck import alongside enrichment, uses `AbortController`, 15-second timeout, on failure sets combos to null (triggers fallback in UI)
+- [x] Call `fetchSpellbookCombos` inside `handleImport` alongside `enrichDeck` -- both fire concurrently after deck is parsed
+- [x] Pass `spellbookCombos` and `spellbookLoading` as new props through `DeckViewTabs` to `SynergySection`
 
 ### Phase 6: Prop Threading (`DeckViewTabs.tsx`)
 
-- [ ] Add `spellbookCombos` and `spellbookLoading` to `DeckViewTabsProps`
-- [ ] Forward to `SynergySection` alongside existing `analysis` and `cardMap` props
+- [x] Add `spellbookCombos` and `spellbookLoading` to `DeckViewTabsProps`
+- [x] Forward to `SynergySection` alongside existing `analysis` and `cardMap` props
 
 ### Phase 7: Verified Combos Component (`src/components/VerifiedCombos.tsx`)
 
-- [ ] Create `VerifiedCombos` component accepting `{ exactCombos: SpellbookCombo[]; nearCombos: SpellbookCombo[]; loading: boolean; cardMap: Record<string, EnrichedCard> }`
-- [ ] Loading state: show subtle shimmer placeholder (same pattern as enrichment loading)
-- [ ] Exact combos section: heading "Verified Combos" with Commander Spellbook attribution text, expandable list using same disclosure pattern as `SynergyPairList`
+- [x] Create `VerifiedCombos` component accepting `{ exactCombos: SpellbookCombo[]; nearCombos: SpellbookCombo[]; loading: boolean; cardMap: Record<string, EnrichedCard> }`
+- [x] Loading state: show subtle shimmer placeholder (same pattern as enrichment loading)
+- [x] Exact combos section: heading "Verified Combos" with Commander Spellbook attribution text, expandable list using same disclosure pattern as `SynergyPairList`
   - Each combo shows: card names joined by " + ", description, produces list as small pills, bracketTag badge
   - Expanded state: card images (same as `SynergyPairList` expanded pattern), zone/state requirements if non-trivial, mana needed, template requirements
-- [ ] Near combos section: heading "Almost There" (combos 1-2 cards away)
+- [x] Near combos section: heading "Almost There" (combos 1-2 cards away)
   - Same layout as exact combos but missing cards highlighted with a distinct style (e.g. `text-amber-400` with "Missing:" prefix)
   - Missing card names rendered as amber-colored text with a dashed border pill
-- [ ] Empty state: when no combos found, show "No verified combos found in Commander Spellbook" message
-- [ ] Accessibility: expandable items use `aria-expanded`, `aria-controls`, Escape to collapse, proper heading hierarchy
-- [ ] `data-testid` attributes: `verified-combos-section`, `verified-combo-item-{i}`, `near-combo-item-{i}`, `missing-card-{name}`, `combo-produces`
+- [x] Empty state: when no combos found, show "No verified combos found in Commander Spellbook" message
+- [x] Accessibility: expandable items use `aria-expanded`, `aria-controls`, Escape to collapse, proper heading hierarchy
+- [x] `data-testid` attributes: `verified-combos-section`, `verified-combo-item-{i}`, `near-combo-item-{i}`, `missing-card-{name}`, `combo-produces`
 
 ### Phase 8: Integration into SynergySection
 
-- [ ] Add `spellbookCombos` and `spellbookLoading` props to `SynergySectionProps`
-- [ ] Render `VerifiedCombos` above the existing "Known Combos" section (from local registry)
-- [ ] When `spellbookCombos` has exact combos, rename local combos section header from "Known Combos" to "Local Combos" to distinguish sources
-- [ ] When `spellbookCombos` is null (API failed or not yet loaded), show only local combos with no visible change from current behavior -- this is the graceful fallback
-- [ ] Update `SynergyStats` combo count: when spellbook combos are available, show `spellbookCombos.exactCombos.length` in the stat card; fallback to `analysis.knownCombos.length`; add `data-testid="stat-near-combo-count"` for near-combo count
+- [x] Add `spellbookCombos` and `spellbookLoading` props to `SynergySectionProps`
+- [x] Render `VerifiedCombos` above the existing "Known Combos" section (from local registry)
+- [x] When `spellbookCombos` has exact combos, rename local combos section header from "Known Combos" to "Local Combos" to distinguish sources
+- [x] When `spellbookCombos` is null (API failed or not yet loaded), show only local combos with no visible change from current behavior -- this is the graceful fallback
+- [x] Update `SynergyStats` combo count: when spellbook combos are available, show `spellbookCombos.exactCombos.length` in the stat card; fallback to `analysis.knownCombos.length`
 
 ### Phase 9: Synergy Engine Integration (Optional Enhancement)
 
@@ -142,22 +142,22 @@ No new npm packages needed. No dependencies on unbuilt features.
 
 Mock both `/api/deck-enrich` and `/api/deck-combos` via `page.route()`:
 
-- [ ] "Verified Combos section appears in Synergy tab when spellbook returns combos"
-- [ ] "Exact combos display card names, description, and produces"
-- [ ] "Near combos display with missing cards highlighted"
-- [ ] "Expanding a verified combo shows card images"
-- [ ] "Combo count stat card reflects spellbook combo count"
-- [ ] "Graceful fallback: when spellbook API fails, local combos still display"
-- [ ] "Loading state shown while spellbook request is pending"
-- [ ] "Near combo missing card has distinct visual treatment"
-- [ ] "Empty state when no combos found"
+- [x] "Verified Combos section appears in Synergy tab when spellbook returns combos"
+- [x] "Exact combos display card names, description, and produces"
+- [x] "Near combos display with missing cards highlighted"
+- [x] "Expanding a verified combo shows card images"
+- [x] "Combo count stat card reflects spellbook combo count"
+- [x] "Graceful fallback: when spellbook API fails, local combos still display"
+- [x] "Loading state shown while spellbook request is pending"
+- [x] "Near combo missing card has distinct visual treatment"
+- [x] "Empty state when no combos found"
 
 ### Phase 11: Fixture Updates (`e2e/fixtures.ts`)
 
-- [ ] Add mock `MOCK_SPELLBOOK_RESPONSE` constant with sample exact and near combos
-- [ ] Add mock `MOCK_SPELLBOOK_EMPTY_RESPONSE` for empty state testing
-- [ ] Add `waitForSynergySection()` enhancement if needed (already exists)
-- [ ] Add `get verifiedCombosSection` locator
+- [x] Add mock `MOCK_SPELLBOOK_RESPONSE` constant with sample exact and near combos
+- [x] Add mock `MOCK_SPELLBOOK_EMPTY_RESPONSE` for empty state testing
+- [x] Add `waitForSynergySection()` enhancement if needed (already exists)
+- [x] Add `get verifiedCombosSection` locator
 
 ---
 
