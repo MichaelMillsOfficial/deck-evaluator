@@ -88,7 +88,7 @@ export default function DeckViewTabs({
         (target.key === "analysis" || target.key === "synergy" || target.key === "hands") &&
         analysisDisabled;
       if (!isDisabled) break;
-      if (e.key === "ArrowRight" || e.key === "End") {
+      if (e.key === "ArrowRight" || e.key === "Home") {
         nextIndex = (nextIndex + 1) % tabs.length;
       } else {
         nextIndex = (nextIndex - 1 + tabs.length) % tabs.length;
