@@ -571,6 +571,7 @@ test.describe("generateReasoning", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("runSimulation", () => {
+  // Build a standard deck and pre-build its pool for runSimulation
   const standardDeck = makeDeck({
     mainboard: [
       ...Array.from({ length: 37 }, (_, i) => ({
@@ -604,32 +605,35 @@ test.describe("runSimulation", () => {
     });
   }
 
+  const standardPool = buildPool(standardDeck, standardCardMap);
+  const standardIdentity = new Set(["G"]);
+
   test("returns correct iteration count", () => {
-    const stats = runSimulation(standardDeck, standardCardMap, 100);
+    const stats = runSimulation(standardPool, standardIdentity, 100);
     expect(stats.totalSimulations).toBe(100);
   });
 
   test("keepableRate is between 0 and 1", () => {
-    const stats = runSimulation(standardDeck, standardCardMap, 100);
+    const stats = runSimulation(standardPool, standardIdentity, 100);
     expect(stats.keepableRate).toBeGreaterThanOrEqual(0);
     expect(stats.keepableRate).toBeLessThanOrEqual(1);
   });
 
   test("avgLandsInOpener is reasonable for 37-land deck", () => {
-    const stats = runSimulation(standardDeck, standardCardMap, 500);
+    const stats = runSimulation(standardPool, standardIdentity, 500);
     // Expected average: 37/99 * 7 ≈ 2.62
     expect(stats.avgLandsInOpener).toBeGreaterThan(1);
     expect(stats.avgLandsInOpener).toBeLessThan(5);
   });
 
   test("avgScore is between 0 and 100", () => {
-    const stats = runSimulation(standardDeck, standardCardMap, 100);
+    const stats = runSimulation(standardPool, standardIdentity, 100);
     expect(stats.avgScore).toBeGreaterThanOrEqual(0);
     expect(stats.avgScore).toBeLessThanOrEqual(100);
   });
 
   test("verdict distribution sums to total simulations", () => {
-    const stats = runSimulation(standardDeck, standardCardMap, 200);
+    const stats = runSimulation(standardPool, standardIdentity, 200);
     const sum =
       stats.verdictDistribution["Strong Keep"] +
       stats.verdictDistribution["Keepable"] +
@@ -655,13 +659,14 @@ test.describe("runSimulation", () => {
         cmc: 0,
       });
     }
-    const stats = runSimulation(allLandDeck, allLandMap, 200);
+    const allLandPool = buildPool(allLandDeck, allLandMap);
+    const stats = runSimulation(allLandPool, new Set(["G"]), 200);
     // All-land hands should almost always be Mulligan
     expect(stats.keepableRate).toBeLessThan(0.1);
   });
 
   test("probT1Play and probT2Play are between 0 and 1", () => {
-    const stats = runSimulation(standardDeck, standardCardMap, 100);
+    const stats = runSimulation(standardPool, standardIdentity, 100);
     expect(stats.probT1Play).toBeGreaterThanOrEqual(0);
     expect(stats.probT1Play).toBeLessThanOrEqual(1);
     expect(stats.probT2Play).toBeGreaterThanOrEqual(0);

@@ -51,6 +51,7 @@ export default function HandDisplay({ hand }: HandDisplayProps) {
               />
             ) : (
               <div
+                role="img"
                 className="flex items-center justify-center rounded-lg border border-slate-600 bg-slate-700/50 text-center"
                 style={{ width: 146, height: 204 }}
                 aria-label={card.name}

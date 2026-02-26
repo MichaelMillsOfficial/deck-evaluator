@@ -36,7 +36,6 @@ export default function DeckViewTabs({
   >({
     analysis: new Set<string>(),
     synergy: new Set<string>(),
-    hands: new Set<string>(),
   });
 
   const analysisDisabled = !cardMap || enrichLoading;
@@ -81,17 +80,24 @@ export default function DeckViewTabs({
 
     e.preventDefault();
 
-    // Skip disabled tabs (analysis, synergy, and hands need cardMap)
-    const targetTab = tabs[newIndex];
-    if (
-      (targetTab.key === "analysis" || targetTab.key === "synergy" || targetTab.key === "hands") &&
-      analysisDisabled
-    )
-      return;
+    // Skip disabled tabs — loop to find next enabled tab in the pressed direction
+    let nextIndex = newIndex;
+    for (let attempts = 0; attempts < tabs.length; attempts++) {
+      const target = tabs[nextIndex];
+      const isDisabled =
+        (target.key === "analysis" || target.key === "synergy" || target.key === "hands") &&
+        analysisDisabled;
+      if (!isDisabled) break;
+      if (e.key === "ArrowRight" || e.key === "End") {
+        nextIndex = (nextIndex + 1) % tabs.length;
+      } else {
+        nextIndex = (nextIndex - 1 + tabs.length) % tabs.length;
+      }
+    }
 
-    setActiveTab(tabKeys[newIndex]);
+    setActiveTab(tabKeys[nextIndex]);
     const nextButton = document.getElementById(
-      `tab-deck-${tabKeys[newIndex]}`
+      `tab-deck-${tabKeys[nextIndex]}`
     );
     nextButton?.focus();
   };

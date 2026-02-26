@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
-import type { DrawnHand } from "@/lib/opening-hand";
+import type { DrawnHand, SimulationStats } from "@/lib/opening-hand";
 import {
   buildPool,
   drawHand,
@@ -23,6 +23,8 @@ interface HandSimulatorProps {
 export default function HandSimulator({ deck, cardMap }: HandSimulatorProps) {
   const [currentHand, setCurrentHand] = useState<DrawnHand | null>(null);
   const [mulliganCount, setMulliganCount] = useState(0);
+  const [simStats, setSimStats] = useState<SimulationStats | null>(null);
+  const [simLoading, setSimLoading] = useState(false);
 
   const pool = useMemo(() => buildPool(deck, cardMap), [deck, cardMap]);
   const commanderIdentity = useMemo(
@@ -30,10 +32,17 @@ export default function HandSimulator({ deck, cardMap }: HandSimulatorProps) {
     [deck, cardMap]
   );
 
-  const simStats = useMemo(
-    () => runSimulation(deck, cardMap, 1000),
-    [deck, cardMap]
-  );
+  useEffect(() => {
+    if (!pool.length) return;
+    setSimLoading(true);
+    // Defer to next frame to avoid blocking render
+    const id = requestAnimationFrame(() => {
+      const stats = runSimulation(pool, commanderIdentity, 1000);
+      setSimStats(stats);
+      setSimLoading(false);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [pool, commanderIdentity]);
 
   const drawNewHand = useCallback(
     (mulliganNumber: number) => {
@@ -65,15 +74,13 @@ export default function HandSimulator({ deck, cardMap }: HandSimulatorProps) {
     drawNewHand(newCount);
   }, [mulliganCount, drawNewHand]);
 
-  const handleNewHand = useCallback(() => {
-    setMulliganCount(0);
-    drawNewHand(0);
-  }, [drawNewHand]);
+  // MINOR-3: handleNewHand is identical to handleDrawHand
+  const handleNewHand = handleDrawHand;
 
   return (
     <div data-testid="hand-simulator" className="space-y-6">
       {/* Simulation stats at top */}
-      <HandSimulationStats stats={simStats} />
+      <HandSimulationStats stats={simStats} loading={simLoading} />
 
       {/* Action buttons */}
       <div className="flex flex-wrap gap-3">

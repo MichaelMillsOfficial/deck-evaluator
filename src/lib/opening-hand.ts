@@ -1,6 +1,6 @@
 import type { DeckData, EnrichedCard } from "./types";
 import { generateTags } from "./card-tags";
-import { resolveCommanderIdentity, type MtgColor } from "./color-distribution";
+import { type MtgColor } from "./color-distribution";
 import { classifyLandEntry } from "./land-base-efficiency";
 
 // ---------------------------------------------------------------------------
@@ -114,13 +114,13 @@ export function drawHand(pool: HandCard[], count: number): HandCard[] {
   const n = copy.length;
   const drawCount = Math.min(count, n);
 
-  // Fisher-Yates shuffle (only need to shuffle drawCount positions)
-  for (let i = n - 1; i > 0; i--) {
+  // Fisher-Yates partial shuffle — only shuffle drawCount positions from the end
+  for (let i = n - 1; i >= n - drawCount && i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
 
-  return copy.slice(0, drawCount);
+  return copy.slice(n - drawCount);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +162,6 @@ export function evaluateHandQuality(
   const lands = hand.filter((c) => isLand(c.enriched));
   const spells = hand.filter((c) => !isLand(c.enriched));
   const landCount = lands.length;
-  const spellCount = spells.length;
 
   // Count ramp cards among non-lands
   const rampCount = spells.filter((c) => hasRampTag(c.enriched)).length;
@@ -433,14 +432,15 @@ export function generateReasoning(
 /**
  * Run a Monte Carlo simulation drawing `iterations` opening hands,
  * scoring each, and computing aggregate statistics.
+ *
+ * Accepts a pre-built pool and commander identity to avoid redundant
+ * computation when the caller already has them.
  */
 export function runSimulation(
-  deck: DeckData,
-  cardMap: Record<string, EnrichedCard>,
+  pool: HandCard[],
+  commanderIdentity: Set<MtgColor | string>,
   iterations = 1000
 ): SimulationStats {
-  const pool = buildPool(deck, cardMap);
-  const commanderIdentity = resolveCommanderIdentity(deck, cardMap);
 
   const verdictDistribution: Record<Verdict, number> = {
     "Strong Keep": 0,

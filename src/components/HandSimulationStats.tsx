@@ -3,7 +3,8 @@
 import type { SimulationStats } from "@/lib/opening-hand";
 
 interface HandSimulationStatsProps {
-  stats: SimulationStats;
+  stats: SimulationStats | null;
+  loading?: boolean;
 }
 
 function formatPercent(value: number): string {
@@ -12,7 +13,39 @@ function formatPercent(value: number): string {
 
 export default function HandSimulationStats({
   stats,
+  loading,
 }: HandSimulationStatsProps) {
+  if (loading || !stats) {
+    return (
+      <div data-testid="simulation-stats" className="space-y-4">
+        {/* Shimmer placeholders for stat cards */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-slate-700 bg-slate-800/50 p-3 text-center"
+            >
+              <div className="mx-auto h-3 w-16 animate-pulse rounded bg-slate-700" />
+              <div className="mx-auto mt-2 h-6 w-12 animate-pulse rounded bg-slate-700" />
+            </div>
+          ))}
+        </div>
+        {/* Shimmer placeholder for verdict distribution */}
+        <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+          <div className="mb-2 h-3 w-40 animate-pulse rounded bg-slate-700" />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i}>
+                <div className="mb-1 h-3 w-full animate-pulse rounded bg-slate-700" />
+                <div className="h-2 w-full animate-pulse rounded-full bg-slate-700" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div data-testid="simulation-stats" className="space-y-4">
       {/* Main stat cards */}
