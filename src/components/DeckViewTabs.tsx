@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import { analyzeDeckSynergy } from "@/lib/synergy-engine";
 import DeckList from "@/components/DeckList";
@@ -28,11 +28,35 @@ export default function DeckViewTabs({
 }: DeckViewTabsProps) {
   const [activeTab, setActiveTab] = useState<ViewTab>("list");
 
+  // Expanded section state persists across tab switches
+  const [expandedSections, setExpandedSections] = useState<
+    Record<string, Set<string>>
+  >({
+    analysis: new Set<string>(),
+    synergy: new Set<string>(),
+  });
+
   const analysisDisabled = !cardMap || enrichLoading;
 
   const synergyAnalysis = useMemo(
     () => (cardMap ? analyzeDeckSynergy(deck, cardMap) : null),
     [deck, cardMap]
+  );
+
+  const handleToggleSection = useCallback(
+    (tab: string, sectionId: string) => {
+      setExpandedSections((prev) => {
+        const current = prev[tab] ?? new Set<string>();
+        const next = new Set(current);
+        if (next.has(sectionId)) {
+          next.delete(sectionId);
+        } else {
+          next.add(sectionId);
+        }
+        return { ...prev, [tab]: next };
+      });
+    },
+    []
   );
 
   const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -127,7 +151,12 @@ export default function DeckViewTabs({
         hidden={activeTab !== "analysis"}
       >
         {activeTab === "analysis" && cardMap && !enrichLoading && (
-          <DeckAnalysis deck={deck} cardMap={cardMap} />
+          <DeckAnalysis
+            deck={deck}
+            cardMap={cardMap}
+            expandedSections={expandedSections.analysis}
+            onToggleSection={(id) => handleToggleSection("analysis", id)}
+          />
         )}
       </div>
 
@@ -148,7 +177,12 @@ export default function DeckViewTabs({
             <p className="mb-4 text-xs text-slate-400">
               Synergy analysis, known combos, and anti-synergy warnings
             </p>
-            <SynergySection analysis={synergyAnalysis} cardMap={cardMap} />
+            <SynergySection
+              analysis={synergyAnalysis}
+              cardMap={cardMap}
+              expandedSections={expandedSections.synergy}
+              onToggleSection={(id) => handleToggleSection("synergy", id)}
+            />
           </section>
         )}
       </div>
