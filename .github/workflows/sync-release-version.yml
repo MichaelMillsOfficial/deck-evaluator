@@ -66,36 +66,36 @@ jobs:
 
       - name: Commit version bump
         if: steps.check.outputs.skip != 'true'
-        id: commit
         run: |
-          BRANCH="chore/bump-version-${{ steps.tag.outputs.version }}"
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
-          git checkout -b "$BRANCH"
           git add package.json package-lock.json
           git commit -m "chore: bump version to ${{ github.event.release.tag_name }}"
 
-      - name: Push branch
+      - name: Push directly to master
         if: steps.check.outputs.skip != 'true'
-        run: git push --force origin "${{ steps.commit.outputs.branch }}"
+        id: direct-push
+        continue-on-error: true
+        run: git push origin HEAD:master
 
-      - name: Create or update pull request
-        if: steps.check.outputs.skip != 'true'
+      - name: Push branch and create PR (fallback)
+        if: steps.check.outputs.skip != 'true' && steps.direct-push.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          BRANCH="${{ steps.commit.outputs.branch }}"
+          BRANCH="chore/bump-version-${{ steps.tag.outputs.version }}"
+          git checkout -b "$BRANCH"
+          git push --force origin "$BRANCH"
+
           TITLE="chore: bump version to ${{ github.event.release.tag_name }}"
           BODY="Automated version bump from release ${{ github.event.release.tag_name }}."
 
-          # Check if a PR already exists for this branch
-          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)
           if [ -n "$EXISTING_PR" ]; then
-            echo "PR #$EXISTING_PR already exists for branch $BRANCH — updating"
+            echo "PR #$EXISTING_PR already exists — updating"
             gh pr edit "$EXISTING_PR" --title "$TITLE" --body "$BODY"
           else
-            gh pr create \
-              --base master \
-              --head "$BRANCH" \
-              --title "$TITLE" \
-              --body "$BODY"
+            if ! gh pr create --base master --head "$BRANCH" --title "$TITLE" --body "$BODY" 2>/tmp/pr-error; then
+              echo "::error::PR creation failed. Enable 'Allow GitHub Actions to create and approve pull requests' at: Settings > Actions > General > Workflow permissions. Branch $BRANCH was pushed — you can create the PR manually."
+              cat /tmp/pr-error >&2
+              exit 1
+            fi
           fi
