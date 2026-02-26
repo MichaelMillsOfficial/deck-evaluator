@@ -317,6 +317,7 @@ test.describe("normalizeSpellbookResponse", () => {
   });
 
   test("sorts near combos by missing count ascending then card count ascending", () => {
+    // 3-card combo: Card A (in deck), Card B (missing) -> 1 missing
     const oneMissing = mockVariant({
       id: "1-missing",
       uses: [
@@ -336,6 +337,7 @@ test.describe("normalizeSpellbookResponse", () => {
         },
       ],
     });
+    // 4-card combo: Card C (in deck), Card D (in deck), Card E (missing), Card F (missing) -> 2 missing
     const twoMissing = mockVariant({
       id: "2-missing",
       uses: [
@@ -360,6 +362,13 @@ test.describe("normalizeSpellbookResponse", () => {
           mustBeCommander: false,
           quantity: 1,
         },
+        {
+          card: { id: 6, name: "Card F", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
       ],
     });
 
@@ -374,22 +383,31 @@ test.describe("normalizeSpellbookResponse", () => {
         almostIncludedByAddingColorsAndChangingCommanders: [],
       },
     };
-    // Card A is in deck, Card B is missing; Card C-E are all missing
-    const deckCardNames = new Set(["Card A"]);
+    // Card A, C, D are in deck; Card B, E, F are missing
+    const deckCardNames = new Set(["Card A", "Card C", "Card D"]);
     const result = normalizeSpellbookResponse(response, deckCardNames);
 
+    expect(result.nearCombos).toHaveLength(2);
     expect(result.nearCombos[0].missingCards.length).toBeLessThanOrEqual(
       result.nearCombos[1].missingCards.length
     );
   });
 
   test("caps near combos at 20 results", () => {
+    // Each variant has 2 cards: "Shared Card" (in deck) and a unique missing card
     const nearVariants = Array.from({ length: 25 }, (_, i) =>
       mockVariant({
         id: `near-${i}`,
         uses: [
           {
-            card: { id: i, name: `Card ${i}`, oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+            card: { id: 100, name: "Shared Card", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+            zoneLocations: ["H"],
+            battlefieldCardState: "",
+            mustBeCommander: false,
+            quantity: 1,
+          },
+          {
+            card: { id: i, name: `Missing Card ${i}`, oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
             zoneLocations: ["H"],
             battlefieldCardState: "",
             mustBeCommander: false,
@@ -410,7 +428,8 @@ test.describe("normalizeSpellbookResponse", () => {
         almostIncludedByAddingColorsAndChangingCommanders: [],
       },
     };
-    const deckCardNames = new Set<string>();
+    // "Shared Card" is in the deck, so each combo has 1 missing card (passes filter)
+    const deckCardNames = new Set(["Shared Card"]);
     const result = normalizeSpellbookResponse(response, deckCardNames);
 
     expect(result.nearCombos.length).toBeLessThanOrEqual(20);
@@ -455,5 +474,197 @@ test.describe("normalizeSpellbookResponse", () => {
 
     expect(result.exactCombos).toHaveLength(1);
     expect(result.exactCombos[0].id).toBe("ok-1");
+  });
+
+  test("filters out near combos where all cards are missing from deck", () => {
+    // Combo uses Stella Lee + Lightning Bolt -- neither is in the deck
+    const allMissingVariant = mockVariant({
+      id: "all-missing",
+      uses: [
+        {
+          card: { id: 10, name: "Stella Lee, Wild Card", oracleId: null, typeLine: "Legendary Creature", oracleText: "", manaValue: 3, identity: "R" },
+          zoneLocations: ["B"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+        {
+          card: { id: 11, name: "Lightning Bolt", oracleId: null, typeLine: "Instant", oracleText: "", manaValue: 1, identity: "R" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+      ],
+    });
+
+    // Combo uses Sol Ring + Paradox Engine -- Sol Ring is in the deck
+    const partialMissingVariant = mockVariant({
+      id: "partial-missing",
+      uses: [
+        {
+          card: { id: 12, name: "Sol Ring", oracleId: null, typeLine: "Artifact", oracleText: "", manaValue: 1, identity: "" },
+          zoneLocations: ["B"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+        {
+          card: { id: 13, name: "Paradox Engine", oracleId: null, typeLine: "Artifact", oracleText: "", manaValue: 5, identity: "" },
+          zoneLocations: ["B"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+      ],
+    });
+
+    const response: SpellbookFindMyCombosResponse = {
+      results: {
+        identity: "WUBRG",
+        included: [],
+        almostIncluded: [allMissingVariant, partialMissingVariant],
+        almostIncludedByAddingColors: [],
+        includedByChangingCommanders: [],
+        almostIncludedByChangingCommanders: [],
+        almostIncludedByAddingColorsAndChangingCommanders: [],
+      },
+    };
+    // Deck only contains Sol Ring -- Stella Lee combo should be filtered out
+    const deckCardNames = new Set(["Sol Ring"]);
+    const result = normalizeSpellbookResponse(response, deckCardNames);
+
+    expect(result.nearCombos).toHaveLength(1);
+    expect(result.nearCombos[0].id).toBe("partial-missing");
+  });
+
+  test("filters out near combos with more than 2 missing cards", () => {
+    // 4-card combo: Card A (in deck), Card B, Card C, Card D (3 missing)
+    const threeMissingVariant = mockVariant({
+      id: "3-missing",
+      uses: [
+        {
+          card: { id: 20, name: "Card A", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+        {
+          card: { id: 21, name: "Card B", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+        {
+          card: { id: 22, name: "Card C", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+        {
+          card: { id: 23, name: "Card D", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+      ],
+    });
+
+    // 3-card combo: Card A (in deck), Card E (missing) -- 1 missing, should pass
+    const oneMissingVariant = mockVariant({
+      id: "1-missing",
+      uses: [
+        {
+          card: { id: 20, name: "Card A", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+        {
+          card: { id: 24, name: "Card E", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+      ],
+    });
+
+    const response: SpellbookFindMyCombosResponse = {
+      results: {
+        identity: "WUBRG",
+        included: [],
+        almostIncluded: [threeMissingVariant, oneMissingVariant],
+        almostIncludedByAddingColors: [],
+        includedByChangingCommanders: [],
+        almostIncludedByChangingCommanders: [],
+        almostIncludedByAddingColorsAndChangingCommanders: [],
+      },
+    };
+    const deckCardNames = new Set(["Card A"]);
+    const result = normalizeSpellbookResponse(response, deckCardNames);
+
+    // Only the 1-missing variant passes the filter (3 missing > max of 2)
+    expect(result.nearCombos).toHaveLength(1);
+    expect(result.nearCombos[0].id).toBe("1-missing");
+  });
+
+  test("keeps near combos with exactly 2 missing cards when some cards are in deck", () => {
+    // 4-card combo: Card A + Card B (in deck), Card C + Card D (missing) -- 2 missing, at limit
+    const twoMissingVariant = mockVariant({
+      id: "2-missing-ok",
+      uses: [
+        {
+          card: { id: 30, name: "Card A", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+        {
+          card: { id: 31, name: "Card B", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+        {
+          card: { id: 32, name: "Card C", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+        {
+          card: { id: 33, name: "Card D", oracleId: null, typeLine: "", oracleText: "", manaValue: 0, identity: "" },
+          zoneLocations: ["H"],
+          battlefieldCardState: "",
+          mustBeCommander: false,
+          quantity: 1,
+        },
+      ],
+    });
+
+    const response: SpellbookFindMyCombosResponse = {
+      results: {
+        identity: "WUBRG",
+        included: [],
+        almostIncluded: [twoMissingVariant],
+        almostIncludedByAddingColors: [],
+        includedByChangingCommanders: [],
+        almostIncludedByChangingCommanders: [],
+        almostIncludedByAddingColorsAndChangingCommanders: [],
+      },
+    };
+    const deckCardNames = new Set(["Card A", "Card B"]);
+    const result = normalizeSpellbookResponse(response, deckCardNames);
+
+    expect(result.nearCombos).toHaveLength(1);
+    expect(result.nearCombos[0].missingCards).toEqual(["Card C", "Card D"]);
   });
 });

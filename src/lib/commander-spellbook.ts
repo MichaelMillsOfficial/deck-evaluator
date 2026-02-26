@@ -193,12 +193,15 @@ export function normalizeVariant(
 }
 
 const NEAR_COMBOS_CAP = 20;
+const NEAR_COMBOS_MAX_MISSING = 2;
 
 /**
  * Normalize the full Commander Spellbook API response into categorized combos.
  * - `included` variants become exactCombos
  * - `almostIncluded` variants become nearCombos
  * - Filters out variants with status "NW" (not working)
+ * - Filters out near combos where no combo cards are in the deck
+ * - Filters out near combos missing more than 2 cards
  * - Sorts exact by card count ascending
  * - Sorts near by missing count ascending, then card count ascending
  * - Caps near combos at 20 results
@@ -217,6 +220,17 @@ export function normalizeSpellbookResponse(
   const nearCombos = response.results.almostIncluded
     .filter(workingFilter)
     .map((v) => normalizeVariant(v, deckCardNames))
+    .filter((combo) => {
+      // Must have at least 1 combo card already in the deck
+      if (combo.cards.length > 0 && combo.missingCards.length === combo.cards.length) {
+        return false;
+      }
+      // Only show combos missing at most 2 cards
+      if (combo.missingCards.length > NEAR_COMBOS_MAX_MISSING) {
+        return false;
+      }
+      return true;
+    })
     .sort((a, b) => {
       const missingDiff = a.missingCards.length - b.missingCards.length;
       if (missingDiff !== 0) return missingDiff;
