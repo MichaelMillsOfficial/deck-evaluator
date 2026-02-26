@@ -6,6 +6,7 @@ import {
 import type { DeckData } from "@/lib/types";
 
 const MAX_CARD_NAMES = 250;
+const MAX_NAME_LENGTH = 200;
 
 export async function POST(request: Request): Promise<Response> {
   let body: unknown;
@@ -38,6 +39,12 @@ export async function POST(request: Request): Promise<Response> {
     if (typeof name !== "string") continue;
     const trimmed = name.trim();
     if (!trimmed) continue;
+    if (trimmed.length > MAX_NAME_LENGTH) {
+      return Response.json(
+        { error: `Card name exceeds maximum length of ${MAX_NAME_LENGTH} characters` },
+        { status: 400 }
+      );
+    }
     cleaned.push(trimmed);
   }
 

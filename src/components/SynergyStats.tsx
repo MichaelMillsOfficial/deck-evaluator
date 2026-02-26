@@ -6,7 +6,6 @@ import type { DeckSynergyAnalysis } from "@/lib/types";
 interface SynergyStatsProps {
   analysis: DeckSynergyAnalysis;
   spellbookComboCount?: number | null;
-  spellbookNearComboCount?: number | null;
 }
 
 type ExpandedCard = "avg" | "combos" | "anti" | null;
@@ -41,7 +40,6 @@ function Chevron({ expanded }: { expanded: boolean }) {
 export default function SynergyStats({
   analysis,
   spellbookComboCount,
-  spellbookNearComboCount,
 }: SynergyStatsProps) {
   const [expanded, setExpanded] = useState<ExpandedCard>(null);
 

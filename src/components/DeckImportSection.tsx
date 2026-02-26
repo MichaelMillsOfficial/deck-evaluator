@@ -103,13 +103,13 @@ export default function DeckImportSection() {
         }),
         signal: AbortSignal.any([
           controller.signal,
-          AbortSignal.timeout(30_000),
+          AbortSignal.timeout(20_000),
         ]),
       });
 
       if (!res.ok) {
-        // Non-200 means validation error; just set null for fallback
-        setSpellbookCombos(null);
+        // Non-200 means validation error; set empty arrays so UI shows "Local Combos"
+        setSpellbookCombos({ exactCombos: [], nearCombos: [] });
         return;
       }
 
@@ -121,8 +121,8 @@ export default function DeckImportSection() {
     } catch (err) {
       // Don't update state for aborted requests
       if (err instanceof DOMException && err.name === "AbortError") return;
-      // Graceful fallback: null triggers local-only combos
-      setSpellbookCombos(null);
+      // Graceful fallback: empty arrays trigger "Local Combos" label
+      setSpellbookCombos({ exactCombos: [], nearCombos: [] });
     } finally {
       setSpellbookLoading(false);
     }

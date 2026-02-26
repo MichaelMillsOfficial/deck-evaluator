@@ -97,7 +97,6 @@ export default function SynergySection({
         <SynergyStats
           analysis={analysis}
           spellbookComboCount={spellbookCombos?.exactCombos.length ?? null}
-          spellbookNearComboCount={spellbookCombos?.nearCombos.length ?? null}
         />
       </CollapsiblePanel>
 
@@ -114,7 +113,6 @@ export default function SynergySection({
       >
         <VerifiedCombos
           exactCombos={spellbookCombos?.exactCombos ?? []}
-          nearCombos={spellbookCombos?.nearCombos ?? []}
           loading={spellbookLoading}
           cardMap={cardMap}
         />

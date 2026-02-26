@@ -6,7 +6,6 @@ import type { SpellbookCombo } from "@/lib/commander-spellbook";
 
 interface VerifiedCombosProps {
   exactCombos: SpellbookCombo[];
-  nearCombos: SpellbookCombo[];
   loading: boolean;
   cardMap: Record<string, EnrichedCard>;
 }
@@ -62,9 +61,9 @@ function ComboItem({
           <p className="mt-0.5 text-xs text-slate-400">{combo.description}</p>
           {combo.produces.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1" data-testid="combo-produces">
-              {combo.produces.map((p) => (
+              {combo.produces.map((p, idx) => (
                 <span
-                  key={p}
+                  key={`${p}-${idx}`}
                   className="rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] font-medium text-slate-300"
                 >
                   {p}
@@ -170,8 +169,8 @@ function ComboItem({
               <p className="text-[10px] font-medium text-slate-400">
                 Also requires:
               </p>
-              {combo.templateRequirements.map((req) => (
-                <p key={req} className="text-xs italic text-slate-300 mt-0.5">
+              {combo.templateRequirements.map((req, idx) => (
+                <p key={`${req}-${idx}`} className="text-xs italic text-slate-300 mt-0.5">
                   {req}
                 </p>
               ))}
@@ -199,7 +198,6 @@ function LoadingShimmer() {
 
 export default function VerifiedCombos({
   exactCombos,
-  nearCombos,
   loading,
   cardMap,
 }: VerifiedCombosProps) {
