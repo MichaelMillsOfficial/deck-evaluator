@@ -21,6 +21,9 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   "Mana Accel Land": { bg: "bg-fuchsia-500/20", text: "text-fuchsia-300" },
   "Non-Land Types": { bg: "bg-purple-500/20", text: "text-purple-300" },
   Cycling: { bg: "bg-zinc-500/20", text: "text-zinc-300" },
+  "Game Changer": { bg: "bg-red-500/20", text: "text-red-300" },
+  "Extra Turn": { bg: "bg-amber-600/20", text: "text-amber-200" },
+  "Mass Land Denial": { bg: "bg-orange-600/20", text: "text-orange-200" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -76,6 +79,23 @@ const BASIC_LAND_SUBTYPES = new Set([
 ]);
 const CYCLING_KEYWORDS = new Set(["Cycling", "Basic landcycling"]);
 const CYCLING_RE = /\b(?:cycling|basic landcycling)\s+/i;
+
+// --- Bracket-related tag patterns ---
+const EXTRA_TURN_RE = /\bextra turn\b/i;
+const FULL_MLD_RE = /\bdestroy all\b[^.]*\blands\b/i;
+const SACRIFICE_MLD_RE =
+  /\beach player\b[^.]*(?:\bsacrifices?\b[^.]*\bland|\bland[^.]*\bsacrifices?\b)/i;
+const RESOURCE_DENIAL_NAMES = new Set([
+  "Blood Moon",
+  "Back to Basics",
+  "Magus of the Moon",
+  "Winter Orb",
+  "Static Orb",
+  "Stasis",
+  "Rising Waters",
+  "Hokori, Dust Drinker",
+  "Tanglewire",
+]);
 
 // Patterns to strip when detecting Utility Land —
 // basic mana reminder text, ETB tapped boilerplate, tap-for-mana, and card name references
@@ -230,6 +250,27 @@ export function generateTags(card: EnrichedCard): string[] {
     if (stripped.length > 0) {
       tags.add("Utility Land");
     }
+  }
+
+  // --- Bracket-related tags ---
+
+  // Game Changer — sourced from Scryfall's game_changer field
+  if (card.isGameChanger) {
+    tags.add("Game Changer");
+  }
+
+  // Extra Turn — oracle text detection
+  if (EXTRA_TURN_RE.test(text)) {
+    tags.add("Extra Turn");
+  }
+
+  // Mass Land Denial — regex patterns + name-based detection
+  if (
+    FULL_MLD_RE.test(text) ||
+    SACRIFICE_MLD_RE.test(text) ||
+    RESOURCE_DENIAL_NAMES.has(card.name)
+  ) {
+    tags.add("Mass Land Denial");
   }
 
   return Array.from(tags).sort();

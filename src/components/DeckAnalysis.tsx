@@ -16,6 +16,9 @@ import {
 import { computeLandBaseEfficiency } from "@/lib/land-base-efficiency";
 import { computeManaBaseRecommendations } from "@/lib/mana-recommendations";
 import { computePowerLevel } from "@/lib/power-level";
+import { computeBracketEstimate } from "@/lib/bracket-estimator";
+import { STATIC_CEDH_STAPLES } from "@/lib/cedh-staples";
+import type { SpellbookCombo } from "@/lib/commander-spellbook";
 import ManaCurveChart from "@/components/ManaCurveChart";
 import TypeFilterBar from "@/components/TypeFilterBar";
 import ColorDistributionChart from "@/components/ColorDistributionChart";
@@ -25,12 +28,14 @@ import LandBaseEfficiency from "@/components/LandBaseEfficiency";
 import DeckCompositionScorecard from "@/components/DeckCompositionScorecard";
 import HypergeometricCalculator from "@/components/HypergeometricCalculator";
 import PowerLevelEstimator from "@/components/PowerLevelEstimator";
+import BracketEstimator from "@/components/BracketEstimator";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import SectionNav from "@/components/SectionNav";
 
 const ANALYSIS_SECTIONS = [
   { id: "commander", label: "Commander" },
   { id: "composition", label: "Composition" },
+  { id: "bracket", label: "Bracket" },
   { id: "power-level", label: "Power Level" },
   { id: "mana-curve", label: "Mana Curve" },
   { id: "color-distribution", label: "Color Dist." },
@@ -43,6 +48,10 @@ interface DeckAnalysisProps {
   cardMap: Record<string, EnrichedCard>;
   expandedSections: Set<string>;
   onToggleSection: (id: string) => void;
+  spellbookCombos?: {
+    exactCombos: SpellbookCombo[];
+    nearCombos: SpellbookCombo[];
+  } | null;
 }
 
 export default function DeckAnalysis({
@@ -50,6 +59,7 @@ export default function DeckAnalysis({
   cardMap,
   expandedSections,
   onToggleSection,
+  spellbookCombos,
 }: DeckAnalysisProps) {
   const [enabledTypes, setEnabledTypes] = useState<Set<CardType>>(
     () => new Set(CARD_TYPES)
@@ -110,6 +120,18 @@ export default function DeckAnalysis({
     [deck, cardMap]
   );
 
+  const bracketResult = useMemo(
+    () =>
+      computeBracketEstimate(
+        deck,
+        cardMap,
+        powerLevel,
+        STATIC_CEDH_STAPLES,
+        spellbookCombos?.exactCombos ?? null
+      ),
+    [deck, cardMap, powerLevel, spellbookCombos]
+  );
+
   const filteredSpells = curveData.reduce(
     (sum, b) => sum + b.permanents + b.nonPermanents,
     0
@@ -160,6 +182,23 @@ export default function DeckAnalysis({
         onToggle={() => onToggleSection("composition")}
       >
         <DeckCompositionScorecard deck={deck} cardMap={cardMap} />
+      </CollapsiblePanel>
+
+      <CollapsiblePanel
+        id="bracket"
+        title="Bracket Estimator"
+        expanded={expandedSections.has("bracket")}
+        onToggle={() => onToggleSection("bracket")}
+        summary={
+          <span
+            data-testid="bracket-summary-badge"
+            className="rounded border px-1.5 py-0.5 text-xs font-semibold bg-slate-700/50 border-slate-600 text-slate-300"
+          >
+            B{bracketResult.bracket}
+          </span>
+        }
+      >
+        <BracketEstimator result={bracketResult} />
       </CollapsiblePanel>
 
       <CollapsiblePanel

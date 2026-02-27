@@ -197,16 +197,16 @@ Each detected constraint becomes a `BracketConstraint` with:
 
 ### Phase 1: Extend EnrichedCard with Game Changer field
 
-- [ ] 1.1 Add `game_changer` to `ScryfallCard` interface in `src/lib/scryfall.ts`
+- [x] 1.1 Add `game_changer` to `ScryfallCard` interface in `src/lib/scryfall.ts`
   - Add `game_changer?: boolean` field to the interface (after `flavor_name`)
-- [ ] 1.2 Add `isGameChanger` to `EnrichedCard` interface in `src/lib/types.ts`
+- [x] \1.2 Add `isGameChanger` to `EnrichedCard` interface in `src/lib/types.ts`
   - Add `isGameChanger: boolean` field
-- [ ] 1.3 Flow `game_changer` through `normalizeToEnrichedCard()` in `src/lib/scryfall.ts`
+- [x] \1.3 Flow `game_changer` through `normalizeToEnrichedCard()` in `src/lib/scryfall.ts`
   - Map `card.game_changer ?? false` to `isGameChanger`
 
 ### Phase 2: Add new card tags — tests first
 
-- [ ] 2.1 Add tag test cases to `tests/unit/card-tags.spec.ts`
+- [x] \1.1 Add tag test cases to `tests/unit/card-tags.spec.ts`
   - Test: Cyclonic Rift (Game Changer + Board Wipe) gets "Game Changer" tag
   - Test: Time Warp gets "Extra Turn" tag
   - Test: Expropriate ("extra turn after this one") gets "Extra Turn" tag
@@ -220,18 +220,18 @@ Each detected constraint becomes a `BracketConstraint` with:
   - Test: mockCard with `isGameChanger: true` gets "Game Changer" tag
   - Test: mockCard with `isGameChanger: false` does NOT get "Game Changer" tag
 
-- [ ] 2.2 Add tag colors to `TAG_COLORS` in `src/lib/card-tags.ts`
+- [x] \1.2 Add tag colors to `TAG_COLORS` in `src/lib/card-tags.ts`
   - `"Game Changer": { bg: "bg-red-500/20", text: "text-red-300" }`
   - `"Extra Turn": { bg: "bg-amber-600/20", text: "text-amber-200" }`
   - `"Mass Land Denial": { bg: "bg-orange-600/20", text: "text-orange-200" }`
 
-- [ ] 2.3 Add regex patterns and name sets to `src/lib/card-tags.ts`
+- [x] \1.3 Add regex patterns and name sets to `src/lib/card-tags.ts`
   - `EXTRA_TURN_RE = /\bextra turn\b/i`
   - `FULL_MLD_RE = /\bdestroy all\b[^.]*\blands\b/i`
   - `SACRIFICE_MLD_RE = /\beach player\b[^.]*\bsacrifices?\b[^.]*\bland/i`
   - `RESOURCE_DENIAL_NAMES: Set<string>` (Blood Moon, Back to Basics, Magus of the Moon, Winter Orb, Static Orb, Stasis, Rising Waters, Hokori Dust Drinker, Tanglewire)
 
-- [ ] 2.4 Add detection logic to `generateTags()` in `src/lib/card-tags.ts`
+- [x] \1.4 Add detection logic to `generateTags()` in `src/lib/card-tags.ts`
   - Game Changer: `if (card.isGameChanger) tags.add("Game Changer")`
   - Extra Turn: `if (EXTRA_TURN_RE.test(text)) tags.add("Extra Turn")`
   - Mass Land Denial: test regex patterns + check `RESOURCE_DENIAL_NAMES.has(card.name)`
@@ -239,7 +239,7 @@ Each detected constraint becomes a `BracketConstraint` with:
 
 ### Phase 3: cEDH staple data module — tests first
 
-- [ ] 3.1 Create `tests/unit/cedh-staples.spec.ts`
+- [x] \1.1 Create `tests/unit/cedh-staples.spec.ts`
   - Test: `computeStapleOverlap()` returns 0% for deck with no staples
   - Test: `computeStapleOverlap()` returns 100% for deck of all staples
   - Test: `computeStapleOverlap()` excludes lands from calculation
@@ -248,7 +248,7 @@ Each detected constraint becomes a `BracketConstraint` with:
   - Test: `buildStapleSet()` returns card names as a Set
   - Test: `STATIC_CEDH_STAPLES` contains expected staples (Sol Ring, Chrome Mox, etc.)
 
-- [ ] 3.2 Create `src/lib/cedh-staples.ts`
+- [x] \1.2 Create `src/lib/cedh-staples.ts`
   - `STATIC_CEDH_STAPLES: Set<string>` — baked-in snapshot of ~127 card names at 20%+ inclusion
   - `interface CedhStapleData { staples: Set<string>; fetchedAt: number }`
   - `async function fetchCedhStaples(): Promise<Set<string>>` — fetches from gh-pages, builds set of names where percent >= 20, falls back to `STATIC_CEDH_STAPLES`
@@ -258,7 +258,7 @@ Each detected constraint becomes a `BracketConstraint` with:
 
 ### Phase 4: Bracket estimator core logic — tests first
 
-- [ ] 4.1 Create `tests/unit/bracket-estimator.spec.ts`
+- [x] \1.1 Create `tests/unit/bracket-estimator.spec.ts`
   - **Bracket floor tests:**
     - Test: Empty deck returns bracket 1
     - Test: Precon-like deck (no GC, no combos, no MLD, no extra turns, PL 4) returns bracket 2
@@ -297,7 +297,7 @@ Each detected constraint becomes a `BracketConstraint` with:
     - Test: Recommendations for B3→B2 list Game Changer cards to remove
     - Test: Recommendations skip unreachable brackets (e.g., don't suggest B1 if PL > 3)
 
-- [ ] 4.2 Create `src/lib/bracket-estimator.ts`
+- [x] \1.2 Create `src/lib/bracket-estimator.ts`
   - Types:
     ```typescript
     interface BracketConstraint {
@@ -337,7 +337,7 @@ Each detected constraint becomes a `BracketConstraint` with:
 
 ### Phase 5: Bracket estimator UI component
 
-- [ ] 5.1 Create `e2e/bracket-estimator.spec.ts`
+- [x] \1.1 Create `e2e/bracket-estimator.spec.ts`
   - Test: Bracket section appears in analysis view
   - Test: Bracket number (1-5) is displayed
   - Test: Bracket name badge is displayed
@@ -349,7 +349,7 @@ Each detected constraint becomes a `BracketConstraint` with:
   - Test: Section is collapsible (follows CollapsiblePanel pattern)
   - Test: Combo source indicator shows "local" or "local+spellbook"
 
-- [ ] 5.2 Create `src/components/BracketEstimator.tsx`
+- [x] \1.2 Create `src/components/BracketEstimator.tsx`
   - Props: `{ result: BracketResult }`
   - Layout follows `PowerLevelEstimator.tsx` pattern:
     - Large bracket number (1-5) with bracket color utility
@@ -369,7 +369,7 @@ Each detected constraint becomes a `BracketConstraint` with:
 
 ### Phase 6: Integration into DeckAnalysis and data threading
 
-- [ ] 6.1 Thread `spellbookCombos` to `DeckAnalysis`
+- [x] \1.1 Thread `spellbookCombos` to `DeckAnalysis`
   - Modify `DeckViewTabs.tsx`: pass `spellbookCombos` prop to the Analysis tab's `DeckAnalysis` component (currently only passed to `SynergySection`)
   - Modify `DeckAnalysis` props interface to accept optional `spellbookCombos`:
     ```typescript
@@ -382,7 +382,7 @@ Each detected constraint becomes a `BracketConstraint` with:
     }
     ```
 
-- [ ] 6.2 Add bracket section to `DeckAnalysis.tsx`
+- [x] \1.2 Add bracket section to `DeckAnalysis.tsx`
   - Add `"bracket"` to `ANALYSIS_SECTIONS` at index 2 (before power-level): `{ id: "bracket", label: "Bracket" }`
   - Add `useMemo` for bracket computation:
     ```typescript
@@ -396,7 +396,7 @@ Each detected constraint becomes a `BracketConstraint` with:
   - Add summary badge to panel header showing bracket number
   - Bracket re-computes automatically when Spellbook data arrives (React reactivity via `useMemo` deps)
 
-- [ ] 6.3 Add async cEDH staple fetching (enhancement)
+- [x] \1.3 Add async cEDH staple fetching (enhancement)
   - In the parent page component (`DeckImportSection`), call `getCedhStaples()` on mount via `useEffect`
   - Pass resolved staples through `DeckViewTabs` → `DeckAnalysis` as a prop
   - While loading, use `STATIC_CEDH_STAPLES` as default
@@ -404,13 +404,13 @@ Each detected constraint becomes a `BracketConstraint` with:
 
 ### Phase 7: Verification and cleanup
 
-- [ ] 7.1 Run `npm run test:unit` — all unit tests pass
-- [ ] 7.2 Run `npm run test:e2e` — all e2e tests pass
-- [ ] 7.3 Run `npm run build` — production build succeeds
-- [ ] 7.4 Run `npm run lint` — no lint errors
-- [ ] 7.5 Manual smoke test: import a known cEDH deck and verify bracket 5 classification
-- [ ] 7.6 Manual smoke test: import a precon-level deck and verify bracket 1-2 classification
-- [ ] 7.7 Manual smoke test: verify Game Changer tag pills appear on enriched cards
+- [x] \1.1 Run `npm run test:unit` — all unit tests pass
+- [x] \1.2 Run `npm run test:e2e` — all e2e tests pass
+- [x] \1.3 Run `npm run build` — production build succeeds
+- [x] \1.4 Run `npm run lint` — no lint errors
+- [x] \1.5 Manual smoke test: import a known cEDH deck and verify bracket 5 classification
+- [x] \1.6 Manual smoke test: import a precon-level deck and verify bracket 1-2 classification
+- [x] \1.7 Manual smoke test: verify Game Changer tag pills appear on enriched cards
 
 ## Files to Create/Modify
 
