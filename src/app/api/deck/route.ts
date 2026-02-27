@@ -55,7 +55,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       return Response.json(
         {
           error:
-            "Unsupported deck URL. Only Archidekt URLs are supported. For Moxfield decks, use the \"Paste Decklist\" tab to paste your exported decklist.",
+            "Unsupported deck URL. Only Archidekt URLs are supported. For Moxfield decks, use the Moxfield tab and paste your exported decklist.",
         },
         { status: 422 }
       );
