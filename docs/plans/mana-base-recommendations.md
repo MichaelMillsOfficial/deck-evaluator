@@ -207,10 +207,12 @@ Use `hypergeometricCdf(deckSize, landCount, 7, 3)` — probability of ≥ 3 land
 
 | Probability | Severity | Message |
 |-------------|----------|---------|
-| ≥ 0.75 | none | — |
-| 0.65–0.75 | `suggestion` | "With N lands, you have a X% chance of 3+ lands in your opening hand. A few more lands would improve consistency." |
-| 0.50–0.65 | `warning` | "With N lands, you only have a X% chance of drawing 3+ lands in your opening hand — expect frequent mulligans." |
-| < 0.50 | `critical` | "With N lands, you have only a X% chance of 3+ opening lands. You will mulligan very frequently." |
+| ≥ 0.45 | none | — |
+| 0.40–0.45 | `suggestion` | "With N lands, you have a X% chance of 3+ lands in your opening hand. A few more lands would improve consistency." |
+| 0.30–0.40 | `warning` | "With N lands, you only have a X% chance of drawing 3+ lands in your opening hand — expect frequent mulligans." |
+| < 0.30 | `critical` | "With N lands, you have only a X% chance of 3+ opening lands. You will mulligan very frequently." |
+
+Note: Thresholds are calibrated to Commander reality — 37 lands in 99 gives ~52% P(≥3 in 7), which is the standard healthy baseline.
 
 ### Output Types
 

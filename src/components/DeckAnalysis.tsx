@@ -14,6 +14,7 @@ import {
   resolveCommanderIdentity,
 } from "@/lib/color-distribution";
 import { computeLandBaseEfficiency } from "@/lib/land-base-efficiency";
+import { computeManaBaseRecommendations } from "@/lib/mana-recommendations";
 import { computePowerLevel } from "@/lib/power-level";
 import ManaCurveChart from "@/components/ManaCurveChart";
 import TypeFilterBar from "@/components/TypeFilterBar";
@@ -21,6 +22,7 @@ import ColorDistributionChart from "@/components/ColorDistributionChart";
 import ManaBaseStats from "@/components/ManaBaseStats";
 import CommanderSection from "@/components/CommanderSection";
 import LandBaseEfficiency from "@/components/LandBaseEfficiency";
+import ManaBaseRecommendations from "@/components/ManaBaseRecommendations";
 import DeckCompositionScorecard from "@/components/DeckCompositionScorecard";
 import HypergeometricCalculator from "@/components/HypergeometricCalculator";
 import PowerLevelEstimator from "@/components/PowerLevelEstimator";
@@ -34,6 +36,7 @@ const ANALYSIS_SECTIONS = [
   { id: "mana-curve", label: "Mana Curve" },
   { id: "color-distribution", label: "Color Dist." },
   { id: "land-efficiency", label: "Land Efficiency" },
+  { id: "mana-recommendations", label: "Mana Recs" },
   { id: "hypergeometric", label: "Draw Odds" },
 ] as const;
 
@@ -96,6 +99,11 @@ export default function DeckAnalysis({
 
   const landEfficiency = useMemo(
     () => computeLandBaseEfficiency(deck, cardMap),
+    [deck, cardMap]
+  );
+
+  const manaRecommendations = useMemo(
+    () => computeManaBaseRecommendations(deck, cardMap),
     [deck, cardMap]
   );
 
@@ -227,6 +235,18 @@ export default function DeckAnalysis({
         onToggle={() => onToggleSection("land-efficiency")}
       >
         <LandBaseEfficiency result={landEfficiency} />
+      </CollapsiblePanel>
+
+      <CollapsiblePanel
+        id="mana-recommendations"
+        title="Mana Base Recommendations"
+        summary={manaRecommendations.recommendations.length > 0
+          ? `${manaRecommendations.recommendations.length} issue${manaRecommendations.recommendations.length === 1 ? "" : 's'}`
+          : "No issues"}
+        expanded={expandedSections.has("mana-recommendations")}
+        onToggle={() => onToggleSection("mana-recommendations")}
+      >
+        <ManaBaseRecommendations result={manaRecommendations} />
       </CollapsiblePanel>
 
       <CollapsiblePanel
