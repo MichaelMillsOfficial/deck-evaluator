@@ -178,7 +178,7 @@ test.describe("Mana Base Recommendations — UI", () => {
     );
   });
 
-  test("Mana Base Recommendations section appears in Analysis tab", async ({
+  test("Mana Base Recommendations section appears inside Land Base Efficiency", async ({
     deckPage,
   }) => {
     const { page } = deckPage;
@@ -193,7 +193,7 @@ test.describe("Mana Base Recommendations — UI", () => {
 
     await deckPage.selectDeckViewTab("Analysis");
     await deckPage.waitForAnalysisPanel();
-    await deckPage.expandAnalysisSection("mana-recommendations");
+    await deckPage.expandAnalysisSection("land-efficiency");
 
     const section = deckPage.analysisPanel.getByTestId("mana-recommendations");
     await expect(section).toBeVisible();
@@ -212,7 +212,7 @@ test.describe("Mana Base Recommendations — UI", () => {
 
     await deckPage.selectDeckViewTab("Analysis");
     await deckPage.waitForAnalysisPanel();
-    await deckPage.expandAnalysisSection("mana-recommendations");
+    await deckPage.expandAnalysisSection("land-efficiency");
 
     const banner = deckPage.analysisPanel.getByTestId(
       "recommendations-health-summary"
@@ -236,7 +236,7 @@ test.describe("Mana Base Recommendations — UI", () => {
 
     await deckPage.selectDeckViewTab("Analysis");
     await deckPage.waitForAnalysisPanel();
-    await deckPage.expandAnalysisSection("mana-recommendations");
+    await deckPage.expandAnalysisSection("land-efficiency");
 
     // This tiny deck should trigger recommendations (low land count, etc.)
     const rows = deckPage.analysisPanel.locator(
