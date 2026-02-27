@@ -1179,10 +1179,10 @@ test.describe("Deck Analysis — Composition Scorecard", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Power Level Estimator
+// Deck Classification (unified Bracket + Power Level)
 // ---------------------------------------------------------------------------
 
-test.describe("Deck Analysis — Power Level Estimator", () => {
+test.describe("Deck Analysis — Deck Classification", () => {
   test.beforeEach(async ({ deckPage }) => {
     const { page } = deckPage;
     await page.route("**/api/deck-enrich", (route) =>
@@ -1204,16 +1204,39 @@ test.describe("Deck Analysis — Power Level Estimator", () => {
     ).toBeVisible({ timeout: 10_000 });
 
     await deckPage.selectDeckViewTab("Analysis");
-    await deckPage.expandAnalysisSection("power-level");
+    await deckPage.expandAnalysisSection("deck-classification");
   });
 
-  test("Power Level Estimator section appears on Analysis tab", async ({
+  test("Deck Classification section appears on Analysis tab", async ({
     deckPage,
   }) => {
     const { page } = deckPage;
+    const section = page.locator(
+      'section[aria-labelledby="deck-classification-heading"]'
+    );
+    await expect(section).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Power Level Estimator" })
+      page.getByRole("heading", { name: "Deck Classification" })
     ).toBeVisible();
+  });
+
+  test("displays bracket number between 1 and 5", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const bracketEl = page.getByTestId("bracket-number");
+    await expect(bracketEl).toBeVisible();
+    const text = await bracketEl.textContent();
+    const bracket = parseInt(text ?? "0", 10);
+    expect(bracket).toBeGreaterThanOrEqual(1);
+    expect(bracket).toBeLessThanOrEqual(5);
+  });
+
+  test("displays bracket name", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const nameEl = page.getByTestId("bracket-name");
+    await expect(nameEl).toBeVisible();
+    const text = await nameEl.textContent();
+    const validNames = ["Exhibition", "Core", "Upgraded", "Optimized", "cEDH"];
+    expect(validNames).toContain(text?.trim());
   });
 
   test("displays power level score between 1 and 10", async ({
@@ -1239,25 +1262,7 @@ test.describe("Deck Analysis — Power Level Estimator", () => {
     expect(validBands).toContain(text?.trim());
   });
 
-  test("displays factor breakdown rows", async ({ deckPage }) => {
-    const { page } = deckPage;
-    const factors = page.getByTestId("power-level-factor");
-    await expect(factors).toHaveCount(8);
-  });
-
-  test("section has accessible heading structure", async ({ deckPage }) => {
-    const { page } = deckPage;
-    const section = page.locator(
-      'section[aria-labelledby="power-level-heading"]'
-    );
-    await expect(section).toBeVisible();
-    const heading = section.getByRole("heading", {
-      name: "Power Level Estimator",
-    });
-    await expect(heading).toBeVisible();
-  });
-
-  test("raw score is visible", async ({ deckPage }) => {
+  test("displays raw score", async ({ deckPage }) => {
     const { page } = deckPage;
     const rawScoreEl = page.getByTestId("power-level-raw-score");
     await expect(rawScoreEl).toBeVisible();
@@ -1267,22 +1272,71 @@ test.describe("Deck Analysis — Power Level Estimator", () => {
     expect(score).toBeLessThanOrEqual(100);
   });
 
-  test("power level section appears before Mana Curve", async ({
+  test("displays bracket scale with 5 segments", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const scale = page.getByTestId("bracket-scale");
+    await expect(scale).toBeVisible();
+  });
+
+  test("displays bracket cascade timeline", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const cascade = page.getByTestId("bracket-cascade");
+    await expect(cascade).toBeVisible();
+  });
+
+  test("displays classification summary badge", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const badge = page.getByTestId("classification-summary-badge");
+    await expect(badge).toBeVisible();
+    const text = await badge.textContent();
+    expect(text).toMatch(/B\d+ \| PL\d+/);
+  });
+
+  test("power level factors are behind a toggle button", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const toggle = page.getByTestId("power-level-factors-toggle");
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    // Factors not visible before clicking
+    await expect(page.getByTestId("power-level-factor")).toHaveCount(0);
+
+    // Click to expand
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    // Now factors are visible
+    const factors = page.getByTestId("power-level-factor");
+    await expect(factors).toHaveCount(8);
+  });
+
+  test("Escape key collapses factors sub-section", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const toggle = page.getByTestId("power-level-factors-toggle");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    await toggle.press("Escape");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  test("deck classification section appears before Mana Curve", async ({
     deckPage,
   }) => {
     const { page } = deckPage;
     await deckPage.expandAnalysisSection("mana-curve");
 
-    const powerPanel = page.getByTestId("panel-power-level");
+    const classPanel = page.getByTestId("panel-deck-classification");
     const manaPanel = page.getByTestId("panel-mana-curve");
-    await expect(powerPanel).toBeVisible();
+    await expect(classPanel).toBeVisible();
     await expect(manaPanel).toBeVisible();
 
-    const powerBound = await powerPanel.boundingBox();
+    const classBound = await classPanel.boundingBox();
     const manaBound = await manaPanel.boundingBox();
-    expect(powerBound).not.toBeNull();
+    expect(classBound).not.toBeNull();
     expect(manaBound).not.toBeNull();
-    // Power level section should appear higher (smaller y) than Mana Curve
-    expect(powerBound!.y).toBeLessThan(manaBound!.y);
+    expect(classBound!.y).toBeLessThan(manaBound!.y);
   });
 });

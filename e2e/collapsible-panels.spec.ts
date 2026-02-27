@@ -120,7 +120,7 @@ test.describe("Collapsible Panels — Analysis Tab", () => {
     const sectionIds = [
       "commander",
       "composition",
-      "power-level",
+      "deck-classification",
       "mana-curve",
       "color-distribution",
       "land-efficiency",
@@ -141,7 +141,7 @@ test.describe("Collapsible Panels — Analysis Tab", () => {
     // Check a few panel headers are visible
     await expect(page.getByTestId("panel-mana-curve")).toBeVisible();
     await expect(page.getByTestId("panel-commander")).toBeVisible();
-    await expect(page.getByTestId("panel-power-level")).toBeVisible();
+    await expect(page.getByTestId("panel-deck-classification")).toBeVisible();
   });
 
   test("clicking a panel header expands it", async ({ deckPage }) => {
@@ -192,8 +192,8 @@ test.describe("Collapsible Panels — Analysis Tab", () => {
     const curvePanel = page.getByTestId("panel-mana-curve");
     await curvePanel.locator("button").first().click();
 
-    // Expand power level
-    const powerPanel = page.getByTestId("panel-power-level");
+    // Expand deck classification
+    const powerPanel = page.getByTestId("panel-deck-classification");
     await powerPanel.locator("button").first().click();
 
     // Both should be expanded
@@ -213,7 +213,7 @@ test.describe("Collapsible Panels — Analysis Tab", () => {
     // Should have chips for all 7 sections
     await expect(page.getByTestId("section-nav-commander")).toBeVisible();
     await expect(page.getByTestId("section-nav-mana-curve")).toBeVisible();
-    await expect(page.getByTestId("section-nav-power-level")).toBeVisible();
+    await expect(page.getByTestId("section-nav-deck-classification")).toBeVisible();
     await expect(page.getByTestId("section-nav-hypergeometric")).toBeVisible();
   });
 

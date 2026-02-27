@@ -27,16 +27,14 @@ import CommanderSection from "@/components/CommanderSection";
 import LandBaseEfficiency from "@/components/LandBaseEfficiency";
 import DeckCompositionScorecard from "@/components/DeckCompositionScorecard";
 import HypergeometricCalculator from "@/components/HypergeometricCalculator";
-import PowerLevelEstimator from "@/components/PowerLevelEstimator";
-import BracketEstimator from "@/components/BracketEstimator";
+import DeckClassification from "@/components/DeckClassification";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import SectionNav from "@/components/SectionNav";
 
 const ANALYSIS_SECTIONS = [
   { id: "commander", label: "Commander" },
   { id: "composition", label: "Composition" },
-  { id: "bracket", label: "Bracket" },
-  { id: "power-level", label: "Power Level" },
+  { id: "deck-classification", label: "Classification" },
   { id: "mana-curve", label: "Mana Curve" },
   { id: "color-distribution", label: "Color Dist." },
   { id: "land-efficiency", label: "Land Efficiency" },
@@ -185,29 +183,20 @@ export default function DeckAnalysis({
       </CollapsiblePanel>
 
       <CollapsiblePanel
-        id="bracket"
-        title="Bracket Estimator"
-        expanded={expandedSections.has("bracket")}
-        onToggle={() => onToggleSection("bracket")}
+        id="deck-classification"
+        title="Deck Classification"
+        expanded={expandedSections.has("deck-classification")}
+        onToggle={() => onToggleSection("deck-classification")}
         summary={
           <span
-            data-testid="bracket-summary-badge"
+            data-testid="classification-summary-badge"
             className="rounded border px-1.5 py-0.5 text-xs font-semibold bg-slate-700/50 border-slate-600 text-slate-300"
           >
-            B{bracketResult.bracket}
+            B{bracketResult.bracket} | PL{powerLevel.powerLevel}
           </span>
         }
       >
-        <BracketEstimator result={bracketResult} />
-      </CollapsiblePanel>
-
-      <CollapsiblePanel
-        id="power-level"
-        title="Power Level Estimator"
-        expanded={expandedSections.has("power-level")}
-        onToggle={() => onToggleSection("power-level")}
-      >
-        <PowerLevelEstimator result={powerLevel} />
+        <DeckClassification bracketResult={bracketResult} powerLevel={powerLevel} />
       </CollapsiblePanel>
 
       <CollapsiblePanel
