@@ -53,6 +53,7 @@ export interface EnrichedCard {
   manaPips: ManaPips;
   producedMana: string[];
   flavorName: string | null;
+  isGameChanger: boolean;
 }
 
 // Synergy analysis types

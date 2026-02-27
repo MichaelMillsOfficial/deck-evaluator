@@ -38,6 +38,7 @@ export interface ScryfallCard {
   card_faces?: ScryfallCardFace[];
   produced_mana?: string[];
   flavor_name?: string;
+  game_changer?: boolean;
 }
 
 export async function fetchCardByName(
@@ -219,5 +220,6 @@ export function normalizeToEnrichedCard(card: ScryfallCard): EnrichedCard {
     manaPips: parseManaPips(manaCost),
     producedMana: card.produced_mana ?? frontFace?.produced_mana ?? [],
     flavorName: card.flavor_name ?? null,
+    isGameChanger: card.game_changer ?? false,
   };
 }

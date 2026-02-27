@@ -22,6 +22,7 @@ function makeCard(overrides: Partial<EnrichedCard> = {}): EnrichedCard {
     manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
     producedMana: [],
     flavorName: null,
+    isGameChanger: false,
     ...overrides,
   };
 }
@@ -881,5 +882,218 @@ test.describe("generateTags — Multi-tag & Edge Cases", () => {
       typeLine: "Basic Land — Plains",
     });
     expect(generateTags(card)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bracket-related Tags: Game Changer, Extra Turn, Mass Land Denial
+// ---------------------------------------------------------------------------
+
+test.describe("generateTags — Game Changer", () => {
+  test("card with isGameChanger: true → Game Changer tag", () => {
+    const card = makeCard({ isGameChanger: true });
+    expect(generateTags(card)).toContain("Game Changer");
+  });
+
+  test("card with isGameChanger: false → no Game Changer tag", () => {
+    const card = makeCard({ isGameChanger: false });
+    expect(generateTags(card)).not.toContain("Game Changer");
+  });
+
+  test("Cyclonic Rift (Game Changer + Board Wipe) → both tags", () => {
+    const card = makeCard({
+      name: "Cyclonic Rift",
+      oracleText:
+        'Return target nonland permanent you don\'t control to its owner\'s hand.\nOverload {6}{U} (You may cast this spell for its overload cost. If you do, change "target" in its text to "each.")',
+      typeLine: "Instant",
+      keywords: ["Overload"],
+      isGameChanger: true,
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Game Changer");
+    expect(tags).toContain("Removal");
+  });
+
+  test("Rhystic Study (Game Changer + Card Draw) → both tags", () => {
+    const card = makeCard({
+      name: "Rhystic Study",
+      oracleText:
+        "Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.",
+      typeLine: "Enchantment",
+      isGameChanger: true,
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Game Changer");
+    expect(tags).toContain("Card Draw");
+  });
+});
+
+test.describe("generateTags — Extra Turn", () => {
+  test("Time Warp → Extra Turn", () => {
+    const card = makeCard({
+      name: "Time Warp",
+      oracleText: "Target player takes an extra turn after this one.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).toContain("Extra Turn");
+  });
+
+  test("Expropriate → Extra Turn", () => {
+    const card = makeCard({
+      name: "Expropriate",
+      oracleText:
+        "Council's dilemma — Starting with you, each player votes for time or money. For each time vote, take an extra turn after this one. For each money vote, choose a permanent owned by the voter and gain control of it. Exile Expropriate.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).toContain("Extra Turn");
+  });
+
+  test("Temporal Manipulation → Extra Turn", () => {
+    const card = makeCard({
+      name: "Temporal Manipulation",
+      oracleText: "Take an extra turn after this one.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).toContain("Extra Turn");
+  });
+
+  test("Lightning Bolt → no Extra Turn", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+      typeLine: "Instant",
+    });
+    expect(generateTags(card)).not.toContain("Extra Turn");
+  });
+
+  test("card mentioning turn without 'extra turn' → no Extra Turn", () => {
+    const card = makeCard({
+      oracleText: "At the beginning of your next turn, draw a card.",
+    });
+    expect(generateTags(card)).not.toContain("Extra Turn");
+  });
+});
+
+test.describe("generateTags — Mass Land Denial", () => {
+  test("Armageddon ('Destroy all lands.') → Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Armageddon",
+      oracleText: "Destroy all lands.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Jokulhaups ('Destroy all artifacts, creatures, and lands.') → Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Jokulhaups",
+      oracleText: "Destroy all artifacts, creatures, and lands. They can't be regenerated.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Obliterate ('Destroy all artifacts, creatures, planeswalkers, and lands.') → Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Obliterate",
+      oracleText:
+        "This spell can't be countered. Destroy all artifacts, creatures, planeswalkers, and lands. They can't be regenerated.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Ruination ('Destroy all nonbasic lands.') → Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Ruination",
+      oracleText: "Destroy all nonbasic lands.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Cataclysm (sacrifice-based MLD) → Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Cataclysm",
+      oracleText:
+        "Each player chooses from among the permanents they control an artifact, a creature, an enchantment, and a land, then sacrifices the rest.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Blood Moon (resource denial by name) → Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Blood Moon",
+      oracleText: "Nonbasic lands are Mountains.",
+      typeLine: "Enchantment",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Winter Orb (stax by name) → Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Winter Orb",
+      oracleText: "As long as Winter Orb is untapped, players can't untap more than one land during their untap steps.",
+      typeLine: "Artifact",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Back to Basics (resource denial by name) → Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Back to Basics",
+      oracleText: "Nonbasic lands don't untap during their controllers' untap steps.",
+      typeLine: "Enchantment",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Stasis (stax by name) → Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Stasis",
+      oracleText:
+        "Players skip their untap steps. At the beginning of your upkeep, sacrifice Stasis unless you pay {U}.",
+      typeLine: "Enchantment",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Static Orb (stax by name) → Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Static Orb",
+      oracleText:
+        "As long as Static Orb is untapped, players can't untap more than two permanents during their untap steps.",
+      typeLine: "Artifact",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Wrath of God ('Destroy all creatures.') → NOT Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Wrath of God",
+      oracleText: "Destroy all creatures. They can't be regenerated.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).not.toContain("Mass Land Denial");
+  });
+
+  test("Farewell ('destroy all nonland permanents' variant) → NOT Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Farewell",
+      oracleText:
+        "Choose one or more — Exile all artifacts. Exile all creatures. Exile all enchantments. Exile all graveyards.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).not.toContain("Mass Land Denial");
+  });
+
+  test("Lightning Bolt → no Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+      typeLine: "Instant",
+    });
+    expect(generateTags(card)).not.toContain("Mass Land Denial");
   });
 });

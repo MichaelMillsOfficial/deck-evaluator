@@ -174,6 +174,7 @@ export default function DeckViewTabs({
             cardMap={cardMap}
             expandedSections={expandedSections.analysis}
             onToggleSection={(id) => handleToggleSection("analysis", id)}
+            spellbookCombos={spellbookCombos}
           />
         )}
       </div>
