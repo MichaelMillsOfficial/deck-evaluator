@@ -189,6 +189,16 @@ export class DeckPage {
     return this.page.getByTestId("analyze-hand-btn");
   }
 
+  /** Expand a collapsible section in the Hands tab by its ID */
+  async expandHandsSection(id: string) {
+    const panel = this.page.getByTestId(`panel-${id}`);
+    const button = panel.locator("button").first();
+    const expanded = await button.getAttribute("aria-expanded");
+    if (expanded !== "true") {
+      await button.click();
+    }
+  }
+
   /** Locator for the verified combos section */
   get verifiedCombosSection() {
     return this.page.getByTestId("verified-combos-section");

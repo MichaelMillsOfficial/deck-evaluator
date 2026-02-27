@@ -222,6 +222,13 @@ test.describe("Top 5 Best Hands", () => {
     await deckPage.selectDeckViewTab("Hands");
     await deckPage.waitForHandsPanel();
 
+    // Expand top hands panel
+    await page
+      .getByTestId("panel-top-hands")
+      .locator("button")
+      .first()
+      .click();
+
     // Top hands section should be visible
     await expect(page.getByTestId("top-hands")).toBeVisible();
 
@@ -247,6 +254,13 @@ test.describe("Top 5 Best Hands", () => {
 
     await deckPage.selectDeckViewTab("Hands");
     await deckPage.waitForHandsPanel();
+
+    // Expand top hands panel
+    await page
+      .getByTestId("panel-top-hands")
+      .locator("button")
+      .first()
+      .click();
 
     // Wait for top hand to load
     const topHand = page.getByTestId("top-hand-1");
@@ -294,7 +308,8 @@ test.describe("Hand Builder", () => {
     await deckPage.selectDeckViewTab("Hands");
     await deckPage.waitForHandsPanel();
 
-    await expect(page.getByTestId("hand-builder")).toBeVisible();
+    // Hand builder panel should be visible (collapsed by default)
+    await expect(page.getByTestId("panel-hand-builder")).toBeVisible();
   });
 
   test("Card picker shows deck cards after expanding", async ({
@@ -316,8 +331,9 @@ test.describe("Hand Builder", () => {
 
     // Expand hand builder
     await page
-      .getByTestId("hand-builder")
-      .getByRole("button", { name: /hand builder/i })
+      .getByTestId("panel-hand-builder")
+      .locator("button")
+      .first()
       .click();
 
     // Should show card picker rows
@@ -346,8 +362,9 @@ test.describe("Hand Builder", () => {
 
     // Expand hand builder
     await page
-      .getByTestId("hand-builder")
-      .getByRole("button", { name: /hand builder/i })
+      .getByTestId("panel-hand-builder")
+      .locator("button")
+      .first()
       .click();
 
     // Initially 0 / 7
@@ -383,8 +400,9 @@ test.describe("Hand Builder", () => {
 
     // Expand hand builder
     await page
-      .getByTestId("hand-builder")
-      .getByRole("button", { name: /hand builder/i })
+      .getByTestId("panel-hand-builder")
+      .locator("button")
+      .first()
       .click();
 
     await expect(page.getByTestId("analyze-hand-btn")).toBeDisabled();
@@ -407,8 +425,9 @@ test.describe("Hand Builder", () => {
 
     // Expand hand builder
     await page
-      .getByTestId("hand-builder")
-      .getByRole("button", { name: /hand builder/i })
+      .getByTestId("panel-hand-builder")
+      .locator("button")
+      .first()
       .click();
 
     // Select some cards
@@ -445,8 +464,9 @@ test.describe("Hand Builder", () => {
 
     // Expand hand builder
     await page
-      .getByTestId("hand-builder")
-      .getByRole("button", { name: /hand builder/i })
+      .getByTestId("panel-hand-builder")
+      .locator("button")
+      .first()
       .click();
 
     // Select a card
@@ -462,5 +482,117 @@ test.describe("Hand Builder", () => {
     await expect(page.getByTestId("selected-count")).toContainText(
       "0 / 7 cards selected"
     );
+  });
+
+  test("Search filters card list by name", async ({ deckPage }) => {
+    const { page } = deckPage;
+    await deckPage.goto();
+    await deckPage.fillDecklist(DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await page
+      .locator('[aria-label="Mana cost: 1 generic"]')
+      .first()
+      .waitFor({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Hands");
+    await deckPage.waitForHandsPanel();
+
+    // Expand hand builder
+    await page
+      .getByTestId("panel-hand-builder")
+      .locator("button")
+      .first()
+      .click();
+
+    // All cards should be visible initially
+    await expect(
+      page.getByTestId("card-picker-row-sol-ring")
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("card-picker-row-command-tower")
+    ).toBeVisible();
+
+    // Type search query
+    await page.getByTestId("hand-builder-search").fill("sol");
+
+    // Sol Ring should still be visible, Command Tower should be hidden
+    await expect(
+      page.getByTestId("card-picker-row-sol-ring")
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("card-picker-row-command-tower")
+    ).not.toBeVisible();
+  });
+
+  test("Search filters by type line", async ({ deckPage }) => {
+    const { page } = deckPage;
+    await deckPage.goto();
+    await deckPage.fillDecklist(DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await page
+      .locator('[aria-label="Mana cost: 1 generic"]')
+      .first()
+      .waitFor({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Hands");
+    await deckPage.waitForHandsPanel();
+
+    // Expand hand builder
+    await page
+      .getByTestId("panel-hand-builder")
+      .locator("button")
+      .first()
+      .click();
+
+    // Search for "instant" type
+    await page.getByTestId("hand-builder-search").fill("instant");
+
+    // Swords and Counterspell are instants, others should be hidden
+    await expect(
+      page.getByTestId("card-picker-row-swords-to-plowshares")
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("card-picker-row-counterspell")
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("card-picker-row-sol-ring")
+    ).not.toBeVisible();
+  });
+
+  test("Search shows no-match message for unmatched query", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await deckPage.goto();
+    await deckPage.fillDecklist(DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await page
+      .locator('[aria-label="Mana cost: 1 generic"]')
+      .first()
+      .waitFor({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Hands");
+    await deckPage.waitForHandsPanel();
+
+    // Expand hand builder
+    await page
+      .getByTestId("panel-hand-builder")
+      .locator("button")
+      .first()
+      .click();
+
+    // Search for something that doesn't exist
+    await page.getByTestId("hand-builder-search").fill("zzzznotacard");
+
+    // Should show no-match message
+    await expect(
+      page.locator("text=No cards match")
+    ).toBeVisible();
   });
 });

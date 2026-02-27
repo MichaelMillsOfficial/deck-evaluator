@@ -24,9 +24,9 @@ export default function HandBuilder({
   pool,
   commanderIdentity,
 }: HandBuilderProps) {
-  const [expanded, setExpanded] = useState(false);
   const [selectedCards, setSelectedCards] = useState<Record<string, number>>({});
   const [result, setResult] = useState<DrawnHand | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Deduplicate pool into unique cards with max available quantity
   const uniqueCards: UniqueCard[] = useMemo(() => {
@@ -56,6 +56,17 @@ export default function HandBuilder({
     () => Object.values(selectedCards).reduce((sum, n) => sum + n, 0),
     [selectedCards]
   );
+
+  // Filter cards by search query (case-insensitive, matches name or type line)
+  const filteredCards = useMemo(() => {
+    if (!searchQuery.trim()) return uniqueCards;
+    const q = searchQuery.toLowerCase();
+    return uniqueCards.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.enriched.typeLine.toLowerCase().includes(q)
+    );
+  }, [uniqueCards, searchQuery]);
 
   const handleIncrement = useCallback(
     (name: string, maxQty: number) => {
@@ -87,6 +98,7 @@ export default function HandBuilder({
   const handleClear = useCallback(() => {
     setSelectedCards({});
     setResult(null);
+    setSearchQuery("");
   }, []);
 
   const handleAnalyze = useCallback(() => {
@@ -110,26 +122,40 @@ export default function HandBuilder({
   }, [selectedCards, uniqueCards, commanderIdentity]);
 
   return (
-    <section data-testid="hand-builder">
-      <button
-        type="button"
-        onClick={() => setExpanded((p) => !p)}
-        aria-expanded={expanded}
-        aria-controls="hand-builder-content"
-        className="flex w-full items-center justify-between rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3 text-left transition-colors hover:bg-slate-800"
-      >
-        <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
-            Hand Builder
-          </h4>
-          <p className="text-xs text-slate-400">
-            Select cards to analyze a specific hand
-          </p>
-        </div>
+    <div data-testid="hand-builder" className="space-y-4">
+      {/* Action bar */}
+      <div className="flex items-center gap-3">
+        <span
+          data-testid="selected-count"
+          className="rounded-full bg-slate-700 px-3 py-1 text-xs text-slate-300"
+        >
+          {totalSelected} / 7 cards selected
+        </span>
+        <button
+          type="button"
+          data-testid="analyze-hand-btn"
+          onClick={handleAnalyze}
+          disabled={totalSelected === 0}
+          className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Analyze Hand
+        </button>
+        {totalSelected > 0 && (
+          <button
+            type="button"
+            data-testid="clear-selection-btn"
+            onClick={handleClear}
+            className="rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-700"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Search */}
+      <div className="relative">
         <svg
-          className={`h-4 w-4 text-slate-400 transition-transform motion-reduce:transition-none ${
-            expanded ? "rotate-180" : ""
-          }`}
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -139,98 +165,77 @@ export default function HandBuilder({
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2}
-            d="M19 9l-7 7-7-7"
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
           />
         </svg>
-      </button>
+        <input
+          type="text"
+          data-testid="hand-builder-search"
+          placeholder="Search cards by name or type..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full rounded-lg border border-slate-700 bg-slate-800/50 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder-slate-500 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+        />
+      </div>
 
-      {expanded && (
-        <div id="hand-builder-content" className="mt-3 space-y-4">
-          {/* Action bar */}
-          <div className="flex items-center gap-3">
-            <span
-              data-testid="selected-count"
-              className="rounded-full bg-slate-700 px-3 py-1 text-xs text-slate-300"
-            >
-              {totalSelected} / 7 cards selected
-            </span>
-            <button
-              type="button"
-              data-testid="analyze-hand-btn"
-              onClick={handleAnalyze}
-              disabled={totalSelected === 0}
-              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Analyze Hand
-            </button>
-            {totalSelected > 0 && (
-              <button
-                type="button"
-                data-testid="clear-selection-btn"
-                onClick={handleClear}
-                className="rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-700"
-              >
-                Clear
-              </button>
+      {/* Card picker */}
+      <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1">
+        {uniqueCards.length === 0 ? (
+          <p className="text-xs text-slate-500">No cards available.</p>
+        ) : filteredCards.length === 0 ? (
+          <p className="text-xs text-slate-500">
+            No cards match &ldquo;{searchQuery}&rdquo;
+          </p>
+        ) : (
+          <>
+            {/* Lands section */}
+            {filteredCards.some((c) => c.isLand) && (
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                Lands
+              </p>
             )}
-          </div>
+            {filteredCards
+              .filter((c) => c.isLand)
+              .map((card) => (
+                <CardPickerRow
+                  key={card.name}
+                  card={card}
+                  selected={selectedCards[card.name] ?? 0}
+                  totalSelected={totalSelected}
+                  onIncrement={handleIncrement}
+                  onDecrement={handleDecrement}
+                />
+              ))}
 
-          {/* Card picker */}
-          <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1">
-            {uniqueCards.length === 0 ? (
-              <p className="text-xs text-slate-500">No cards available.</p>
-            ) : (
-              <>
-                {/* Lands section */}
-                {uniqueCards.some((c) => c.isLand) && (
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                    Lands
-                  </p>
-                )}
-                {uniqueCards
-                  .filter((c) => c.isLand)
-                  .map((card) => (
-                    <CardPickerRow
-                      key={card.name}
-                      card={card}
-                      selected={selectedCards[card.name] ?? 0}
-                      totalSelected={totalSelected}
-                      onIncrement={handleIncrement}
-                      onDecrement={handleDecrement}
-                    />
-                  ))}
-
-                {/* Non-lands section */}
-                {uniqueCards.some((c) => !c.isLand) && (
-                  <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                    Non-lands
-                  </p>
-                )}
-                {uniqueCards
-                  .filter((c) => !c.isLand)
-                  .map((card) => (
-                    <CardPickerRow
-                      key={card.name}
-                      card={card}
-                      selected={selectedCards[card.name] ?? 0}
-                      totalSelected={totalSelected}
-                      onIncrement={handleIncrement}
-                      onDecrement={handleDecrement}
-                    />
-                  ))}
-              </>
+            {/* Non-lands section */}
+            {filteredCards.some((c) => !c.isLand) && (
+              <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                Non-lands
+              </p>
             )}
-          </div>
+            {filteredCards
+              .filter((c) => !c.isLand)
+              .map((card) => (
+                <CardPickerRow
+                  key={card.name}
+                  card={card}
+                  selected={selectedCards[card.name] ?? 0}
+                  totalSelected={totalSelected}
+                  onIncrement={handleIncrement}
+                  onDecrement={handleDecrement}
+                />
+              ))}
+          </>
+        )}
+      </div>
 
-          {/* Result */}
-          {result && (
-            <div data-testid="hand-builder-result">
-              <HandDisplay hand={result} />
-            </div>
-          )}
+      {/* Result */}
+      {result && (
+        <div data-testid="hand-builder-result">
+          <HandDisplay hand={result} />
         </div>
       )}
-    </section>
+    </div>
   );
 }
 

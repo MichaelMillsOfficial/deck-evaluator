@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { RankedHand } from "@/lib/opening-hand";
 import ManaCost from "@/components/ManaCost";
 
@@ -17,78 +16,43 @@ interface TopHandsProps {
 }
 
 export default function TopHands({ hands, loading }: TopHandsProps) {
-  const [expanded, setExpanded] = useState(true);
-
   return (
-    <section data-testid="top-hands" aria-label="Top 5 best hands">
-      <button
-        type="button"
-        onClick={() => setExpanded((p) => !p)}
-        aria-expanded={expanded}
-        aria-controls="top-hands-content"
-        className="flex w-full items-center justify-between rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3 text-left transition-colors hover:bg-slate-800"
-      >
-        <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
-            Top 5 Best Hands
-          </h4>
-          <p className="text-xs text-slate-400">
-            Highest-scoring hands from simulation
-          </p>
-        </div>
-        <svg
-          className={`h-4 w-4 text-slate-400 transition-transform motion-reduce:transition-none ${
-            expanded ? "rotate-180" : ""
-          }`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
-      </button>
-
-      {expanded && (
-        <div id="top-hands-content" className="mt-3 space-y-3">
-          {loading ? (
-            // Shimmer placeholders
-            Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="rounded-lg border border-slate-700 bg-slate-800/50 p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-6 w-6 animate-pulse rounded-full bg-slate-700" />
-                  <div className="h-4 w-48 animate-pulse rounded bg-slate-700" />
-                </div>
-                <div className="mt-3 flex gap-2">
-                  {Array.from({ length: 5 }).map((_, j) => (
-                    <div
-                      key={j}
-                      className="h-[68px] w-[49px] animate-pulse rounded bg-slate-700"
-                    />
-                  ))}
-                </div>
+    <div data-testid="top-hands" aria-label="Top 5 best hands">
+      {loading ? (
+        // Shimmer placeholders
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-slate-700 bg-slate-800/50 p-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-6 w-6 animate-pulse rounded-full bg-slate-700" />
+                <div className="h-4 w-48 animate-pulse rounded bg-slate-700" />
               </div>
-            ))
-          ) : hands.length === 0 ? (
-            <p className="text-xs text-slate-500">
-              No hands found from simulation.
-            </p>
-          ) : (
-            hands.map((ranked) => (
-              <TopHandEntry key={ranked.cardKey} ranked={ranked} />
-            ))
-          )}
+              <div className="mt-3 flex gap-2">
+                {Array.from({ length: 5 }).map((_, j) => (
+                  <div
+                    key={j}
+                    className="h-[68px] w-[49px] animate-pulse rounded bg-slate-700"
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : hands.length === 0 ? (
+        <p className="text-xs text-slate-500">
+          No hands found from simulation.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {hands.map((ranked) => (
+            <TopHandEntry key={ranked.cardKey} ranked={ranked} />
+          ))}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 

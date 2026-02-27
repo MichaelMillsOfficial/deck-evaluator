@@ -44,6 +44,7 @@ export default function DeckViewTabs({
   >({
     analysis: new Set<string>(),
     synergy: new Set<string>(),
+    hands: new Set<string>(),
   });
 
   const analysisDisabled = !cardMap || enrichLoading;
@@ -224,7 +225,12 @@ export default function DeckViewTabs({
               Draw sample opening hands, evaluate quality, and view aggregate
               statistics
             </p>
-            <HandSimulator deck={deck} cardMap={cardMap} />
+            <HandSimulator
+              deck={deck}
+              cardMap={cardMap}
+              expandedSections={expandedSections.hands ?? new Set<string>()}
+              onToggleSection={(id) => handleToggleSection("hands", id)}
+            />
           </section>
         )}
       </div>
