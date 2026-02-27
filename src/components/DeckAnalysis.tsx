@@ -14,6 +14,7 @@ import {
   resolveCommanderIdentity,
 } from "@/lib/color-distribution";
 import { computeLandBaseEfficiency } from "@/lib/land-base-efficiency";
+import { computeManaBaseRecommendations } from "@/lib/mana-recommendations";
 import { computePowerLevel } from "@/lib/power-level";
 import ManaCurveChart from "@/components/ManaCurveChart";
 import TypeFilterBar from "@/components/TypeFilterBar";
@@ -96,6 +97,11 @@ export default function DeckAnalysis({
 
   const landEfficiency = useMemo(
     () => computeLandBaseEfficiency(deck, cardMap),
+    [deck, cardMap]
+  );
+
+  const manaRecommendations = useMemo(
+    () => computeManaBaseRecommendations(deck, cardMap),
     [deck, cardMap]
   );
 
@@ -226,7 +232,7 @@ export default function DeckAnalysis({
         expanded={expandedSections.has("land-efficiency")}
         onToggle={() => onToggleSection("land-efficiency")}
       >
-        <LandBaseEfficiency result={landEfficiency} />
+        <LandBaseEfficiency result={landEfficiency} recommendations={manaRecommendations} />
       </CollapsiblePanel>
 
       <CollapsiblePanel
