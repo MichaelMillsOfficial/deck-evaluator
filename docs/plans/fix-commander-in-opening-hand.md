@@ -40,82 +40,82 @@ Since `buildPool` will no longer include commanders, the `HandBuilder` card pick
 
 ### Phase 1: Update Unit Tests (TDD)
 
-- [x] 1.1 Update `tests/unit/opening-hand.spec.ts` — flip the `buildPool` "includes commanders in pool" test
+- [ ] 1.1 Update `tests/unit/opening-hand.spec.ts` — flip the `buildPool` "includes commanders in pool" test
   - Rename to "excludes commanders from pool"
   - Assert `pool.some(c => c.name === "Atraxa")` is `false`
   - Assert pool length is 1 (only Sol Ring)
 
-- [x] 1.2 Add new test: `buildPool` returns correct count for deck with commanders
+- [ ] 1.2 Add new test: `buildPool` returns correct count for deck with commanders
   - Deck with 2 commanders + 5 mainboard cards
   - Assert pool length is 5 (mainboard only)
 
-- [x] 1.3 Add new test: `evaluateHandQuality` considers command zone for curve playability
+- [ ] 1.3 Add new test: `evaluateHandQuality` considers command zone for curve playability
   - Hand with 2 lands, 1 high-CMC spell; commander has CMC 1
   - Without `commandZone`: T1 not playable
   - With `commandZone` containing the 1-CMC commander: T1 is playable
   - Assert higher score with command zone awareness
 
-- [x] 1.4 Add new test in `tests/unit/hypergeometric.spec.ts` (or inline): `getDeckSize` excludes commanders
+- [ ] 1.4 Add new test in `tests/unit/hypergeometric.spec.ts` (or inline): `getDeckSize` excludes commanders
   - Deck with 1 commander + 99 mainboard
   - Assert `getDeckSize` returns 99
 
 ### Phase 2: Fix Core Logic — `opening-hand.ts`
 
-- [x] 2.1 Update `buildPool` to exclude commanders
+- [ ] 2.1 Update `buildPool` to exclude commanders
   - Change line 92 from `[...deck.commanders, ...deck.mainboard]` to `[...deck.mainboard]`
   - Update JSDoc comment accordingly
 
-- [x] 2.2 Add `buildCommandZone` helper function
+- [ ] 2.2 Add `buildCommandZone` helper function
   - Signature: `export function buildCommandZone(deck: DeckData, cardMap: Record<string, EnrichedCard>): HandCard[]`
   - Same mapping logic as `buildPool` but only for `deck.commanders`
 
-- [x] 2.3 Update `evaluateHandQuality` to accept optional `commandZone` parameter
+- [ ] 2.3 Update `evaluateHandQuality` to accept optional `commandZone` parameter
   - Add parameter: `commandZone: HandCard[] = []`
   - In the playable-turns analysis, check both `spells` and `commandZone` cards when determining if a spell is castable on T1/T2/T3
   - Commander cards from command zone count as playable spells but do NOT affect `landCount`, `rampCount`, or `colorCoverage`
 
-- [x] 2.4 Update `runSimulation` to accept and pass through `commandZone`
+- [ ] 2.4 Update `runSimulation` to accept and pass through `commandZone`
   - Add parameter: `commandZone: HandCard[] = []`
   - Pass `commandZone` to `evaluateHandQuality` inside the loop
 
-- [x] 2.5 Update `findTopHands` to accept and pass through `commandZone`
+- [ ] 2.5 Update `findTopHands` to accept and pass through `commandZone`
   - Add parameter: `commandZone: HandCard[] = []`
   - Pass `commandZone` to `evaluateHandQuality` inside the loop
 
 ### Phase 3: Fix Core Logic — `hypergeometric.ts`
 
-- [x] 3.1 Update `getLibraryCards` to exclude commanders
+- [ ] 3.1 Update `getLibraryCards` to exclude commanders
   - Change from `[...deck.commanders, ...deck.mainboard]` to `[...deck.mainboard]`
   - Update JSDoc comment
 
 ### Phase 4: Update Components
 
-- [x] 4.1 Update `HandSimulator.tsx`
+- [ ] 4.1 Update `HandSimulator.tsx`
   - Add `commandZone` memo: `useMemo(() => buildCommandZone(deck, cardMap), [deck, cardMap])`
   - Pass `commandZone` to `runSimulation`, `findTopHands`, and `evaluateHandQuality` calls
   - Pass `commandZone` to `HandDisplay` and `HandBuilder` as a prop
 
-- [x] 4.2 Update `HandDisplay.tsx` to show command zone
+- [ ] 4.2 Update `HandDisplay.tsx` to show command zone
   - Accept `commandZone?: HandCard[]` prop
   - When non-empty, render a "Command Zone" section above hand cards
   - Use purple-accent styling per design decisions table
   - Show commander card image (or fallback) and mana cost
 
-- [x] 4.3 Update `HandBuilder.tsx` to show command zone
+- [ ] 4.3 Update `HandBuilder.tsx` to show command zone
   - Accept `commandZone?: HandCard[]` prop
   - When non-empty, render a "Command Zone" display above the card picker
   - Commanders are shown for reference but are not selectable (they're always available)
 
 ### Phase 5: Update E2E Tests
 
-- [x] 5.1 Update `e2e/opening-hand-ui.spec.ts`
+- [ ] 5.1 Update `e2e/opening-hand-ui.spec.ts`
   - Add test: "Drawn hand does not contain commander cards"
     - Draw a hand, verify no card in the hand display matches "Atraxa"
   - Add test: "Command zone shows commander when drawing hand"
     - After drawing, verify a command zone element is visible with commander name
   - Existing tests should continue passing since they don't assert Atraxa appears in hand
 
-- [x] 5.2 Update `e2e/hand-analysis.spec.ts`
+- [ ] 5.2 Update `e2e/hand-analysis.spec.ts`
   - Add test: "Hand builder does not list commander in card picker"
     - Expand hand builder, verify `card-picker-row-atraxa-praetors-voice` is NOT visible
   - Add test: "Hand builder shows command zone above card picker"
@@ -124,9 +124,9 @@ Since `buildPool` will no longer include commanders, the `HandBuilder` card pick
 
 ### Phase 6: Verification
 
-- [x] 6.1 Run `npm run test:unit` — all unit tests pass
-- [x] 6.2 Run `npm run test:e2e` — all e2e tests pass
-- [x] 6.3 Run `npm run build` — production build succeeds
+- [ ] 6.1 Run `npm run test:unit` — all unit tests pass
+- [ ] 6.2 Run `npm run test:e2e` — all e2e tests pass
+- [ ] 6.3 Run `npm run build` — production build succeeds
 
 ## Files to Create/Modify
 
