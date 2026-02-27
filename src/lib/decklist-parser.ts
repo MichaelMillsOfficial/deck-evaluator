@@ -12,8 +12,21 @@ const ZONE_HEADERS: Record<string, Zone> = {
 const CARD_LINE = /^(\d+)x?\s+(.+)$/;
 const ZONE_LINE = /^(commander|sideboard|mainboard|companion):?\s*$/i;
 
-export function parseDecklist(text: string): DeckData {
+export interface ParseDecklistOptions {
+  /** When provided, these card names are used as commanders instead of
+   *  header detection or heuristic inference. Cards matching these names
+   *  are moved from their parsed zone into the commanders zone. */
+  commanders?: string[];
+}
+
+export function parseDecklist(
+  text: string,
+  options?: ParseDecklistOptions
+): DeckData {
   const lines = text.split(/\r?\n/);
+  const hasOverride =
+    options?.commanders != null && options.commanders.length > 0;
+
   let currentZone: Zone = "mainboard";
   let hadExplicitCommander = false;
 
@@ -31,8 +44,14 @@ export function parseDecklist(text: string): DeckData {
     if (zoneMatch) {
       const mapped = ZONE_HEADERS[zoneMatch[1].toLowerCase()];
       if (mapped) {
-        currentZone = mapped;
-        if (mapped === "commanders") hadExplicitCommander = true;
+        // When override is active, treat COMMANDER: header as mainboard
+        // so the override is the sole source of truth for commanders.
+        if (hasOverride && mapped === "commanders") {
+          currentZone = "mainboard";
+        } else {
+          currentZone = mapped;
+          if (mapped === "commanders") hadExplicitCommander = true;
+        }
       }
       continue;
     }
@@ -46,11 +65,14 @@ export function parseDecklist(text: string): DeckData {
     }
   }
 
-  // Heuristic: if no explicit COMMANDER: header, check if the last
-  // blank-line-separated group (1-2 cards) is likely the commander(s).
-  // This handles common export formats (MTGA, Moxfield) where the
-  // commander appears at the end separated by a blank line.
-  if (!hadExplicitCommander) {
+  if (hasOverride) {
+    // Move named cards from mainboard/sideboard into commanders
+    applyCommanderOverride(options!.commanders!, zones);
+  } else if (!hadExplicitCommander) {
+    // Heuristic: if no explicit COMMANDER: header, check if the last
+    // blank-line-separated group (1-2 cards) is likely the commander(s).
+    // This handles common export formats (MTGA, Moxfield) where the
+    // commander appears at the end separated by a blank line.
     inferCommanders(lines, zones);
   }
 
@@ -62,6 +84,25 @@ export function parseDecklist(text: string): DeckData {
     mainboard: zones.mainboard,
     sideboard: zones.sideboard,
   };
+}
+
+/**
+ * Moves cards with the given names from mainboard/sideboard into the
+ * commanders zone. Used when the caller specifies commanders explicitly.
+ */
+function applyCommanderOverride(
+  names: string[],
+  zones: Record<Zone, DeckCard[]>
+): void {
+  for (const name of names) {
+    for (const zone of ["mainboard", "sideboard"] as Zone[]) {
+      const idx = zones[zone].findIndex((c) => c.name === name);
+      if (idx !== -1) {
+        zones.commanders.push(zones[zone].splice(idx, 1)[0]);
+        break;
+      }
+    }
+  }
 }
 
 /**

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import CommanderInput from "@/components/CommanderInput";
 
 type ImportTab = "manual" | "moxfield" | "archidekt";
 
 interface DeckInputProps {
   onSubmitUrl: (url: string) => void | Promise<void>;
-  onSubmitText: (text: string) => void | Promise<void>;
+  onSubmitText: (text: string, commanders?: string[]) => void | Promise<void>;
   loading: boolean;
 }
 
@@ -36,16 +37,18 @@ export default function DeckInput({
 }: DeckInputProps) {
   const [activeTab, setActiveTab] = useState<ImportTab>("manual");
   const [textValue, setTextValue] = useState("");
+  const [commanders, setCommanders] = useState<string[]>([]);
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const trimmed = textValue.trim();
     if (!trimmed) return;
-    onSubmitText(trimmed);
+    onSubmitText(trimmed, commanders.length > 0 ? commanders : undefined);
   };
 
   const loadExample = () => {
     setTextValue(EXAMPLE_DECKLIST);
+    setCommanders([]);
   };
 
   const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -101,7 +104,10 @@ export default function DeckInput({
             aria-controls={`tabpanel-${tab.key}`}
             tabIndex={activeTab === tab.key ? 0 : -1}
             type="button"
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => {
+              setActiveTab(tab.key);
+              setCommanders([]);
+            }}
             onKeyDown={handleTabKeyDown}
             className={`flex-1 min-h-[44px] rounded-md px-3 py-2.5 sm:px-4 sm:py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 ${
               activeTab === tab.key
@@ -125,6 +131,14 @@ export default function DeckInput({
           aria-busy={loading}
           className="flex flex-col gap-4"
         >
+          {/* Commander input (optional) */}
+          <CommanderInput
+            value={commanders}
+            onChange={setCommanders}
+            decklistText={textValue}
+            disabled={loading}
+          />
+
           {/* Decklist textarea */}
           <div>
             <label

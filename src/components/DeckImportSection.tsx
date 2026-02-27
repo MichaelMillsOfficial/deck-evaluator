@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { SpellbookCombo } from "@/lib/commander-spellbook";
+import { validateCommanderLegality } from "@/lib/commander-validation";
 import DeckInput from "@/components/DeckInput";
 import DeckViewTabs from "@/components/DeckViewTabs";
 
@@ -20,6 +21,7 @@ export default function DeckImportSection() {
     nearCombos: SpellbookCombo[];
   } | null>(null);
   const [spellbookLoading, setSpellbookLoading] = useState(false);
+  const [commanderWarning, setCommanderWarning] = useState<string | null>(null);
   const deckResultRef = useRef<HTMLDivElement>(null);
   const enrichAbortRef = useRef<AbortController | null>(null);
   const spellbookAbortRef = useRef<AbortController | null>(null);
@@ -29,6 +31,21 @@ export default function DeckImportSection() {
       deckResultRef.current.focus();
     }
   }, [deckData]);
+
+  // Post-enrichment commander legality check
+  useEffect(() => {
+    if (!deckData || !cardMap || enrichLoading) {
+      setCommanderWarning(null);
+      return;
+    }
+    if (deckData.commanders.length === 0) return;
+
+    const { warnings } = validateCommanderLegality(
+      deckData.commanders.map((c) => c.name),
+      cardMap
+    );
+    setCommanderWarning(warnings.length > 0 ? warnings.join(" ") : null);
+  }, [deckData, cardMap, enrichLoading]);
 
   const enrichDeck = useCallback(async (deck: DeckData) => {
     const allCards = [
@@ -134,6 +151,7 @@ export default function DeckImportSection() {
     setDeckData(null);
     setCardMap(null);
     setEnrichError(null);
+    setCommanderWarning(null);
     setSpellbookCombos(null);
 
     try {
@@ -164,12 +182,12 @@ export default function DeckImportSection() {
   const handleFetchDeck = (url: string) =>
     handleImport(() => fetch(`/api/deck?url=${encodeURIComponent(url)}`));
 
-  const handleParseDeck = (text: string) =>
+  const handleParseDeck = (text: string, commanders?: string[]) =>
     handleImport(() =>
       fetch("/api/deck-parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, ...(commanders ? { commanders } : {}) }),
       })
     );
 
@@ -242,6 +260,33 @@ export default function DeckImportSection() {
                 }}
                 className="ml-4 shrink-0 text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
                 aria-label="Dismiss warning"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {commanderWarning && !enrichLoading && (
+            <div
+              role="alert"
+              className="mt-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400"
+            >
+              <span>{commanderWarning}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setCommanderWarning(null);
+                  deckResultRef.current?.focus();
+                }}
+                className="ml-4 shrink-0 text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
+                aria-label="Dismiss commander warning"
               >
                 <svg
                   className="h-4 w-4"

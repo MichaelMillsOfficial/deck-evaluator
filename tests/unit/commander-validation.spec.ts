@@ -3,6 +3,9 @@ import {
   isSingletonExempt,
   getMaxQuantity,
   validateCommanderDeck,
+  isLegalCommander,
+  validateCommanderSelection,
+  validateCommanderLegality,
   buildEdhrecUrl,
   BASIC_LAND_NAMES,
 } from "../../src/lib/commander-validation";
@@ -204,6 +207,160 @@ test.describe("validateCommanderDeck", () => {
     const result = validateCommanderDeck(deck, {}, bannedSet, gameChangerNames);
     // Should be valid (100 cards total, no singleton violations)
     expect(result.isValid).toBe(true);
+  });
+});
+
+// --- isLegalCommander ---
+
+test.describe("isLegalCommander", () => {
+  test("legendary creature is a valid commander", () => {
+    const card = makeCard({
+      name: "Atraxa, Praetors' Voice",
+      typeLine: "Legendary Creature — Phyrexian Angel Horror",
+      supertypes: ["Legendary"],
+    });
+    expect(isLegalCommander(card)).toBe(true);
+  });
+
+  test("non-legendary creature is not a valid commander", () => {
+    const card = makeCard({
+      name: "Llanowar Elves",
+      typeLine: "Creature — Elf Druid",
+      supertypes: [],
+    });
+    expect(isLegalCommander(card)).toBe(false);
+  });
+
+  test("legendary planeswalker is a valid commander", () => {
+    const card = makeCard({
+      name: "Teferi, Temporal Archmage",
+      typeLine: "Legendary Planeswalker — Teferi",
+      supertypes: ["Legendary"],
+      oracleText: "Teferi, Temporal Archmage can be your commander.",
+    });
+    expect(isLegalCommander(card)).toBe(true);
+  });
+
+  test("non-legendary card with 'can be your commander' is valid", () => {
+    const card = makeCard({
+      name: "Some Special Card",
+      typeLine: "Planeswalker — Test",
+      supertypes: [],
+      oracleText: "Some Special Card can be your commander.",
+    });
+    expect(isLegalCommander(card)).toBe(true);
+  });
+
+  test("legendary enchantment (not creature/planeswalker) is not valid", () => {
+    const card = makeCard({
+      name: "Smothering Tithe",
+      typeLine: "Legendary Enchantment",
+      supertypes: ["Legendary"],
+    });
+    expect(isLegalCommander(card)).toBe(false);
+  });
+
+  test("legendary artifact creature is valid", () => {
+    const card = makeCard({
+      name: "Traxos, Scourge of Kroog",
+      typeLine: "Legendary Artifact Creature — Construct",
+      supertypes: ["Legendary"],
+    });
+    expect(isLegalCommander(card)).toBe(true);
+  });
+});
+
+// --- validateCommanderSelection ---
+
+test.describe("validateCommanderSelection", () => {
+  test("valid single commander in decklist", () => {
+    const result = validateCommanderSelection(
+      ["Atraxa, Praetors' Voice"],
+      ["Atraxa, Praetors' Voice", "Sol Ring", "Command Tower"]
+    );
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  test("valid partner pair (2 commanders)", () => {
+    const result = validateCommanderSelection(
+      ["Thrasios, Triton Hero", "Tymna the Weaver"],
+      ["Thrasios, Triton Hero", "Tymna the Weaver", "Sol Ring"]
+    );
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  test("more than 2 commanders rejected", () => {
+    const result = validateCommanderSelection(
+      ["A", "B", "C"],
+      ["A", "B", "C", "Sol Ring"]
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.errors[0]).toContain("2");
+  });
+
+  test("commander not in decklist fails", () => {
+    const result = validateCommanderSelection(
+      ["Atraxa, Praetors' Voice"],
+      ["Sol Ring", "Command Tower"]
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]).toContain("Atraxa");
+  });
+
+  test("empty commanders array is valid", () => {
+    const result = validateCommanderSelection([], ["Sol Ring"]);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+});
+
+// --- validateCommanderLegality ---
+
+test.describe("validateCommanderLegality", () => {
+  test("returns no warnings for legal commander", () => {
+    const cardMap: Record<string, EnrichedCard> = {
+      "Atraxa, Praetors' Voice": makeCard({
+        name: "Atraxa, Praetors' Voice",
+        typeLine: "Legendary Creature — Phyrexian Angel Horror",
+        supertypes: ["Legendary"],
+      }),
+    };
+    const result = validateCommanderLegality(
+      ["Atraxa, Praetors' Voice"],
+      cardMap
+    );
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  test("returns warning for non-legendary commander", () => {
+    const cardMap: Record<string, EnrichedCard> = {
+      "Llanowar Elves": makeCard({
+        name: "Llanowar Elves",
+        typeLine: "Creature — Elf Druid",
+        supertypes: [],
+      }),
+    };
+    const result = validateCommanderLegality(["Llanowar Elves"], cardMap);
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings[0]).toContain("Llanowar Elves");
+  });
+
+  test("returns warning for commander not found in card map", () => {
+    const result = validateCommanderLegality(["Unknown Card"], {});
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings[0]).toContain("Unknown Card");
+  });
+
+  test("returns warnings for each invalid commander in a pair", () => {
+    const cardMap: Record<string, EnrichedCard> = {
+      "Bird A": makeCard({ name: "Bird A", typeLine: "Creature — Bird", supertypes: [] }),
+      "Bird B": makeCard({ name: "Bird B", typeLine: "Creature — Bird", supertypes: [] }),
+    };
+    const result = validateCommanderLegality(["Bird A", "Bird B"], cardMap);
+    expect(result.warnings).toHaveLength(2);
   });
 });
 

@@ -41,7 +41,24 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const deckData = parseDecklist(text);
+  // Optional commander override from the UI
+  const rawCommanders = (body as Record<string, unknown>).commanders;
+  let commanders: string[] | undefined;
+  if (rawCommanders !== undefined) {
+    if (
+      !Array.isArray(rawCommanders) ||
+      rawCommanders.some((c) => typeof c !== "string") ||
+      rawCommanders.length > 2
+    ) {
+      return Response.json(
+        { error: "commanders must be an array of at most 2 strings" },
+        { status: 400 }
+      );
+    }
+    commanders = rawCommanders as string[];
+  }
+
+  const deckData = parseDecklist(text, commanders ? { commanders } : undefined);
 
   const totalCards =
     deckData.commanders.length +
