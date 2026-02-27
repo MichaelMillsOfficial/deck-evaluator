@@ -28,6 +28,7 @@ const MOCK_RESPONSE = {
       manaPips: { W: 0, U: 1, B: 0, R: 0, G: 1, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Sol Ring": {
       name: "Sol Ring",
@@ -48,6 +49,7 @@ const MOCK_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["C"],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     Counterspell: {
       name: "Counterspell",
@@ -68,6 +70,7 @@ const MOCK_RESPONSE = {
       manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     Forest: {
       name: "Forest",
@@ -88,6 +91,7 @@ const MOCK_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["G"],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     Island: {
       name: "Island",
@@ -108,6 +112,7 @@ const MOCK_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["U"],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Breeding Pool": {
       name: "Breeding Pool",
@@ -129,6 +134,7 @@ const MOCK_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["G", "U"],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Command Tower": {
       name: "Command Tower",
@@ -150,6 +156,7 @@ const MOCK_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
   },
   notFound: [],

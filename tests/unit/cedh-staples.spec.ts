@@ -28,6 +28,7 @@ function mockCard(overrides: Partial<EnrichedCard> = {}): EnrichedCard {
     producedMana: [],
     flavorName: null,
     isGameChanger: false,
+    prices: { usd: null, usdFoil: null, eur: null },
     ...overrides,
   };
 }

@@ -32,6 +32,7 @@ const MOCK_SYNERGY_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Walking Ballista": {
       name: "Walking Ballista",
@@ -57,6 +58,7 @@ const MOCK_SYNERGY_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Doubling Season": {
       name: "Doubling Season",
@@ -82,6 +84,7 @@ const MOCK_SYNERGY_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     Reanimate: {
       name: "Reanimate",
@@ -107,6 +110,7 @@ const MOCK_SYNERGY_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 1, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Rest in Peace": {
       name: "Rest in Peace",
@@ -132,6 +136,7 @@ const MOCK_SYNERGY_RESPONSE = {
       manaPips: { W: 1, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Thassa's Oracle": {
       name: "Thassa's Oracle",
@@ -157,6 +162,7 @@ const MOCK_SYNERGY_RESPONSE = {
       manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Demonic Consultation": {
       name: "Demonic Consultation",
@@ -182,6 +188,7 @@ const MOCK_SYNERGY_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 1, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Command Tower": {
       name: "Command Tower",
@@ -203,6 +210,7 @@ const MOCK_SYNERGY_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
   },
   notFound: [],

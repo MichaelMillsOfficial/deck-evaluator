@@ -5,6 +5,7 @@ import type { EnrichedCard } from "@/lib/types";
 import ManaCost from "@/components/ManaCost";
 import CardTags from "@/components/CardTags";
 import OracleText from "@/components/OracleText";
+import { formatUSD } from "@/lib/budget-analysis";
 
 interface EnrichedCardRowProps {
   card: EnrichedCard;
@@ -100,6 +101,9 @@ export default function EnrichedCardRow({
                   <span>Keywords: {card.keywords.join(", ")}</span>
                 )}
                 <span className="capitalize">Rarity: {card.rarity}</span>
+                {card.prices.usd != null && (
+                  <span data-testid="card-price">Price: {formatUSD(card.prices.usd)}</span>
+                )}
               </div>
             </div>
           </td>

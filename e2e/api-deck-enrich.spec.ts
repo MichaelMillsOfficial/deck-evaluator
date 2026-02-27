@@ -55,6 +55,12 @@ test.describe("POST /api/deck-enrich", () => {
     expect(solRing.rarity).toBeTruthy();
     expect(solRing.manaPips).toBeDefined();
 
+    // Prices object should be present with usd, usdFoil, eur fields
+    expect(solRing.prices).toBeDefined();
+    expect(solRing.prices).toHaveProperty("usd");
+    expect(solRing.prices).toHaveProperty("usdFoil");
+    expect(solRing.prices).toHaveProperty("eur");
+
     // Command Tower should be found
     const tower = body.cards["Command Tower"];
     expect(tower).toBeDefined();

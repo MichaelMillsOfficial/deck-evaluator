@@ -1,31 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { generateTags } from "../../src/lib/card-tags";
-import type { EnrichedCard } from "../../src/lib/types";
-
-function makeCard(overrides: Partial<EnrichedCard> = {}): EnrichedCard {
-  return {
-    name: "Test Card",
-    manaCost: "",
-    cmc: 0,
-    colorIdentity: [],
-    colors: [],
-    typeLine: "Creature",
-    supertypes: [],
-    subtypes: [],
-    oracleText: "",
-    keywords: [],
-    power: null,
-    toughness: null,
-    loyalty: null,
-    rarity: "common",
-    imageUris: null,
-    manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
-    producedMana: [],
-    flavorName: null,
-    isGameChanger: false,
-    ...overrides,
-  };
-}
+import { makeCard } from "../helpers";
 
 test.describe("generateTags — Ramp", () => {
   test("Sol Ring (tap to add mana) → Ramp", () => {

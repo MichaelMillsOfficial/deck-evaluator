@@ -1,32 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { analyzeDeckSynergy } from "../../src/lib/synergy-engine";
 import type { DeckData, EnrichedCard } from "../../src/lib/types";
-
-/** Helper to build a minimal EnrichedCard */
-function mockCard(overrides: Partial<EnrichedCard> = {}): EnrichedCard {
-  return {
-    name: "Test Card",
-    manaCost: "",
-    cmc: 0,
-    colorIdentity: [],
-    colors: [],
-    typeLine: "Creature",
-    supertypes: [],
-    subtypes: [],
-    oracleText: "",
-    keywords: [],
-    power: null,
-    toughness: null,
-    loyalty: null,
-    rarity: "common",
-    imageUris: null,
-    manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
-    producedMana: [],
-    flavorName: null,
-    isGameChanger: false,
-    ...overrides,
-  };
-}
+import { makeCard as mockCard } from "../helpers";
 
 function mockDeck(
   mainboard: string[],
