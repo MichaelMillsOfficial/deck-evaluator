@@ -500,7 +500,7 @@ test.describe("Card Tags", () => {
     ).toBeVisible();
   });
 
-  test("Command Tower (no functional tags) shows no tag badges", async ({
+  test("Command Tower shows only land-property tags (Mana Fixing)", async ({
     deckPage,
   }) => {
     const { page } = deckPage;
@@ -525,11 +525,14 @@ test.describe("Card Tags", () => {
       page.locator('[data-testid="card-tag"]').first()
     ).toBeVisible({ timeout: 10_000 });
 
-    // Command Tower row should NOT have any tags
+    // Command Tower should have a Mana Fixing tag (produces 5 colors)
     const towerRow = page.locator("tr").filter({ hasText: "Command Tower" });
     await expect(
       towerRow.locator('[data-testid="card-tag"]')
-    ).toHaveCount(0);
+    ).toHaveCount(1);
+    await expect(
+      towerRow.locator('[data-testid="card-tag"]').first()
+    ).toHaveText("Mana Fixing");
   });
 
   test("tags are visible without expanding the card detail row", async ({
