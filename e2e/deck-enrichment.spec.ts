@@ -88,7 +88,7 @@ test.describe("Deck Enrichment", () => {
     await page.route("**/api/deck-enrich", async (route) => {
       await new Promise<void>((resolve) => {
         releaseEnrichment = resolve;
-        setTimeout(resolve, 5_000);
+        setTimeout(resolve, 500);
       });
       await route.fulfill({
         status: 200,
@@ -122,7 +122,7 @@ test.describe("Deck Enrichment", () => {
     await page.route("**/api/deck-enrich", async (route) => {
       await new Promise<void>((resolve) => {
         releaseEnrichment = resolve;
-        setTimeout(resolve, 5_000);
+        setTimeout(resolve, 500);
       });
       await route.fulfill({
         status: 200,
@@ -642,7 +642,7 @@ test.describe("Deck Enrichment — Accessibility", () => {
     await page.route("**/api/deck-enrich", async (route) => {
       await new Promise<void>((resolve) => {
         releaseEnrichment = resolve;
-        setTimeout(resolve, 5_000);
+        setTimeout(resolve, 500);
       });
       await route.fulfill({
         status: 200,

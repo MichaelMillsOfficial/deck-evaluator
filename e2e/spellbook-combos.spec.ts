@@ -396,7 +396,7 @@ test.describe("Spellbook Graceful Fallback", () => {
     await page.route("**/api/deck-combos", async (route) => {
       await new Promise<void>((resolve) => {
         releaseSpellbook = resolve;
-        setTimeout(resolve, 10_000);
+        setTimeout(resolve, 500);
       });
       await route.fulfill({
         status: 200,
