@@ -131,6 +131,29 @@ export default function DeckInput({
           aria-busy={loading}
           className="flex flex-col gap-4"
         >
+          {/* Moxfield export instructions */}
+          {activeTab === "moxfield" && (
+            <div
+              data-testid="moxfield-export-guide"
+              className="rounded-lg border border-slate-600 bg-slate-900/50 px-4 py-3 text-sm text-slate-300"
+            >
+              <p className="mb-2 font-medium text-white">
+                How to import from Moxfield:
+              </p>
+              <ol className="list-inside list-decimal space-y-1 text-slate-400">
+                <li>
+                  Open your deck on{" "}
+                  <span className="text-purple-400">moxfield.com</span>
+                </li>
+                <li>
+                  Click <strong className="text-slate-300">Export</strong> →{" "}
+                  <strong className="text-slate-300">Copy for MTGO</strong>
+                </li>
+                <li>Paste the copied text below</li>
+              </ol>
+            </div>
+          )}
+
           {/* Commander input (optional) */}
           <CommanderInput
             value={commanders}

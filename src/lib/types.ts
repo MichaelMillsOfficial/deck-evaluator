@@ -12,23 +12,6 @@ export interface DeckData {
   sideboard: DeckCard[];
 }
 
-// Raw Moxfield API types
-export interface MoxfieldCardEntry {
-  quantity: number;
-  card: { name: string };
-}
-
-export interface MoxfieldDeckSection {
-  [cardName: string]: MoxfieldCardEntry;
-}
-
-export interface MoxfieldApiResponse {
-  name: string;
-  mainboard: MoxfieldDeckSection;
-  commanders: MoxfieldDeckSection;
-  sideboard: MoxfieldDeckSection;
-}
-
 // Raw Archidekt API types
 export interface ArchidektCard {
   quantity: number;
