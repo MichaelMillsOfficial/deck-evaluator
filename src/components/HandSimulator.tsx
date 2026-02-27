@@ -2,16 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
-import type { DrawnHand, SimulationStats } from "@/lib/opening-hand";
+import type { DrawnHand, RankedHand, SimulationStats } from "@/lib/opening-hand";
 import {
   buildPool,
   drawHand,
   evaluateHandQuality,
+  findTopHands,
   runSimulation,
 } from "@/lib/opening-hand";
 import { resolveCommanderIdentity } from "@/lib/color-distribution";
 import HandDisplay from "@/components/HandDisplay";
 import HandSimulationStats from "@/components/HandSimulationStats";
+import TopHands from "@/components/TopHands";
+import HandBuilder from "@/components/HandBuilder";
 
 const MAX_MULLIGANS = 3;
 
@@ -24,6 +27,7 @@ export default function HandSimulator({ deck, cardMap }: HandSimulatorProps) {
   const [currentHand, setCurrentHand] = useState<DrawnHand | null>(null);
   const [mulliganCount, setMulliganCount] = useState(0);
   const [simStats, setSimStats] = useState<SimulationStats | null>(null);
+  const [topHands, setTopHands] = useState<RankedHand[]>([]);
   const [simLoading, setSimLoading] = useState(false);
 
   const pool = useMemo(() => buildPool(deck, cardMap), [deck, cardMap]);
@@ -38,7 +42,9 @@ export default function HandSimulator({ deck, cardMap }: HandSimulatorProps) {
     // Defer to next frame to avoid blocking render
     const id = requestAnimationFrame(() => {
       const stats = runSimulation(pool, commanderIdentity, 1000);
+      const top = findTopHands(pool, commanderIdentity, 5, 2000);
       setSimStats(stats);
+      setTopHands(top);
       setSimLoading(false);
     });
     return () => cancelAnimationFrame(id);
@@ -82,6 +88,9 @@ export default function HandSimulator({ deck, cardMap }: HandSimulatorProps) {
       {/* Simulation stats at top */}
       <HandSimulationStats stats={simStats} loading={simLoading} />
 
+      {/* Top 5 best hands */}
+      <TopHands hands={topHands} loading={simLoading} />
+
       {/* Action buttons */}
       <div className="flex flex-wrap gap-3">
         {!currentHand ? (
@@ -118,6 +127,9 @@ export default function HandSimulator({ deck, cardMap }: HandSimulatorProps) {
 
       {/* Hand display */}
       {currentHand && <HandDisplay hand={currentHand} />}
+
+      {/* Hand builder */}
+      <HandBuilder pool={pool} commanderIdentity={commanderIdentity} />
     </div>
   );
 }

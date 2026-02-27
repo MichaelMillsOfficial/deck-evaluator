@@ -63,9 +63,9 @@ Both features appear as sections within the existing Hands tab, ordered:
 
 ### Phase 1: Core Logic — `findTopHands()` (`src/lib/opening-hand.ts`)
 
-- [ ] 1.1 Add `RankedHand` type to `src/lib/opening-hand.ts`
+- [x] 1.1 Add `RankedHand` type to `src/lib/opening-hand.ts`
   - `{ rank: number; hand: DrawnHand; cardKey: string }` — `cardKey` is the dedup key (sorted card names joined by `|`)
-- [ ] 1.2 Implement `findTopHands(pool, commanderIdentity, topN?, iterations?): RankedHand[]`
+- [x] 1.2 Implement `findTopHands(pool, commanderIdentity, topN?, iterations?): RankedHand[]`
   - Default `topN = 5`, `iterations = 2000`
   - Loop: draw hand → evaluate → compute cardKey → if unique and score > min in buffer, insert
   - Return sorted descending by score, with `rank` set 1..N
@@ -73,7 +73,7 @@ Both features appear as sections within the existing Hands tab, ordered:
 
 ### Phase 2: Unit Tests — `findTopHands` (`tests/unit/opening-hand.spec.ts`)
 
-- [ ] 2.1 Add `findTopHands` describe block to `tests/unit/opening-hand.spec.ts`
+- [x] 2.1 Add `findTopHands` describe block to `tests/unit/opening-hand.spec.ts`
   - Test: "returns at most topN hands" — call with `topN=3`, verify length <= 3
   - Test: "hands are sorted by score descending" — verify `result[0].hand.quality.score >= result[1].hand.quality.score`
   - Test: "rank values are 1-indexed and sequential" — verify ranks are `[1, 2, 3, ...]`
@@ -83,7 +83,7 @@ Both features appear as sections within the existing Hands tab, ordered:
 
 ### Phase 3: Top Hands Component (`src/components/TopHands.tsx`)
 
-- [ ] 3.1 Create `src/components/TopHands.tsx`
+- [x] 3.1 Create `src/components/TopHands.tsx`
   - Props: `{ hands: RankedHand[]; loading: boolean }`
   - Loading state: shimmer placeholders (3 rows)
   - Each hand: rank badge, card image thumbnails (small, ~73x102px), verdict badge, score, reasoning bullets
@@ -93,7 +93,7 @@ Both features appear as sections within the existing Hands tab, ordered:
 
 ### Phase 4: Hand Builder Component (`src/components/HandBuilder.tsx`)
 
-- [ ] 4.1 Create `src/components/HandBuilder.tsx`
+- [x] 4.1 Create `src/components/HandBuilder.tsx`
   - Props: `{ pool: HandCard[]; commanderIdentity: Set<MtgColor | string> }`
   - Internal state: `selectedCards: Record<string, number>` (card name → selected quantity)
   - Deduplicate pool into unique cards with max quantity
@@ -112,7 +112,7 @@ Both features appear as sections within the existing Hands tab, ordered:
 
 ### Phase 5: Integration into HandSimulator (`src/components/HandSimulator.tsx`)
 
-- [ ] 5.1 Modify `src/components/HandSimulator.tsx` to:
+- [x] 5.1 Modify `src/components/HandSimulator.tsx` to:
   - Import `findTopHands` from `@/lib/opening-hand` and `TopHands` + `HandBuilder` components
   - Add `topHands` state alongside existing `simStats`
   - In the existing `useEffect`, call `findTopHands(pool, commanderIdentity)` after `runSimulation()` and set state
@@ -121,7 +121,7 @@ Both features appear as sections within the existing Hands tab, ordered:
 
 ### Phase 6: E2E Tests (`e2e/hand-analysis.spec.ts`)
 
-- [ ] 6.1 Create `e2e/hand-analysis.spec.ts` with tests:
+- [x] 6.1 Create `e2e/hand-analysis.spec.ts` with tests:
   - Test: "Top 5 best hands appear after simulation completes" — navigate to Hands tab, verify `top-hands` container visible with up to 5 `top-hand-*` entries
   - Test: "Top hands show rank, verdict badge, and reasoning" — verify first entry has rank "1", a verdict badge, and reasoning text
   - Test: "Hand builder is visible on Hands tab" — verify `hand-builder` container visible
@@ -133,7 +133,7 @@ Both features appear as sections within the existing Hands tab, ordered:
 
 ### Phase 7: Fixture Updates (`e2e/fixtures.ts`)
 
-- [ ] 7.1 Add page-object helpers to `DeckPage` in `e2e/fixtures.ts`:
+- [x] 7.1 Add page-object helpers to `DeckPage` in `e2e/fixtures.ts`:
   - `get topHandsSection` — locator for `[data-testid="top-hands"]`
   - `get handBuilder` — locator for `[data-testid="hand-builder"]`
   - `get analyzeHandButton` — locator for `[data-testid="analyze-hand-btn"]`

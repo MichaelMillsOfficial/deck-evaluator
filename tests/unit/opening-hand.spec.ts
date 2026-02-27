@@ -6,6 +6,7 @@ import {
   getVerdict,
   generateReasoning,
   runSimulation,
+  findTopHands,
 } from "../../src/lib/opening-hand";
 import type { HandCard } from "../../src/lib/opening-hand";
 import type { DeckData, EnrichedCard } from "../../src/lib/types";
@@ -673,5 +674,106 @@ test.describe("runSimulation", () => {
     expect(stats.probT2Play).toBeLessThanOrEqual(1);
     expect(stats.probT3Play).toBeGreaterThanOrEqual(0);
     expect(stats.probT3Play).toBeLessThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findTopHands
+// ---------------------------------------------------------------------------
+
+test.describe("findTopHands", () => {
+  // Reuse the standard pool from runSimulation tests
+  const standardDeck = makeDeck({
+    mainboard: [
+      ...Array.from({ length: 37 }, (_, i) => ({
+        name: `Land ${i}`,
+        quantity: 1,
+      })),
+      ...Array.from({ length: 62 }, (_, i) => ({
+        name: `Spell ${i}`,
+        quantity: 1,
+      })),
+    ],
+  });
+
+  const standardCardMap: Record<string, EnrichedCard> = {};
+  for (let i = 0; i < 37; i++) {
+    standardCardMap[`Land ${i}`] = makeCard({
+      name: `Land ${i}`,
+      typeLine: "Basic Land — Forest",
+      supertypes: ["Basic"],
+      producedMana: ["G"],
+      cmc: 0,
+    });
+  }
+  for (let i = 0; i < 62; i++) {
+    standardCardMap[`Spell ${i}`] = makeCard({
+      name: `Spell ${i}`,
+      typeLine: "Creature",
+      cmc: (i % 6) + 1,
+      manaCost: `{${(i % 6) + 1}}`,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    });
+  }
+
+  const standardPool = buildPool(standardDeck, standardCardMap);
+  const standardIdentity = new Set(["G"]);
+
+  test("returns at most topN hands", () => {
+    const result = findTopHands(standardPool, standardIdentity, 3, 500);
+    expect(result.length).toBeLessThanOrEqual(3);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  test("hands are sorted by score descending", () => {
+    const result = findTopHands(standardPool, standardIdentity, 5, 500);
+    for (let i = 1; i < result.length; i++) {
+      expect(result[i - 1].hand.quality.score).toBeGreaterThanOrEqual(
+        result[i].hand.quality.score
+      );
+    }
+  });
+
+  test("rank values are 1-indexed and sequential", () => {
+    const result = findTopHands(standardPool, standardIdentity, 5, 500);
+    for (let i = 0; i < result.length; i++) {
+      expect(result[i].rank).toBe(i + 1);
+    }
+  });
+
+  test("no duplicate cardKeys in results", () => {
+    const result = findTopHands(standardPool, standardIdentity, 5, 1000);
+    const keys = result.map((r) => r.cardKey);
+    const uniqueKeys = new Set(keys);
+    expect(uniqueKeys.size).toBe(keys.length);
+  });
+
+  test("returns empty array for empty pool", () => {
+    const result = findTopHands([], new Set(["G"]), 5, 100);
+    expect(result).toEqual([]);
+  });
+
+  test("returns fewer than topN when pool has very few unique combinations", () => {
+    // Pool of only 3 cards — max 1 unique 7-card hand (can't even form one)
+    const tinyPool: HandCard[] = [
+      { name: "A", quantity: 1, enriched: makeCard({ name: "A", typeLine: "Basic Land — Forest", producedMana: ["G"] }) },
+      { name: "B", quantity: 1, enriched: makeCard({ name: "B", typeLine: "Creature", cmc: 1, manaCost: "{G}", manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 } }) },
+      { name: "C", quantity: 1, enriched: makeCard({ name: "C", typeLine: "Creature", cmc: 2, manaCost: "{1}{G}", manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 } }) },
+    ];
+    const result = findTopHands(tinyPool, new Set(["G"]), 5, 100);
+    // Only 1 unique combination possible (all 3 cards)
+    expect(result.length).toBeLessThanOrEqual(1);
+  });
+
+  test("all returned hands have valid quality results", () => {
+    const result = findTopHands(standardPool, standardIdentity, 5, 500);
+    for (const ranked of result) {
+      expect(ranked.hand.quality.score).toBeGreaterThanOrEqual(0);
+      expect(ranked.hand.quality.score).toBeLessThanOrEqual(100);
+      expect(["Strong Keep", "Keepable", "Marginal", "Mulligan"]).toContain(
+        ranked.hand.quality.verdict
+      );
+      expect(ranked.hand.quality.reasoning.length).toBeGreaterThan(0);
+    }
   });
 });
