@@ -154,13 +154,15 @@ export default function DeckInput({
             </div>
           )}
 
-          {/* Commander input (optional) */}
-          <CommanderInput
-            value={commanders}
-            onChange={setCommanders}
-            decklistText={textValue}
-            disabled={loading}
-          />
+          {/* Commander input (optional — hidden on Moxfield tab since MTGO export includes commanders) */}
+          {activeTab !== "moxfield" && (
+            <CommanderInput
+              value={commanders}
+              onChange={setCommanders}
+              decklistText={textValue}
+              disabled={loading}
+            />
+          )}
 
           {/* Decklist textarea */}
           <div>
