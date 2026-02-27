@@ -16,8 +16,14 @@ test.describe("Tab Navigation", () => {
     // Load Example should not be visible on Moxfield tab
     await expect(deckPage.loadExampleButton).toBeHidden();
 
-    // Textarea should still be present with Moxfield placeholder
+    // Textarea should still be present for pasting exported text
     await expect(deckPage.decklistTextarea).toBeVisible();
+
+    // Export instructions should be visible
+    const guide = deckPage.page.getByTestId("moxfield-export-guide");
+    await expect(guide).toBeVisible();
+    await expect(guide).toContainText("How to import from Moxfield");
+    await expect(guide).toContainText("Copy for MTGO");
   });
 
   test("switches to Archidekt tab", async ({ deckPage }) => {
@@ -35,6 +41,11 @@ test.describe("Tab Navigation", () => {
 
     await deckPage.selectTab("Manual Import");
     await expect(deckPage.loadExampleButton).toBeVisible();
+
+    // Moxfield export guide should not be visible on Manual tab
+    await expect(
+      deckPage.page.getByTestId("moxfield-export-guide")
+    ).toBeHidden();
   });
 
   test("textarea content persists when switching tabs", async ({

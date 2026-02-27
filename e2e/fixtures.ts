@@ -174,6 +174,31 @@ export class DeckPage {
     return this.page.locator("#tabpanel-deck-hands");
   }
 
+  /** Locator for the top hands section */
+  get topHandsSection() {
+    return this.page.getByTestId("top-hands");
+  }
+
+  /** Locator for the hand builder section */
+  get handBuilder() {
+    return this.page.getByTestId("hand-builder");
+  }
+
+  /** Locator for the analyze hand button */
+  get analyzeHandButton() {
+    return this.page.getByTestId("analyze-hand-btn");
+  }
+
+  /** Expand a collapsible section in the Hands tab by its ID */
+  async expandHandsSection(id: string) {
+    const panel = this.page.getByTestId(`panel-${id}`);
+    const button = panel.locator("button").first();
+    const expanded = await button.getAttribute("aria-expanded");
+    if (expanded !== "true") {
+      await button.click();
+    }
+  }
+
   /** Locator for the verified combos section */
   get verifiedCombosSection() {
     return this.page.getByTestId("verified-combos-section");
