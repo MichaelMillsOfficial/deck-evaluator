@@ -306,8 +306,8 @@ test.describe("Deck Analysis — Tab Availability", () => {
     await page.route("**/api/deck-enrich", async (route) => {
       await new Promise<void>((resolve) => {
         fulfillEnrichment = resolve;
-        // Auto-resolve after 5s as safety net
-        setTimeout(resolve, 5_000);
+        // Auto-resolve after 500ms as safety net
+        setTimeout(resolve, 500);
       });
       await route.fulfill({
         status: 200,
