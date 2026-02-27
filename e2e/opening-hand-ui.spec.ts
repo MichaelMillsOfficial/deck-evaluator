@@ -250,7 +250,8 @@ test.describe("Opening Hand Simulator", () => {
     await deckPage.selectDeckViewTab("Hands");
     await deckPage.waitForHandsPanel();
 
-    // Click Draw Hand
+    // Expand Draw Hand section and click Draw Hand
+    await deckPage.expandHandsSection("draw-hand");
     await page.getByTestId("draw-hand-btn").click();
 
     // Hand display should appear
@@ -273,6 +274,7 @@ test.describe("Opening Hand Simulator", () => {
 
     await deckPage.selectDeckViewTab("Hands");
     await deckPage.waitForHandsPanel();
+    await deckPage.expandHandsSection("draw-hand");
     await page.getByTestId("draw-hand-btn").click();
 
     // Verdict badge should be visible
@@ -298,6 +300,7 @@ test.describe("Opening Hand Simulator", () => {
 
     await deckPage.selectDeckViewTab("Hands");
     await deckPage.waitForHandsPanel();
+    await deckPage.expandHandsSection("draw-hand");
     await page.getByTestId("draw-hand-btn").click();
 
     // Click Mulligan
@@ -323,6 +326,7 @@ test.describe("Opening Hand Simulator", () => {
 
     await deckPage.selectDeckViewTab("Hands");
     await deckPage.waitForHandsPanel();
+    await deckPage.expandHandsSection("draw-hand");
     await page.getByTestId("draw-hand-btn").click();
 
     // Mulligan 3 times
@@ -347,6 +351,7 @@ test.describe("Opening Hand Simulator", () => {
 
     await deckPage.selectDeckViewTab("Hands");
     await deckPage.waitForHandsPanel();
+    await deckPage.expandHandsSection("draw-hand");
     await page.getByTestId("draw-hand-btn").click();
 
     // Mulligan once
@@ -376,6 +381,9 @@ test.describe("Opening Hand Simulator", () => {
 
     await deckPage.selectDeckViewTab("Hands");
     await deckPage.waitForHandsPanel();
+
+    // Expand simulation stats section
+    await deckPage.expandHandsSection("sim-stats");
 
     // Stat cards should be visible once the async simulation finishes.
     // The Monte Carlo simulation runs inside useEffect + requestAnimationFrame,

@@ -47,6 +47,12 @@ export interface SimulationStats {
   verdictDistribution: Record<Verdict, number>;
 }
 
+export interface RankedHand {
+  rank: number;
+  hand: DrawnHand;
+  cardKey: string;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -481,4 +487,62 @@ export function runSimulation(
     probT3Play: iterations > 0 ? t3Plays / iterations : 0,
     verdictDistribution,
   };
+}
+
+// ---------------------------------------------------------------------------
+// findTopHands
+// ---------------------------------------------------------------------------
+
+/**
+ * Run a Monte Carlo simulation and return the top `topN` unique hands by
+ * quality score. Hands are deduplicated by sorting card names alphabetically.
+ */
+export function findTopHands(
+  pool: HandCard[],
+  commanderIdentity: Set<MtgColor | string>,
+  topN = 5,
+  iterations = 2000
+): RankedHand[] {
+  if (pool.length === 0) return [];
+
+  // Buffer of top hands, sorted ascending by score (worst first for easy eviction)
+  const buffer: { hand: DrawnHand; cardKey: string }[] = [];
+  const seenKeys = new Set<string>();
+
+  for (let i = 0; i < iterations; i++) {
+    const cards = drawHand(pool, 7);
+    const quality = evaluateHandQuality(cards, 0, commanderIdentity);
+
+    // Dedup key: sorted card names joined
+    const cardKey = cards
+      .map((c) => c.name)
+      .sort()
+      .join("|");
+
+    if (seenKeys.has(cardKey)) continue;
+
+    // Check if this hand qualifies for the buffer
+    if (buffer.length < topN) {
+      buffer.push({ hand: { cards, quality, mulliganNumber: 0 }, cardKey });
+      seenKeys.add(cardKey);
+      // Keep sorted ascending by score
+      buffer.sort((a, b) => a.hand.quality.score - b.hand.quality.score);
+    } else if (quality.score > buffer[0].hand.quality.score) {
+      // Evict the lowest-scoring hand
+      const evicted = buffer.shift()!;
+      seenKeys.delete(evicted.cardKey);
+      buffer.push({ hand: { cards, quality, mulliganNumber: 0 }, cardKey });
+      seenKeys.add(cardKey);
+      buffer.sort((a, b) => a.hand.quality.score - b.hand.quality.score);
+    }
+  }
+
+  // Return sorted descending (best first) with rank
+  return buffer
+    .sort((a, b) => b.hand.quality.score - a.hand.quality.score)
+    .map((entry, idx) => ({
+      rank: idx + 1,
+      hand: entry.hand,
+      cardKey: entry.cardKey,
+    }));
 }
