@@ -37,7 +37,7 @@ function getAllCards(deck: DeckData) {
 }
 
 /** Regex patterns for conditional ETB-tapped lands */
-const CONDITIONAL_PATTERNS = [
+export const CONDITIONAL_PATTERNS = [
   /enters the battlefield tapped unless/i,
   /you may pay 2 life\. if you don't, it enters the battlefield tapped/i,
   /you may pay \d+ life\. if you don't,? it enters/i,
