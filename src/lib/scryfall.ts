@@ -39,6 +39,7 @@ export interface ScryfallCard {
   produced_mana?: string[];
   flavor_name?: string;
   game_changer?: boolean;
+  prices?: { usd: string | null; usd_foil: string | null; eur: string | null };
 }
 
 export async function fetchCardByName(
@@ -184,6 +185,12 @@ async function fetchBatchWithRetry(
   throw lastError ?? new Error("Scryfall API error: retries exhausted");
 }
 
+function parsePrice(val: string | null | undefined): number | null {
+  if (!val) return null;
+  const n = parseFloat(val);
+  return isNaN(n) || n < 0 ? null : n;
+}
+
 /**
  * Normalizes a Scryfall card response into our EnrichedCard type.
  * Handles DFCs by falling back to card_faces[0] when top-level fields are undefined.
@@ -221,5 +228,10 @@ export function normalizeToEnrichedCard(card: ScryfallCard): EnrichedCard {
     producedMana: card.produced_mana ?? frontFace?.produced_mana ?? [],
     flavorName: card.flavor_name ?? null,
     isGameChanger: card.game_changer ?? false,
+    prices: {
+      usd: parsePrice(card.prices?.usd),
+      usdFoil: parsePrice(card.prices?.usd_foil),
+      eur: parsePrice(card.prices?.eur),
+    },
   };
 }

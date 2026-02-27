@@ -19,6 +19,7 @@ import { computePowerLevel } from "@/lib/power-level";
 import { computeBracketEstimate } from "@/lib/bracket-estimator";
 import { STATIC_CEDH_STAPLES } from "@/lib/cedh-staples";
 import type { SpellbookCombo } from "@/lib/commander-spellbook";
+import { computeBudgetAnalysis } from "@/lib/budget-analysis";
 import ManaCurveChart from "@/components/ManaCurveChart";
 import TypeFilterBar from "@/components/TypeFilterBar";
 import ColorDistributionChart from "@/components/ColorDistributionChart";
@@ -30,6 +31,10 @@ import HypergeometricCalculator from "@/components/HypergeometricCalculator";
 import DeckClassification from "@/components/DeckClassification";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import SectionNav from "@/components/SectionNav";
+import BudgetStats from "@/components/BudgetStats";
+import PriceDistributionChart from "@/components/PriceDistributionChart";
+import TopExpensiveCardsTable from "@/components/TopExpensiveCardsTable";
+import PriceByCategoryChart from "@/components/PriceByCategoryChart";
 
 const ANALYSIS_SECTIONS = [
   { id: "commander", label: "Commander" },
@@ -39,6 +44,7 @@ const ANALYSIS_SECTIONS = [
   { id: "color-distribution", label: "Color Dist." },
   { id: "land-efficiency", label: "Land Efficiency" },
   { id: "hypergeometric", label: "Draw Odds" },
+  { id: "budget", label: "Budget" },
 ] as const;
 
 interface DeckAnalysisProps {
@@ -128,6 +134,11 @@ export default function DeckAnalysis({
         spellbookCombos?.exactCombos ?? null
       ),
     [deck, cardMap, powerLevel, spellbookCombos]
+  );
+
+  const budgetAnalysis = useMemo(
+    () => computeBudgetAnalysis(deck, cardMap),
+    [deck, cardMap]
   );
 
   const filteredSpells = curveData.reduce(
@@ -270,6 +281,21 @@ export default function DeckAnalysis({
         onToggle={() => onToggleSection("hypergeometric")}
       >
         <HypergeometricCalculator deck={deck} cardMap={cardMap} />
+      </CollapsiblePanel>
+
+      <CollapsiblePanel
+        id="budget"
+        title="Budget Analysis"
+        summary={budgetAnalysis.totalCostFormatted}
+        expanded={expandedSections.has("budget")}
+        onToggle={() => onToggleSection("budget")}
+      >
+        <div className="space-y-6">
+          <BudgetStats result={budgetAnalysis} />
+          <PriceDistributionChart data={budgetAnalysis.distribution} />
+          <TopExpensiveCardsTable cards={budgetAnalysis.mostExpensive} />
+          <PriceByCategoryChart byType={budgetAnalysis.byType} byRole={budgetAnalysis.byRole} />
+        </div>
       </CollapsiblePanel>
     </div>
   );

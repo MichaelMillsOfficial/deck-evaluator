@@ -24,6 +24,12 @@ export interface ArchidektApiResponse {
   cards: ArchidektCard[];
 }
 
+export interface CardPrices {
+  usd: number | null;
+  usdFoil: number | null;
+  eur: number | null;
+}
+
 // Enriched card data (from Scryfall)
 export interface ManaPips {
   W: number;
@@ -54,6 +60,7 @@ export interface EnrichedCard {
   producedMana: string[];
   flavorName: string | null;
   isGameChanger: boolean;
+  prices: CardPrices;
 }
 
 // Synergy analysis types

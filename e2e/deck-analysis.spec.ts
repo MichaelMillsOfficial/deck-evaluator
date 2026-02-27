@@ -22,6 +22,7 @@ const MOCK_ANALYSIS_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["C"],
       flavorName: null,
+      prices: { usd: 1.5, usdFoil: 5.0, eur: 1.2 },
     },
     "Counterspell": {
       name: "Counterspell",
@@ -42,6 +43,7 @@ const MOCK_ANALYSIS_RESPONSE = {
       manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 1.25, usdFoil: 3.0, eur: 1.0 },
     },
     "Cultivate": {
       name: "Cultivate",
@@ -63,6 +65,7 @@ const MOCK_ANALYSIS_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 0.35, usdFoil: 1.0, eur: 0.3 },
     },
     "Command Tower": {
       name: "Command Tower",
@@ -84,6 +87,7 @@ const MOCK_ANALYSIS_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
+      prices: { usd: 0.25, usdFoil: 0.75, eur: 0.2 },
     },
   },
   notFound: [],
@@ -111,6 +115,7 @@ const MOCK_COMMANDER_RESPONSE = {
       manaPips: { W: 0, U: 1, B: 0, R: 0, G: 1, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 2.5, usdFoil: 8.0, eur: 2.0 },
     },
     "Sol Ring": {
       name: "Sol Ring",
@@ -131,6 +136,7 @@ const MOCK_COMMANDER_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["C"],
       flavorName: null,
+      prices: { usd: 1.5, usdFoil: 5.0, eur: 1.2 },
     },
     "Counterspell": {
       name: "Counterspell",
@@ -151,6 +157,7 @@ const MOCK_COMMANDER_RESPONSE = {
       manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 1.25, usdFoil: 3.0, eur: 1.0 },
     },
     "Cultivate": {
       name: "Cultivate",
@@ -172,6 +179,7 @@ const MOCK_COMMANDER_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 0.35, usdFoil: 1.0, eur: 0.3 },
     },
     "Command Tower": {
       name: "Command Tower",
@@ -193,6 +201,7 @@ const MOCK_COMMANDER_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
+      prices: { usd: 0.25, usdFoil: 0.75, eur: 0.2 },
     },
     "Breeding Pool": {
       name: "Breeding Pool",
@@ -213,6 +222,7 @@ const MOCK_COMMANDER_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["G", "U"],
       flavorName: null,
+      prices: { usd: 18.0, usdFoil: 25.0, eur: 15.0 },
     },
   },
   notFound: [],
@@ -800,6 +810,7 @@ const MOCK_SCORECARD_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["C"],
       flavorName: null,
+      prices: { usd: 1.5, usdFoil: 5.0, eur: 1.2 },
     },
     "Cultivate": {
       name: "Cultivate",
@@ -821,6 +832,7 @@ const MOCK_SCORECARD_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 0.35, usdFoil: 1.0, eur: 0.3 },
     },
     // Card Draw
     "Rhystic Study": {
@@ -843,6 +855,7 @@ const MOCK_SCORECARD_RESPONSE = {
       manaPips: { W: 0, U: 1, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 35.0, usdFoil: 45.0, eur: 30.0 },
     },
     // Removal
     "Swords to Plowshares": {
@@ -864,6 +877,7 @@ const MOCK_SCORECARD_RESPONSE = {
       manaPips: { W: 1, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 2.5, usdFoil: 6.0, eur: 2.0 },
     },
     // Board Wipe (also counts as Removal)
     "Wrath of God": {
@@ -885,6 +899,7 @@ const MOCK_SCORECARD_RESPONSE = {
       manaPips: { W: 2, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 3.0, usdFoil: 8.0, eur: 2.5 },
     },
     // Counterspell
     "Counterspell": {
@@ -906,6 +921,7 @@ const MOCK_SCORECARD_RESPONSE = {
       manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 1.25, usdFoil: 3.0, eur: 1.0 },
     },
     // Recursion
     "Regrowth": {
@@ -927,6 +943,7 @@ const MOCK_SCORECARD_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 4.0, usdFoil: 10.0, eur: 3.5 },
     },
     // Protection
     "Heroic Intervention": {
@@ -949,6 +966,7 @@ const MOCK_SCORECARD_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 8.0, usdFoil: 15.0, eur: 7.0 },
     },
     // Untagged vanilla creature
     "Grizzly Bears": {
@@ -970,6 +988,7 @@ const MOCK_SCORECARD_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: 0.1, usdFoil: 0.5, eur: 0.08 },
     },
     // Land
     "Command Tower": {
@@ -992,6 +1011,7 @@ const MOCK_SCORECARD_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
+      prices: { usd: 0.25, usdFoil: 0.75, eur: 0.2 },
     },
   },
   notFound: [],
@@ -1338,5 +1358,130 @@ test.describe("Deck Analysis — Deck Classification", () => {
     expect(classBound).not.toBeNull();
     expect(manaBound).not.toBeNull();
     expect(classBound!.y).toBeLessThan(manaBound!.y);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Budget Analysis
+// ---------------------------------------------------------------------------
+
+test.describe("Deck Analysis — Budget Analysis", () => {
+  test.beforeEach(async ({ deckPage }) => {
+    const { page } = deckPage;
+    await page.route("**/api/deck-enrich", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_ANALYSIS_RESPONSE),
+      })
+    );
+    await deckPage.goto();
+    await deckPage.fillDecklist(
+      "1 Sol Ring\n1 Counterspell\n1 Cultivate\n1 Command Tower"
+    );
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Analysis");
+    await deckPage.expandAnalysisSection("budget");
+  });
+
+  test("Budget Analysis panel visible on Analysis tab", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await expect(page.getByTestId("panel-budget")).toBeVisible();
+    // Panel header button contains the title text
+    await expect(page.getByTestId("panel-budget")).toContainText("Budget Analysis");
+  });
+
+  test("displays total deck cost in panel summary", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const panel = page.getByTestId("panel-budget");
+    // The summary is in the panel header button as text
+    // Sol Ring $1.50 + Counterspell $1.25 + Cultivate $0.35 + Command Tower $0.25 = $3.35
+    await expect(panel).toContainText("$3.35");
+  });
+
+  test("displays total cost, avg price, and median price stat cards", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await expect(page.getByTestId("budget-total-cost")).toBeVisible();
+    await expect(page.getByTestId("budget-avg-price")).toBeVisible();
+    await expect(page.getByTestId("budget-median-price")).toBeVisible();
+
+    // Total cost: $3.35
+    await expect(page.getByTestId("budget-total-cost")).toContainText("$3.35");
+  });
+
+  test("displays price distribution chart with accessible label", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const chart = page.locator(
+      '[role="img"][aria-label="Price distribution chart"]'
+    );
+    await expect(chart).toBeVisible();
+  });
+
+  test("displays top expensive cards table with correct ranking", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const table = page.getByTestId("budget-top-expensive");
+    await expect(table).toBeVisible();
+
+    // Sol Ring ($1.50) should be first (most expensive)
+    const firstRow = table.locator("tbody tr").first();
+    await expect(firstRow).toContainText("Sol Ring");
+    await expect(firstRow).toContainText("$1.50");
+  });
+
+  test("displays spending by card type chart", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const chart = page.getByTestId("budget-by-type");
+    await expect(chart).toBeVisible();
+    await expect(chart).toContainText("Spending by Card Type");
+  });
+
+  test("displays spending by role chart with overlap disclaimer", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    const chart = page.getByTestId("budget-by-role");
+    await expect(chart).toBeVisible();
+    await expect(chart).toContainText("Spending by Role");
+    await expect(chart).toContainText(
+      "Cards with multiple roles are counted in each category"
+    );
+  });
+
+  test("budget section appears after Draw Probability", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await deckPage.expandAnalysisSection("hypergeometric");
+
+    const hyperPanel = page.getByTestId("panel-hypergeometric");
+    const budgetPanel = page.getByTestId("panel-budget");
+    await expect(hyperPanel).toBeVisible();
+    await expect(budgetPanel).toBeVisible();
+
+    const hyperBound = await hyperPanel.boundingBox();
+    const budgetBound = await budgetPanel.boundingBox();
+    expect(hyperBound).not.toBeNull();
+    expect(budgetBound).not.toBeNull();
+    expect(hyperBound!.y).toBeLessThan(budgetBound!.y);
+  });
+
+  test("section nav includes Budget chip", async ({ deckPage }) => {
+    const { page } = deckPage;
+    const sectionNav = page.getByTestId("section-nav");
+    await expect(sectionNav).toContainText("Budget");
   });
 });

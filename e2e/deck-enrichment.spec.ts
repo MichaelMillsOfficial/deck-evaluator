@@ -22,6 +22,7 @@ const MOCK_ENRICH_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["C"],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Command Tower": {
       name: "Command Tower",
@@ -43,6 +44,7 @@ const MOCK_ENRICH_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
   },
   notFound: [],
@@ -340,6 +342,7 @@ const MOCK_TAGS_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["C"],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Swords to Plowshares": {
       name: "Swords to Plowshares",
@@ -361,6 +364,7 @@ const MOCK_TAGS_RESPONSE = {
       manaPips: { W: 1, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     Counterspell: {
       name: "Counterspell",
@@ -381,6 +385,7 @@ const MOCK_TAGS_RESPONSE = {
       manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Command Tower": {
       name: "Command Tower",
@@ -402,6 +407,7 @@ const MOCK_TAGS_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
   },
   notFound: [],

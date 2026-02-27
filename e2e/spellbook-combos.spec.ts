@@ -29,6 +29,7 @@ const MOCK_ENRICH_RESPONSE = {
       manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Demonic Consultation": {
       name: "Demonic Consultation",
@@ -54,6 +55,7 @@ const MOCK_ENRICH_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 1, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Dramatic Reversal": {
       name: "Dramatic Reversal",
@@ -78,6 +80,7 @@ const MOCK_ENRICH_RESPONSE = {
       manaPips: { W: 0, U: 1, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Sol Ring": {
       name: "Sol Ring",
@@ -98,6 +101,7 @@ const MOCK_ENRICH_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["C"],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
     "Command Tower": {
       name: "Command Tower",
@@ -119,6 +123,7 @@ const MOCK_ENRICH_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
+      prices: { usd: null, usdFoil: null, eur: null },
     },
   },
   notFound: [],
