@@ -31,6 +31,14 @@ SIDEBOARD:
 
 export const MINIMAL_DECKLIST = "1 Sol Ring";
 
+/** Decklist without a COMMANDER: header — used for commander input tests */
+export const FLAT_DECKLIST = `1 Atraxa, Praetors' Voice
+1 Sol Ring
+1 Command Tower
+1 Arcane Signet
+1 Swords to Plowshares
+1 Counterspell`;
+
 // ---------------------------------------------------------------------------
 // Page-object helpers — keep tests focused on intent, not selectors
 // ---------------------------------------------------------------------------
@@ -174,6 +182,36 @@ export class DeckPage {
   /** Locator for the near combos section */
   get nearCombosSection() {
     return this.page.getByTestId("near-combos-section");
+  }
+
+  /** Locator for the commander input field */
+  get commanderInput() {
+    return this.page.locator("#commander-input");
+  }
+
+  /** Locator for the commander tag pills container */
+  get commanderTags() {
+    return this.page.getByTestId("commander-tags");
+  }
+
+  /**
+   * Type a commander name into the commander input, wait for the autocomplete
+   * dropdown to appear, and click the matching suggestion.
+   * NOTE: Callers must mock /api/card-autocomplete via page.route() first.
+   */
+  async fillCommander(name: string) {
+    await this.commanderInput.fill(name);
+    // Wait for autocomplete dropdown to appear
+    const option = this.page.getByRole("option", { name });
+    await option.waitFor({ timeout: 5_000 });
+    await option.click();
+  }
+
+  /** Remove a commander tag by clicking its × button */
+  async removeCommander(name: string) {
+    await this.page
+      .getByRole("button", { name: `Remove ${name}` })
+      .click();
   }
 }
 

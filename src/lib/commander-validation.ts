@@ -129,6 +129,67 @@ export function validateCommanderDeck(
 }
 
 /**
+ * Check if a card is a legal commander.
+ * Must be a Legendary Creature or Legendary Planeswalker,
+ * or have "can be your commander" in oracle text.
+ */
+export function isLegalCommander(card: EnrichedCard): boolean {
+  if (/can be your commander/i.test(card.oracleText)) return true;
+  if (!card.supertypes.includes("Legendary")) return false;
+  return /\bCreature\b/.test(card.typeLine) || /\bPlaneswalker\b/.test(card.typeLine);
+}
+
+/**
+ * Validate that chosen commander names are acceptable selections.
+ * Checks: max 2 commanders, each name must exist in the deck card list.
+ */
+export function validateCommanderSelection(
+  names: string[],
+  deckCardNames: string[]
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (names.length === 0) return { valid: true, errors };
+
+  if (names.length > 2) {
+    errors.push("A deck can have at most 2 commanders.");
+  }
+
+  const deckSet = new Set(deckCardNames);
+  for (const name of names) {
+    if (!deckSet.has(name)) {
+      errors.push(`"${name}" is not in the decklist.`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Post-enrichment check: warn if selected commanders aren't legal commanders.
+ * Returns warnings (not hard errors) so unknown/new cards can still pass.
+ */
+export function validateCommanderLegality(
+  names: string[],
+  cardMap: Record<string, EnrichedCard>
+): { warnings: string[] } {
+  const warnings: string[] = [];
+
+  for (const name of names) {
+    const card = cardMap[name];
+    if (!card) {
+      warnings.push(`Could not verify "${name}" as a legal commander (card data not found).`);
+      continue;
+    }
+    if (!isLegalCommander(card)) {
+      warnings.push(`"${name}" may not be a legal commander — it is not a Legendary Creature or Planeswalker.`);
+    }
+  }
+
+  return { warnings };
+}
+
+/**
  * Build an EDHREC URL for the given commander name(s).
  */
 export function buildEdhrecUrl(commanderNames: string[]): string {
