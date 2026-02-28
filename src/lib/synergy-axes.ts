@@ -111,12 +111,14 @@ const ENCHANTMENT_KEYWORDS = new Set(["Constellation"]);
 
 // --- Lifegain ---
 const LIFEGAIN_TRIGGER_RE = /whenever you gain life/i;
-const LIFEGAIN_PAYOFF_RE = /pay.+?life|you gain.+?life/i;
+const LIFEGAIN_PAYOFF_RE = /\byou gain.+?\blife\b/i;
 const LIFEGAIN_KEYWORDS = new Set(["Lifelink"]);
 
 // --- Evasion ---
 const EVASION_UNBLOCKABLE_RE = /can't be blocked/i;
 const EVASION_COMBAT_DAMAGE_RE = /deals? combat damage to.+?(?:player|opponent)/i;
+const EVASION_GRANTS_RE =
+  /\b(?:ha[sv]e?|gains?)\s+(?:flying|menace|trample|shadow|fear|intimidate|skulk)\b/i;
 const EVASION_KEYWORDS = new Set([
   "Flying",
   "Menace",
@@ -358,6 +360,7 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
       if (card.keywords.some((kw) => EVASION_KEYWORDS.has(kw))) score += 0.4;
       if (EVASION_UNBLOCKABLE_RE.test(text)) score += 0.6;
       if (EVASION_COMBAT_DAMAGE_RE.test(text)) score += 0.5;
+      if (EVASION_GRANTS_RE.test(text)) score += 0.5;
       return Math.min(score, 1);
     },
     conflictsWith: [],

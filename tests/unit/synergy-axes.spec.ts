@@ -510,6 +510,153 @@ test.describe("Evasion axis", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Issue #48 — Lifegain axis: drop "pay life" false positives
+// ---------------------------------------------------------------------------
+
+test.describe("Lifegain axis — pay-life exclusions (Issue #48)", () => {
+  test("Arid Mesa (fetch land, 'Pay 1 life') → lifegain score = 0", () => {
+    const axis = getAxisById("lifegain")!;
+    const card = mockCard({
+      name: "Arid Mesa",
+      oracleText:
+        "{T}, Pay 1 life, Sacrifice Arid Mesa: Search your library for a Mountain or Plains card, put it onto the battlefield, then shuffle.",
+      typeLine: "Land",
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("Breeding Pool (shock land, 'pay 2 life') → lifegain score = 0", () => {
+    const axis = getAxisById("lifegain")!;
+    const card = mockCard({
+      name: "Breeding Pool",
+      oracleText:
+        "({T}: Add {G} or {U}.) As Breeding Pool enters the battlefield, you may pay 2 life. If you don't, it enters the battlefield tapped.",
+      typeLine: "Land — Forest Island",
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("Bolas's Citadel ('paying life rather than mana') → lifegain score = 0", () => {
+    const axis = getAxisById("lifegain")!;
+    const card = mockCard({
+      name: "Bolas's Citadel",
+      oracleText:
+        "You may look at the top card of your library any time.\nYou may play lands and cast spells from the top of your library by paying life equal to their mana costs rather than paying their mana costs.\n{T}, Sacrifice ten nonland permanents: Each opponent loses 10 life.",
+      typeLine: "Legendary Artifact",
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("Necropotence ('Pay 1 life:') → lifegain score = 0", () => {
+    const axis = getAxisById("lifegain")!;
+    const card = mockCard({
+      name: "Necropotence",
+      oracleText:
+        "Skip your draw step.\nWhenever you discard a card, exile that card from your graveyard.\nPay 1 life: Exile the top card of your library face down. Put that card into your hand at the beginning of your next end step.",
+      typeLine: "Enchantment",
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("Ajani's Pridemate ('Whenever you gain life') → lifegain score > 0", () => {
+    const axis = getAxisById("lifegain")!;
+    const card = mockCard({
+      name: "Ajani's Pridemate",
+      oracleText:
+        "Whenever you gain life, put a +1/+1 counter on Ajani's Pridemate.",
+      typeLine: "Creature — Cat Soldier",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Soul Warden ('you gain 1 life') → lifegain score > 0", () => {
+    const axis = getAxisById("lifegain")!;
+    const card = mockCard({
+      name: "Soul Warden",
+      oracleText:
+        "Whenever another creature enters the battlefield, you gain 1 life.",
+      typeLine: "Creature — Human Cleric",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Lifelink keyword → still lifegain > 0 (no regression)", () => {
+    const axis = getAxisById("lifegain")!;
+    const card = mockCard({ keywords: ["Lifelink"] });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #48 — Tribal axis: verify Tribal Unity detection
+// ---------------------------------------------------------------------------
+
+test.describe("Tribal axis — Tribal Unity verification (Issue #48)", () => {
+  test("Tribal Unity ('Choose a creature type. Creatures of the chosen type get +X/+X') → tribal score > 0", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Tribal Unity",
+      oracleText:
+        "Choose a creature type. Creatures of the chosen type get +X/+X until end of turn, where X is the amount of mana spent to cast this spell.",
+      typeLine: "Instant",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #48 — Evasion axis: grants-evasion via has/have
+// ---------------------------------------------------------------------------
+
+test.describe("Evasion axis — grants-evasion (Issue #48)", () => {
+  test("Two Headed Sliver ('All Sliver creatures have menace') → evasion score > 0", () => {
+    const axis = getAxisById("evasion")!;
+    const card = mockCard({
+      name: "Two-Headed Sliver",
+      oracleText:
+        "All Sliver creatures have menace. (They can't be blocked except by two or more creatures.)",
+      typeLine: "Creature — Sliver",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Archetype of Imagination ('Creatures you control have flying') → evasion score > 0", () => {
+    const axis = getAxisById("evasion")!;
+    const card = mockCard({
+      name: "Archetype of Imagination",
+      oracleText:
+        "Creatures you control have flying. Creatures your opponents control lose flying and can't have or gain flying.",
+      typeLine: "Enchantment Creature — Human Wizard",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Goblin War Drums ('Creatures you control have menace') → evasion score > 0", () => {
+    const axis = getAxisById("evasion")!;
+    const card = mockCard({
+      name: "Goblin War Drums",
+      oracleText: "Creatures you control have menace.",
+      typeLine: "Enchantment",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Flying keyword → still evasion > 0 (no regression)", () => {
+    const axis = getAxisById("evasion")!;
+    const card = mockCard({ keywords: ["Flying"] });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Unblockable text → still evasion > 0 (no regression)", () => {
+    const axis = getAxisById("evasion")!;
+    const card = mockCard({
+      oracleText: "This creature can't be blocked.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+});
+
 test.describe("Axis conflict declarations", () => {
   test("graveyard and graveyardHate conflict with each other", () => {
     const gy = getAxisById("graveyard")!;
