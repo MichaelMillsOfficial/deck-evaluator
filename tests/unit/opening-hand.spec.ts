@@ -2791,3 +2791,359 @@ test.describe("mana dorks in evaluateHandQuality", () => {
     // This is inherently tested by the fact that T1 logic is land-only
   });
 });
+
+// ---------------------------------------------------------------------------
+// getManaProducers — dorks array
+// ---------------------------------------------------------------------------
+
+test.describe("getManaProducers dorks array", () => {
+  function handCard(name: string, overrides: Partial<EnrichedCard> = {}): HandCard {
+    return { name, quantity: 1, enriched: makeCard({ name, ...overrides }) };
+  }
+
+  const forest: HandCard = handCard("Forest", {
+    typeLine: "Basic Land — Forest",
+    producedMana: ["G"],
+  });
+
+  test("Llanowar Elves (CMC 1) + Forest → dorks contains entry with availableTurn 2", () => {
+    const elves = handCard("Llanowar Elves", {
+      typeLine: "Creature — Elf Druid",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [forest, elves];
+    const untapped = [["G"]];
+    const all = [["G"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.dorks).toHaveLength(1);
+    expect(result.dorks[0]).toEqual({
+      name: "Llanowar Elves",
+      producedMana: ["G"],
+      availableTurn: 2,
+    });
+  });
+
+  test("Bloom Tender (CMC 2) + 2 Forests → dorks contains entry with availableTurn 3", () => {
+    const forest2 = handCard("Forest", {
+      typeLine: "Basic Land — Forest",
+      producedMana: ["G"],
+    });
+    const bloom = handCard("Bloom Tender", {
+      typeLine: "Creature — Elf",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      producedMana: ["W", "U", "B", "R", "G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [forest, forest2, bloom];
+    const untapped = [["G"], ["G"]];
+    const all = [["G"], ["G"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.dorks).toHaveLength(1);
+    expect(result.dorks[0]).toEqual({
+      name: "Bloom Tender",
+      producedMana: ["W", "U", "B", "R", "G"],
+      availableTurn: 3,
+    });
+  });
+
+  test("uncastable dork → not in dorks array", () => {
+    const island = handCard("Island", {
+      typeLine: "Basic Land — Island",
+      producedMana: ["U"],
+    });
+    const elves = handCard("Llanowar Elves", {
+      typeLine: "Creature — Elf Druid",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [island, elves];
+    const untapped = [["U"]];
+    const all = [["U"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.dorks).toHaveLength(0);
+  });
+
+  test("no dorks → empty dorks array", () => {
+    const hand = [forest];
+    const untapped = [["G"]];
+    const all = [["G"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.dorks).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateReasoning with mana dorks
+// ---------------------------------------------------------------------------
+
+test.describe("generateReasoning with mana dorks", () => {
+  test("1 land + 1 dork → reasoning mentions dork name", () => {
+    const factors = {
+      landCount: 1,
+      rampCount: 1,
+      playableTurns: [true, true, false],
+      colorCoverage: 1.0,
+      curvePlayability: 0.67,
+      manaDorks: [{ name: "Llanowar Elves", producedMana: ["G"], availableTurn: 2 }],
+    };
+    const reasoning = generateReasoning(factors, 0);
+    expect(reasoning.some((r) => /1 land but Llanowar Elves/.test(r))).toBe(true);
+  });
+
+  test("1 land + multiple dorks → reasoning mentions both names", () => {
+    const factors = {
+      landCount: 1,
+      rampCount: 2,
+      playableTurns: [true, true, false],
+      colorCoverage: 1.0,
+      curvePlayability: 0.67,
+      manaDorks: [
+        { name: "Llanowar Elves", producedMana: ["G"], availableTurn: 2 },
+        { name: "Sol Ring", producedMana: ["C"], availableTurn: 2 },
+      ],
+    };
+    const reasoning = generateReasoning(factors, 0);
+    const landLine = reasoning.find((r) => /1 land but/.test(r));
+    expect(landLine).toBeDefined();
+    expect(landLine).toMatch(/Llanowar Elves/);
+    expect(landLine).toMatch(/Sol Ring/);
+  });
+
+  test("1 land + no dorks → standard low-land reasoning", () => {
+    const factors = {
+      landCount: 1,
+      rampCount: 0,
+      playableTurns: [false, false, false],
+      colorCoverage: 0.5,
+      curvePlayability: 0,
+      manaDorks: [],
+    };
+    const reasoning = generateReasoning(factors, 0);
+    expect(reasoning.some((r) => /Only 1 land/.test(r))).toBe(true);
+    expect(reasoning.some((r) => /but/.test(r) && /dork|Elves|Ring/i.test(r))).toBe(false);
+  });
+
+  test("2 lands + 1 dork → reasoning mentions dork with land count", () => {
+    const factors = {
+      landCount: 2,
+      rampCount: 1,
+      playableTurns: [true, true, true],
+      colorCoverage: 1.0,
+      curvePlayability: 1.0,
+      manaDorks: [{ name: "Birds of Paradise", producedMana: ["W", "U", "B", "R", "G"], availableTurn: 2 }],
+    };
+    const reasoning = generateReasoning(factors, 0);
+    expect(reasoning.some((r) => /2 lands.*Birds of Paradise/.test(r))).toBe(true);
+  });
+
+  test("3+ lands + dorks → standard land message (dorks not mentioned)", () => {
+    const factors = {
+      landCount: 3,
+      rampCount: 1,
+      playableTurns: [true, true, true],
+      colorCoverage: 1.0,
+      curvePlayability: 1.0,
+      manaDorks: [{ name: "Llanowar Elves", producedMana: ["G"], availableTurn: 2 }],
+    };
+    const reasoning = generateReasoning(factors, 0);
+    expect(reasoning.some((r) => /3 lands -- solid/.test(r))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateReasoning with color detail + pip demand %
+// ---------------------------------------------------------------------------
+
+test.describe("generateReasoning with color detail", () => {
+  test("partial coverage with pipWeights → shows demand % for covered and missing", () => {
+    const factors = {
+      landCount: 2,
+      rampCount: 0,
+      playableTurns: [true, true, false],
+      colorCoverage: 0.9,
+      curvePlayability: 0.67,
+      coveredColors: ["G", "W"],
+      missingColors: ["B"],
+      pipWeights: { G: 0.6, W: 0.3, B: 0.1 },
+    };
+    const reasoning = generateReasoning(factors, 0);
+    const colorLine = reasoning.find((r) => /Partial color coverage/.test(r));
+    expect(colorLine).toBeDefined();
+    expect(colorLine).toMatch(/G \(60%\)/);
+    expect(colorLine).toMatch(/W \(30%\)/);
+    expect(colorLine).toMatch(/B \(10%\)/);
+  });
+
+  test("partial coverage with major colors missing → shows high % for missing", () => {
+    const factors = {
+      landCount: 1,
+      rampCount: 0,
+      playableTurns: [false, false, false],
+      colorCoverage: 0.1,
+      curvePlayability: 0,
+      coveredColors: ["B"],
+      missingColors: ["G", "W"],
+      pipWeights: { G: 0.6, W: 0.3, B: 0.1 },
+    };
+    const reasoning = generateReasoning(factors, 0);
+    const colorLine = reasoning.find((r) => /Partial color coverage/.test(r));
+    expect(colorLine).toBeDefined();
+    expect(colorLine).toMatch(/missing G \(60%\)/);
+  });
+
+  test("partial coverage without pipWeights → shows color letters without percentages", () => {
+    const factors = {
+      landCount: 2,
+      rampCount: 0,
+      playableTurns: [true, true, false],
+      colorCoverage: 2 / 3,
+      curvePlayability: 0.67,
+      coveredColors: ["G", "W"],
+      missingColors: ["B"],
+    };
+    const reasoning = generateReasoning(factors, 0);
+    const colorLine = reasoning.find((r) => /Partial color coverage/.test(r));
+    expect(colorLine).toBeDefined();
+    expect(colorLine).toMatch(/producing G, W/);
+    expect(colorLine).toMatch(/missing B/);
+    // No per-color demand percentages like "G (60%)" — only the overall % is shown
+    expect(colorLine).not.toMatch(/[WUBRG] \(\d+%\)/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dork color coverage scoring
+// ---------------------------------------------------------------------------
+
+test.describe("dork color coverage scoring", () => {
+  function handCard(name: string, overrides: Partial<EnrichedCard> = {}): HandCard {
+    return { name, quantity: 1, enriched: makeCard({ name, ...overrides }) };
+  }
+
+  test("[Island, Birds of Paradise] in Gruul deck → coveredColors includes G and R from Birds", () => {
+    const island = handCard("Island", {
+      typeLine: "Basic Land — Island",
+      producedMana: ["U"],
+    });
+    const birds = handCard("Birds of Paradise", {
+      typeLine: "Creature — Bird",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["W", "U", "B", "R", "G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    // Birds can't be cast with Island (needs G), so it's uncastable
+    // Wait — Island doesn't produce G, so Birds can't be cast
+    // Need a land that produces G for Birds to be castable
+    const forest = handCard("Forest", {
+      typeLine: "Basic Land — Forest",
+      producedMana: ["G"],
+    });
+    const hand = [forest, birds, island];
+    // Gruul = R, G
+    const result = evaluateHandQuality(hand, 0, new Set(["R", "G"]));
+    // Birds is castable (Forest provides G) → adds WUBRG to available colors
+    // So R is covered from Birds, G from Forest + Birds
+    expect(result.factors.coveredColors).toContain("G");
+    expect(result.factors.coveredColors).toContain("R");
+    expect(result.factors.colorCoverage).toBeGreaterThan(0);
+  });
+
+  test("[Island, uncastable Birds] in Gruul deck → Birds doesn't contribute colors", () => {
+    const island = handCard("Island", {
+      typeLine: "Basic Land — Island",
+      producedMana: ["U"],
+    });
+    const birds = handCard("Birds of Paradise", {
+      typeLine: "Creature — Bird",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["W", "U", "B", "R", "G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [island, birds];
+    // Gruul = R, G — Island doesn't produce G, so Birds can't be cast
+    const result = evaluateHandQuality(hand, 0, new Set(["R", "G"]));
+    // Birds is NOT castable, so it doesn't contribute colors
+    // Only U from Island, which isn't in Gruul identity
+    expect(result.factors.coveredColors).not.toContain("R");
+    expect(result.factors.coveredColors).not.toContain("G");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: evaluateHandQuality populates new factors
+// ---------------------------------------------------------------------------
+
+test.describe("evaluateHandQuality populates new factors", () => {
+  function handCard(name: string, overrides: Partial<EnrichedCard> = {}): HandCard {
+    return { name, quantity: 1, enriched: makeCard({ name, ...overrides }) };
+  }
+
+  test("[Forest, Llanowar Elves, spell] → reasoning contains 'Llanowar Elves'", () => {
+    const forest = handCard("Forest", {
+      typeLine: "Basic Land — Forest",
+      producedMana: ["G"],
+    });
+    const elves = handCard("Llanowar Elves", {
+      typeLine: "Creature — Elf Druid",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+      oracleText: "{T}: Add {G}.",
+    });
+    const spell = handCard("Elvish Visionary", {
+      typeLine: "Creature — Elf Shaman",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [forest, elves, spell];
+    const result = evaluateHandQuality(hand, 0, new Set(["G"]));
+    expect(result.reasoning.some((r) => /Llanowar Elves/.test(r))).toBe(true);
+    expect(result.factors.manaDorks).toBeDefined();
+    expect(result.factors.manaDorks!.length).toBeGreaterThan(0);
+  });
+
+  test("[Forest, Plains, spell] with Abzan pipWeights → reasoning contains demand %", () => {
+    const forest = handCard("Forest", {
+      typeLine: "Basic Land — Forest",
+      producedMana: ["G"],
+    });
+    const plains = handCard("Plains", {
+      typeLine: "Basic Land — Plains",
+      producedMana: ["W"],
+    });
+    const spell = handCard("Spell", {
+      typeLine: "Creature",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [forest, plains, spell];
+    const pipWeights = { W: 0.3, B: 0.1, G: 0.6 };
+    const context: HandEvaluationContext = {
+      deckThemes: [],
+      pipWeights,
+    };
+    const result = evaluateHandQuality(hand, 0, new Set(["W", "B", "G"]), [], context);
+    // Should mention demand percentages in color reasoning
+    const colorLine = result.reasoning.find((r) => /color coverage/.test(r));
+    expect(colorLine).toBeDefined();
+    expect(colorLine).toMatch(/\d+%/);
+    expect(result.factors.coveredColors).toContain("G");
+    expect(result.factors.coveredColors).toContain("W");
+    expect(result.factors.missingColors).toContain("B");
+  });
+});

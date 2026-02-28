@@ -24,6 +24,10 @@ export interface HandQualityFactors {
   cardAdvantageCount?: number;
   interactionCount?: number;
   themeHits?: string[];
+  manaDorks?: { name: string; producedMana: string[]; availableTurn: number }[];
+  coveredColors?: string[];
+  missingColors?: string[];
+  pipWeights?: Record<string, number>;
 }
 
 export type Verdict = "Strong Keep" | "Keepable" | "Marginal" | "Mulligan";
@@ -272,11 +276,13 @@ export function getManaProducers(
   t3Sources: string[][];
   t2DorkCount: number;
   t3DorkCount: number;
+  dorks: { name: string; producedMana: string[]; availableTurn: number }[];
 } {
   const t2Sources = [...allLandSources];
   const t3Sources = [...allLandSources];
   let t2DorkCount = 0;
   let t3DorkCount = 0;
+  const dorks: { name: string; producedMana: string[]; availableTurn: number }[] = [];
 
   for (const card of hand) {
     const e = card.enriched;
@@ -293,17 +299,19 @@ export function getManaProducers(
         // Also contributes T3
         t3Sources.push(e.producedMana);
         t3DorkCount++;
+        dorks.push({ name: card.name, producedMana: e.producedMana, availableTurn: 2 });
       }
     } else {
       // CMC 2: can be cast T2 with all lands → contributes T3 only
       if (canCastWithLands(e, allLandSources)) {
         t3Sources.push(e.producedMana);
         t3DorkCount++;
+        dorks.push({ name: card.name, producedMana: e.producedMana, availableTurn: 3 });
       }
     }
   }
 
-  return { t2Sources, t3Sources, t2DorkCount, t3DorkCount };
+  return { t2Sources, t3Sources, t2DorkCount, t3DorkCount, dorks };
 }
 
 // ---------------------------------------------------------------------------
@@ -922,8 +930,17 @@ export function evaluateHandQuality(
   const untappedLandSources = untappedLands.map((l) => l.enriched.producedMana);
 
   // --- Mana dork detection ---
-  const { t2Sources, t3Sources, t2DorkCount, t3DorkCount } =
+  const { t2Sources, t3Sources, t2DorkCount, t3DorkCount, dorks } =
     getManaProducers(hand, untappedLandSources, allLandSources);
+
+  // Add dork-produced colors to available colors for coverage
+  for (const dork of dorks) {
+    for (const color of dork.producedMana) {
+      if (color !== "C") {
+        availableColors.add(color);
+      }
+    }
+  }
 
   // --- Playable turns analysis ---
   const allSpells = [...spells, ...commandZone];
@@ -1028,7 +1045,15 @@ export function evaluateHandQuality(
     playableTurns,
     colorCoverage,
     curvePlayability,
+    manaDorks: dorks,
+    coveredColors: neededColors.filter((c) => availableColors.has(c)),
+    missingColors: neededColors.filter((c) => !availableColors.has(c)),
   };
+
+  // Pass pip weights through to reasoning when available
+  if (context?.pipWeights && Object.keys(context.pipWeights).length > 0) {
+    factors.pipWeights = context.pipWeights;
+  }
 
   let clampedScore: number;
   let commanderAdjustments: string[] = [];
@@ -1127,12 +1152,29 @@ export function generateReasoning(
   const reasoning: string[] = [];
 
   // Land assessment
+  const dorks = factors.manaDorks ?? [];
   if (factors.landCount === 0) {
     reasoning.push("No lands in hand -- cannot cast any spells");
   } else if (factors.landCount === 1) {
-    reasoning.push(
-      "Only 1 land -- risky without early land draws"
-    );
+    if (dorks.length === 1) {
+      const d = dorks[0];
+      const colors = d.producedMana.join(", ");
+      reasoning.push(
+        `Only 1 land but ${d.name} provides ${colors} on T${d.availableTurn}`
+      );
+    } else if (dorks.length > 1) {
+      const dorkDescs = dorks
+        .map((d) => `${d.name} (${d.producedMana.join(", ")}, T${d.availableTurn})`)
+        .join(" and ");
+      reasoning.push(`Only 1 land but ${dorkDescs} provide additional mana`);
+    } else {
+      reasoning.push("Only 1 land -- risky without early land draws");
+    }
+  } else if (factors.landCount === 2 && dorks.length > 0) {
+    const dorkDescs = dorks
+      .map((d) => `${d.name} adding ${d.producedMana.join(", ")} on T${d.availableTurn}`)
+      .join(", ");
+    reasoning.push(`2 lands with ${dorkDescs}`);
   } else if (factors.landCount >= 5) {
     reasoning.push(
       `${factors.landCount} lands -- too many, not enough spells`
@@ -1154,9 +1196,31 @@ export function generateReasoning(
   if (factors.colorCoverage >= 1.0) {
     reasoning.push("Full color coverage -- all deck colors available");
   } else if (factors.colorCoverage > 0) {
-    reasoning.push(
-      `Partial color coverage (${Math.round(factors.colorCoverage * 100)}%) -- missing some deck colors`
-    );
+    const covered = factors.coveredColors;
+    const missing = factors.missingColors;
+    const pw = factors.pipWeights;
+
+    if (covered && missing && pw && Object.keys(pw).length > 0) {
+      const pct = Math.round(factors.colorCoverage * 100);
+      const coveredStr = covered
+        .map((c) => `${c} (${Math.round((pw[c] ?? 0) * 100)}%)`)
+        .join(", ");
+      const missingStr = missing
+        .map((c) => `${c} (${Math.round((pw[c] ?? 0) * 100)}%)`)
+        .join(", ");
+      reasoning.push(
+        `Partial color coverage (${pct}%) -- covers ${coveredStr} but missing ${missingStr}`
+      );
+    } else if (covered && missing && covered.length > 0 && missing.length > 0) {
+      const pct = Math.round(factors.colorCoverage * 100);
+      reasoning.push(
+        `Partial color coverage (${pct}%) -- producing ${covered.join(", ")} but missing ${missing.join(", ")}`
+      );
+    } else {
+      reasoning.push(
+        `Partial color coverage (${Math.round(factors.colorCoverage * 100)}%) -- missing some deck colors`
+      );
+    }
   } else if (factors.landCount > 0) {
     reasoning.push("No color coverage -- lands do not produce needed colors");
   }
