@@ -263,7 +263,7 @@ test.describe("countCardsByTag", () => {
     expect(count).toBe(0);
   });
 
-  test("includes commanders in count", () => {
+  test("excludes commanders from count (not in library)", () => {
     const cmdCardMap: Record<string, EnrichedCard> = {
       "Selvala, Heart of the Wilds": makeCard({
         name: "Selvala, Heart of the Wilds",
@@ -275,9 +275,9 @@ test.describe("countCardsByTag", () => {
     const deck = makeDeck({
       commanders: [{ name: "Selvala, Heart of the Wilds", quantity: 1 }],
     });
-    // Ramp via tap-for-mana-any-color pattern
+    // Commander is in command zone, not library — should not count
     const count = countCardsByTag(deck, cmdCardMap, "Ramp");
-    expect(count).toBe(1);
+    expect(count).toBe(0);
   });
 
   test("excludes sideboard cards", () => {
@@ -303,7 +303,7 @@ test.describe("countCardsByTag", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("getDeckSize", () => {
-  test("sums commanders + mainboard quantity", () => {
+  test("sums mainboard quantity only, excludes commanders and sideboard", () => {
     const deck = makeDeck({
       commanders: [{ name: "A", quantity: 1 }],
       mainboard: [
@@ -312,7 +312,7 @@ test.describe("getDeckSize", () => {
       ],
       sideboard: [{ name: "D", quantity: 10 }],
     });
-    expect(getDeckSize(deck)).toBe(6); // 1 + 3 + 2, sideboard excluded
+    expect(getDeckSize(deck)).toBe(5); // 3 + 2, commanders + sideboard excluded
   });
 
   test("empty deck returns 0", () => {
@@ -339,11 +339,11 @@ test.describe("countCardsByName", () => {
     expect(countCardsByName(deck, "Counterspell")).toBe(0);
   });
 
-  test("includes commanders", () => {
+  test("excludes commanders (not in library)", () => {
     const deck = makeDeck({
       commanders: [{ name: "Atraxa", quantity: 1 }],
     });
-    expect(countCardsByName(deck, "Atraxa")).toBe(1);
+    expect(countCardsByName(deck, "Atraxa")).toBe(0);
   });
 
   test("excludes sideboard", () => {
@@ -398,12 +398,12 @@ test.describe("computePrecomputedQueries", () => {
   const deck = makeDeck({
     commanders: [
       {
-        name: "Forest",
+        name: "Omnath, Locus of Mana",
         quantity: 1,
       },
     ],
     mainboard: [
-      { name: "Forest", quantity: 36 },
+      { name: "Forest", quantity: 37 },
       { name: "Sol Ring", quantity: 1 },
       { name: "Rhystic Study", quantity: 1 },
       { name: "Swords to Plowshares", quantity: 1 },
