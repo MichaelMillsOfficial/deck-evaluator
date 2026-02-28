@@ -40,9 +40,12 @@ const RAMP_LAND_SEARCH_RE =
 const RAMP_ANY_COLOR_RE =
   /\{T\}.*?[Aa]dd\s+(?:one\s+mana\s+of\s+any|mana\s+of\s+any\s+(?:one\s+)?(?:color|type))\b/;
 const RAMP_AMOUNT_RE = /\{T\}.*?[Aa]dd\s+(?:an\s+amount\s+of\s+|X\s+)\{[WUBRGC]\}/;
+const RAMP_ADDITIONAL_LAND_RE = /\badditional lands?\b/i;
 const CARD_DRAW_RE = /\bdraw\b.+?\bcards?\b|\bdraw a card\b/i;
 const CARD_ADVANTAGE_RE =
   /\b(?:look at|reveal)\b.+?\bput\b.+?\binto your hand\b/i;
+const CARD_ADVANTAGE_IMPULSE_RE =
+  /\byou may (?:play|cast)\b.+?\b(?:exiled|those cards?|that card)\b/i;
 const REMOVAL_TARGET_RE =
   /\b(?:destroy|exile)\s+target\b/i;
 const REMOVAL_BOUNCE_RE = /\breturn target.+?to its owner's hand\b/i;
@@ -63,8 +66,9 @@ const PROTECTION_KEYWORDS = new Set([
   "Ward",
 ]);
 const PROTECTION_ORACLE_RE =
-  /\bgains?\b.+?\b(?:hexproof|indestructible|protection|shroud)\b/i;
+  /\b(?:gains?|ha[sv]e?)\b.+?\b(?:hexproof|indestructible|protection|shroud)\b/i;
 const RECURSION_RE = /\breturn\b.+?\bfrom\b.+?\bgraveyard\b/i;
+const RECURSION_PLAY_GY_RE = /\b(?:play|cast)\b.+?\bfrom\b.+?\bgraveyard\b/i;
 
 // --- Land tag patterns ---
 const ETB_TAPPED_RE = /enters the battlefield tapped|enters tapped/i;
@@ -163,8 +167,9 @@ export function generateTags(card: EnrichedCard): string[] {
       RAMP_ANY_COLOR_RE.test(text) ||
       RAMP_AMOUNT_RE.test(text);
     const hasLandSearch = RAMP_LAND_SEARCH_RE.test(text);
+    const hasAdditionalLand = !isLand && RAMP_ADDITIONAL_LAND_RE.test(text);
 
-    if ((!isLand && hasTapForMana) || hasLandSearch) {
+    if ((!isLand && hasTapForMana) || hasLandSearch || hasAdditionalLand) {
       tags.add("Ramp");
     }
   }
@@ -174,9 +179,15 @@ export function generateTags(card: EnrichedCard): string[] {
     tags.add("Card Draw");
   }
 
-  // Card Advantage — look/reveal + put into hand (but not if already Card Draw)
-  if (!tags.has("Card Draw") && CARD_ADVANTAGE_RE.test(text)) {
-    tags.add("Card Advantage");
+  // Card Advantage — look/reveal + put into hand, impulse draw, cascade
+  if (!tags.has("Card Draw")) {
+    if (
+      CARD_ADVANTAGE_RE.test(text) ||
+      CARD_ADVANTAGE_IMPULSE_RE.test(text) ||
+      card.keywords.includes("Cascade")
+    ) {
+      tags.add("Card Advantage");
+    }
   }
 
   // Board Wipe (check before single-target removal)
@@ -222,7 +233,7 @@ export function generateTags(card: EnrichedCard): string[] {
   }
 
   // Recursion
-  if (RECURSION_RE.test(text)) {
+  if (RECURSION_RE.test(text) || RECURSION_PLAY_GY_RE.test(text)) {
     tags.add("Recursion");
   }
 

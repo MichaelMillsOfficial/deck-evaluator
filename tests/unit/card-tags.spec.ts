@@ -1330,3 +1330,203 @@ test.describe("generateTags — Snow Payoff", () => {
     expect(generateTags(card)).not.toContain("Snow Payoff");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Issue #48 — Recursion: play/cast from graveyard
+// ---------------------------------------------------------------------------
+
+test.describe("generateTags — Recursion (play/cast from graveyard)", () => {
+  test("Crucible of Worlds ('play lands from your graveyard') → Recursion", () => {
+    const card = makeCard({
+      name: "Crucible of Worlds",
+      oracleText: "You may play lands from your graveyard.",
+      typeLine: "Artifact",
+    });
+    expect(generateTags(card)).toContain("Recursion");
+  });
+
+  test("Muldrotha ('cast permanent spells from your graveyard') → Recursion", () => {
+    const card = makeCard({
+      name: "Muldrotha, the Gravetide",
+      oracleText:
+        "During each of your turns, you may play a land and cast a spell from your graveyard.",
+      typeLine: "Legendary Creature — Elemental Avatar",
+    });
+    expect(generateTags(card)).toContain("Recursion");
+  });
+
+  test("existing 'return from graveyard' pattern still works", () => {
+    const card = makeCard({
+      oracleText:
+        "Return target creature card from your graveyard to the battlefield.",
+    });
+    expect(generateTags(card)).toContain("Recursion");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #48 — Ramp: additional land plays
+// ---------------------------------------------------------------------------
+
+test.describe("generateTags — Ramp (additional land)", () => {
+  test("Escape to the Wilds ('play an additional land this turn') → Ramp", () => {
+    const card = makeCard({
+      name: "Escape to the Wilds",
+      oracleText:
+        "Exile the top five cards of your library. You may play cards exiled this way until the end of your next turn. You may play an additional land this turn.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).toContain("Ramp");
+  });
+
+  test("Exploration ('play an additional land on each of your turns') → Ramp", () => {
+    const card = makeCard({
+      name: "Exploration",
+      oracleText:
+        "You may play an additional land on each of your turns.",
+      typeLine: "Enchantment",
+    });
+    expect(generateTags(card)).toContain("Ramp");
+  });
+
+  test("Azusa, Lost but Seeking ('play two additional lands') → Ramp", () => {
+    const card = makeCard({
+      name: "Azusa, Lost but Seeking",
+      oracleText:
+        "You may play two additional lands on each of your turns.",
+      typeLine: "Legendary Creature — Human Monk",
+    });
+    expect(generateTags(card)).toContain("Ramp");
+  });
+
+  test("Llanowar Elves (tap-for-mana, no additional land) → still Ramp", () => {
+    const card = makeCard({
+      name: "Llanowar Elves",
+      oracleText: "{T}: Add {G}.",
+      typeLine: "Creature — Elf Druid",
+    });
+    expect(generateTags(card)).toContain("Ramp");
+  });
+
+  test("basic land → still no Ramp", () => {
+    const card = makeCard({
+      name: "Forest",
+      oracleText: "({T}: Add {G}.)",
+      typeLine: "Basic Land — Forest",
+    });
+    expect(generateTags(card)).not.toContain("Ramp");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #48 — Card Advantage: impulse draw + cascade
+// ---------------------------------------------------------------------------
+
+test.describe("generateTags — Card Advantage (impulse draw & cascade)", () => {
+  test("Escape to the Wilds ('play cards exiled this way') → Card Advantage", () => {
+    const card = makeCard({
+      name: "Escape to the Wilds",
+      oracleText:
+        "Exile the top five cards of your library. You may play cards exiled this way until the end of your next turn. You may play an additional land this turn.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).toContain("Card Advantage");
+  });
+
+  test("Light Up the Stage ('You may play them this turn') → Card Advantage", () => {
+    const card = makeCard({
+      name: "Light Up the Stage",
+      oracleText:
+        "Exile the top two cards of your library. Until the end of your next turn, you may play those cards.",
+      typeLine: "Sorcery",
+    });
+    expect(generateTags(card)).toContain("Card Advantage");
+  });
+
+  test("Prosper, Tome-Bound ('you may play that card this turn') → Card Advantage", () => {
+    const card = makeCard({
+      name: "Prosper, Tome-Bound",
+      oracleText:
+        "At the beginning of your end step, exile the top card of your library. You may play that card until you exile another card with Prosper.",
+      typeLine: "Legendary Creature — Tiefling Warlock",
+    });
+    expect(generateTags(card)).toContain("Card Advantage");
+  });
+
+  test("The First Sliver (Cascade keyword) → Card Advantage", () => {
+    const card = makeCard({
+      name: "The First Sliver",
+      oracleText:
+        "Cascade\nSliver spells you cast have cascade.",
+      typeLine: "Legendary Creature — Sliver",
+      keywords: ["Cascade"],
+    });
+    expect(generateTags(card)).toContain("Card Advantage");
+  });
+
+  test("Bloodbraid Elf (Cascade keyword) → Card Advantage", () => {
+    const card = makeCard({
+      name: "Bloodbraid Elf",
+      oracleText:
+        "Cascade\nHaste",
+      typeLine: "Creature — Elf Berserker",
+      keywords: ["Cascade", "Haste"],
+    });
+    expect(generateTags(card)).toContain("Card Advantage");
+  });
+
+  test("Card Draw ('draw three cards') → Card Draw, NOT Card Advantage", () => {
+    const card = makeCard({ oracleText: "Draw three cards." });
+    const tags = generateTags(card);
+    expect(tags).toContain("Card Draw");
+    expect(tags).not.toContain("Card Advantage");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #48 — Protection: has/have grants
+// ---------------------------------------------------------------------------
+
+test.describe("generateTags — Protection (has/have grants)", () => {
+  test("Whispersilk Cloak ('has shroud') → Protection", () => {
+    const card = makeCard({
+      name: "Whispersilk Cloak",
+      oracleText:
+        "Equipped creature has shroud and can't be blocked. Equip {2}",
+      typeLine: "Artifact — Equipment",
+    });
+    expect(generateTags(card)).toContain("Protection");
+  });
+
+  test("Ward Sliver ('have protection from the chosen color') → Protection", () => {
+    const card = makeCard({
+      name: "Ward Sliver",
+      oracleText:
+        "As Ward Sliver enters the battlefield, choose a color. All Slivers have protection from the chosen color.",
+      typeLine: "Creature — Sliver",
+    });
+    expect(generateTags(card)).toContain("Protection");
+  });
+
+  test("Swiftfoot Boots ('has hexproof') → Protection", () => {
+    const card = makeCard({
+      name: "Swiftfoot Boots",
+      oracleText:
+        "Equipped creature has hexproof and haste. Equip {1}",
+      typeLine: "Artifact — Equipment",
+    });
+    expect(generateTags(card)).toContain("Protection");
+  });
+
+  test("Hexproof keyword → still Protection (no regression)", () => {
+    const card = makeCard({ keywords: ["Hexproof"] });
+    expect(generateTags(card)).toContain("Protection");
+  });
+
+  test("'gains indestructible' oracle text → still Protection (no regression)", () => {
+    const card = makeCard({
+      oracleText: "Target creature gains indestructible until end of turn.",
+    });
+    expect(generateTags(card)).toContain("Protection");
+  });
+});
