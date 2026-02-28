@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type { HandCard } from "@/lib/opening-hand";
+import type { HandCard, HandEvaluationContext } from "@/lib/opening-hand";
 import type { DrawnHand } from "@/lib/opening-hand";
 import { evaluateHandQuality } from "@/lib/opening-hand";
 import type { MtgColor } from "@/lib/color-distribution";
@@ -12,6 +12,7 @@ interface HandBuilderProps {
   pool: HandCard[];
   commanderIdentity: Set<MtgColor | string>;
   commandZone?: HandCard[];
+  context?: HandEvaluationContext;
 }
 
 interface UniqueCard {
@@ -25,6 +26,7 @@ export default function HandBuilder({
   pool,
   commanderIdentity,
   commandZone = [],
+  context,
 }: HandBuilderProps) {
   const [selectedCards, setSelectedCards] = useState<Record<string, number>>({});
   const [result, setResult] = useState<DrawnHand | null>(null);
@@ -119,9 +121,9 @@ export default function HandBuilder({
     }
 
     const mulliganNumber = Math.max(0, 7 - hand.length);
-    const quality = evaluateHandQuality(hand, mulliganNumber, commanderIdentity, commandZone);
+    const quality = evaluateHandQuality(hand, mulliganNumber, commanderIdentity, commandZone, context);
     setResult({ cards: hand, quality, mulliganNumber });
-  }, [selectedCards, uniqueCards, commanderIdentity, commandZone]);
+  }, [selectedCards, uniqueCards, commanderIdentity, commandZone, context]);
 
   return (
     <div data-testid="hand-builder" className="space-y-4">

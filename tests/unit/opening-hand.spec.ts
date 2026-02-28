@@ -8,9 +8,15 @@ import {
   generateReasoning,
   runSimulation,
   findTopHands,
+  scoreRamp,
+  scoreCardAdvantage,
+  scoreInteraction,
+  scoreStrategy,
+  getAbilityReliability,
+  computeAdjustedWeights,
 } from "../../src/lib/opening-hand";
-import type { HandCard } from "../../src/lib/opening-hand";
-import type { EnrichedCard } from "../../src/lib/types";
+import type { HandCard, HandEvaluationContext } from "../../src/lib/opening-hand";
+import type { EnrichedCard, DeckTheme } from "../../src/lib/types";
 import { makeCard, makeDeck } from "../helpers";
 
 // ---------------------------------------------------------------------------
@@ -878,5 +884,1117 @@ test.describe("findTopHands", () => {
       );
       expect(ranked.hand.quality.reasoning.length).toBeGreaterThan(0);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scoreRamp (tempo-weighted)
+// ---------------------------------------------------------------------------
+
+test.describe("scoreRamp", () => {
+  test("CMC 1 ramp gets full weight (1.0)", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Sol Ring",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Sol Ring",
+          typeLine: "Artifact",
+          cmc: 1,
+          manaCost: "{1}",
+          oracleText: "{T}: Add {C}{C}.",
+          producedMana: ["C"],
+        }),
+      },
+    ];
+    const score = scoreRamp(hand);
+    // 1 ramp at full weight = effectiveCount 1.0 → score 70
+    expect(score).toBe(70);
+  });
+
+  test("CMC 2 ramp gets full weight (1.0)", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Arcane Signet",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Arcane Signet",
+          typeLine: "Artifact",
+          cmc: 2,
+          manaCost: "{2}",
+          oracleText: "{T}: Add one mana of any color in your commander's color identity.",
+          producedMana: ["W", "U", "B", "R", "G"],
+        }),
+      },
+    ];
+    const score = scoreRamp(hand);
+    expect(score).toBe(70);
+  });
+
+  test("CMC 3 ramp gets 0.8 weight", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Cultivate",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Cultivate",
+          typeLine: "Sorcery",
+          cmc: 3,
+          manaCost: "{2}{G}",
+          oracleText: "Search your library for up to two basic land cards.",
+          manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+        }),
+      },
+    ];
+    const score = scoreRamp(hand);
+    // effectiveCount = 0.8 → score 50 (>= 0.5)
+    expect(score).toBe(50);
+  });
+
+  test("CMC 4 ramp gets 0.5 weight", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Explosive Vegetation",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Explosive Vegetation",
+          typeLine: "Sorcery",
+          cmc: 4,
+          manaCost: "{3}{G}",
+          oracleText: "Search your library for up to two basic land cards.",
+          manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+        }),
+      },
+    ];
+    const score = scoreRamp(hand);
+    // effectiveCount = 0.5 → score 50
+    expect(score).toBe(50);
+  });
+
+  test("CMC 6 ramp gets 0.2 weight", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Boundless Realms",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Boundless Realms",
+          typeLine: "Sorcery",
+          cmc: 6,
+          manaCost: "{6}{G}",
+          oracleText: "Search your library for up to X basic land cards.",
+          manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+        }),
+      },
+    ];
+    const score = scoreRamp(hand);
+    // effectiveCount = 0.2 → score 30 (< 0.5)
+    expect(score).toBe(30);
+  });
+
+  test("two CMC-2 ramp cards = effectiveCount 2.0 → score 100", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Sol Ring",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Sol Ring",
+          typeLine: "Artifact",
+          cmc: 1,
+          manaCost: "{1}",
+          oracleText: "{T}: Add {C}{C}.",
+          producedMana: ["C"],
+        }),
+      },
+      {
+        name: "Arcane Signet",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Arcane Signet",
+          typeLine: "Artifact",
+          cmc: 2,
+          manaCost: "{2}",
+          oracleText: "{T}: Add one mana of any color in your commander's color identity.",
+          producedMana: ["W", "U", "B", "R", "G"],
+        }),
+      },
+    ];
+    const score = scoreRamp(hand);
+    expect(score).toBe(100);
+  });
+
+  test("no ramp cards → score 30", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Lightning Bolt",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Lightning Bolt",
+          typeLine: "Instant",
+          cmc: 1,
+          oracleText: "Lightning Bolt deals 3 damage to any target.",
+        }),
+      },
+    ];
+    const score = scoreRamp(hand);
+    expect(score).toBe(30);
+  });
+
+  test("lands are not counted as ramp", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Forest",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+    ];
+    const score = scoreRamp(hand);
+    expect(score).toBe(30); // no ramp
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scoreCardAdvantage (tempo-weighted)
+// ---------------------------------------------------------------------------
+
+test.describe("scoreCardAdvantage", () => {
+  test("CMC 2 draw spell gets full weight (1.0)", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Night's Whisper",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Night's Whisper",
+          typeLine: "Sorcery",
+          cmc: 2,
+          oracleText: "You draw two cards and you lose 2 life.",
+        }),
+      },
+    ];
+    const score = scoreCardAdvantage(hand);
+    // effectiveCount = 1.0 → score 70
+    expect(score).toBe(70);
+  });
+
+  test("CMC 3 draw spell gets full weight (1.0)", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Harmonize",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Harmonize",
+          typeLine: "Sorcery",
+          cmc: 3,
+          oracleText: "Draw three cards.",
+        }),
+      },
+    ];
+    const score = scoreCardAdvantage(hand);
+    expect(score).toBe(70);
+  });
+
+  test("CMC 5 draw spell gets 0.7 weight", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Tidings",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Tidings",
+          typeLine: "Sorcery",
+          cmc: 5,
+          oracleText: "Draw four cards.",
+        }),
+      },
+    ];
+    const score = scoreCardAdvantage(hand);
+    // effectiveCount = 0.7 → score 50 (>= 0.5)
+    expect(score).toBe(50);
+  });
+
+  test("CMC 6 draw spell gets 0.4 weight", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Opportunity",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Opportunity",
+          typeLine: "Instant",
+          cmc: 6,
+          oracleText: "Target player draws four cards.",
+        }),
+      },
+    ];
+    const score = scoreCardAdvantage(hand);
+    // effectiveCount = 0.4 → score 25 (< 0.5)
+    expect(score).toBe(25);
+  });
+
+  test("two cheap draw spells = effectiveCount >= 2.0 → score 100", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Night's Whisper",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Night's Whisper",
+          typeLine: "Sorcery",
+          cmc: 2,
+          oracleText: "You draw two cards and you lose 2 life.",
+        }),
+      },
+      {
+        name: "Brainstorm",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Brainstorm",
+          typeLine: "Instant",
+          cmc: 1,
+          oracleText: "Draw three cards, then put two cards from your hand on top of your library.",
+        }),
+      },
+    ];
+    const score = scoreCardAdvantage(hand);
+    expect(score).toBe(100);
+  });
+
+  test("no card advantage sources → score 25", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Lightning Bolt",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Lightning Bolt",
+          typeLine: "Instant",
+          cmc: 1,
+          oracleText: "Lightning Bolt deals 3 damage to any target.",
+        }),
+      },
+    ];
+    const score = scoreCardAdvantage(hand);
+    expect(score).toBe(25);
+  });
+
+  test("tutor counts as card advantage", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Demonic Tutor",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Demonic Tutor",
+          typeLine: "Sorcery",
+          cmc: 2,
+          oracleText: "Search your library for a card, put that card into your hand, then shuffle.",
+        }),
+      },
+    ];
+    const score = scoreCardAdvantage(hand);
+    // Tutor at CMC 2 → weight 1.0, effectiveCount 1.0 → score 70
+    expect(score).toBe(70);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scoreInteraction (tempo-weighted)
+// ---------------------------------------------------------------------------
+
+test.describe("scoreInteraction", () => {
+  test("CMC 1 removal gets full weight (1.0)", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Swords to Plowshares",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Swords to Plowshares",
+          typeLine: "Instant",
+          cmc: 1,
+          oracleText: "Exile target creature. Its controller gains life equal to its power.",
+        }),
+      },
+    ];
+    const score = scoreInteraction(hand);
+    // effectiveCount = 1.0 → score 70
+    expect(score).toBe(70);
+  });
+
+  test("CMC 2 counterspell gets full weight (1.0)", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Counterspell",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Counterspell",
+          typeLine: "Instant",
+          cmc: 2,
+          oracleText: "Counter target spell.",
+        }),
+      },
+    ];
+    const score = scoreInteraction(hand);
+    expect(score).toBe(70);
+  });
+
+  test("CMC 5 removal gets 0.7 weight", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Lava Axe Removal",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Lava Axe Removal",
+          typeLine: "Sorcery",
+          cmc: 5,
+          oracleText: "Destroy target creature or planeswalker.",
+        }),
+      },
+    ];
+    const score = scoreInteraction(hand);
+    // effectiveCount = 0.7 → score 50 (>= 0.5)
+    expect(score).toBe(50);
+  });
+
+  test("CMC 6 removal gets 0.4 weight", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Meteor Removal",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Meteor Removal",
+          typeLine: "Sorcery",
+          cmc: 6,
+          oracleText: "Destroy target permanent.",
+        }),
+      },
+    ];
+    const score = scoreInteraction(hand);
+    // effectiveCount = 0.4 → score 20 (< 0.5)
+    expect(score).toBe(20);
+  });
+
+  test("two cheap interaction pieces → score 100", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Swords to Plowshares",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Swords to Plowshares",
+          typeLine: "Instant",
+          cmc: 1,
+          oracleText: "Exile target creature.",
+        }),
+      },
+      {
+        name: "Counterspell",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Counterspell",
+          typeLine: "Instant",
+          cmc: 2,
+          oracleText: "Counter target spell.",
+        }),
+      },
+    ];
+    const score = scoreInteraction(hand);
+    expect(score).toBe(100);
+  });
+
+  test("no interaction → score 20", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Llanowar Elves",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Llanowar Elves",
+          typeLine: "Creature",
+          cmc: 1,
+          oracleText: "{T}: Add {G}.",
+          producedMana: ["G"],
+        }),
+      },
+    ];
+    const score = scoreInteraction(hand);
+    expect(score).toBe(20);
+  });
+
+  test("board wipe counts as interaction", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Wrath of God",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Wrath of God",
+          typeLine: "Sorcery",
+          cmc: 4,
+          oracleText: "Destroy all creatures. They can't be regenerated.",
+        }),
+      },
+    ];
+    const score = scoreInteraction(hand);
+    // CMC 4 → weight 0.7, effectiveCount 0.7 → score 50
+    expect(score).toBe(50);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scoreStrategy (theme alignment with tempo weighting)
+// ---------------------------------------------------------------------------
+
+test.describe("scoreStrategy", () => {
+  const tokensTheme: DeckTheme = {
+    axisId: "tokens",
+    axisName: "Tokens",
+    strength: 0.8,
+    cardCount: 15,
+  };
+  const sacrificeTheme: DeckTheme = {
+    axisId: "sacrifice",
+    axisName: "Sacrifice",
+    strength: 0.6,
+    cardCount: 10,
+  };
+  const graveyardTheme: DeckTheme = {
+    axisId: "graveyard",
+    axisName: "Graveyard",
+    strength: 0.5,
+    cardCount: 8,
+  };
+
+  test("no themes in deck returns neutral 50", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Creature",
+        quantity: 1,
+        enriched: makeCard({ name: "Creature", typeLine: "Creature", cmc: 2 }),
+      },
+    ];
+    const score = scoreStrategy(hand, [], 3, 0);
+    expect(score).toBe(50);
+  });
+
+  test("on-theme castable cards produce high score", () => {
+    // Card that creates tokens (matches tokens theme) and is cheap enough to cast
+    const hand: HandCard[] = [
+      {
+        name: "Raise the Alarm",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Raise the Alarm",
+          typeLine: "Instant",
+          cmc: 2,
+          oracleText: "Create two 1/1 white Soldier creature tokens.",
+        }),
+      },
+      {
+        name: "Sac Outlet",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Sac Outlet",
+          typeLine: "Creature",
+          cmc: 2,
+          oracleText: "Sacrifice a creature: Draw a card.",
+        }),
+      },
+    ];
+    // 3 lands + 0 ramp → availableMana = 3, both CMC 2 → full weight
+    const score = scoreStrategy(hand, [tokensTheme, sacrificeTheme, graveyardTheme], 3, 0);
+    expect(score).toBeGreaterThanOrEqual(50);
+  });
+
+  test("on-theme but high-CMC cards with low mana produce low score", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Army of the Damned",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Army of the Damned",
+          typeLine: "Sorcery",
+          cmc: 8,
+          oracleText: "Create thirteen 2/2 black Zombie creature tokens.",
+        }),
+      },
+    ];
+    // 2 lands + 0 ramp → availableMana = 2, CMC 8 → minimal weight (0.15)
+    const score = scoreStrategy(hand, [tokensTheme], 2, 0);
+    expect(score).toBeLessThan(50);
+  });
+
+  test("on-theme low-CMC cards with adequate mana produce high score", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Young Pyromancer",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Young Pyromancer",
+          typeLine: "Creature",
+          cmc: 2,
+          oracleText: "Whenever you cast an instant or sorcery spell, create a 1/1 red Elemental creature token.",
+        }),
+      },
+      {
+        name: "Viscera Seer",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Viscera Seer",
+          typeLine: "Creature",
+          cmc: 1,
+          oracleText: "Sacrifice a creature: Scry 1.",
+        }),
+      },
+    ];
+    // 3 lands + 1 ramp → availableMana = 4
+    const score = scoreStrategy(hand, [tokensTheme, sacrificeTheme], 3, 1);
+    expect(score).toBeGreaterThanOrEqual(60);
+  });
+
+  test("no theme hits produce score near 0", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Generic Creature",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Generic Creature",
+          typeLine: "Creature",
+          cmc: 3,
+          oracleText: "Vigilance",
+          keywords: ["Vigilance"],
+        }),
+      },
+    ];
+    const score = scoreStrategy(hand, [tokensTheme, sacrificeTheme], 3, 0);
+    expect(score).toBeLessThanOrEqual(20);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getAbilityReliability
+// ---------------------------------------------------------------------------
+
+test.describe("getAbilityReliability", () => {
+  test("ETB/triggered card draw → 1.0", () => {
+    const card = makeCard({
+      name: "Mulldrifter",
+      oracleText: "When Mulldrifter enters the battlefield, draw two cards.",
+      cmc: 5,
+    });
+    const reliability = getAbilityReliability(card, "cardAdvantage");
+    expect(reliability).toBe(1.0);
+  });
+
+  test("whenever triggered draw → 1.0", () => {
+    const card = makeCard({
+      name: "Tymna the Weaver",
+      oracleText: "At the beginning of your postcombat main phase, you may pay X life, where X is the number of opponents that were dealt combat damage this turn. If you do, draw X cards.",
+      cmc: 3,
+    });
+    const reliability = getAbilityReliability(card, "cardAdvantage");
+    expect(reliability).toBe(1.0);
+  });
+
+  test("cheap activated ability draw (2 mana) → 0.8", () => {
+    const card = makeCard({
+      name: "Thrasios",
+      oracleText: "{2}{U}{G}: Scry 1, then reveal the top card of your library. If it's a land card, put it onto the battlefield tapped. Otherwise, draw a card.",
+      cmc: 2,
+    });
+    // {2}{U}{G} = 4 mana → moderate activated
+    const reliability = getAbilityReliability(card, "cardAdvantage");
+    expect(reliability).toBe(0.5);
+  });
+
+  test("expensive activated ability draw (5+ mana) → 0.3", () => {
+    const card = makeCard({
+      name: "Expensive Draw",
+      oracleText: "{5}: Draw two cards.",
+      cmc: 3,
+    });
+    const reliability = getAbilityReliability(card, "cardAdvantage");
+    expect(reliability).toBe(0.3);
+  });
+
+  test("ETB removal → 1.0", () => {
+    const card = makeCard({
+      name: "Shriekmaw",
+      oracleText: "When Shriekmaw enters the battlefield, destroy target nonartifact, nonblack creature.",
+      cmc: 5,
+    });
+    const reliability = getAbilityReliability(card, "interaction");
+    expect(reliability).toBe(1.0);
+  });
+
+  test("cheap activated removal ({1}: Exile) → 0.8", () => {
+    const card = makeCard({
+      name: "Cheap Exile",
+      oracleText: "{1}: Exile target creature.",
+      cmc: 2,
+    });
+    const reliability = getAbilityReliability(card, "interaction");
+    expect(reliability).toBe(0.8);
+  });
+
+  test("moderate activated removal ({1}{W}{B}: Exile) → 0.5", () => {
+    const card = makeCard({
+      name: "Ayli, Eternal Pilgrim",
+      oracleText: "{1}{W}{B}, Sacrifice a creature: Exile target nonland permanent.",
+      cmc: 2,
+    });
+    const reliability = getAbilityReliability(card, "interaction");
+    expect(reliability).toBe(0.5);
+  });
+
+  test("card without the relevant tag type → 1.0 (fallback)", () => {
+    const card = makeCard({
+      name: "Grizzly Bears",
+      oracleText: "",
+      cmc: 2,
+    });
+    // No card advantage abilities at all → defaults to 1.0
+    const reliability = getAbilityReliability(card, "cardAdvantage");
+    expect(reliability).toBe(1.0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeAdjustedWeights
+// ---------------------------------------------------------------------------
+
+test.describe("computeAdjustedWeights", () => {
+  test("empty command zone returns base weights with no reasoning", () => {
+    const result = computeAdjustedWeights([]);
+    expect(result.reasoning).toEqual([]);
+    // Weights should sum to 1.0
+    const sum = Object.values(result.weights).reduce((s, w) => s + w, 0);
+    expect(sum).toBeCloseTo(1.0, 5);
+  });
+
+  test("low-CMC triggered draw commander reduces CA weight", () => {
+    const commander: HandCard = {
+      name: "Tymna the Weaver",
+      quantity: 1,
+      enriched: makeCard({
+        name: "Tymna the Weaver",
+        typeLine: "Legendary Creature",
+        cmc: 3,
+        oracleText: "At the beginning of your postcombat main phase, you may pay X life, where X is the number of opponents that were dealt combat damage this turn. If you do, draw X cards.",
+      }),
+    };
+    const result = computeAdjustedWeights([commander]);
+    // Should reduce CA weight and add reasoning
+    expect(result.weights.cardAdvantage).toBeLessThan(0.08);
+    expect(result.reasoning.length).toBeGreaterThan(0);
+    expect(result.reasoning.some((r) => /card advantage|card draw/i.test(r))).toBe(true);
+    // Weights should sum to 1.0
+    const sum = Object.values(result.weights).reduce((s, w) => s + w, 0);
+    expect(sum).toBeCloseTo(1.0, 5);
+  });
+
+  test("high-CMC CA commander produces minimal weight reduction", () => {
+    const commander: HandCard = {
+      name: "Kozilek",
+      quantity: 1,
+      enriched: makeCard({
+        name: "Kozilek",
+        typeLine: "Legendary Creature",
+        cmc: 10,
+        oracleText: "When you cast this spell, draw four cards.",
+      }),
+    };
+    const result = computeAdjustedWeights([commander]);
+    // High CMC → cmcScale 0.25, so adjustment is small
+    // CA weight should be only slightly reduced
+    expect(result.weights.cardAdvantage).toBeGreaterThan(0.05);
+    // Weights should sum to 1.0
+    const sum = Object.values(result.weights).reduce((s, w) => s + w, 0);
+    expect(sum).toBeCloseTo(1.0, 5);
+  });
+
+  test("removal commander reduces interaction weight", () => {
+    const commander: HandCard = {
+      name: "Ayli, Eternal Pilgrim",
+      quantity: 1,
+      enriched: makeCard({
+        name: "Ayli, Eternal Pilgrim",
+        typeLine: "Legendary Creature",
+        cmc: 2,
+        oracleText: "{1}{W}{B}, Sacrifice a creature: Exile target nonland permanent.",
+      }),
+    };
+    const result = computeAdjustedWeights([commander]);
+    expect(result.weights.interaction).toBeLessThan(0.07);
+    // Weights should sum to 1.0
+    const sum = Object.values(result.weights).reduce((s, w) => s + w, 0);
+    expect(sum).toBeCloseTo(1.0, 5);
+  });
+
+  test("ramp commander reduces ramp weight", () => {
+    const commander: HandCard = {
+      name: "Selvala",
+      quantity: 1,
+      enriched: makeCard({
+        name: "Selvala",
+        typeLine: "Legendary Creature",
+        cmc: 3,
+        oracleText: "{T}: Add one mana of any color in your commander's color identity. Whenever Selvala enters the battlefield, each player draws a card.",
+        producedMana: ["W", "U", "B", "R", "G"],
+      }),
+    };
+    const result = computeAdjustedWeights([commander]);
+    expect(result.weights.ramp).toBeLessThan(0.10);
+    const sum = Object.values(result.weights).reduce((s, w) => s + w, 0);
+    expect(sum).toBeCloseTo(1.0, 5);
+  });
+
+  test("weights always sum to 1.0 across all adjustments", () => {
+    // Commander with multiple tags
+    const commander: HandCard = {
+      name: "MultiAbility",
+      quantity: 1,
+      enriched: makeCard({
+        name: "MultiAbility",
+        typeLine: "Legendary Creature",
+        cmc: 3,
+        oracleText: "When MultiAbility enters the battlefield, draw two cards. Destroy target creature.",
+      }),
+    };
+    const result = computeAdjustedWeights([commander]);
+    const sum = Object.values(result.weights).reduce((s, w) => s + w, 0);
+    expect(sum).toBeCloseTo(1.0, 5);
+  });
+
+  test("partner commanders use most favorable for each capability", () => {
+    const draw: HandCard = {
+      name: "Tymna the Weaver",
+      quantity: 1,
+      enriched: makeCard({
+        name: "Tymna the Weaver",
+        typeLine: "Legendary Creature",
+        cmc: 3,
+        oracleText: "At the beginning of your postcombat main phase, you may pay X life. If you do, draw X cards.",
+      }),
+    };
+    const ramp: HandCard = {
+      name: "Thrasios",
+      quantity: 1,
+      enriched: makeCard({
+        name: "Thrasios",
+        typeLine: "Legendary Creature",
+        cmc: 2,
+        oracleText: "{2}{U}{G}: Scry 1, then reveal the top card of your library. If it's a land card, put it onto the battlefield tapped. Otherwise, draw a card.",
+        producedMana: [],
+      }),
+    };
+    const result = computeAdjustedWeights([draw, ramp]);
+    // Both should contribute adjustments
+    expect(result.weights.cardAdvantage).toBeLessThan(0.08);
+    const sum = Object.values(result.weights).reduce((s, w) => s + w, 0);
+    expect(sum).toBeCloseTo(1.0, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Backward compatibility: no context = original 4-factor weights
+// ---------------------------------------------------------------------------
+
+test.describe("backward compatibility", () => {
+  test("calling evaluateHandQuality without context produces same scores as before", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Forest",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Forest 2",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest 2",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Forest 3",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest 3",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Sol Ring",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Sol Ring",
+          typeLine: "Artifact",
+          cmc: 1,
+          manaCost: "{1}",
+          oracleText: "{T}: Add {C}{C}.",
+          producedMana: ["C"],
+        }),
+      },
+      {
+        name: "Llanowar Elves",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Llanowar Elves",
+          typeLine: "Creature — Elf Druid",
+          cmc: 1,
+          manaCost: "{G}",
+          oracleText: "{T}: Add {G}.",
+          producedMana: ["G"],
+          manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+          colors: ["G"],
+        }),
+      },
+      {
+        name: "Cultivate",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Cultivate",
+          typeLine: "Sorcery",
+          cmc: 3,
+          manaCost: "{2}{G}",
+          oracleText: "Search your library for up to two basic land cards.",
+          manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+          colors: ["G"],
+        }),
+      },
+      {
+        name: "Beast Within",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Beast Within",
+          typeLine: "Instant",
+          cmc: 3,
+          manaCost: "{2}{G}",
+          oracleText: "Destroy target permanent.",
+          manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+          colors: ["G"],
+        }),
+      },
+    ];
+
+    // Without context — original 4-factor
+    const resultWithout = evaluateHandQuality(hand, 0, new Set(["G"]));
+    // With context — 7-factor
+    const context: HandEvaluationContext = { deckThemes: [] };
+    const resultWith = evaluateHandQuality(hand, 0, new Set(["G"]), [], context);
+
+    // Without context should use original weights (35/30/20/15)
+    // Factors should be unchanged
+    expect(resultWithout.factors.landCount).toBe(3);
+    // Sol Ring + Llanowar Elves + Cultivate = 3 ramp cards
+    expect(resultWithout.factors.rampCount).toBe(3);
+
+    // The verdict should remain "Strong Keep" for a well-built hand without context
+    expect(resultWithout.verdict).toBe("Strong Keep");
+  });
+
+  test("without context, no new factor fields are present", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Forest",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+    ];
+    const result = evaluateHandQuality(hand, 0, new Set(["G"]));
+    // New factor fields should be undefined when no context
+    expect(result.factors.strategyScore).toBeUndefined();
+    expect(result.factors.cardAdvantageCount).toBeUndefined();
+    expect(result.factors.interactionCount).toBeUndefined();
+    expect(result.factors.themeHits).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reasoning output with context
+// ---------------------------------------------------------------------------
+
+test.describe("reasoning output with context", () => {
+  test("strategy reasoning included when context provided and themes exist", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Forest",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Forest 2",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest 2",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Forest 3",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest 3",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Token Maker",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Token Maker",
+          typeLine: "Creature",
+          cmc: 2,
+          oracleText: "Create two 1/1 green Saproling creature tokens.",
+        }),
+      },
+      {
+        name: "Draw Spell",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Draw Spell",
+          typeLine: "Sorcery",
+          cmc: 2,
+          oracleText: "Draw two cards.",
+        }),
+      },
+      {
+        name: "Removal",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Removal",
+          typeLine: "Instant",
+          cmc: 2,
+          oracleText: "Destroy target creature.",
+        }),
+      },
+      {
+        name: "Ramp",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Ramp",
+          typeLine: "Artifact",
+          cmc: 2,
+          oracleText: "{T}: Add {G}.",
+          producedMana: ["G"],
+        }),
+      },
+    ];
+
+    const themes: DeckTheme[] = [
+      { axisId: "tokens", axisName: "Tokens", strength: 0.8, cardCount: 15 },
+    ];
+    const context: HandEvaluationContext = { deckThemes: themes };
+    const result = evaluateHandQuality(hand, 0, new Set(["G"]), [], context);
+
+    // Should include strategy/card-advantage/interaction reasoning
+    expect(result.reasoning.some((r) => /theme|game plan|strategic/i.test(r))).toBe(true);
+    expect(result.reasoning.some((r) => /card advantage|card draw/i.test(r))).toBe(true);
+    expect(result.reasoning.some((r) => /interaction|threat|answer/i.test(r))).toBe(true);
+  });
+
+  test("no strategy reasoning when no themes", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Forest",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+    ];
+    const context: HandEvaluationContext = { deckThemes: [] };
+    const result = evaluateHandQuality(hand, 0, new Set(["G"]), [], context);
+    // Should NOT include strategy reasoning when no themes detected
+    expect(result.reasoning.some((r) => /theme|game plan|strategic/i.test(r))).toBe(false);
+  });
+
+  test("card advantage reasoning appears with context", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Forest",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Brainstorm",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Brainstorm",
+          typeLine: "Instant",
+          cmc: 1,
+          oracleText: "Draw three cards, then put two cards from your hand on top of your library.",
+        }),
+      },
+    ];
+    const context: HandEvaluationContext = { deckThemes: [] };
+    const result = evaluateHandQuality(hand, 0, new Set(["G"]), [], context);
+    expect(result.reasoning.some((r) => /card advantage|card draw/i.test(r))).toBe(true);
+  });
+
+  test("interaction reasoning appears with context", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Forest",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Beast Within",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Beast Within",
+          typeLine: "Instant",
+          cmc: 3,
+          oracleText: "Destroy target permanent.",
+        }),
+      },
+    ];
+    const context: HandEvaluationContext = { deckThemes: [] };
+    const result = evaluateHandQuality(hand, 0, new Set(["G"]), [], context);
+    expect(result.reasoning.some((r) => /interaction|threat|answer/i.test(r))).toBe(true);
   });
 });
