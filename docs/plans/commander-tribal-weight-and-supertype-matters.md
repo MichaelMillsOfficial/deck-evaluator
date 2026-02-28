@@ -16,13 +16,40 @@ The tribal synergy system introduced in Issue #44 provides creature-type-aware d
 - "Snow Matters" synergy detection
 - "Historic" detection (legendary + artifact + saga — composite pattern)
 - Card tags: "Legendary Payoff", "Snow Payoff"
-- Supertype breakdown in CreatureTypeBreakdown component (or new companion component)
+- New `SupertypeBreakdown` UI component (separate from CreatureTypeBreakdown)
 - Known combos for supertype archetypes
 
 **Scope — out:**
 - New UI tabs or pages (reuse existing Analysis/Synergy sections)
 - "Party" mechanic (Warrior/Wizard/Cleric/Rogue grouping — different enough to be its own feature)
 - Planeswalker-specific synergies (Superfriends — also its own feature)
+- "Modified creatures" mechanic (equipped/enchanted/countered — NEO-specific, future feature)
+
+## Resolved Ambiguities
+
+These questions were identified during review and are resolved here to prevent implementation confusion:
+
+1. **Nearly every commander is Legendary.** Commander Legendary supertype contributes only +1 to anchor score (below threshold of 4), so it alone does NOT trigger legendary-matters detection. Oracle text references (+4) or high density (+3 at 20+) are required.
+
+2. **Tier overlap in commander tribal boost.** When a creature type appears in both `commanderSubtypes` and `commanderOracleTypes`, use the HIGHEST tier rate (0.25), not the sum. Do not stack tiers for the same type.
+
+3. **Partner commanders.** Both commanders contribute to all type sets (subtypes, oracle types). Both get the +0.25 commander subtype rate.
+
+4. **"Artifact" is a card type, not a supertype.** `card.supertypes` only contains Legendary, Snow, Basic, etc. For historic detection, `isHistoric()` must check `card.supertypes` for Legendary, `card.typeLine` for Artifact, and `card.subtypes` for Saga.
+
+5. **"Historic" is a virtual anchor.** It is not a supertype — it's a composite game mechanic. `identifySupertypeAnchors` detects it from oracle text containing the literal word "historic". `boostSupertypeScores` handles it via `isHistoric()` which expands to Legendary OR Artifact OR Saga.
+
+6. **Double-scoring for Jhoira.** Jhoira matches both `SUPERTYPE_LEGENDARY_CAST_RE` (+0.7, via "historic" alternative) and `SUPERTYPE_HISTORIC_RE` (+0.5) for total 1.2, capped to 1.0. This is intentional — Jhoira is the ultimate historic payoff and should max out.
+
+7. **UI component choice.** Create a NEW `SupertypeBreakdown` component rather than extending `CreatureTypeBreakdown`. They measure different things (creature types vs supertypes/card types) and have different rendering needs.
+
+8. **Narfi snow detection.** The original `SNOW_PERMANENT_RE: /\bsnow (?:permanent|creature|land)/i` would miss "Other snow and Zombie creatures" because "and" sits between "snow" and "creatures". Fixed by: (a) broadened regex `/\bsnow\b[^.]*?\b(?:permanent|creature|land)s?\b/i` and (b) separate `/\bother snow\b/i` pattern.
+
+9. **{S} detection in mana cost.** The `detect()` function checks `card.oracleText` for most patterns but ALSO checks `card.manaCost` for `{S}`. This is the only pattern that needs to inspect the mana cost field.
+
+10. **Ratadrabik + Blade of the Bloodchief was not a real combo.** Replaced with verified combos: Jhoira + Sensei's Divining Top and Teshar + Mox Amber.
+
+11. **Phase ordering for supertypes.ts.** Tests are written BEFORE implementation (TDD). Phase 5 creates tests, Phase 6 creates the module.
 
 ## Design Decisions
 
@@ -36,48 +63,71 @@ The current `boostTribalScores()` applies a uniform `min(0.4, matchCount * 0.15)
 | Card subtype matches commander's subtype | +0.15/match (cap 0.4) | +0.25/match (cap 0.5) — stronger |
 | Card subtype matches commander's oracle-referenced type | +0.15/match (cap 0.4) | +0.20/match (cap 0.45) — moderate |
 
-This preserves the existing logic but adds a distinct tier for commander-aligned creatures. The commander's own subtypes get the highest premium because they represent the most intentional deckbuilding signal.
+**Tier priority rule:** When a type appears in multiple tiers, use the **highest** tier rate for that type. Do not stack tiers for the same type.
 
 ### Supertype Matters Axis
 
-Rather than one axis per supertype, we use a **single axis** (`"supertypeMatter"`) that detects all supertype-matters patterns, similar to how the tribal axis covers all creature types. The axis detect() function checks for legendary-matters, snow-matters, and historic-matters patterns.
+A **single axis** (`"supertypeMatter"`) detects all supertype-matters patterns. This axis does NOT conflict with existing axes — a Jhoira deck correctly scores on both `artifacts` and `supertypeMatter`. `conflictsWith: []`.
 
-| Pattern | Score | Example cards |
-|---------|-------|---------------|
-| "whenever you cast a legendary" | +0.7 | Jodah the Unifier |
-| "whenever a legendary.*enters" | +0.6 | Ratadrabik of Urborg |
-| "for each legendary" / "number of legendary" | +0.5 | Kethis, the Hidden Hand |
-| "legendary.*(?:spell\|permanent\|card).*cost.*less" | +0.6 | Jhoira's Familiar (partial) |
-| "whenever you cast a historic" | +0.7 | Jhoira, Weatherlight Captain |
-| "historic" keyword pattern | +0.5 | Raff Capashen, Ship's Mage |
-| card.supertypes includes "Snow" AND snow payoff text | +0.6 | Marit Lage's Slumber |
-| "snow permanent" / "snow mana" | +0.5 | Narfi, Betrayer King |
-| "{S}" (snow mana symbol) in cost or text | +0.4 | Icehide Golem |
+**Legendary-matters patterns:**
+
+| Pattern | Regex | Score | Example cards |
+|---------|-------|-------|---------------|
+| Cast/play legendary/historic | `/whenever you (?:cast\|play) a (?:legendary\|historic)/i` | +0.7 | Jodah, Jhoira, Shanid |
+| Legendary ETB/death trigger | `/whenever (?:a\|another) legendary.*(?:enters\|dies)/i` | +0.6 | Ratadrabik, Yoshimaru |
+| Static legendary buff | `/legendary (?:creature\|permanent)s? you control (?:get \+\|have)/i` | +0.5 | Jodah ("Legendary creatures you control get +1/+1") |
+| Other legendary lord | `/other legendary (?:creature\|permanent)s? you control/i` | +0.5 | Shanid ("Other legendary creatures you control have menace") |
+| For each / each legendary | `/\b(?:for each\|each\|number of) legendary\b/i` | +0.5 | Kethis, Heroes' Podium |
+| Legendary cost reduction | `/legendary.*(?:spell\|permanent\|card)s?.*cost.*less/i` | +0.6 | Kethis |
+| Legendary graveyard synergy | `/legendary cards? (?:from\|in) your graveyard/i` | +0.5 | Kethis second ability |
+| Legend rule manipulation | `/\blegend rule\b/i` | +0.4 | Mirror Box, Sakashima |
+| "historic" keyword | `/\bhistoric\b/i` | +0.5 | Raff Capashen, Teshar |
+
+**Snow-matters patterns:**
+
+| Pattern | Regex | Score | Example cards |
+|---------|-------|-------|---------------|
+| Snow permanent/creature/land (broad) | `/\bsnow\b[^.]*?\b(?:permanent\|creature\|land)s?\b/i` | +0.5 | Marit Lage's Slumber |
+| "other snow" lord | `/\bother snow\b/i` | +0.6 | Narfi |
+| Snow trigger/for-each | `/whenever a snow.*enters\|for each snow/i` | +0.5 | Marit Lage's Slumber |
+| {S} in oracle text | `/\{S\}/` on `card.oracleText` | +0.4 | Snow activated abilities |
+| {S} in mana cost | `/\{S\}/` on `card.manaCost` | +0.3 | Icehide Golem |
 
 ### Supertype Anchor Identification
 
-Mirrors `identifyTribalAnchors()` logic but for supertypes:
+| Signal | Score | Notes |
+|--------|-------|-------|
+| Commander has "Snow" supertype | +3 | Snow commanders are rare and always intentional |
+| Commander has "Legendary" supertype | +1 | Low because nearly universal — not a strong signal alone |
+| Commander oracle text references supertype | +4 | Strongest signal |
+| Other card oracle text references supertype | +2 | Payoff cards in the 99 |
+| Density: >= 20 legendary permanents | +3 | High threshold (legendary is common) |
+| Density: >= 8 snow permanents | +3 | Low threshold (snow is all-or-nothing) |
 
-| Signal | Score |
-|--------|-------|
-| Commander has supertype (e.g., Legendary) | +2 |
-| Commander oracle text references supertype | +4 |
-| Other card oracle text references supertype | +2 |
-| Density: >= 15 legendary permanents in deck | +3 |
-| Density: >= 8 snow permanents in deck | +3 |
+**Anchor threshold: >= 4 points.** Examples:
+- Legendary commander alone (+1) → NOT an anchor (correct)
+- Legendary commander (+1) + oracle refs (+4) → anchor at 5 (Jodah/Kethis — correct)
+- Legendary commander (+1) + 20+ legendary density (+3) → anchor at 4 (legend-heavy decks — correct)
+- Snow commander (+3) + oracle refs (+4) → anchor at 7 (Narfi — correct)
 
-Higher density thresholds than creature types because "Legendary" is far more common than any single creature type.
+### Card Type Resolution for isHistoric
+
+```typescript
+function isHistoric(card: EnrichedCard): boolean {
+  return (
+    card.supertypes.includes("Legendary") ||
+    card.typeLine.toLowerCase().includes("artifact") ||
+    card.subtypes.includes("Saga")
+  );
+}
+```
 
 ### Card Tags
 
 | Tag | Color | Detection |
 |-----|-------|-----------|
-| `"Legendary Payoff"` | `bg-amber-500/20`, `text-amber-300` | Oracle text references legendary spells/permanents as payoff |
-| `"Snow Payoff"` | `bg-cyan-500/20`, `text-cyan-300` | Oracle text references snow permanents/mana as payoff |
-
-### UI: Supertype Breakdown
-
-Extend `CreatureTypeBreakdown` to optionally show a "Supertypes" section when a supertype-matters theme is detected, or create a lightweight `SupertypeBreakdown` component. The bar chart shows Legendary/Snow/Basic counts across the deck.
+| `"Legendary Payoff"` | `bg-amber-500/20`, `text-amber-300` | Oracle text matches any legendary/historic payoff pattern |
+| `"Snow Payoff"` | `bg-cyan-500/20`, `text-cyan-300` | Oracle text or manaCost references snow permanents/mana |
 
 ## Algorithm Design
 
@@ -85,32 +135,37 @@ Extend `CreatureTypeBreakdown` to optionally show a "Supertypes" section when a 
 
 ```
 1. Resolve commanders → EnrichedCard[]
-2. Extract commanderTypes = Set of commander creature subtypes
+2. Extract commanderSubtypes = Set of all commander creature subtypes
 3. Extract commanderOracleTypes = Set of types referenced in commander oracle text
 4. Call identifyTribalAnchors() → anchors[]
 5. For each card in deck:
    a. Get creature subtypes
-   b. Classify each matching anchor:
-      - commanderSubtype match → boost = 0.25
-      - commanderOracleType match → boost = 0.20
-      - other anchor match → boost = 0.15
-   c. Total boost = min(0.5, sum of per-match boosts)
-   d. Apply to tribal axis score
+   b. For each subtype matching an anchor, determine tier:
+      - If subtype in commanderSubtypes → rate = 0.25
+      - Else if subtype in commanderOracleTypes → rate = 0.20
+      - Else → rate = 0.15
+      (Highest tier wins per type — no stacking)
+   c. Total boost = min(0.5, sum of per-match rates)
+   d. Changelings: iterate all anchors, each at its respective tier rate
+   e. Apply boost to tribal axis score (cap at 1.0)
 ```
 
 ### Supertype Scoring Pipeline
 
 ```
-1. computeAxisScores() — supertypeMatter axis detect() scores oracle-text payoffs
+1. computeAxisScores() — supertypeMatter detect() scores oracle-text payoffs
+   detect() checks: card.oracleText for all legendary/snow/historic patterns
+                     card.manaCost for {S} (snow mana)
 2. boostSupertypeScores():
    a. Resolve commanders, call identifySupertypeAnchors()
    b. If no anchors, return
    c. For each card:
-      - Check card.supertypes against anchors
-      - Historic check: if "historic" anchor, match Legendary OR Artifact OR Saga
-      - Compute boost = min(0.4, matchCount * 0.15)
+      - "legendary" anchor → card.supertypes.includes("Legendary")
+      - "snow" anchor → card.supertypes.includes("Snow")
+      - "historic" anchor → isHistoric(card) (Legendary OR Artifact OR Saga)
+      - boost = min(0.4, matchCount * 0.15)
       - Apply to supertypeMatter axis score
-3. Theme annotation: "Legendary Matters", "Snow Matters", etc.
+3. Theme annotation: "Legendary Matters", "Snow Matters", "Historic"
 ```
 
 ## Implementation Tasks
@@ -118,178 +173,136 @@ Extend `CreatureTypeBreakdown` to optionally show a "Supertypes" section when a 
 ### Phase 1: Enhanced Commander Tribal Boost — Tests
 
 - [ ] 1.1 Add tests to `tests/unit/synergy-engine.spec.ts`
-  - Test case: Commander's creature type gets higher boost than non-commander anchor
-    - Deck: Elf commander + 10 Elves + 5 Goblins (Goblins as secondary density anchor)
-    - Assert: Elf creatures score higher than Goblin creatures
+  - Test case: Commander subtype gets higher boost than density-only anchor
+    - Deck: Elf commander + 10 Elves + 5 Goblins (secondary density anchor)
+    - Assert: Elf creature scores higher than Goblin creature
   - Test case: Commander oracle-referenced type gets moderate boost
-    - Deck: Najeela (references Warriors in oracle text) + Warriors + Soldiers
-    - Assert: Warriors score higher than Soldiers (both have density, but Warriors referenced by commander)
-  - Test case: Non-commander anchor cards still receive standard boost
-    - Assert: Cards matching only density-based anchors still get boosted (no regression)
-  - Test case: Commander alignment boost stacks with tribal payoff score
-    - Elvish Archdruid (Elf lord + Elf creature) in Elf commander deck → score reflects both detect() and alignment boost
+    - Deck: Najeela (references Warriors) + 5 Warriors + 5 Soldiers
+    - Assert: Warriors score higher than Soldiers
+  - Test case: Overlapping tiers use highest rate (not sum)
+  - Test case: Non-commander anchor cards still get standard boost (no regression)
+  - Test case: Partner commanders — both subtypes get +0.25 rate
+  - Test case: Changeling gets tiered boost across all anchors
 
 ### Phase 2: Enhanced Commander Tribal Boost — Implementation
 
 - [ ] 2.1 Modify `src/lib/creature-types.ts`
   - New export: `getCommanderTypes(commanders: EnrichedCard[]): { subtypes: Set<string>; oracleTypes: Set<string> }`
-  - Extracts commander creature subtypes and oracle-referenced types as separate sets
 
 - [ ] 2.2 Modify `src/lib/synergy-engine.ts` — update `boostTribalScores()`
-  - Import `getCommanderTypes` from creature-types
-  - Before boost loop: call `getCommanderTypes(commanders)` to get `commanderSubtypes` and `commanderOracleTypes`
-  - In boost loop: classify each anchor match into tiers:
-    - `commanderSubtypes.has(anchor)` → 0.25 per match
-    - `commanderOracleTypes.has(anchor)` → 0.20 per match
-    - else → 0.15 per match (unchanged)
-  - Update cap from `min(0.4, ...)` to `min(0.5, ...)` for commander-aligned cards
-  - Changeling: matches all anchors at their respective tier rates
+  - Import and call `getCommanderTypes` before boost loop
+  - Classify each anchor match into tiers: 0.25 / 0.20 / 0.15
+  - Update cap to `min(0.5, sum)` for commander-aligned cards
 
 ### Phase 3: Supertype Matters Axis — Tests
 
-- [ ] 3.1 Create or extend `tests/unit/synergy-axes.spec.ts` with supertypeMatter axis tests
-  - Test case: Jodah, the Unifier — "Whenever you cast a legendary nontoken spell" → score > 0
-  - Test case: Jhoira, Weatherlight Captain — "Whenever you cast a historic spell" → score > 0
-  - Test case: Ratadrabik of Urborg — "Whenever another legendary creature you control dies" → score > 0
-  - Test case: Kethis, the Hidden Hand — "legendary spells you cast cost {1} less" + "exile two legendary cards from your graveyard" → score > 0
-  - Test case: Narfi, Betrayer King — "Other snow and Zombie creatures you control get +1/+1" → score > 0
-  - Test case: Marit Lage's Slumber — "Whenever a snow permanent enters the battlefield" → score > 0
-  - Test case: Card with {S} in oracle text → score > 0
-  - Test case: Generic creature with no supertype references → score = 0
-  - Test case: Card that happens to be Legendary but has no supertype payoff text → score = 0
+- [ ] 3.1 Add tests to `tests/unit/synergy-axes.spec.ts` for `supertypeMatter` axis
+  - Jodah ("Whenever you cast a legendary...Legendary creatures you control get +1/+1") → score > 0
+  - Jhoira ("Whenever you cast a historic spell") → score > 0
+  - Ratadrabik ("Whenever another legendary creature you control dies") → score > 0
+  - Kethis ("Legendary spells...cost {1} less" + "each legendary card in your graveyard") → score > 0
+  - Shanid ("play a legendary land or cast a legendary spell") → score > 0
+  - Mirror Box ("legend rule") → score > 0
+  - Narfi ("Other snow and Zombie creatures...get +1/+1" + {S}{S}{S} ability) → score > 0
+  - Marit Lage's Slumber ("Whenever a snow permanent enters") → score > 0
+  - Card with {S} in manaCost only → score > 0
+  - Generic creature (no supertype refs) → score = 0
+  - Legendary creature with no payoff text (e.g., Thalia) → score = 0
+  - Hylda of the Icy Crown (ice-themed, NOT snow-matters) → score = 0
 
 ### Phase 4: Supertype Matters Axis — Implementation
 
-- [ ] 4.1 Add regex patterns to `src/lib/synergy-axes.ts`
-  - `LEGENDARY_CAST_RE`: `/whenever you cast a (?:legendary|historic)/i`
-  - `LEGENDARY_ETB_RE`: `/whenever (?:a|another) legendary.*(?:enters|dies)/i`
-  - `LEGENDARY_FOR_EACH_RE`: `/\b(?:for each|number of) legendary\b/i`
-  - `LEGENDARY_COST_RE`: `/legendary.*(?:spell|permanent|card)s?.*cost.*less/i`
-  - `HISTORIC_RE`: `/\bhistoric\b/i`
-  - `SNOW_PERMANENT_RE`: `/\bsnow (?:permanent|creature|land)/i`
-  - `SNOW_MANA_RE`: `/\{S\}/`
-  - `SNOW_MATTERS_RE`: `/whenever a snow.*enters|for each snow/i`
+- [ ] 4.1 Add regex patterns to `src/lib/synergy-axes.ts` (per pattern tables above)
 
-- [ ] 4.2 Add new axis definition to `SYNERGY_AXES` array in `src/lib/synergy-axes.ts`
-  - `id: "supertypeMatter"`
-  - `name: "Supertype Matters"`
-  - `description: "Legendary, historic, and snow permanent synergies"`
-  - `color: { bg: "bg-amber-500/20", text: "text-amber-300" }`
-  - `detect(card)` scoring: per the algorithm design table above
-  - `conflictsWith: []`
+- [ ] 4.2 Add `supertypeMatter` axis definition to `SYNERGY_AXES`
+  - `id: "supertypeMatter"`, `name: "Supertype Matters"`, `conflictsWith: []`
+  - `detect(card)`: check `card.oracleText` for all patterns; check `card.manaCost` for `{S}`
 
-### Phase 5: Supertype Anchoring & Engine Boost — Tests
+### Phase 5: Supertype Module — Tests (TDD: tests before implementation)
 
-- [ ] 5.1 Add tests to `tests/unit/synergy-engine.spec.ts`
-  - Test case: Jodah commander + 15 legendary creatures → legendary-matters theme detected
-  - Test case: Legendary creatures get boosted scores in Jodah deck
-  - Test case: Non-legendary cards (e.g., basic sorcery) do NOT get supertype boost
-  - Test case: Snow commander (e.g., Narfi) + snow permanents → snow-matters theme detected
-  - Test case: Deck with no supertype payoffs → no supertype theme, no boost applied
-  - Test case: Historic anchor matches Legendary creatures, Artifacts, AND Saga enchantments
+- [ ] 5.1 Create `tests/unit/supertypes.spec.ts`
+  - `identifySupertypeAnchors` tests:
+    - Jodah commander → `["legendary"]`
+    - Narfi commander → `["snow"]`
+    - Jhoira commander → `["historic"]`
+    - Yarok commander (Legendary, no legendary oracle text) + 10 legendaries → no anchors
+    - Jodah + 20 legendary permanents → anchor score boosted by density
+  - `isHistoric` tests:
+    - Legendary Creature → true; Artifact → true; Saga → true
+    - Regular Creature → false; Instant → false
+  - `computeSupertypeBreakdown` tests:
+    - Counts Legendary, Snow correctly; empty deck → empty Map
 
-### Phase 6: Supertype Anchoring & Engine Boost — Implementation
+### Phase 6: Supertype Module — Implementation
 
 - [ ] 6.1 Create `src/lib/supertypes.ts`
-  - `identifySupertypeAnchors(commanders: EnrichedCard[], cardNames: string[], cardMap: Record<string, EnrichedCard>): string[]`
-    - Scoring: commander supertypes (+2), commander oracle refs (+4), card oracle refs (+2), density thresholds (+3)
-    - Returns anchors like `["legendary"]`, `["snow"]`, `["historic"]`
-  - `isHistoric(card: EnrichedCard): boolean`
-    - Returns true if card is Legendary, Artifact, or has "Saga" subtype
-  - `computeSupertypeBreakdown(cardNames: string[], cardMap: Record<string, EnrichedCard>): Map<string, number>`
-    - Counts Legendary, Snow, Basic, etc. across deck
+  - `isHistoric(card)`: checks `card.supertypes` for Legendary, `card.typeLine` for Artifact, `card.subtypes` for Saga
+  - `identifySupertypeAnchors(commanders, cardNames, cardMap)`: scoring per anchor table, threshold >= 4
+  - `computeSupertypeBreakdown(cardNames, cardMap)`: counts supertypes across deck
 
-- [ ] 6.2 Add `tests/unit/supertypes.spec.ts`
-  - Tests for `identifySupertypeAnchors`, `isHistoric`, `computeSupertypeBreakdown`
-  - Test case: Jodah as commander → "legendary" is anchor
-  - Test case: Narfi as commander → "snow" is anchor
-  - Test case: Jhoira as commander → "historic" is anchor
-  - Test case: Non-legendary commander with no supertype text → no anchors
-  - Test case: isHistoric returns true for Legendary creature, Artifact, Saga; false for regular creature
-  - Test case: computeSupertypeBreakdown counts correctly
+### Phase 7: Supertype Engine Boost — Tests
 
-- [ ] 6.3 Modify `src/lib/synergy-engine.ts` — add `boostSupertypeScores()`
-  - Function signature: `boostSupertypeScores(deck: DeckData, cardNames: string[], cardMap: Record<string, EnrichedCard>, axisScores: Map<string, CardAxisScore[]>): void`
-  - Calls `identifySupertypeAnchors()` to get anchors
-  - For each card: check `card.supertypes` against anchors (historic = Legendary OR Artifact OR Saga)
-  - Boost = `min(0.4, matchCount * 0.15)`
-  - Insert call after `boostTribalScores()` in main pipeline
+- [ ] 7.1 Add tests to `tests/unit/synergy-engine.spec.ts`
+  - Jodah + 20 legendary creatures → supertypeMatter theme with detail "legendary"
+  - Legendary creatures get boosted scores in Jodah deck
+  - Non-legendary sorcery does NOT get boost
+  - Narfi + 8 snow permanents → snow-matters theme
+  - Jhoira + legendary creatures + artifacts + Saga → historic matches all three
+  - Yarok + 10 legendaries → no supertypeMatter theme
 
-- [ ] 6.4 Modify `identifyDeckThemes()` in `src/lib/synergy-engine.ts`
-  - Accept optional `supertypeAnchors?: string[]` parameter
-  - Annotate supertypeMatter theme with primary anchor: `"Legendary Matters"`, `"Snow Matters"`, `"Historic"`
-  - Set `theme.detail` to anchor value
+### Phase 8: Supertype Engine Boost — Implementation
 
-### Phase 7: Card Tags — Tests
+- [ ] 8.1 Add `boostSupertypeScores()` to `src/lib/synergy-engine.ts`
+  - Match cards against anchors using supertypes/typeLine/subtypes (not just supertypes)
+  - Insert after `boostTribalScores()` in pipeline
 
-- [ ] 7.1 Add tests to `tests/unit/card-tags.spec.ts`
-  - Test case: Jodah, the Unifier → "Legendary Payoff"
-  - Test case: Kethis, the Hidden Hand → "Legendary Payoff"
-  - Test case: Jhoira, Weatherlight Captain (historic) → "Legendary Payoff" (historic includes legendary)
-  - Test case: Narfi, Betrayer King → "Snow Payoff"
-  - Test case: Marit Lage's Slumber → "Snow Payoff"
-  - Test case: Card with {S} in oracle text → "Snow Payoff"
-  - Test case: Generic legendary creature (no payoff text) → no "Legendary Payoff"
-  - Test case: Grizzly Bears → no supertype payoff tags
+- [ ] 8.2 Update `identifyDeckThemes()` for supertypeMatter annotation
+  - `"legendary"` → "Legendary Matters", `"snow"` → "Snow Matters", `"historic"` → "Historic"
 
-### Phase 8: Card Tags — Implementation
+### Phase 9: Card Tags — Tests
 
-- [ ] 8.1 Modify `src/lib/card-tags.ts`
-  - Add TAG_COLORS entries for `"Legendary Payoff"` and `"Snow Payoff"`
-  - Add regex patterns (reuse from synergy-axes or define locally):
-    - `LEGENDARY_PAYOFF_RE`: matches legendary/historic cast triggers, cost reduction, ETB/death triggers
-    - `SNOW_PAYOFF_RE`: matches snow permanent triggers, snow mana references, {S} costs
-  - Add detection block in `generateTags()`:
-    - If legendary/historic payoff patterns match → `tags.add("Legendary Payoff")`
-    - If snow payoff patterns match → `tags.add("Snow Payoff")`
+- [ ] 9.1 Add tests to `tests/unit/card-tags.spec.ts`
+  - Jodah → "Legendary Payoff"; Kethis → "Legendary Payoff"; Jhoira → "Legendary Payoff"
+  - Shanid → "Legendary Payoff"; Mirror Box → "Legendary Payoff"
+  - Narfi → "Snow Payoff"; Marit Lage's Slumber → "Snow Payoff"
+  - Card with {S} in manaCost → "Snow Payoff"
+  - Thalia (Legendary, no payoff text) → no "Legendary Payoff"
+  - Grizzly Bears → no supertype payoff tags
 
-### Phase 9: UI Integration
+### Phase 10: Card Tags — Implementation
 
-- [ ] 9.1 Create `src/components/SupertypeBreakdown.tsx`
-  - Follow pattern of `CreatureTypeBreakdown.tsx`
-  - Props: `{ deck: DeckData; cardMap: Record<string, EnrichedCard> }`
-  - Uses `computeSupertypeBreakdown()` from supertypes.ts
-  - Shows horizontal bar chart of Legendary, Snow, Basic counts
-  - Self-hides when no relevant supertypes found (returns null)
-  - Dark theme: `bg-amber-500/60` bars on `bg-slate-700` (amber for legendary theme)
+- [ ] 10.1 Modify `src/lib/card-tags.ts`
+  - Add TAG_COLORS for "Legendary Payoff" and "Snow Payoff"
+  - Add combined regex patterns; check oracle text AND manaCost for {S}
 
-- [ ] 9.2 Modify `src/components/SynergySection.tsx`
-  - Render `SupertypeBreakdown` when supertypeMatter theme detected (alongside existing CreatureTypeBreakdown for tribal)
+### Phase 11: UI Integration
 
-- [ ] 9.3 Modify `src/components/DeckAnalysis.tsx`
-  - Add `"supertypes"` to `ANALYSIS_SECTIONS` array
-  - Add `SupertypeBreakdown` in a `CollapsiblePanel` near the creature types section
+- [ ] 11.1 Create `src/components/SupertypeBreakdown.tsx` (follow CreatureTypeBreakdown pattern)
+- [ ] 11.2 Modify `src/components/SynergySection.tsx` — render when supertypeMatter theme detected
+- [ ] 11.3 Modify `src/components/DeckAnalysis.tsx` — add supertypes collapsible panel
 
-### Phase 10: Known Combos
+### Phase 12: Known Combos
 
-- [ ] 10.1 Add legendary/historic combos to `src/lib/known-combos.ts`
-  - Kethis, the Hidden Hand + Mox Amber (legendary mana loop)
-  - Jhoira, Weatherlight Captain + Aetherflux Reservoir (historic storm)
-  - Ratadrabik of Urborg + Blade of the Bloodchief (legendary death value — if applicable)
+- [ ] 12.1 Add combos to `src/lib/known-combos.ts`
+  - Kethis + Mox Amber (legendary mana loop)
+  - Jhoira + Aetherflux Reservoir (historic storm)
+  - Jhoira + Sensei's Divining Top (draw deck with cost reducer)
+  - Teshar + Mox Amber (historic recursion loop)
 
-- [ ] 10.2 Add tests to `tests/unit/known-combos.spec.ts`
-  - Test case: Kethis + Mox Amber detected
-  - Test case: Jhoira + Aetherflux Reservoir detected
+- [ ] 12.2 Add tests to `tests/unit/known-combos.spec.ts`
 
-### Phase 11: Full Test Verification & Review
+### Phase 13: Full Test Verification & Review
 
-- [ ] 11.1 Run `npm run test:unit` — all unit tests pass (0 failures)
-- [ ] 11.2 Run `npx tsc --noEmit` — no new TypeScript errors in changed files
-- [ ] 11.3 Code review sub-agent — verify pattern adherence, naming, test quality
-- [ ] 11.4 MTG card expert review — verify detection accuracy against real cards:
-  - Jodah, the Unifier (legendary-matters commander)
-  - Jhoira, Weatherlight Captain (historic commander)
-  - Narfi, Betrayer King (snow commander)
-  - Kethis, the Hidden Hand (legendary graveyard)
-  - Marit Lage's Slumber (snow payoff)
-  - A generic legendary creature (should NOT get Legendary Payoff tag)
-  - Commander with Elf type in Elf deck (should get enhanced tribal boost)
+- [ ] 13.1 Run `npm run test:unit` — all pass
+- [ ] 13.2 Run `npx tsc --noEmit` — no new errors in changed files
+- [ ] 13.3 Code review sub-agent
+- [ ] 13.4 MTG card expert review against: Jodah, Jhoira, Narfi, Kethis, Shanid, Mirror Box, Marit Lage's Slumber, Icehide Golem, Thalia (negative), Hylda (negative), Elf commander in Elf deck, partner commanders
 
 ## Files to Create/Modify
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/lib/supertypes.ts` | Create | Supertype anchor identification, historic check, supertype breakdown |
+| `src/lib/supertypes.ts` | Create | `identifySupertypeAnchors`, `isHistoric`, `computeSupertypeBreakdown` |
 | `tests/unit/supertypes.spec.ts` | Create | Unit tests for supertypes module |
 | `src/components/SupertypeBreakdown.tsx` | Create | Bar chart for supertype frequency |
 | `src/lib/creature-types.ts` | Modify | Add `getCommanderTypes()` export |
@@ -299,12 +312,12 @@ Extend `CreatureTypeBreakdown` to optionally show a "Supertypes" section when a 
 | `src/lib/known-combos.ts` | Modify | Add legendary/historic combos |
 | `src/components/SynergySection.tsx` | Modify | Render SupertypeBreakdown for supertypeMatter theme |
 | `src/components/DeckAnalysis.tsx` | Modify | Add supertypes collapsible panel |
-| `tests/unit/synergy-engine.spec.ts` | Modify | Commander alignment boost tests + supertype engine tests |
+| `tests/unit/synergy-engine.spec.ts` | Modify | Commander alignment boost + supertype engine tests |
 | `tests/unit/synergy-axes.spec.ts` | Modify | supertypeMatter axis tests |
 | `tests/unit/card-tags.spec.ts` | Modify | Legendary Payoff / Snow Payoff tag tests |
 | `tests/unit/known-combos.spec.ts` | Modify | Legendary combo tests |
 
-No changes to: `src/lib/types.ts` (DeckTheme.detail already supports string), `src/lib/deck-composition.ts`, `src/lib/mana.ts`, `src/lib/decklist-parser.ts`, `src/lib/scryfall.ts`, `src/lib/archidekt.ts`, e2e test files.
+No changes to: `src/lib/types.ts`, `src/lib/deck-composition.ts`, `src/lib/mana.ts`, `src/lib/decklist-parser.ts`, `src/lib/scryfall.ts`, `src/lib/archidekt.ts`, e2e test files.
 
 ## Verification
 
