@@ -16,6 +16,8 @@ import {
   computeAdjustedWeights,
   parsePipRequirements,
   canCastWithLands,
+  getManaProducers,
+  computePipWeights,
 } from "../../src/lib/opening-hand";
 import type { HandCard, HandEvaluationContext, PipRequirement } from "../../src/lib/opening-hand";
 import type { EnrichedCard, DeckTheme } from "../../src/lib/types";
@@ -2356,5 +2358,436 @@ test.describe("evaluateHandQuality land-to-pip integration", () => {
     const result = evaluateHandQuality(hand, 0, new Set(["G", "W"]));
     // Forest produces G which satisfies {G/W}
     expect(result.factors.playableTurns[0]).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getManaProducers
+// ---------------------------------------------------------------------------
+
+test.describe("getManaProducers", () => {
+  function handCard(name: string, overrides: Partial<EnrichedCard> = {}): HandCard {
+    return { name, quantity: 1, enriched: makeCard({ name, ...overrides }) };
+  }
+
+  const forest: HandCard = handCard("Forest", {
+    typeLine: "Basic Land — Forest",
+    producedMana: ["G"],
+  });
+  const mountain: HandCard = handCard("Mountain", {
+    typeLine: "Basic Land — Mountain",
+    producedMana: ["R"],
+  });
+  const island: HandCard = handCard("Island", {
+    typeLine: "Basic Land — Island",
+    producedMana: ["U"],
+  });
+
+  test("Llanowar Elves (CMC 1, produces G) with Forest → T2 sources include dork", () => {
+    const elves = handCard("Llanowar Elves", {
+      typeLine: "Creature — Elf Druid",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [forest, mountain, elves];
+    const untapped = [["G"], ["R"]];
+    const all = [["G"], ["R"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.t2DorkCount).toBe(1);
+    // T2 sources should have lands + elves' produced mana
+    expect(result.t2Sources.length).toBe(all.length + 1);
+    expect(result.t2Sources).toContainEqual(["G"]); // elves entry
+  });
+
+  test("Birds of Paradise (CMC 1, produces WUBRG) with Forest → T2 includes 5-color entry", () => {
+    const birds = handCard("Birds of Paradise", {
+      typeLine: "Creature — Bird",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["W", "U", "B", "R", "G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [forest, birds];
+    const untapped = [["G"]];
+    const all = [["G"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.t2DorkCount).toBe(1);
+    expect(result.t2Sources).toContainEqual(["W", "U", "B", "R", "G"]);
+  });
+
+  test("dork not castable: Birds of Paradise + Island only → NOT in T2", () => {
+    const birds = handCard("Birds of Paradise", {
+      typeLine: "Creature — Bird",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["W", "U", "B", "R", "G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [island, birds];
+    const untapped = [["U"]];
+    const all = [["U"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.t2DorkCount).toBe(0);
+    expect(result.t2Sources.length).toBe(all.length); // no extra source
+  });
+
+  test("CMC 2 dork (Bloom Tender) → NOT in T2, IS in T3", () => {
+    const bloom = handCard("Bloom Tender", {
+      typeLine: "Creature — Elf",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      producedMana: ["W", "U", "B", "R", "G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const forest2 = handCard("Forest", {
+      typeLine: "Basic Land — Forest",
+      producedMana: ["G"],
+    });
+    const hand = [forest, forest2, bloom];
+    const untapped = [["G"], ["G"]];
+    const all = [["G"], ["G"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.t2DorkCount).toBe(0);
+    expect(result.t3DorkCount).toBe(1);
+    expect(result.t3Sources).toContainEqual(["W", "U", "B", "R", "G"]);
+  });
+
+  test("CMC 3+ excluded: Selvala → not in T2 or T3", () => {
+    const selvala = handCard("Selvala, Heart of the Wilds", {
+      typeLine: "Legendary Creature — Elf Scout",
+      manaCost: "{1}{G}{G}",
+      cmc: 3,
+      producedMana: ["G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 2, C: 0 },
+    });
+    const hand = [forest, mountain, selvala];
+    const untapped = [["G"], ["R"]];
+    const all = [["G"], ["R"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.t2DorkCount).toBe(0);
+    expect(result.t3DorkCount).toBe(0);
+    expect(result.t2Sources.length).toBe(all.length);
+    expect(result.t3Sources.length).toBe(all.length);
+  });
+
+  test("Sol Ring (CMC 1, produces C) → T2 includes colorless source", () => {
+    const solRing = handCard("Sol Ring", {
+      typeLine: "Artifact",
+      manaCost: "{1}",
+      cmc: 1,
+      producedMana: ["C"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    });
+    const hand = [forest, solRing];
+    const untapped = [["G"]];
+    const all = [["G"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.t2DorkCount).toBe(1);
+    expect(result.t2Sources).toContainEqual(["C"]);
+  });
+
+  test("Dryad Arbor (Land Creature) → NOT treated as dork", () => {
+    const dryadArbor = handCard("Dryad Arbor", {
+      typeLine: "Land Creature — Forest Dryad",
+      manaCost: "",
+      cmc: 0,
+      producedMana: ["G"],
+    });
+    const hand = [forest, dryadArbor];
+    const untapped = [["G"], ["G"]];
+    const all = [["G"], ["G"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.t2DorkCount).toBe(0);
+    expect(result.t3DorkCount).toBe(0);
+    // Sources should equal land sources only
+    expect(result.t2Sources.length).toBe(all.length);
+  });
+
+  test("multiple dorks: Elves + Birds + Forest → T2 has both entries", () => {
+    const elves = handCard("Llanowar Elves", {
+      typeLine: "Creature — Elf Druid",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const birds = handCard("Birds of Paradise", {
+      typeLine: "Creature — Bird",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["W", "U", "B", "R", "G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [forest, elves, birds];
+    const untapped = [["G"]];
+    const all = [["G"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.t2DorkCount).toBe(2);
+    expect(result.t2Sources.length).toBe(all.length + 2);
+  });
+
+  test("no dorks: just lands → T2/T3 equal land sources", () => {
+    const hand = [forest, mountain];
+    const untapped = [["G"], ["R"]];
+    const all = [["G"], ["R"]];
+
+    const result = getManaProducers(hand, untapped, all);
+    expect(result.t2DorkCount).toBe(0);
+    expect(result.t3DorkCount).toBe(0);
+    expect(result.t2Sources).toEqual(all);
+    expect(result.t3Sources).toEqual(all);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computePipWeights
+// ---------------------------------------------------------------------------
+
+test.describe("computePipWeights", () => {
+  test("Abzan pips G=60 W=30 B=10 → weighted proportionally", () => {
+    const pips = { W: 30, U: 0, B: 10, R: 0, G: 60 };
+    const identity = new Set(["W", "B", "G"]);
+    const weights = computePipWeights(pips, identity);
+    expect(weights["G"]).toBeCloseTo(0.6, 5);
+    expect(weights["W"]).toBeCloseTo(0.3, 5);
+    expect(weights["B"]).toBeCloseTo(0.1, 5);
+  });
+
+  test("equal pips G=50 W=50 → equal weights", () => {
+    const pips = { W: 50, U: 0, B: 0, R: 0, G: 50 };
+    const identity = new Set(["W", "G"]);
+    const weights = computePipWeights(pips, identity);
+    expect(weights["G"]).toBeCloseTo(0.5, 5);
+    expect(weights["W"]).toBeCloseTo(0.5, 5);
+  });
+
+  test("single color → weight 1.0", () => {
+    const pips = { W: 0, U: 0, B: 0, R: 0, G: 40 };
+    const identity = new Set(["G"]);
+    const weights = computePipWeights(pips, identity);
+    expect(weights["G"]).toBeCloseTo(1.0, 5);
+  });
+
+  test("zero pips for one identity color → 0 weight for that color", () => {
+    const pips = { W: 0, U: 0, B: 0, R: 0, G: 30 };
+    const identity = new Set(["W", "G"]);
+    const weights = computePipWeights(pips, identity);
+    expect(weights["G"]).toBeCloseTo(1.0, 5);
+    expect(weights["W"]).toBeCloseTo(0.0, 5);
+  });
+
+  test("empty identity → empty record", () => {
+    const pips = { W: 10, U: 0, B: 0, R: 0, G: 10 };
+    const identity = new Set<string>();
+    const weights = computePipWeights(pips, identity);
+    expect(Object.keys(weights)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Weighted color coverage via evaluateHandQuality
+// ---------------------------------------------------------------------------
+
+test.describe("weighted color coverage", () => {
+  function handCard(name: string, overrides: Partial<EnrichedCard> = {}): HandCard {
+    return { name, quantity: 1, enriched: makeCard({ name, ...overrides }) };
+  }
+
+  test("Abzan hand with only Swamp + pipWeights B=0.1 → low color coverage", () => {
+    const swamp = handCard("Swamp", {
+      typeLine: "Basic Land — Swamp",
+      producedMana: ["B"],
+    });
+    const spell1 = handCard("Spell1", {
+      typeLine: "Creature",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const spell2 = handCard("Spell2", {
+      typeLine: "Creature",
+      manaCost: "{2}{W}",
+      cmc: 3,
+      manaPips: { W: 1, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    });
+    const hand = [swamp, swamp, spell1, spell2];
+    const pipWeights = { W: 0.3, B: 0.1, G: 0.6 };
+    const context: HandEvaluationContext = {
+      deckThemes: [],
+      pipWeights,
+    };
+    const result = evaluateHandQuality(hand, 0, new Set(["W", "B", "G"]), [], context);
+    // Only B covered → 0.1
+    expect(result.factors.colorCoverage).toBeCloseTo(0.1, 5);
+  });
+
+  test("Abzan hand with Forest + Plains → ~0.9 coverage", () => {
+    const forestCard = handCard("Forest", {
+      typeLine: "Basic Land — Forest",
+      producedMana: ["G"],
+    });
+    const plainsCard = handCard("Plains", {
+      typeLine: "Basic Land — Plains",
+      producedMana: ["W"],
+    });
+    const spell = handCard("Spell", {
+      typeLine: "Creature",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [forestCard, plainsCard, spell];
+    const pipWeights = { W: 0.3, B: 0.1, G: 0.6 };
+    const context: HandEvaluationContext = {
+      deckThemes: [],
+      pipWeights,
+    };
+    const result = evaluateHandQuality(hand, 0, new Set(["W", "B", "G"]), [], context);
+    // G + W covered → 0.6 + 0.3 = 0.9
+    expect(result.factors.colorCoverage).toBeCloseTo(0.9, 5);
+  });
+
+  test("without context → equal-weight formula (backward compat)", () => {
+    const forestCard = handCard("Forest", {
+      typeLine: "Basic Land — Forest",
+      producedMana: ["G"],
+    });
+    const plainsCard = handCard("Plains", {
+      typeLine: "Basic Land — Plains",
+      producedMana: ["W"],
+    });
+    const spell = handCard("Spell", {
+      typeLine: "Creature",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [forestCard, plainsCard, spell];
+    // No context → equal weight: 2/3 colors covered
+    const result = evaluateHandQuality(hand, 0, new Set(["W", "B", "G"]));
+    expect(result.factors.colorCoverage).toBeCloseTo(2 / 3, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mana dorks wired into evaluateHandQuality
+// ---------------------------------------------------------------------------
+
+test.describe("mana dorks in evaluateHandQuality", () => {
+  function handCard(name: string, overrides: Partial<EnrichedCard> = {}): HandCard {
+    return { name, quantity: 1, enriched: makeCard({ name, ...overrides }) };
+  }
+
+  test("[Forest, Llanowar Elves, 3-CMC green spell] → T2 playable", () => {
+    const forestCard = handCard("Forest", {
+      typeLine: "Basic Land — Forest",
+      producedMana: ["G"],
+    });
+    const elves = handCard("Llanowar Elves", {
+      typeLine: "Creature — Elf Druid",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+      oracleText: "{T}: Add {G}.",
+    });
+    const spell = handCard("Elvish Visionary", {
+      typeLine: "Creature — Elf Shaman",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [forestCard, elves, spell];
+    // Only 1 land, but Elves provides G on T2
+    const result = evaluateHandQuality(hand, 0, new Set(["G"]));
+    // T2: 1 land + 1 dork = 2 mana, spell is CMC 2 with {1}{G}
+    expect(result.factors.playableTurns[1]).toBe(true);
+  });
+
+  test("[Island, Llanowar Elves, 2-CMC green spell] → T2 NOT playable (can't cast Elves)", () => {
+    const islandCard = handCard("Island", {
+      typeLine: "Basic Land — Island",
+      producedMana: ["U"],
+    });
+    const elves = handCard("Llanowar Elves", {
+      typeLine: "Creature — Elf Druid",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+      oracleText: "{T}: Add {G}.",
+    });
+    const spell = handCard("Elvish Visionary", {
+      typeLine: "Creature — Elf Shaman",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [islandCard, elves, spell];
+    const result = evaluateHandQuality(hand, 0, new Set(["U", "G"]));
+    // Can't cast Elves with Island, so no dork contribution to T2
+    expect(result.factors.playableTurns[1]).toBe(false);
+  });
+
+  test("[Forest, Forest, Bloom Tender, 3-CMC spell] → T2 from lands, T3 benefits from Tender", () => {
+    const forestCard = handCard("Forest", {
+      typeLine: "Basic Land — Forest",
+      producedMana: ["G"],
+    });
+    const forestCard2 = handCard("Forest", {
+      typeLine: "Basic Land — Forest",
+      producedMana: ["G"],
+    });
+    const bloom = handCard("Bloom Tender", {
+      typeLine: "Creature — Elf",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      producedMana: ["W", "U", "B", "R", "G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+      oracleText: "{T}: For each color among permanents you control, add one mana of that color.",
+    });
+    const spell = handCard("Cultivate", {
+      typeLine: "Sorcery",
+      manaCost: "{2}{G}",
+      cmc: 3,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+    const hand = [forestCard, forestCard2, bloom, spell];
+    const result = evaluateHandQuality(hand, 0, new Set(["G"]));
+    // T2: 2 lands → can cast 2-cmc (Bloom Tender itself)
+    expect(result.factors.playableTurns[1]).toBe(true);
+    // T3: 2 lands + Bloom Tender dork = 3 mana → can cast 3-cmc
+    expect(result.factors.playableTurns[2]).toBe(true);
+  });
+
+  test("T1 unchanged: Elves doesn't provide T1 mana for other spells", () => {
+    const forestCard = handCard("Forest", {
+      typeLine: "Basic Land — Forest",
+      producedMana: ["G"],
+    });
+    const elves = handCard("Llanowar Elves", {
+      typeLine: "Creature — Elf Druid",
+      manaCost: "{G}",
+      cmc: 1,
+      producedMana: ["G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+      oracleText: "{T}: Add {G}.",
+    });
+    const hand = [forestCard, elves];
+    const result = evaluateHandQuality(hand, 0, new Set(["G"]));
+    // T1: Elves itself is playable (CMC 1 with Forest)
+    expect(result.factors.playableTurns[0]).toBe(true);
+    // But T1 check should not use dork mana for OTHER spells (dork has summoning sickness)
+    // This is inherently tested by the fact that T1 logic is land-only
   });
 });

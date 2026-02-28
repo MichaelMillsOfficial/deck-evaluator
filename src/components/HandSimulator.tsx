@@ -7,12 +7,13 @@ import {
   buildPool,
   buildCommandZone,
   buildCardCache,
+  computePipWeights,
   drawHand,
   evaluateHandQuality,
   findTopHands,
   runSimulation,
 } from "@/lib/opening-hand";
-import { resolveCommanderIdentity } from "@/lib/color-distribution";
+import { computeColorDistribution, resolveCommanderIdentity } from "@/lib/color-distribution";
 import HandDisplay from "@/components/HandDisplay";
 import HandSimulationStats from "@/components/HandSimulationStats";
 import TopHands from "@/components/TopHands";
@@ -59,11 +60,14 @@ export default function HandSimulator({
 
   const context: HandEvaluationContext | undefined = useMemo(() => {
     if (!pool.length) return undefined;
+    const distribution = computeColorDistribution(deck, cardMap);
+    const pipWeights = computePipWeights({ ...distribution.pips }, commanderIdentity);
     return {
       deckThemes,
       cardCache: buildCardCache(pool),
+      pipWeights,
     };
-  }, [pool, deckThemes]);
+  }, [pool, deckThemes, deck, cardMap, commanderIdentity]);
 
   useEffect(() => {
     if (!pool.length) return;

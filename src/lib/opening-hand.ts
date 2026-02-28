@@ -62,6 +62,7 @@ export interface RankedHand {
 export interface HandEvaluationContext {
   deckThemes: DeckTheme[];
   cardCache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>;
+  pipWeights?: Record<string, number>;
 }
 
 export interface HandWeights {
@@ -209,6 +210,100 @@ function getAxisScoresForCard(
     if (score > 0) scores.set(axis.id, score);
   }
   return scores;
+}
+
+// ---------------------------------------------------------------------------
+// computePipWeights
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute per-color weights based on pip demand.
+ * Colors with more pips in the deck get higher weight (sum to 1.0).
+ * Used for weighted color coverage scoring.
+ */
+export function computePipWeights(
+  pips: Record<string, number>,
+  commanderIdentity: Set<string>
+): Record<string, number> {
+  if (commanderIdentity.size === 0) return {};
+
+  const totalPips = Array.from(commanderIdentity).reduce(
+    (sum, c) => sum + (pips[c] ?? 0),
+    0
+  );
+
+  if (totalPips === 0) {
+    // No pips at all → equal weights
+    const w = 1.0 / commanderIdentity.size;
+    const result: Record<string, number> = {};
+    for (const c of commanderIdentity) result[c] = w;
+    return result;
+  }
+
+  const result: Record<string, number> = {};
+  for (const c of commanderIdentity) {
+    result[c] = (pips[c] ?? 0) / totalPips;
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// getManaProducers
+// ---------------------------------------------------------------------------
+
+/**
+ * Identify mana dorks in the hand and compute which additional mana sources
+ * they contribute on T2 and T3, accounting for summoning sickness (one-turn delay).
+ *
+ * A non-land card is a mana dork if:
+ * - producedMana.length > 0
+ * - !typeLine.includes("Land")
+ * - cmc <= 2
+ *
+ * T2 sources: land sources + CMC ≤ 1 dorks castable T1 with untapped lands
+ * T3 sources: land sources + CMC ≤ 2 dorks castable by T2 with all lands
+ */
+export function getManaProducers(
+  hand: HandCard[],
+  untappedLandSources: string[][],
+  allLandSources: string[][]
+): {
+  t2Sources: string[][];
+  t3Sources: string[][];
+  t2DorkCount: number;
+  t3DorkCount: number;
+} {
+  const t2Sources = [...allLandSources];
+  const t3Sources = [...allLandSources];
+  let t2DorkCount = 0;
+  let t3DorkCount = 0;
+
+  for (const card of hand) {
+    const e = card.enriched;
+    // Must produce mana, not be a land, and CMC ≤ 2
+    if (e.producedMana.length === 0) continue;
+    if (isLand(e)) continue;
+    if (e.cmc > 2) continue;
+
+    if (e.cmc <= 1) {
+      // CMC ≤ 1: can be cast T1 with untapped lands → contributes T2
+      if (canCastWithLands(e, untappedLandSources)) {
+        t2Sources.push(e.producedMana);
+        t2DorkCount++;
+        // Also contributes T3
+        t3Sources.push(e.producedMana);
+        t3DorkCount++;
+      }
+    } else {
+      // CMC 2: can be cast T2 with all lands → contributes T3 only
+      if (canCastWithLands(e, allLandSources)) {
+        t3Sources.push(e.producedMana);
+        t3DorkCount++;
+      }
+    }
+  }
+
+  return { t2Sources, t3Sources, t2DorkCount, t3DorkCount };
 }
 
 // ---------------------------------------------------------------------------
@@ -826,11 +921,15 @@ export function evaluateHandQuality(
   const allLandSources = lands.map((l) => l.enriched.producedMana);
   const untappedLandSources = untappedLands.map((l) => l.enriched.producedMana);
 
+  // --- Mana dork detection ---
+  const { t2Sources, t3Sources, t2DorkCount, t3DorkCount } =
+    getManaProducers(hand, untappedLandSources, allLandSources);
+
   // --- Playable turns analysis ---
   const allSpells = [...spells, ...commandZone];
   const playableTurns: boolean[] = [];
 
-  // Turn 1
+  // Turn 1 — land sources only (dorks have summoning sickness)
   const t1Playable =
     untappedCount >= 1 &&
     allSpells.some((s) => {
@@ -839,21 +938,21 @@ export function evaluateHandQuality(
     });
   playableTurns.push(t1Playable);
 
-  // Turn 2
+  // Turn 2 — lands + CMC ≤ 1 dorks cast T1
   const t2Playable =
-    landCount >= 2 &&
+    landCount + t2DorkCount >= 2 &&
     allSpells.some((s) => {
       if (s.enriched.cmc > 2) return false;
-      return canCastWithLands(s.enriched, allLandSources);
+      return canCastWithLands(s.enriched, t2Sources);
     });
   playableTurns.push(t2Playable);
 
-  // Turn 3
+  // Turn 3 — lands + CMC ≤ 2 dorks cast by T2
   const t3Playable =
-    landCount >= 3 &&
+    landCount + t3DorkCount >= 3 &&
     allSpells.some((s) => {
       if (s.enriched.cmc > 3) return false;
-      return canCastWithLands(s.enriched, allLandSources);
+      return canCastWithLands(s.enriched, t3Sources);
     });
   playableTurns.push(t3Playable);
 
@@ -861,10 +960,21 @@ export function evaluateHandQuality(
   const neededColors = Array.from(commanderIdentity);
   let colorCoverage = 1.0;
   if (neededColors.length > 0 && landCount > 0) {
-    const coveredCount = neededColors.filter((c) =>
-      availableColors.has(c)
-    ).length;
-    colorCoverage = coveredCount / neededColors.length;
+    const pw = context?.pipWeights;
+    if (pw && Object.keys(pw).length > 0) {
+      // Weighted coverage: sum weights of covered colors
+      colorCoverage = 0;
+      for (const c of neededColors) {
+        if (availableColors.has(c)) {
+          colorCoverage += pw[c] ?? 0;
+        }
+      }
+    } else {
+      const coveredCount = neededColors.filter((c) =>
+        availableColors.has(c)
+      ).length;
+      colorCoverage = coveredCount / neededColors.length;
+    }
   } else if (neededColors.length > 0 && landCount === 0) {
     colorCoverage = 0;
   }
