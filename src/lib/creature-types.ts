@@ -265,6 +265,29 @@ export function computeCreatureTypeBreakdown(
 }
 
 /**
+ * Extract commander creature subtypes and oracle-referenced types as separate sets.
+ * Used by boostTribalScores to apply tiered boost rates.
+ */
+export function getCommanderTypes(commanders: EnrichedCard[]): {
+  subtypes: Set<string>;
+  oracleTypes: Set<string>;
+} {
+  const subtypes = new Set<string>();
+  const oracleTypes = new Set<string>();
+
+  for (const commander of commanders) {
+    for (const st of getCreatureSubtypes(commander)) {
+      subtypes.add(st);
+    }
+    for (const type of extractReferencedTypes(commander.oracleText)) {
+      oracleTypes.add(type);
+    }
+  }
+
+  return { subtypes, oracleTypes };
+}
+
+/**
  * Identify the tribal anchor types for a deck.
  * Anchors are types the deck is strategically built around, determined by:
  * 1. Commander creature subtypes

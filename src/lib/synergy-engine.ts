@@ -13,8 +13,13 @@ import { generateTags } from "./card-tags";
 import {
   identifyTribalAnchors,
   getCreatureSubtypes,
+  getCommanderTypes,
   isChangeling,
 } from "./creature-types";
+import {
+  identifySupertypeAnchors,
+  isHistoric,
+} from "./supertypes";
 
 const BASE_SCORE = 50;
 const AXIS_WEIGHT = 3;
@@ -299,6 +304,10 @@ function boostTribalScores(
   const tribalAxis = SYNERGY_AXES.find((a) => a.id === "tribal");
   if (!tribalAxis) return;
 
+  // Extract commander type sets for tiered boosting
+  const { subtypes: cmdSubtypes, oracleTypes: cmdOracleTypes } =
+    getCommanderTypes(commanders);
+
   for (const name of cardNames) {
     const card = cardMap[name];
     if (!card) continue;
@@ -306,15 +315,26 @@ function boostTribalScores(
     const subtypes = getCreatureSubtypes(card);
     const changeling = isChangeling(card);
 
-    // Changelings match all anchor types; regular creatures match by subtype
-    const matchCount = changeling
-      ? anchors.length
-      : subtypes.filter((st) => anchorSet.has(st)).length;
+    // Determine matching anchors and their tiered boost rates
+    const matchingAnchors = changeling
+      ? anchors
+      : subtypes.filter((st) => anchorSet.has(st));
 
-    if (matchCount === 0) continue;
+    if (matchingAnchors.length === 0) continue;
 
-    // Compute boost: enough to cross the 0.2 threshold for synergy pairing
-    const boost = Math.min(0.4, matchCount * 0.15);
+    // Compute tiered boost: commander subtypes 0.25, oracle-referenced 0.20, density-only 0.15
+    // Use highest tier per type (don't stack)
+    let boost = 0;
+    for (const type of matchingAnchors) {
+      if (cmdSubtypes.has(type)) {
+        boost += 0.25;
+      } else if (cmdOracleTypes.has(type)) {
+        boost += 0.20;
+      } else {
+        boost += 0.15;
+      }
+    }
+    boost = Math.min(0.5, boost);
 
     const cardAxes = axisScores.get(name) ?? [];
     const existing = cardAxes.find((a) => a.axisId === "tribal");
@@ -334,10 +354,80 @@ function boostTribalScores(
   }
 }
 
+/**
+ * Boost supertypeMatter axis scores for cards matching supertype anchors.
+ * Similar to boostTribalScores but for legendary/snow/historic patterns.
+ */
+function boostSupertypeScores(
+  deck: DeckData,
+  cardNames: string[],
+  cardMap: Record<string, EnrichedCard>,
+  axisScores: Map<string, CardAxisScore[]>
+): string[] {
+  // Resolve commanders
+  const commanders: EnrichedCard[] = [];
+  for (const cmd of deck.commanders) {
+    const card = cardMap[cmd.name];
+    if (card) commanders.push(card);
+  }
+
+  // Identify which supertypes the deck is built around
+  const anchors = identifySupertypeAnchors(commanders, cardNames, cardMap);
+  if (anchors.length === 0) return anchors;
+
+  const anchorSet = new Set(anchors);
+  const supertypeAxis = SYNERGY_AXES.find((a) => a.id === "supertypeMatter");
+  if (!supertypeAxis) return anchors;
+
+  for (const name of cardNames) {
+    const card = cardMap[name];
+    if (!card) continue;
+
+    // Check each anchor against the card
+    let matchCount = 0;
+    for (const anchor of anchors) {
+      if (anchor === "legendary" && card.supertypes.includes("Legendary")) {
+        matchCount++;
+      } else if (anchor === "snow" && card.supertypes.includes("Snow")) {
+        matchCount++;
+      } else if (anchor === "historic" && isHistoric(card)) {
+        matchCount++;
+      }
+    }
+
+    if (matchCount === 0) continue;
+
+    const boost = Math.min(0.4, matchCount * 0.2);
+    const cardAxes = axisScores.get(name) ?? [];
+    const existing = cardAxes.find((a) => a.axisId === "supertypeMatter");
+
+    if (existing) {
+      existing.relevance = Math.min(1, existing.relevance + boost);
+    } else {
+      cardAxes.push({
+        axisId: "supertypeMatter",
+        axisName: supertypeAxis.name,
+        relevance: boost,
+      });
+      axisScores.set(name, cardAxes);
+    }
+  }
+
+  return anchors;
+}
+
+/** Supertype anchor name to theme display name */
+const SUPERTYPE_THEME_NAMES: Record<string, string> = {
+  legendary: "Legendary Matters",
+  snow: "Snow Matters",
+  historic: "Historic",
+};
+
 /** Identify deck themes from axis strengths */
 function identifyDeckThemes(
   axisScores: Map<string, CardAxisScore[]>,
-  anchors?: string[]
+  anchors?: string[],
+  supertypeAnchors?: string[]
 ): DeckTheme[] {
   const axisCardCounts = new Map<string, number>();
   const axisStrengths = new Map<string, number>();
@@ -367,6 +457,11 @@ function identifyDeckThemes(
       theme.detail = anchors[0];
       theme.axisName = `${anchors[0]} Tribal`;
     }
+    // Annotate supertypeMatter themes with the primary supertype anchor
+    if (axisId === "supertypeMatter" && supertypeAnchors && supertypeAnchors.length > 0) {
+      theme.detail = supertypeAnchors[0];
+      theme.axisName = SUPERTYPE_THEME_NAMES[supertypeAnchors[0]] ?? "Supertype Matters";
+    }
     themes.push(theme);
   }
 
@@ -385,6 +480,9 @@ export function analyzeDeckSynergy(
 
   // Step 1b: Boost tribal scores for creatures sharing subtypes with anchors
   boostTribalScores(deck, cardNames, cardMap, axisScores);
+
+  // Step 1c: Boost supertype scores for cards matching supertype anchors
+  const supertypeAnchors = boostSupertypeScores(deck, cardNames, cardMap, axisScores);
 
   // Step 2: Compute deck-level axis strengths
   const deckAxisStrengths = computeDeckAxisStrengths(axisScores);
@@ -415,7 +513,7 @@ export function analyzeDeckSynergy(
     if (card) commanders.push(card);
   }
   const tribalAnchors = identifyTribalAnchors(commanders, cardNames, cardMap);
-  const deckThemes = identifyDeckThemes(axisScores, tribalAnchors);
+  const deckThemes = identifyDeckThemes(axisScores, tribalAnchors, supertypeAnchors);
 
   // Step 8: Sort and return
   const topSynergies = [...synergyPairs, ...comboPairs]

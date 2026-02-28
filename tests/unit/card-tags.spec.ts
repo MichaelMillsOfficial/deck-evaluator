@@ -1198,3 +1198,135 @@ test.describe("generateTags — Tribal Payoff", () => {
     expect(generateTags(card)).toContain("Tribal Payoff");
   });
 });
+
+test.describe("generateTags — Legendary Payoff", () => {
+  test("Jodah (cast legendary + legendary buff) → Legendary Payoff", () => {
+    const card = makeCard({
+      name: "Jodah, the Unifier",
+      oracleText:
+        "Whenever you cast a legendary nontoken spell, exile cards from the top of your library until you exile a legendary nontoken spell that costs less. You may cast that spell without paying its mana cost. Legendary creatures you control get +1/+1.",
+      typeLine: "Legendary Creature — Human Wizard",
+      supertypes: ["Legendary"],
+    });
+    expect(generateTags(card)).toContain("Legendary Payoff");
+  });
+
+  test("Kethis (legendary cost reduction + graveyard) → Legendary Payoff", () => {
+    const card = makeCard({
+      name: "Kethis, the Hidden Hand",
+      oracleText:
+        "Legendary spells you cast cost {1} less to cast.\nExile two legendary cards from your graveyard: Until end of turn, each legendary card in your graveyard gains \"You may play this card from your graveyard.\"",
+      typeLine: "Legendary Creature — Elf Advisor",
+      supertypes: ["Legendary"],
+    });
+    expect(generateTags(card)).toContain("Legendary Payoff");
+  });
+
+  test("Jhoira (historic cast trigger) → Legendary Payoff", () => {
+    const card = makeCard({
+      name: "Jhoira, Weatherlight Captain",
+      oracleText: "Whenever you cast a historic spell, draw a card.",
+      typeLine: "Legendary Creature — Human Artificer",
+      supertypes: ["Legendary"],
+    });
+    expect(generateTags(card)).toContain("Legendary Payoff");
+  });
+
+  test("Shanid (play a legendary) → Legendary Payoff", () => {
+    const card = makeCard({
+      name: "Shanid, Sleepers' Scourge",
+      oracleText:
+        "Menace\nOther legendary creatures you control have menace.\nWhenever you play a legendary land or cast a legendary spell, you draw a card and you lose 1 life.",
+      typeLine: "Legendary Creature — Human Knight",
+      supertypes: ["Legendary"],
+    });
+    expect(generateTags(card)).toContain("Legendary Payoff");
+  });
+
+  test("Mirror Box (legend rule) → Legendary Payoff", () => {
+    const card = makeCard({
+      name: "Mirror Box",
+      oracleText:
+        "The \"legend rule\" doesn't apply to permanents you control.\nEach legendary creature you control gets +1/+1.\nEach nontoken creature you control gets +1/+1 for each other creature you control with the same name.",
+      typeLine: "Artifact",
+      supertypes: [],
+    });
+    expect(generateTags(card)).toContain("Legendary Payoff");
+  });
+
+  test("Thalia (Legendary, no payoff text) → no Legendary Payoff", () => {
+    const card = makeCard({
+      name: "Thalia, Guardian of Thraben",
+      oracleText:
+        "First strike\nNoncreature spells cost {1} more to cast.",
+      typeLine: "Legendary Creature — Human Soldier",
+      supertypes: ["Legendary"],
+    });
+    expect(generateTags(card)).not.toContain("Legendary Payoff");
+  });
+
+  test("Grizzly Bears → no Legendary Payoff", () => {
+    const card = makeCard({
+      name: "Grizzly Bears",
+      oracleText: "",
+      typeLine: "Creature — Bear",
+    });
+    expect(generateTags(card)).not.toContain("Legendary Payoff");
+  });
+});
+
+test.describe("generateTags — Snow Payoff", () => {
+  test("Narfi (other snow lord + {S} in oracle) → Snow Payoff", () => {
+    const card = makeCard({
+      name: "Narfi, Betrayer King",
+      oracleText:
+        "Other snow and Zombie creatures you control get +1/+1.\n{S}{S}{S}: Return Narfi, Betrayer King from your graveyard to the battlefield tapped.",
+      typeLine: "Legendary Snow Creature — Zombie Wizard",
+      supertypes: ["Legendary", "Snow"],
+      manaCost: "{3}{U}{B}",
+    });
+    expect(generateTags(card)).toContain("Snow Payoff");
+  });
+
+  test("Marit Lage's Slumber (snow permanent enters) → Snow Payoff", () => {
+    const card = makeCard({
+      name: "Marit Lage's Slumber",
+      oracleText:
+        "Whenever a snow permanent enters the battlefield under your control, scry 1.\nAt the beginning of your upkeep, if you control ten or more snow permanents, sacrifice Marit Lage's Slumber. If you do, create Marit Lage, a legendary 20/20 black Avatar creature token with flying and indestructible.",
+      typeLine: "Legendary Snow Enchantment",
+      supertypes: ["Legendary", "Snow"],
+    });
+    expect(generateTags(card)).toContain("Snow Payoff");
+  });
+
+  test("Card with {S} in manaCost only → Snow Payoff", () => {
+    const card = makeCard({
+      name: "Icehide Golem",
+      oracleText: "",
+      typeLine: "Snow Artifact Creature — Golem",
+      supertypes: ["Snow"],
+      manaCost: "{S}",
+    });
+    expect(generateTags(card)).toContain("Snow Payoff");
+  });
+
+  test("Hylda (ice-themed, NOT snow) → no Snow Payoff", () => {
+    const card = makeCard({
+      name: "Hylda of the Icy Crown",
+      oracleText:
+        "Whenever you tap an untapped creature an opponent controls, you may pay {1}. When you do, choose one — Create a 4/4 white and blue Elemental creature token. Put two +1/+1 counters on target creature you control. Scry 2, then draw a card.",
+      typeLine: "Legendary Creature — Human Warlock",
+      supertypes: ["Legendary"],
+    });
+    expect(generateTags(card)).not.toContain("Snow Payoff");
+  });
+
+  test("Grizzly Bears → no Snow Payoff", () => {
+    const card = makeCard({
+      name: "Grizzly Bears",
+      oracleText: "",
+      typeLine: "Creature — Bear",
+    });
+    expect(generateTags(card)).not.toContain("Snow Payoff");
+  });
+});

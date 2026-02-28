@@ -103,4 +103,52 @@ test.describe("findCombosInDeck", () => {
     expect(combo).toBeDefined();
     expect(combo!.type).toBe("infinite");
   });
+
+  test("finds Kethis + Mox Amber legendary combo", () => {
+    const cardNames = ["Kethis, the Hidden Hand", "Mox Amber", "Forest"];
+    const found = findCombosInDeck(cardNames);
+    const combo = found.find(
+      (c) =>
+        c.cards.includes("Kethis, the Hidden Hand") &&
+        c.cards.includes("Mox Amber")
+    );
+    expect(combo).toBeDefined();
+    expect(combo!.type).toBe("value");
+  });
+
+  test("finds Jhoira + Aetherflux Reservoir historic combo", () => {
+    const cardNames = ["Jhoira, Weatherlight Captain", "Aetherflux Reservoir"];
+    const found = findCombosInDeck(cardNames);
+    const combo = found.find(
+      (c) =>
+        c.cards.includes("Jhoira, Weatherlight Captain") &&
+        c.cards.includes("Aetherflux Reservoir")
+    );
+    expect(combo).toBeDefined();
+    expect(combo!.type).toBe("wincon");
+  });
+
+  test("finds Jhoira + Sensei's Divining Top historic combo", () => {
+    const cardNames = ["Jhoira, Weatherlight Captain", "Sensei's Divining Top"];
+    const found = findCombosInDeck(cardNames);
+    const combo = found.find(
+      (c) =>
+        c.cards.includes("Jhoira, Weatherlight Captain") &&
+        c.cards.includes("Sensei's Divining Top")
+    );
+    expect(combo).toBeDefined();
+    expect(combo!.type).toBe("value");
+  });
+
+  test("finds Teshar + Mox Amber historic recursion combo", () => {
+    const cardNames = ["Teshar, Ancestor's Apostle", "Mox Amber"];
+    const found = findCombosInDeck(cardNames);
+    const combo = found.find(
+      (c) =>
+        c.cards.includes("Teshar, Ancestor's Apostle") &&
+        c.cards.includes("Mox Amber")
+    );
+    expect(combo).toBeDefined();
+    expect(combo!.type).toBe("value");
+  });
 });

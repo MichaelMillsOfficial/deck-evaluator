@@ -127,6 +127,29 @@ const EVASION_KEYWORDS = new Set([
   "Skulk",
 ]);
 
+// --- Supertype Matters ---
+const SUPERTYPE_LEGENDARY_CAST_RE =
+  /whenever you (?:cast|play) a (?:legendary|historic)/i;
+const SUPERTYPE_LEGENDARY_ETB_RE =
+  /whenever (?:a|another) legendary.*(?:enters|dies)/i;
+const SUPERTYPE_LEGENDARY_STATIC_RE =
+  /legendary (?:creature|permanent)s? you control (?:get \+|have)/i;
+const SUPERTYPE_LEGENDARY_OTHER_RE =
+  /other legendary (?:creature|permanent)s? you control/i;
+const SUPERTYPE_LEGENDARY_FOR_EACH_RE =
+  /\b(?:for each|each|number of) legendary\b/i;
+const SUPERTYPE_LEGENDARY_COST_RE =
+  /legendary.*(?:spell|permanent|card)s?.*cost.*less/i;
+const SUPERTYPE_LEGENDARY_GRAVEYARD_RE =
+  /legendary cards? (?:from|in) your graveyard/i;
+const SUPERTYPE_LEGEND_RULE_RE = /\blegend rule\b/i;
+const SUPERTYPE_HISTORIC_RE = /\bhistoric\b/i;
+const SUPERTYPE_SNOW_BROAD_RE =
+  /\bsnow\b[^.]*?\b(?:permanent|creature|land)s?\b/i;
+const SUPERTYPE_SNOW_OTHER_RE = /\bother snow\b/i;
+const SUPERTYPE_SNOW_TRIGGER_RE = /whenever a snow.*enters|for each snow/i;
+const SUPERTYPE_SNOW_MANA_RE = /\{S\}/;
+
 export const SYNERGY_AXES: SynergyAxisDefinition[] = [
   {
     id: "counters",
@@ -335,6 +358,36 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
       if (card.keywords.some((kw) => EVASION_KEYWORDS.has(kw))) score += 0.4;
       if (EVASION_UNBLOCKABLE_RE.test(text)) score += 0.6;
       if (EVASION_COMBAT_DAMAGE_RE.test(text)) score += 0.5;
+      return Math.min(score, 1);
+    },
+    conflictsWith: [],
+  },
+  {
+    id: "supertypeMatter",
+    name: "Supertype Matters",
+    description: "Legendary, historic, and snow permanent synergies",
+    color: { bg: "bg-amber-500/20", text: "text-amber-300" },
+    detect(card) {
+      const text = card.oracleText;
+      let score = 0;
+      // Legendary-matters
+      if (SUPERTYPE_LEGENDARY_CAST_RE.test(text)) score += 0.7;
+      if (SUPERTYPE_LEGENDARY_ETB_RE.test(text)) score += 0.6;
+      if (SUPERTYPE_LEGENDARY_STATIC_RE.test(text)) score += 0.5;
+      if (SUPERTYPE_LEGENDARY_OTHER_RE.test(text)) score += 0.5;
+      if (SUPERTYPE_LEGENDARY_FOR_EACH_RE.test(text)) score += 0.5;
+      if (SUPERTYPE_LEGENDARY_COST_RE.test(text)) score += 0.6;
+      if (SUPERTYPE_LEGENDARY_GRAVEYARD_RE.test(text)) score += 0.5;
+      if (SUPERTYPE_LEGEND_RULE_RE.test(text)) score += 0.4;
+      // Historic
+      if (SUPERTYPE_HISTORIC_RE.test(text)) score += 0.5;
+      // Snow-matters
+      if (SUPERTYPE_SNOW_OTHER_RE.test(text)) score += 0.6;
+      if (SUPERTYPE_SNOW_BROAD_RE.test(text)) score += 0.5;
+      if (SUPERTYPE_SNOW_TRIGGER_RE.test(text)) score += 0.5;
+      if (SUPERTYPE_SNOW_MANA_RE.test(text)) score += 0.4;
+      // {S} in mana cost (not just oracle text)
+      if (SUPERTYPE_SNOW_MANA_RE.test(card.manaCost)) score += 0.3;
       return Math.min(score, 1);
     },
     conflictsWith: [],

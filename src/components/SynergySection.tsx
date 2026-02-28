@@ -5,6 +5,7 @@ import type { DeckData, DeckSynergyAnalysis, EnrichedCard } from "@/lib/types";
 import type { SpellbookCombo } from "@/lib/commander-spellbook";
 import DeckThemes from "@/components/DeckThemes";
 import CreatureTypeBreakdown from "@/components/CreatureTypeBreakdown";
+import SupertypeBreakdown from "@/components/SupertypeBreakdown";
 import SynergyStats from "@/components/SynergyStats";
 import SynergyPairList from "@/components/SynergyPairList";
 import CardSynergyTable from "@/components/CardSynergyTable";
@@ -92,6 +93,11 @@ export default function SynergySection({
         {analysis.deckThemes.some((t) => t.axisId === "tribal") && (
           <div className="mt-4">
             <CreatureTypeBreakdown deck={deck} cardMap={cardMap} />
+          </div>
+        )}
+        {analysis.deckThemes.some((t) => t.axisId === "supertypeMatter") && (
+          <div className="mt-4">
+            <SupertypeBreakdown deck={deck} cardMap={cardMap} />
           </div>
         )}
       </CollapsiblePanel>

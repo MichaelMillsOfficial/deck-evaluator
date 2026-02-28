@@ -144,6 +144,28 @@ export const KNOWN_COMBOS: KnownCombo[] = [
     description: "All Zombies gain swampwalk and regeneration (all lands are Swamps)",
     type: "value",
   },
+
+  // --- Legendary / Historic Combos ---
+  {
+    cards: ["Kethis, the Hidden Hand", "Mox Amber"],
+    description: "Legendary mana loop: Kethis lets you replay Mox Amber from graveyard for free mana",
+    type: "value",
+  },
+  {
+    cards: ["Jhoira, Weatherlight Captain", "Aetherflux Reservoir"],
+    description: "Historic storm: chain historic spells drawing cards with Jhoira, gain life with Reservoir to kill",
+    type: "wincon",
+  },
+  {
+    cards: ["Jhoira, Weatherlight Captain", "Sensei's Divining Top"],
+    description: "Draw engine: Top is historic, draw with Jhoira, recast Top from library with cost reducer",
+    type: "value",
+  },
+  {
+    cards: ["Teshar, Ancestor's Apostle", "Mox Amber"],
+    description: "Historic recursion loop: cast Mox Amber (historic), Teshar returns a creature, sacrifice and repeat",
+    type: "value",
+  },
 ];
 
 /**
