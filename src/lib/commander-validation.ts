@@ -130,13 +130,19 @@ export function validateCommanderDeck(
 
 /**
  * Check if a card is a legal commander.
- * Must be a Legendary Creature or Legendary Planeswalker,
+ * Must be Legendary and one of: Creature, Planeswalker, Vehicle, or Spacecraft,
  * or have "can be your commander" in oracle text.
+ *
+ * As of July 2025 (Edge of Eternities), legendary Vehicles and Spacecraft
+ * with a power/toughness box are eligible to be commanders.
  */
 export function isLegalCommander(card: EnrichedCard): boolean {
   if (/can be your commander/i.test(card.oracleText)) return true;
   if (!card.supertypes.includes("Legendary")) return false;
-  return /\bCreature\b/.test(card.typeLine) || /\bPlaneswalker\b/.test(card.typeLine);
+  return /\bCreature\b/.test(card.typeLine)
+    || /\bPlaneswalker\b/.test(card.typeLine)
+    || /\bVehicle\b/.test(card.typeLine)
+    || /\bSpacecraft\b/.test(card.typeLine);
 }
 
 /**
@@ -182,7 +188,7 @@ export function validateCommanderLegality(
       continue;
     }
     if (!isLegalCommander(card)) {
-      warnings.push(`"${name}" may not be a legal commander — it is not a Legendary Creature or Planeswalker.`);
+      warnings.push(`"${name}" may not be a legal commander — it is not a Legendary Creature, Planeswalker, Vehicle, or Spacecraft.`);
     }
   }
 

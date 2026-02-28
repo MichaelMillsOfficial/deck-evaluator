@@ -81,17 +81,18 @@ function getProducedColors(card: EnrichedCard): Set<string> {
 // ---------------------------------------------------------------------------
 
 /**
- * Flatten commanders + mainboard into a pool of HandCards, repeating for
- * quantity. Sideboard is excluded. Cards missing from cardMap are skipped.
+ * Flatten mainboard into a pool of HandCards, repeating for quantity.
+ * Commanders and sideboard are excluded — commanders start in the command
+ * zone and are never part of the library. Cards missing from cardMap are
+ * skipped.
  */
 export function buildPool(
   deck: DeckData,
   cardMap: Record<string, EnrichedCard>
 ): HandCard[] {
   const pool: HandCard[] = [];
-  const cards = [...deck.commanders, ...deck.mainboard];
 
-  for (const card of cards) {
+  for (const card of deck.mainboard) {
     const enriched = cardMap[card.name];
     if (!enriched) continue;
 
@@ -105,6 +106,32 @@ export function buildPool(
   }
 
   return pool;
+}
+
+/**
+ * Build command zone HandCards from the deck's commanders.
+ * These cards are always available to cast and are never drawn.
+ */
+export function buildCommandZone(
+  deck: DeckData,
+  cardMap: Record<string, EnrichedCard>
+): HandCard[] {
+  const zone: HandCard[] = [];
+
+  for (const card of deck.commanders) {
+    const enriched = cardMap[card.name];
+    if (!enriched) continue;
+
+    for (let i = 0; i < card.quantity; i++) {
+      zone.push({
+        name: card.name,
+        quantity: card.quantity,
+        enriched,
+      });
+    }
+  }
+
+  return zone;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +172,8 @@ export function drawHand(pool: HandCard[], count: number): HandCard[] {
 export function evaluateHandQuality(
   hand: HandCard[],
   mulliganNumber: number,
-  commanderIdentity: Set<MtgColor | string>
+  commanderIdentity: Set<MtgColor | string>,
+  commandZone: HandCard[] = []
 ): HandQualityResult {
   const handSize = hand.length;
   if (handSize === 0) {
@@ -196,12 +224,14 @@ export function evaluateHandQuality(
   // Turn 1: need 1 untapped land + spell with CMC <= 1 castable with that land's colors
   // Turn 2: need 2 lands (at least 1 untapped initially) + spell CMC <= 2
   // Turn 3: need 3 lands + spell CMC <= 3
+  // Commanders in the command zone are always available as castable spells.
+  const allSpells = [...spells, ...commandZone];
   const playableTurns: boolean[] = [];
 
   // Turn 1
   const t1Playable =
     untappedCount >= 1 &&
-    spells.some((s) => {
+    allSpells.some((s) => {
       if (s.enriched.cmc > 1) return false;
       // Check if the spell's color requirements can be met by untapped lands
       return canCastSpell(s.enriched, untappedColors);
@@ -211,7 +241,7 @@ export function evaluateHandQuality(
   // Turn 2
   const t2Playable =
     landCount >= 2 &&
-    spells.some((s) => {
+    allSpells.some((s) => {
       if (s.enriched.cmc > 2) return false;
       return canCastSpell(s.enriched, availableColors);
     });
@@ -220,7 +250,7 @@ export function evaluateHandQuality(
   // Turn 3
   const t3Playable =
     landCount >= 3 &&
-    spells.some((s) => {
+    allSpells.some((s) => {
       if (s.enriched.cmc > 3) return false;
       return canCastSpell(s.enriched, availableColors);
     });
@@ -445,7 +475,8 @@ export function generateReasoning(
 export function runSimulation(
   pool: HandCard[],
   commanderIdentity: Set<MtgColor | string>,
-  iterations = 1000
+  iterations = 1000,
+  commandZone: HandCard[] = []
 ): SimulationStats {
 
   const verdictDistribution: Record<Verdict, number> = {
@@ -463,7 +494,7 @@ export function runSimulation(
 
   for (let i = 0; i < iterations; i++) {
     const hand = drawHand(pool, 7);
-    const quality = evaluateHandQuality(hand, 0, commanderIdentity);
+    const quality = evaluateHandQuality(hand, 0, commanderIdentity, commandZone);
 
     verdictDistribution[quality.verdict]++;
     totalScore += quality.score;
@@ -501,7 +532,8 @@ export function findTopHands(
   pool: HandCard[],
   commanderIdentity: Set<MtgColor | string>,
   topN = 5,
-  iterations = 2000
+  iterations = 2000,
+  commandZone: HandCard[] = []
 ): RankedHand[] {
   if (pool.length === 0) return [];
 
@@ -511,7 +543,7 @@ export function findTopHands(
 
   for (let i = 0; i < iterations; i++) {
     const cards = drawHand(pool, 7);
-    const quality = evaluateHandQuality(cards, 0, commanderIdentity);
+    const quality = evaluateHandQuality(cards, 0, commanderIdentity, commandZone);
 
     // Dedup key: sorted card names joined
     const cardKey = cards

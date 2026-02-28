@@ -407,6 +407,55 @@ test.describe("Opening Hand Simulator", () => {
     await expect(page.getByTestId("verdict-distribution")).toBeVisible();
   });
 
+  test("Drawn hand does not contain commander cards", async ({ deckPage }) => {
+    const { page } = deckPage;
+    await deckPage.goto();
+    await deckPage.fillDecklist(DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Hands");
+    await deckPage.waitForHandsPanel();
+    await deckPage.expandHandsSection("draw-hand");
+    await page.getByTestId("draw-hand-btn").click();
+
+    // Hand display should be visible
+    await expect(page.getByTestId("hand-display")).toBeVisible();
+
+    // Commander "Atraxa" should NOT appear in the hand cards
+    const handCards = page.getByTestId("hand-cards");
+    await expect(handCards).not.toContainText("Atraxa");
+  });
+
+  test("Command zone shows commander when drawing hand", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await deckPage.goto();
+    await deckPage.fillDecklist(DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Hands");
+    await deckPage.waitForHandsPanel();
+    await deckPage.expandHandsSection("draw-hand");
+    await page.getByTestId("draw-hand-btn").click();
+
+    // Command zone should be visible and contain the commander
+    const commandZone = page.getByTestId("command-zone");
+    await expect(commandZone).toBeVisible();
+    await expect(commandZone).toContainText("Atraxa");
+    await expect(commandZone).toContainText("Command Zone");
+  });
+
   test("Tab accessible with proper ARIA attributes", async ({ deckPage }) => {
     const { page } = deckPage;
     await deckPage.goto();

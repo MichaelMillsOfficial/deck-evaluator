@@ -1,6 +1,6 @@
 "use client";
 
-import type { DrawnHand } from "@/lib/opening-hand";
+import type { DrawnHand, HandCard } from "@/lib/opening-hand";
 import ManaCost from "@/components/ManaCost";
 
 const VERDICT_COLORS: Record<string, string> = {
@@ -12,9 +12,10 @@ const VERDICT_COLORS: Record<string, string> = {
 
 interface HandDisplayProps {
   hand: DrawnHand;
+  commandZone?: HandCard[];
 }
 
-export default function HandDisplay({ hand }: HandDisplayProps) {
+export default function HandDisplay({ hand, commandZone = [] }: HandDisplayProps) {
   const { cards, quality, mulliganNumber } = hand;
   const verdictStyle = VERDICT_COLORS[quality.verdict] ?? "";
 
@@ -24,6 +25,48 @@ export default function HandDisplay({ hand }: HandDisplayProps) {
       aria-label={`Drawn hand: ${quality.verdict}, score ${quality.score}`}
       className="space-y-4"
     >
+      {/* Command Zone */}
+      {commandZone.length > 0 && (
+        <div
+          data-testid="command-zone"
+          className="rounded-lg border border-purple-500/30 bg-purple-950/20 p-2"
+        >
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-purple-400">
+            Command Zone
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {commandZone.map((card, idx) => (
+              <div key={`cmd-${card.name}-${idx}`} className="flex items-center gap-1.5">
+                {card.enriched.imageUris?.small ? (
+                  <img
+                    src={card.enriched.imageUris.small}
+                    alt={card.name}
+                    width={48}
+                    height={67}
+                    className="rounded border border-purple-500/40"
+                  />
+                ) : (
+                  <div
+                    role="img"
+                    className="flex items-center justify-center rounded border border-purple-500/40 bg-slate-700/50"
+                    style={{ width: 48, height: 67 }}
+                    aria-label={card.name}
+                  >
+                    <p className="px-0.5 text-[8px] font-medium text-slate-200 leading-tight text-center">
+                      {card.name}
+                    </p>
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-purple-200 truncate">{card.name}</p>
+                  <ManaCost cost={card.enriched.manaCost} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Mulligan indicator */}
       {mulliganNumber > 0 && (
         <p
