@@ -185,9 +185,74 @@ export const TEMPLATE_COMMAND_ZONE: CompositionTemplate = {
   ],
 };
 
+export const TEMPLATE_TRIBAL: CompositionTemplate = {
+  id: "tribal",
+  name: "Tribal Template",
+  description: "Creature type-focused deck with lords, tribal payoffs, and critical mass of shared-type creatures",
+  categories: [
+    {
+      tag: "Lands",
+      label: "Lands",
+      min: 35,
+      max: 38,
+      description: "Mana-producing lands",
+    },
+    {
+      tag: "Lord",
+      label: "Lords",
+      min: 3,
+      max: 6,
+      description: "Type-specific creature buffs (+1/+1 or keyword grants)",
+    },
+    {
+      tag: "Tribal Payoff",
+      label: "Tribal Payoffs",
+      min: 5,
+      max: 10,
+      description: "Cards that reward playing a specific creature type",
+    },
+    {
+      tag: "Ramp",
+      label: "Ramp",
+      min: 7,
+      max: 10,
+      description: "Mana acceleration and land search",
+    },
+    {
+      tag: "Card Draw",
+      label: "Card Draw",
+      min: 7,
+      max: 10,
+      description: "Draw effects and card advantage",
+    },
+    {
+      tag: "Removal",
+      label: "Removal",
+      min: 5,
+      max: 8,
+      description: "Single-target and mass removal",
+    },
+    {
+      tag: "Board Wipe",
+      label: "Board Wipes",
+      min: 2,
+      max: 3,
+      description: "Mass removal (prefer asymmetric like Kindred Dominance)",
+    },
+    {
+      tag: "Protection",
+      label: "Protection",
+      min: 3,
+      max: 5,
+      description: "Keep your board alive",
+    },
+  ],
+};
+
 export const AVAILABLE_TEMPLATES: CompositionTemplate[] = [
   TEMPLATE_COMMAND_ZONE, // default first
   TEMPLATE_8X8,
+  TEMPLATE_TRIBAL,
 ];
 
 // ---------------------------------------------------------------------------

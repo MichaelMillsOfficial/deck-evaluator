@@ -231,12 +231,121 @@ test.describe("Tribal axis", () => {
     expect(axis.detect(card)).toBeGreaterThan(0);
   });
 
+  test("Najeela (type-specific trigger: Whenever a Warrior attacks) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Najeela, the Blade-Blossom",
+      oracleText:
+        "Whenever a Warrior attacks, you may have its controller create a 1/1 white Warrior creature token that's tapped and attacking.",
+      subtypes: ["Human", "Warrior"],
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Goblin Chieftain (type-specific lord + haste) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Goblin Chieftain",
+      oracleText: "Haste\nOther Goblin creatures you control get +1/+1 and have haste.",
+      subtypes: ["Goblin"],
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Kindred Dominance (type-specific board wipe) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Kindred Dominance",
+      typeLine: "Kindred Sorcery",
+      oracleText:
+        "Choose a creature type. Destroy all creatures that aren't of the chosen type.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Mirror Entity (Changeling keyword) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Mirror Entity",
+      keywords: ["Changeling"],
+      typeLine: "Creature — Shapeshifter",
+      subtypes: ["Shapeshifter"],
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Herald's Horn (chosen type cost reduction + card advantage) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Herald's Horn",
+      typeLine: "Artifact",
+      oracleText:
+        "As Herald's Horn enters the battlefield, choose a creature type.\nCreature spells of the chosen type cost {1} less to cast.\nAt the beginning of your upkeep, look at the top card of your library. If it's a creature card of the chosen type, you may reveal it and put it into your hand.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Vanquisher's Banner (chosen type lord + draw) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Vanquisher's Banner",
+      typeLine: "Artifact",
+      oracleText:
+        "As Vanquisher's Banner enters the battlefield, choose a creature type.\nCreatures you control of the chosen type get +1/+1.\nWhenever you cast a creature spell of the chosen type, draw a card.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Coat of Arms (creatures that share type get +1/+1) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Coat of Arms",
+      typeLine: "Artifact",
+      oracleText:
+        "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
   test("returns 0 for generic creature", () => {
     const axis = getAxisById("tribal")!;
     const card = mockCard({
       typeLine: "Creature — Human",
       oracleText: "Flying",
       subtypes: ["Human"],
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("Glorious Anthem (generic anthem, no type reference) → 0", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Glorious Anthem",
+      typeLine: "Enchantment",
+      oracleText: "Creatures you control get +1/+1.",
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("Maskwood Nexus ('every creature type') scores > 0", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Maskwood Nexus",
+      typeLine: "Artifact",
+      oracleText:
+        "Creatures you control are every creature type. The same is true for creature spells you control and creature cards you own that aren't on the battlefield.\n{4}, {T}: Create a 2/2 colorless Shapeshifter creature token with changeling.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Elesh Norn (generic 'other creatures' buff, no type name) → 0", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Elesh Norn, Grand Cenobite",
+      typeLine: "Legendary Creature — Phyrexian Praetor",
+      oracleText:
+        "Vigilance\nOther creatures you control get +2/+2. Creatures your opponents control get -2/-2.",
+      keywords: ["Vigilance"],
     });
     expect(axis.detect(card)).toBe(0);
   });
@@ -415,5 +524,146 @@ test.describe("Axis conflict declarations", () => {
     // with cards that have Board Wipe tag -- this is handled at engine level
     // So we just verify tokens axis exists
     expect(tokens).toBeDefined();
+  });
+});
+
+test.describe("Supertype Matters axis", () => {
+  test("Jodah, the Unifier (cast legendary + static buff) scores > 0", () => {
+    const axis = getAxisById("supertypeMatter")!;
+    const card = mockCard({
+      name: "Jodah, the Unifier",
+      typeLine: "Legendary Creature — Human",
+      supertypes: ["Legendary"],
+      oracleText:
+        "Legendary creatures you control get +1/+1.\nWhenever you cast a legendary nontoken spell, exile cards from the top of your library until you exile a legendary nontoken card. You may cast the exiled cards without paying their mana costs.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Jhoira, Weatherlight Captain (historic cast trigger) scores > 0", () => {
+    const axis = getAxisById("supertypeMatter")!;
+    const card = mockCard({
+      name: "Jhoira, Weatherlight Captain",
+      typeLine: "Legendary Creature — Human Artificer",
+      supertypes: ["Legendary"],
+      oracleText: "Whenever you cast a historic spell, draw a card.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Ratadrabik of Urborg (legendary death trigger) scores > 0", () => {
+    const axis = getAxisById("supertypeMatter")!;
+    const card = mockCard({
+      name: "Ratadrabik of Urborg",
+      typeLine: "Legendary Creature — Zombie Wizard",
+      supertypes: ["Legendary"],
+      oracleText:
+        "Vigilance, ward {2}\nOther legendary creatures you control have vigilance.\nWhenever another legendary creature you control dies, create a token that's a copy of that creature, except it's not legendary and it's a 2/2 black Zombie in addition to its other colors and types.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Kethis, the Hidden Hand (cost reduction + graveyard) scores > 0", () => {
+    const axis = getAxisById("supertypeMatter")!;
+    const card = mockCard({
+      name: "Kethis, the Hidden Hand",
+      typeLine: "Legendary Creature — Elf Advisor",
+      supertypes: ["Legendary"],
+      oracleText:
+        "Legendary spells you cast cost {1} less to cast.\nExile two legendary cards from your graveyard: Until end of turn, each legendary card in your graveyard gains \"You may play this card from your graveyard.\"",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Shanid, Sleepers' Scourge (play a legendary + other legendary lord) scores > 0", () => {
+    const axis = getAxisById("supertypeMatter")!;
+    const card = mockCard({
+      name: "Shanid, Sleepers' Scourge",
+      typeLine: "Legendary Creature — Human Knight",
+      supertypes: ["Legendary"],
+      oracleText:
+        "Menace\nOther legendary creatures you control have menace.\nWhenever you play a legendary land or cast a legendary spell, you draw a card and you lose 1 life.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Mirror Box (legend rule manipulation) scores > 0", () => {
+    const axis = getAxisById("supertypeMatter")!;
+    const card = mockCard({
+      name: "Mirror Box",
+      typeLine: "Artifact",
+      oracleText:
+        "The \"legend rule\" doesn't apply to permanents you control.\nEach legendary creature you control gets +1/+1.\nEach nontoken creature you control with the same name as another creature you control gets +1/+1.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Narfi, Betrayer King (other snow lord + {S} ability) scores > 0", () => {
+    const axis = getAxisById("supertypeMatter")!;
+    const card = mockCard({
+      name: "Narfi, Betrayer King",
+      typeLine: "Legendary Snow Creature — Zombie Wizard",
+      supertypes: ["Legendary", "Snow"],
+      oracleText:
+        "Other snow and Zombie creatures you control get +1/+1.\n{S}{S}{S}: Return Narfi, Betrayer King from your graveyard to the battlefield tapped.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Marit Lage's Slumber (snow permanent enters trigger) scores > 0", () => {
+    const axis = getAxisById("supertypeMatter")!;
+    const card = mockCard({
+      name: "Marit Lage's Slumber",
+      typeLine: "Legendary Snow Enchantment",
+      supertypes: ["Legendary", "Snow"],
+      oracleText:
+        "Whenever a snow permanent enters the battlefield under your control, scry 1.\nAt the beginning of your upkeep, if you control ten or more snow permanents, sacrifice Marit Lage's Slumber and create Marit Lage, a legendary 20/20 black Avatar creature token with flying and indestructible.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("card with {S} only in manaCost scores > 0", () => {
+    const axis = getAxisById("supertypeMatter")!;
+    const card = mockCard({
+      name: "Icehide Golem",
+      typeLine: "Snow Artifact Creature — Golem",
+      supertypes: ["Snow"],
+      manaCost: "{S}",
+      oracleText: "",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("generic creature with no supertype references → 0", () => {
+    const axis = getAxisById("supertypeMatter")!;
+    const card = mockCard({
+      name: "Grizzly Bears",
+      typeLine: "Creature — Bear",
+      oracleText: "",
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("Legendary creature with no payoff text (Thalia) → 0", () => {
+    const axis = getAxisById("supertypeMatter")!;
+    const card = mockCard({
+      name: "Thalia, Guardian of Thraben",
+      typeLine: "Legendary Creature — Human Soldier",
+      supertypes: ["Legendary"],
+      oracleText: "First strike\nNoncreature spells cost {1} more to cast.",
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("Hylda of the Icy Crown (ice-themed, NOT snow-matters) → 0", () => {
+    const axis = getAxisById("supertypeMatter")!;
+    const card = mockCard({
+      name: "Hylda of the Icy Crown",
+      typeLine: "Legendary Creature — Human Warlock",
+      supertypes: ["Legendary"],
+      oracleText:
+        "Whenever you tap an untapped creature an opponent controls, choose one —\n• Create a 4/4 white and blue Elemental creature token.\n• Put two +1/+1 counters on target creature you control.\n• Scry 2, then draw a card.",
+    });
+    expect(axis.detect(card)).toBe(0);
   });
 });

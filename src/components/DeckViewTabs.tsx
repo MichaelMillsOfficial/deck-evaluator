@@ -197,6 +197,7 @@ export default function DeckViewTabs({
               Synergy analysis, known combos, and anti-synergy warnings
             </p>
             <SynergySection
+              deck={deck}
               analysis={synergyAnalysis}
               cardMap={cardMap}
               expandedSections={expandedSections.synergy}

@@ -35,10 +35,14 @@ import BudgetStats from "@/components/BudgetStats";
 import PriceDistributionChart from "@/components/PriceDistributionChart";
 import TopExpensiveCardsTable from "@/components/TopExpensiveCardsTable";
 import PriceByCategoryChart from "@/components/PriceByCategoryChart";
+import CreatureTypeBreakdown from "@/components/CreatureTypeBreakdown";
+import SupertypeBreakdown from "@/components/SupertypeBreakdown";
 
 const ANALYSIS_SECTIONS = [
   { id: "commander", label: "Commander" },
   { id: "composition", label: "Composition" },
+  { id: "creature-types", label: "Creature Types" },
+  { id: "supertypes", label: "Supertypes" },
   { id: "deck-classification", label: "Classification" },
   { id: "mana-curve", label: "Mana Curve" },
   { id: "color-distribution", label: "Color Dist." },
@@ -191,6 +195,24 @@ export default function DeckAnalysis({
         onToggle={() => onToggleSection("composition")}
       >
         <DeckCompositionScorecard deck={deck} cardMap={cardMap} />
+      </CollapsiblePanel>
+
+      <CollapsiblePanel
+        id="creature-types"
+        title="Creature Types"
+        expanded={expandedSections.has("creature-types")}
+        onToggle={() => onToggleSection("creature-types")}
+      >
+        <CreatureTypeBreakdown deck={deck} cardMap={cardMap} />
+      </CollapsiblePanel>
+
+      <CollapsiblePanel
+        id="supertypes"
+        title="Supertypes"
+        expanded={expandedSections.has("supertypes")}
+        onToggle={() => onToggleSection("supertypes")}
+      >
+        <SupertypeBreakdown deck={deck} cardMap={cardMap} />
       </CollapsiblePanel>
 
       <CollapsiblePanel

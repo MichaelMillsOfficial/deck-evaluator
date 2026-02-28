@@ -286,4 +286,522 @@ test.describe("analyzeDeckSynergy", () => {
     expect(Array.isArray(score.axes)).toBe(true);
     expect(Array.isArray(score.pairs)).toBe(true);
   });
+
+  test("tribal-heavy deck: Elf lord and Elves score above baseline", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Elvish Archdruid": mockCard({
+        name: "Elvish Archdruid",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "Other Elf creatures you control get +1/+1.\n{T}: Add {G} for each Elf you control.",
+      }),
+      "Llanowar Elves": mockCard({
+        name: "Llanowar Elves",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      "Elvish Mystic": mockCard({
+        name: "Elvish Mystic",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      "Fyndhorn Elves": mockCard({
+        name: "Fyndhorn Elves",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      "Priest of Titania": mockCard({
+        name: "Priest of Titania",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G} for each Elf on the battlefield.",
+      }),
+      "Lightning Bolt": mockCard({
+        name: "Lightning Bolt",
+        typeLine: "Instant",
+        oracleText: "Lightning Bolt deals 3 damage to any target.",
+      }),
+    };
+    const deck = mockDeck(
+      ["Llanowar Elves", "Elvish Mystic", "Fyndhorn Elves", "Priest of Titania", "Lightning Bolt"],
+      ["Elvish Archdruid"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Elf lord should score above baseline (50)
+    const archdruidScore = result.cardScores["Elvish Archdruid"]?.score ?? 0;
+    expect(archdruidScore).toBeGreaterThan(50);
+
+    // Plain Elves should also get a tribal boost above baseline
+    const llanowarScore = result.cardScores["Llanowar Elves"]?.score ?? 0;
+    expect(llanowarScore).toBeGreaterThan(50);
+
+    // Non-tribal card should stay at baseline
+    const boltScore = result.cardScores["Lightning Bolt"]?.score ?? 50;
+    expect(archdruidScore).toBeGreaterThan(boltScore);
+  });
+
+  test("Changeling synergizes with tribal payoffs", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Mirror Entity": mockCard({
+        name: "Mirror Entity",
+        typeLine: "Creature — Shapeshifter",
+        subtypes: ["Shapeshifter"],
+        keywords: ["Changeling"],
+        oracleText: "{X}: Until end of turn, creatures you control have base power and toughness X/X and gain all creature types until end of turn.",
+      }),
+      "Elvish Archdruid": mockCard({
+        name: "Elvish Archdruid",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "Other Elf creatures you control get +1/+1.\n{T}: Add {G} for each Elf you control.",
+      }),
+      "Llanowar Elves": mockCard({
+        name: "Llanowar Elves",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      "Elvish Mystic": mockCard({
+        name: "Elvish Mystic",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Mirror Entity should have synergy with the Elf lord
+    const mirrorScore = result.cardScores["Mirror Entity"]?.score ?? 0;
+    expect(mirrorScore).toBeGreaterThan(50);
+  });
+
+  test("warrior commander establishes tribal anchor and detects tribal theme", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Najeela, the Blade-Blossom": mockCard({
+        name: "Najeela, the Blade-Blossom",
+        typeLine: "Legendary Creature — Human Warrior",
+        subtypes: ["Human", "Warrior"],
+        oracleText: "Whenever a Warrior attacks, you may have its controller create a 1/1 white Warrior creature token that's tapped and attacking.",
+      }),
+      "Warrior A": mockCard({
+        name: "Warrior A",
+        typeLine: "Creature — Human Warrior",
+        subtypes: ["Human", "Warrior"],
+        oracleText: "Haste",
+      }),
+      "Warrior B": mockCard({
+        name: "Warrior B",
+        typeLine: "Creature — Human Warrior",
+        subtypes: ["Human", "Warrior"],
+        oracleText: "First strike",
+      }),
+      "Warrior C": mockCard({
+        name: "Warrior C",
+        typeLine: "Creature — Elf Warrior",
+        subtypes: ["Elf", "Warrior"],
+        oracleText: "Trample",
+      }),
+      "Warrior D": mockCard({
+        name: "Warrior D",
+        typeLine: "Creature — Warrior",
+        subtypes: ["Warrior"],
+        oracleText: "",
+      }),
+    };
+    const deck = mockDeck(
+      ["Warrior A", "Warrior B", "Warrior C", "Warrior D"],
+      ["Najeela, the Blade-Blossom"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Should detect tribal as a deck theme
+    const tribalTheme = result.deckThemes.find((t) => t.axisId === "tribal");
+    expect(tribalTheme).toBeDefined();
+  });
+
+  test("commander subtype gets higher tribal boost than density-only anchor", () => {
+    // Elf commander + 10 Elves + 5 Goblins (Goblins reach density threshold)
+    const cards: Record<string, EnrichedCard> = {
+      "Elf Commander": mockCard({
+        name: "Elf Commander",
+        typeLine: "Legendary Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        supertypes: ["Legendary"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      ...Object.fromEntries(
+        Array.from({ length: 10 }, (_, i) => [
+          `Elf ${i}`,
+          mockCard({
+            name: `Elf ${i}`,
+            typeLine: "Creature — Elf",
+            subtypes: ["Elf"],
+          }),
+        ])
+      ),
+      ...Object.fromEntries(
+        Array.from({ length: 5 }, (_, i) => [
+          `Goblin ${i}`,
+          mockCard({
+            name: `Goblin ${i}`,
+            typeLine: "Creature — Goblin",
+            subtypes: ["Goblin"],
+          }),
+        ])
+      ),
+    };
+    const elfNames = Array.from({ length: 10 }, (_, i) => `Elf ${i}`);
+    const goblinNames = Array.from({ length: 5 }, (_, i) => `Goblin ${i}`);
+    const deck = mockDeck([...elfNames, ...goblinNames], ["Elf Commander"]);
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Elf creatures should score higher than Goblin creatures (commander alignment)
+    const avgElfScore =
+      elfNames.reduce((sum, n) => sum + (result.cardScores[n]?.score ?? 50), 0) / elfNames.length;
+    const avgGoblinScore =
+      goblinNames.reduce((sum, n) => sum + (result.cardScores[n]?.score ?? 50), 0) /
+      goblinNames.length;
+    expect(avgElfScore).toBeGreaterThan(avgGoblinScore);
+  });
+
+  test("commander oracle-referenced type gets moderate boost above density-only", () => {
+    // Najeela references Warriors in oracle text. Warriors and Soldiers both have density.
+    const cards: Record<string, EnrichedCard> = {
+      "Najeela, the Blade-Blossom": mockCard({
+        name: "Najeela, the Blade-Blossom",
+        typeLine: "Legendary Creature — Human Warrior",
+        subtypes: ["Human", "Warrior"],
+        supertypes: ["Legendary"],
+        oracleText:
+          "Whenever a Warrior attacks, you may have its controller create a 1/1 white Warrior creature token that's tapped and attacking.",
+      }),
+      ...Object.fromEntries(
+        Array.from({ length: 5 }, (_, i) => [
+          `Warrior ${i}`,
+          mockCard({
+            name: `Warrior ${i}`,
+            typeLine: "Creature — Warrior",
+            subtypes: ["Warrior"],
+          }),
+        ])
+      ),
+      ...Object.fromEntries(
+        Array.from({ length: 5 }, (_, i) => [
+          `Soldier ${i}`,
+          mockCard({
+            name: `Soldier ${i}`,
+            typeLine: "Creature — Soldier",
+            subtypes: ["Soldier"],
+          }),
+        ])
+      ),
+    };
+    const warriorNames = Array.from({ length: 5 }, (_, i) => `Warrior ${i}`);
+    const soldierNames = Array.from({ length: 5 }, (_, i) => `Soldier ${i}`);
+    const deck = mockDeck(
+      [...warriorNames, ...soldierNames],
+      ["Najeela, the Blade-Blossom"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Warriors should score higher than Soldiers (commander subtype + oracle reference)
+    const avgWarriorScore =
+      warriorNames.reduce((sum, n) => sum + (result.cardScores[n]?.score ?? 50), 0) /
+      warriorNames.length;
+    const avgSoldierScore =
+      soldierNames.reduce((sum, n) => sum + (result.cardScores[n]?.score ?? 50), 0) /
+      soldierNames.length;
+    expect(avgWarriorScore).toBeGreaterThan(avgSoldierScore);
+  });
+
+  test("non-commander anchor cards still receive standard boost (regression)", () => {
+    // Same deck as above — Soldiers should still score above baseline (50)
+    const cards: Record<string, EnrichedCard> = {
+      "Elf Commander": mockCard({
+        name: "Elf Commander",
+        typeLine: "Legendary Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        supertypes: ["Legendary"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      ...Object.fromEntries(
+        Array.from({ length: 6 }, (_, i) => [
+          `Elf ${i}`,
+          mockCard({
+            name: `Elf ${i}`,
+            typeLine: "Creature — Elf",
+            subtypes: ["Elf"],
+          }),
+        ])
+      ),
+      ...Object.fromEntries(
+        Array.from({ length: 5 }, (_, i) => [
+          `Goblin ${i}`,
+          mockCard({
+            name: `Goblin ${i}`,
+            typeLine: "Creature — Goblin",
+            subtypes: ["Goblin"],
+          }),
+        ])
+      ),
+    };
+    const goblinNames = Array.from({ length: 5 }, (_, i) => `Goblin ${i}`);
+    const elfNames = Array.from({ length: 6 }, (_, i) => `Elf ${i}`);
+    const deck = mockDeck([...elfNames, ...goblinNames], ["Elf Commander"]);
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Goblins (density-only anchor) should still get boosted above baseline
+    const goblinScore = result.cardScores["Goblin 0"]?.score ?? 50;
+    expect(goblinScore).toBeGreaterThan(50);
+  });
+
+  test("Jodah deck: legendary creatures get boosted supertypeMatter scores", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Jodah, the Unifier": mockCard({
+        name: "Jodah, the Unifier",
+        typeLine: "Legendary Creature — Human Wizard",
+        supertypes: ["Legendary"],
+        subtypes: ["Human", "Wizard"],
+        oracleText:
+          "Whenever you cast a legendary nontoken spell, exile cards from the top of your library until you exile a legendary nontoken spell that costs less. You may cast that spell without paying its mana cost. Legendary creatures you control get +1/+1.",
+      }),
+      // 20 legendary creatures to hit density threshold
+      ...Object.fromEntries(
+        Array.from({ length: 20 }, (_, i) => [
+          `Legend ${i}`,
+          mockCard({
+            name: `Legend ${i}`,
+            typeLine: "Legendary Creature — Human",
+            supertypes: ["Legendary"],
+            subtypes: ["Human"],
+          }),
+        ])
+      ),
+      "Generic Sorcery": mockCard({
+        name: "Generic Sorcery",
+        typeLine: "Sorcery",
+        supertypes: [],
+        oracleText: "Draw a card.",
+      }),
+    };
+    const legendNames = Array.from({ length: 20 }, (_, i) => `Legend ${i}`);
+    const deck = mockDeck(
+      [...legendNames, "Generic Sorcery"],
+      ["Jodah, the Unifier"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Should detect supertypeMatter as a deck theme
+    const supertypeTheme = result.deckThemes.find(
+      (t) => t.axisId === "supertypeMatter"
+    );
+    expect(supertypeTheme).toBeDefined();
+    expect(supertypeTheme!.detail).toBe("legendary");
+
+    // Legendary creatures should score higher than non-legendary sorcery
+    const avgLegendScore =
+      legendNames.reduce(
+        (sum, n) => sum + (result.cardScores[n]?.score ?? 50),
+        0
+      ) / legendNames.length;
+    const sorceryScore =
+      result.cardScores["Generic Sorcery"]?.score ?? 50;
+    expect(avgLegendScore).toBeGreaterThan(sorceryScore);
+  });
+
+  test("non-legendary sorcery does NOT get supertypeMatter boost in Jodah deck", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Jodah, the Unifier": mockCard({
+        name: "Jodah, the Unifier",
+        typeLine: "Legendary Creature — Human Wizard",
+        supertypes: ["Legendary"],
+        subtypes: ["Human", "Wizard"],
+        oracleText:
+          "Whenever you cast a legendary nontoken spell, exile cards from the top of your library until you exile a legendary nontoken spell that costs less. You may cast that spell without paying its mana cost. Legendary creatures you control get +1/+1.",
+      }),
+      ...Object.fromEntries(
+        Array.from({ length: 20 }, (_, i) => [
+          `Legend ${i}`,
+          mockCard({
+            name: `Legend ${i}`,
+            typeLine: "Legendary Creature — Human",
+            supertypes: ["Legendary"],
+            subtypes: ["Human"],
+          }),
+        ])
+      ),
+      "Shock": mockCard({
+        name: "Shock",
+        typeLine: "Instant",
+        supertypes: [],
+        oracleText: "Shock deals 2 damage to any target.",
+      }),
+    };
+    const legendNames = Array.from({ length: 20 }, (_, i) => `Legend ${i}`);
+    const deck = mockDeck(
+      [...legendNames, "Shock"],
+      ["Jodah, the Unifier"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Shock should NOT have a supertypeMatter axis score
+    const shockAxes = result.cardScores["Shock"]?.axes ?? [];
+    const supertypeAxis = shockAxes.find(
+      (a) => a.axisId === "supertypeMatter"
+    );
+    expect(supertypeAxis).toBeUndefined();
+  });
+
+  test("Narfi deck: snow permanents get boosted and snow theme detected", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Narfi, Betrayer King": mockCard({
+        name: "Narfi, Betrayer King",
+        typeLine: "Legendary Snow Creature — Zombie Wizard",
+        supertypes: ["Legendary", "Snow"],
+        subtypes: ["Zombie", "Wizard"],
+        oracleText:
+          "Other snow and Zombie creatures you control get +1/+1.\n{S}{S}{S}: Return Narfi, Betrayer King from your graveyard to the battlefield tapped.",
+        manaCost: "{3}{U}{B}",
+      }),
+      ...Object.fromEntries(
+        Array.from({ length: 8 }, (_, i) => [
+          `Snow Creature ${i}`,
+          mockCard({
+            name: `Snow Creature ${i}`,
+            typeLine: "Snow Creature — Zombie",
+            supertypes: ["Snow"],
+            subtypes: ["Zombie"],
+          }),
+        ])
+      ),
+      "Regular Creature": mockCard({
+        name: "Regular Creature",
+        typeLine: "Creature — Human",
+        supertypes: [],
+        subtypes: ["Human"],
+      }),
+    };
+    const snowNames = Array.from(
+      { length: 8 },
+      (_, i) => `Snow Creature ${i}`
+    );
+    const deck = mockDeck(
+      [...snowNames, "Regular Creature"],
+      ["Narfi, Betrayer King"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Should detect supertypeMatter theme with snow detail
+    const supertypeTheme = result.deckThemes.find(
+      (t) => t.axisId === "supertypeMatter"
+    );
+    expect(supertypeTheme).toBeDefined();
+    expect(supertypeTheme!.detail).toBe("snow");
+
+    // Snow creatures should score higher than regular creature
+    const avgSnowScore =
+      snowNames.reduce(
+        (sum, n) => sum + (result.cardScores[n]?.score ?? 50),
+        0
+      ) / snowNames.length;
+    const regularScore =
+      result.cardScores["Regular Creature"]?.score ?? 50;
+    expect(avgSnowScore).toBeGreaterThan(regularScore);
+  });
+
+  test("Jhoira deck: historic cards (legendary + artifact + saga) all get boost", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Jhoira, Weatherlight Captain": mockCard({
+        name: "Jhoira, Weatherlight Captain",
+        typeLine: "Legendary Creature — Human Artificer",
+        supertypes: ["Legendary"],
+        subtypes: ["Human", "Artificer"],
+        oracleText: "Whenever you cast a historic spell, draw a card.",
+      }),
+      "Mox Amber": mockCard({
+        name: "Mox Amber",
+        typeLine: "Legendary Artifact",
+        supertypes: ["Legendary"],
+        subtypes: [],
+        oracleText:
+          "{T}: Add one mana of any color among legendary creatures and planeswalkers you control.",
+      }),
+      "Sol Ring": mockCard({
+        name: "Sol Ring",
+        typeLine: "Artifact",
+        supertypes: [],
+        subtypes: [],
+        oracleText: "{T}: Add {C}{C}.",
+      }),
+      "The Eldest Reborn": mockCard({
+        name: "The Eldest Reborn",
+        typeLine: "Enchantment — Saga",
+        supertypes: [],
+        subtypes: ["Saga"],
+        oracleText:
+          "I — Each opponent sacrifices a creature or planeswalker.\nII — Each opponent discards a card.\nIII — Put target creature or planeswalker card from a graveyard onto the battlefield under your control.",
+      }),
+      "Regular Enchantment": mockCard({
+        name: "Regular Enchantment",
+        typeLine: "Enchantment",
+        supertypes: [],
+        subtypes: [],
+        oracleText: "At the beginning of your upkeep, scry 1.",
+      }),
+    };
+    const deck = mockDeck(
+      ["Mox Amber", "Sol Ring", "The Eldest Reborn", "Regular Enchantment"],
+      ["Jhoira, Weatherlight Captain"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // All historic cards should score higher than the regular enchantment
+    const moxScore = result.cardScores["Mox Amber"]?.score ?? 50;
+    const solRingScore = result.cardScores["Sol Ring"]?.score ?? 50;
+    const sagaScore = result.cardScores["The Eldest Reborn"]?.score ?? 50;
+    const regularScore =
+      result.cardScores["Regular Enchantment"]?.score ?? 50;
+
+    expect(moxScore).toBeGreaterThan(regularScore);
+    expect(solRingScore).toBeGreaterThan(regularScore);
+    expect(sagaScore).toBeGreaterThan(regularScore);
+  });
+
+  test("Yarok with 10 legendaries does NOT get supertypeMatter theme", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Yarok, the Desecrated": mockCard({
+        name: "Yarok, the Desecrated",
+        typeLine: "Legendary Creature — Elemental Horror",
+        supertypes: ["Legendary"],
+        subtypes: ["Elemental", "Horror"],
+        oracleText:
+          "Deathtouch, lifelink\nIf a permanent entering the battlefield causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.",
+      }),
+      ...Object.fromEntries(
+        Array.from({ length: 10 }, (_, i) => [
+          `Legend ${i}`,
+          mockCard({
+            name: `Legend ${i}`,
+            typeLine: "Legendary Creature — Human",
+            supertypes: ["Legendary"],
+            subtypes: ["Human"],
+          }),
+        ])
+      ),
+    };
+    const legendNames = Array.from({ length: 10 }, (_, i) => `Legend ${i}`);
+    const deck = mockDeck(legendNames, ["Yarok, the Desecrated"]);
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Should NOT detect supertypeMatter theme — Yarok doesn't care about legendaries
+    const supertypeTheme = result.deckThemes.find(
+      (t) => t.axisId === "supertypeMatter"
+    );
+    expect(supertypeTheme).toBeUndefined();
+  });
 });

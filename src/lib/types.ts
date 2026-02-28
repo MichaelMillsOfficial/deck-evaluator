@@ -95,6 +95,8 @@ export interface DeckTheme {
   axisName: string;
   strength: number;
   cardCount: number;
+  /** Optional detail for the theme, e.g. primary creature type for tribal */
+  detail?: string;
 }
 
 /** Full deck synergy analysis result */

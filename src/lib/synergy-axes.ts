@@ -1,4 +1,5 @@
 import type { EnrichedCard } from "./types";
+import { CREATURE_TYPE_PATTERN } from "./creature-types";
 
 export interface SynergyAxisDefinition {
   id: string;
@@ -53,12 +54,31 @@ const SAC_ARISTOCRAT_RE = /whenever you sacrifice/i;
 const SAC_KEYWORDS = new Set(["Exploit"]);
 
 // --- Tribal ---
-const TRIBAL_LORD_RE =
-  /other.+?(?:creature|creatures).+?(?:you control )?get \+/i;
+const TRIBAL_CHOSEN_TYPE_LORD_RE =
+  /other.+?creatures? you control of the chosen type get \+/i;
 const TRIBAL_KINDRED_RE = /^Kindred\b/i;
 const TRIBAL_CHOOSE_TYPE_RE = /\bchoose a creature type\b/i;
 const TRIBAL_TYPE_MATTERS_RE =
   /(?:creatures? (?:you control )?(?:of the chosen|that share a creature) type)/i;
+// Dynamic type-specific patterns built from CREATURE_TYPE_PATTERN
+const TRIBAL_TYPE_SPECIFIC_LORD_RE = new RegExp(
+  `(?:other )?(?:${CREATURE_TYPE_PATTERN})(?:s| creatures?) you control get \\+`,
+  "i"
+);
+const TRIBAL_TYPE_TRIGGER_RE = new RegExp(
+  `\\bwhenever (?:a |an )(?:${CREATURE_TYPE_PATTERN})\\b`,
+  "i"
+);
+const TRIBAL_FOR_EACH_TYPE_RE = new RegExp(
+  `\\b(?:for each|number of) (?:${CREATURE_TYPE_PATTERN})s?\\b`,
+  "i"
+);
+const TRIBAL_CREATURE_SPELL_OF_TYPE_RE =
+  /creature (?:spell|card)s? (?:of the chosen type|you cast of the chosen type)/i;
+const TRIBAL_SHARE_TYPE_RE =
+  /shares? (?:at least one |a )?creature type/i;
+const TRIBAL_EVERY_TYPE_RE =
+  /\bevery creature type\b/i;
 
 // --- Landfall ---
 const LANDFALL_TRIGGER_RE =
@@ -106,6 +126,29 @@ const EVASION_KEYWORDS = new Set([
   "Intimidate",
   "Skulk",
 ]);
+
+// --- Supertype Matters ---
+const SUPERTYPE_LEGENDARY_CAST_RE =
+  /whenever you (?:cast|play) a (?:legendary|historic)/i;
+const SUPERTYPE_LEGENDARY_ETB_RE =
+  /whenever (?:a|another) legendary.*(?:enters|dies)/i;
+const SUPERTYPE_LEGENDARY_STATIC_RE =
+  /legendary (?:creature|permanent)s? you control (?:get \+|have)/i;
+const SUPERTYPE_LEGENDARY_OTHER_RE =
+  /other legendary (?:creature|permanent)s? you control/i;
+const SUPERTYPE_LEGENDARY_FOR_EACH_RE =
+  /\b(?:for each|each|number of) legendary\b/i;
+const SUPERTYPE_LEGENDARY_COST_RE =
+  /legendary.*(?:spell|permanent|card)s?.*cost.*less/i;
+const SUPERTYPE_LEGENDARY_GRAVEYARD_RE =
+  /legendary cards? (?:from|in) your graveyard/i;
+const SUPERTYPE_LEGEND_RULE_RE = /\blegend rule\b/i;
+const SUPERTYPE_HISTORIC_RE = /\bhistoric\b/i;
+const SUPERTYPE_SNOW_BROAD_RE =
+  /\bsnow\b[^.]*?\b(?:permanent|creature|land)s?\b/i;
+const SUPERTYPE_SNOW_OTHER_RE = /\bother snow\b/i;
+const SUPERTYPE_SNOW_TRIGGER_RE = /whenever a snow.*enters|for each snow/i;
+const SUPERTYPE_SNOW_MANA_RE = /\{S\}/;
 
 export const SYNERGY_AXES: SynergyAxisDefinition[] = [
   {
@@ -194,15 +237,33 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
   {
     id: "tribal",
     name: "Tribal",
-    description: "Creature type lords, tribal payoffs",
+    description: "Creature type lords, tribal payoffs, kindred synergies",
     color: { bg: "bg-teal-500/20", text: "text-teal-300" },
     detect(card) {
       const text = card.oracleText;
       let score = 0;
-      if (TRIBAL_LORD_RE.test(text)) score += 0.8;
+      // "of the chosen type" lord (e.g. Adaptive Automaton)
+      if (TRIBAL_CHOSEN_TYPE_LORD_RE.test(text)) score += 0.7;
+      // Kindred type line (e.g. "Kindred Sorcery")
       if (TRIBAL_KINDRED_RE.test(card.typeLine)) score += 0.7;
+      // "Choose a creature type"
       if (TRIBAL_CHOOSE_TYPE_RE.test(text)) score += 0.5;
+      // "creatures of the chosen/that share a creature type"
       if (TRIBAL_TYPE_MATTERS_RE.test(text)) score += 0.6;
+      // Type-specific lord ("Other Elf creatures you control get +1/+1")
+      if (TRIBAL_TYPE_SPECIFIC_LORD_RE.test(text)) score += 0.7;
+      // Type-specific trigger ("Whenever a Warrior attacks")
+      if (TRIBAL_TYPE_TRIGGER_RE.test(text)) score += 0.6;
+      // "for each Elf" / "number of Goblins"
+      if (TRIBAL_FOR_EACH_TYPE_RE.test(text)) score += 0.5;
+      // "creature spells of the chosen type"
+      if (TRIBAL_CREATURE_SPELL_OF_TYPE_RE.test(text)) score += 0.5;
+      // "shares a creature type" (e.g. Coat of Arms)
+      if (TRIBAL_SHARE_TYPE_RE.test(text)) score += 0.6;
+      // "every creature type" (e.g. Maskwood Nexus)
+      if (TRIBAL_EVERY_TYPE_RE.test(text)) score += 0.6;
+      // Changeling keyword — all creature types
+      if (card.keywords.includes("Changeling")) score += 0.3;
       return Math.min(score, 1);
     },
     conflictsWith: [],
@@ -297,6 +358,36 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
       if (card.keywords.some((kw) => EVASION_KEYWORDS.has(kw))) score += 0.4;
       if (EVASION_UNBLOCKABLE_RE.test(text)) score += 0.6;
       if (EVASION_COMBAT_DAMAGE_RE.test(text)) score += 0.5;
+      return Math.min(score, 1);
+    },
+    conflictsWith: [],
+  },
+  {
+    id: "supertypeMatter",
+    name: "Supertype Matters",
+    description: "Legendary, historic, and snow permanent synergies",
+    color: { bg: "bg-amber-500/20", text: "text-amber-300" },
+    detect(card) {
+      const text = card.oracleText;
+      let score = 0;
+      // Legendary-matters
+      if (SUPERTYPE_LEGENDARY_CAST_RE.test(text)) score += 0.7;
+      if (SUPERTYPE_LEGENDARY_ETB_RE.test(text)) score += 0.6;
+      if (SUPERTYPE_LEGENDARY_STATIC_RE.test(text)) score += 0.5;
+      if (SUPERTYPE_LEGENDARY_OTHER_RE.test(text)) score += 0.5;
+      if (SUPERTYPE_LEGENDARY_FOR_EACH_RE.test(text)) score += 0.5;
+      if (SUPERTYPE_LEGENDARY_COST_RE.test(text)) score += 0.6;
+      if (SUPERTYPE_LEGENDARY_GRAVEYARD_RE.test(text)) score += 0.5;
+      if (SUPERTYPE_LEGEND_RULE_RE.test(text)) score += 0.4;
+      // Historic
+      if (SUPERTYPE_HISTORIC_RE.test(text)) score += 0.5;
+      // Snow-matters
+      if (SUPERTYPE_SNOW_OTHER_RE.test(text)) score += 0.6;
+      if (SUPERTYPE_SNOW_BROAD_RE.test(text)) score += 0.5;
+      if (SUPERTYPE_SNOW_TRIGGER_RE.test(text)) score += 0.5;
+      if (SUPERTYPE_SNOW_MANA_RE.test(text)) score += 0.4;
+      // {S} in mana cost (not just oracle text)
+      if (SUPERTYPE_SNOW_MANA_RE.test(card.manaCost)) score += 0.3;
       return Math.min(score, 1);
     },
     conflictsWith: [],

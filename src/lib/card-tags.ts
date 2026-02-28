@@ -1,5 +1,6 @@
 import type { EnrichedCard } from "./types";
 import { CONDITIONAL_PATTERNS } from "./land-base-efficiency";
+import { CREATURE_TYPE_PATTERN } from "./creature-types";
 
 export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   Ramp: { bg: "bg-emerald-500/20", text: "text-emerald-300" },
@@ -24,6 +25,10 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   "Game Changer": { bg: "bg-red-500/20", text: "text-red-300" },
   "Extra Turn": { bg: "bg-amber-600/20", text: "text-amber-200" },
   "Mass Land Denial": { bg: "bg-orange-600/20", text: "text-orange-200" },
+  Lord: { bg: "bg-teal-600/20", text: "text-teal-200" },
+  "Tribal Payoff": { bg: "bg-teal-500/20", text: "text-teal-300" },
+  "Legendary Payoff": { bg: "bg-amber-500/20", text: "text-amber-300" },
+  "Snow Payoff": { bg: "bg-cyan-500/20", text: "text-cyan-300" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -85,6 +90,36 @@ const EXTRA_TURN_RE = /\bextra turn\b/i;
 const FULL_MLD_RE = /\bdestroy all\b[^.]*\blands\b/i;
 const SACRIFICE_MLD_RE =
   /\beach player\b[^.]*(?:\bsacrifices?\b[^.]*\bland|\bland[^.]*\bsacrifices?\b)/i;
+// --- Tribal tag patterns ---
+const LORD_TYPE_SPECIFIC_RE = new RegExp(
+  `(?:other )?(?:${CREATURE_TYPE_PATTERN})(?:s| creatures?) you control get \\+`,
+  "i"
+);
+const LORD_CHOSEN_TYPE_RE =
+  /(?:other )?creatures? you control of the chosen type get \+/i;
+const TRIBAL_PAYOFF_KINDRED_RE = /^Kindred\b/i;
+const TRIBAL_PAYOFF_CHOOSE_RE = /\bchoose a creature type\b/i;
+const TRIBAL_PAYOFF_SHARE_RE = /shares? (?:at least one |a )?creature type/i;
+const TRIBAL_PAYOFF_OF_TYPE_RE = /creature (?:spell|card)s? (?:of|you cast of) the chosen type/i;
+const TRIBAL_PAYOFF_EVERY_TYPE_RE = /\bevery creature type\b/i;
+
+// --- Legendary Payoff tag patterns ---
+const LEGENDARY_CAST_RE = /whenever you (?:cast|play) a (?:legendary|historic)/i;
+const LEGENDARY_ETB_RE = /whenever (?:a|another) legendary.*(?:enters|dies)/i;
+const LEGENDARY_STATIC_RE = /legendary (?:creature|permanent)s? you control (?:get \+|have)/i;
+const LEGENDARY_OTHER_RE = /other legendary (?:creature|permanent)s? you control/i;
+const LEGENDARY_FOR_EACH_RE = /\b(?:for each|each|number of) legendary\b/i;
+const LEGENDARY_COST_RE = /legendary.*(?:spell|permanent|card)s?.*cost.*less/i;
+const LEGENDARY_GRAVEYARD_RE = /legendary cards? (?:from|in) your graveyard/i;
+const LEGEND_RULE_RE = /\blegend rule\b/i;
+const HISTORIC_RE = /\bhistoric\b/i;
+
+// --- Snow Payoff tag patterns ---
+const SNOW_BROAD_RE = /\bsnow\b[^.]*?\b(?:permanent|creature|land|mana)s?\b/i;
+const SNOW_OTHER_RE = /\bother snow\b/i;
+const SNOW_TRIGGER_RE = /whenever a snow.*enters|for each snow/i;
+const SNOW_MANA_RE = /\{S\}/;
+
 const RESOURCE_DENIAL_NAMES = new Set([
   "Blood Moon",
   "Back to Basics",
@@ -271,6 +306,54 @@ export function generateTags(card: EnrichedCard): string[] {
     RESOURCE_DENIAL_NAMES.has(card.name)
   ) {
     tags.add("Mass Land Denial");
+  }
+
+  // --- Tribal tags ---
+
+  // Lord — type-specific buff ("Other Elf creatures you control get +1/+1")
+  // or chosen-type lord ("Other creatures you control of the chosen type get +1/+1")
+  if (LORD_TYPE_SPECIFIC_RE.test(text) || LORD_CHOSEN_TYPE_RE.test(text)) {
+    tags.add("Lord");
+  }
+
+  // Tribal Payoff — any card that rewards a specific creature type strategy
+  if (
+    TRIBAL_PAYOFF_KINDRED_RE.test(card.typeLine) ||
+    TRIBAL_PAYOFF_CHOOSE_RE.test(text) ||
+    TRIBAL_PAYOFF_SHARE_RE.test(text) ||
+    TRIBAL_PAYOFF_OF_TYPE_RE.test(text) ||
+    TRIBAL_PAYOFF_EVERY_TYPE_RE.test(text) ||
+    LORD_TYPE_SPECIFIC_RE.test(text)
+  ) {
+    tags.add("Tribal Payoff");
+  }
+
+  // --- Supertype payoff tags ---
+
+  // Legendary Payoff — oracle text references legendary/historic payoff patterns
+  if (
+    LEGENDARY_CAST_RE.test(text) ||
+    LEGENDARY_ETB_RE.test(text) ||
+    LEGENDARY_STATIC_RE.test(text) ||
+    LEGENDARY_OTHER_RE.test(text) ||
+    LEGENDARY_FOR_EACH_RE.test(text) ||
+    LEGENDARY_COST_RE.test(text) ||
+    LEGENDARY_GRAVEYARD_RE.test(text) ||
+    LEGEND_RULE_RE.test(text) ||
+    HISTORIC_RE.test(text)
+  ) {
+    tags.add("Legendary Payoff");
+  }
+
+  // Snow Payoff — oracle text or mana cost references snow patterns
+  if (
+    SNOW_BROAD_RE.test(text) ||
+    SNOW_OTHER_RE.test(text) ||
+    SNOW_TRIGGER_RE.test(text) ||
+    SNOW_MANA_RE.test(text) ||
+    SNOW_MANA_RE.test(card.manaCost)
+  ) {
+    tags.add("Snow Payoff");
   }
 
   return Array.from(tags).sort();
