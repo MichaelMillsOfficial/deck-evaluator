@@ -233,6 +233,33 @@ test.describe("isLegalCommander", () => {
     });
     expect(isLegalCommander(card)).toBe(true);
   });
+
+  test("legendary vehicle is a valid commander", () => {
+    const card = makeCard({
+      name: "Hearthull, the Worldseed",
+      typeLine: "Legendary Artifact — Vehicle",
+      supertypes: ["Legendary"],
+    });
+    expect(isLegalCommander(card)).toBe(true);
+  });
+
+  test("legendary spacecraft is a valid commander", () => {
+    const card = makeCard({
+      name: "Some Legendary Spacecraft",
+      typeLine: "Legendary Artifact — Spacecraft",
+      supertypes: ["Legendary"],
+    });
+    expect(isLegalCommander(card)).toBe(true);
+  });
+
+  test("non-legendary vehicle is not a valid commander", () => {
+    const card = makeCard({
+      name: "Smuggler's Copter",
+      typeLine: "Artifact — Vehicle",
+      supertypes: [],
+    });
+    expect(isLegalCommander(card)).toBe(false);
+  });
 });
 
 // --- validateCommanderSelection ---
@@ -317,6 +344,21 @@ test.describe("validateCommanderLegality", () => {
     const result = validateCommanderLegality(["Unknown Card"], {});
     expect(result.warnings.length).toBeGreaterThan(0);
     expect(result.warnings[0]).toContain("Unknown Card");
+  });
+
+  test("returns no warnings for legendary vehicle commander", () => {
+    const cardMap: Record<string, EnrichedCard> = {
+      "Hearthull, the Worldseed": makeCard({
+        name: "Hearthull, the Worldseed",
+        typeLine: "Legendary Artifact — Vehicle",
+        supertypes: ["Legendary"],
+      }),
+    };
+    const result = validateCommanderLegality(
+      ["Hearthull, the Worldseed"],
+      cardMap
+    );
+    expect(result.warnings).toHaveLength(0);
   });
 
   test("returns warnings for each invalid commander in a pair", () => {
