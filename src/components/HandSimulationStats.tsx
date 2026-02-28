@@ -70,6 +70,13 @@ export default function HandSimulationStats({
           label="T2 Play"
           value={formatPercent(stats.probT2Play)}
         />
+        {stats.avgStrategyScore !== undefined && (
+          <StatCard
+            testId="stat-avg-strategy"
+            label="Avg Strategy"
+            value={String(stats.avgStrategyScore)}
+          />
+        )}
       </div>
 
       {/* Verdict distribution */}

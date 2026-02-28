@@ -230,6 +230,7 @@ export default function DeckViewTabs({
             <HandSimulator
               deck={deck}
               cardMap={cardMap}
+              deckThemes={synergyAnalysis?.deckThemes ?? []}
               expandedSections={expandedSections.hands ?? new Set<string>()}
               onToggleSection={(id) => handleToggleSection("hands", id)}
             />

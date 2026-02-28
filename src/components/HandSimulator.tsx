@@ -1,17 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { DeckData, EnrichedCard } from "@/lib/types";
-import type { DrawnHand, RankedHand, SimulationStats } from "@/lib/opening-hand";
+import type { DeckData, DeckTheme, EnrichedCard } from "@/lib/types";
+import type { DrawnHand, HandEvaluationContext, RankedHand, SimulationStats } from "@/lib/opening-hand";
 import {
   buildPool,
   buildCommandZone,
+  buildCardCache,
+  computePipWeights,
   drawHand,
   evaluateHandQuality,
   findTopHands,
   runSimulation,
 } from "@/lib/opening-hand";
-import { resolveCommanderIdentity } from "@/lib/color-distribution";
+import { computeColorDistribution, resolveCommanderIdentity } from "@/lib/color-distribution";
 import HandDisplay from "@/components/HandDisplay";
 import HandSimulationStats from "@/components/HandSimulationStats";
 import TopHands from "@/components/TopHands";
@@ -31,6 +33,7 @@ const HANDS_SECTIONS = [
 interface HandSimulatorProps {
   deck: DeckData;
   cardMap: Record<string, EnrichedCard>;
+  deckThemes?: DeckTheme[];
   expandedSections: Set<string>;
   onToggleSection: (id: string) => void;
 }
@@ -38,6 +41,7 @@ interface HandSimulatorProps {
 export default function HandSimulator({
   deck,
   cardMap,
+  deckThemes = [],
   expandedSections,
   onToggleSection,
 }: HandSimulatorProps) {
@@ -54,19 +58,30 @@ export default function HandSimulator({
     [deck, cardMap]
   );
 
+  const context: HandEvaluationContext | undefined = useMemo(() => {
+    if (!pool.length) return undefined;
+    const distribution = computeColorDistribution(deck, cardMap);
+    const pipWeights = computePipWeights({ ...distribution.pips }, commanderIdentity);
+    return {
+      deckThemes,
+      cardCache: buildCardCache(pool),
+      pipWeights,
+    };
+  }, [pool, deckThemes, deck, cardMap, commanderIdentity]);
+
   useEffect(() => {
     if (!pool.length) return;
     setSimLoading(true);
     // Defer to next frame to avoid blocking render
     const id = requestAnimationFrame(() => {
-      const stats = runSimulation(pool, commanderIdentity, 1000, commandZone);
-      const top = findTopHands(pool, commanderIdentity, 5, 2000, commandZone);
+      const stats = runSimulation(pool, commanderIdentity, 1000, commandZone, context);
+      const top = findTopHands(pool, commanderIdentity, 5, 2000, commandZone, context);
       setSimStats(stats);
       setTopHands(top);
       setSimLoading(false);
     });
     return () => cancelAnimationFrame(id);
-  }, [pool, commanderIdentity, commandZone]);
+  }, [pool, commanderIdentity, commandZone, context]);
 
   const drawNewHand = useCallback(
     (mulliganNumber: number) => {
@@ -76,7 +91,8 @@ export default function HandSimulator({
         cards,
         mulliganNumber,
         commanderIdentity,
-        commandZone
+        commandZone,
+        context
       );
       const hand: DrawnHand = {
         cards,
@@ -85,7 +101,7 @@ export default function HandSimulator({
       };
       setCurrentHand(hand);
     },
-    [pool, commanderIdentity, commandZone]
+    [pool, commanderIdentity, commandZone, context]
   );
 
   const handleDrawHand = useCallback(() => {
@@ -188,7 +204,7 @@ export default function HandSimulator({
         expanded={expandedSections.has("hand-builder")}
         onToggle={() => onToggleSection("hand-builder")}
       >
-        <HandBuilder pool={pool} commanderIdentity={commanderIdentity} commandZone={commandZone} />
+        <HandBuilder pool={pool} commanderIdentity={commanderIdentity} commandZone={commandZone} context={context} />
       </CollapsiblePanel>
     </div>
   );

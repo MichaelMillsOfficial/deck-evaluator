@@ -1,7 +1,8 @@
-import type { DeckData, EnrichedCard } from "./types";
+import type { DeckData, DeckTheme, EnrichedCard } from "./types";
 import { generateTags } from "./card-tags";
 import { type MtgColor } from "./color-distribution";
 import { classifyLandEntry } from "./land-base-efficiency";
+import { SYNERGY_AXES } from "./synergy-axes";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -19,6 +20,14 @@ export interface HandQualityFactors {
   playableTurns: boolean[];
   colorCoverage: number;
   curvePlayability: number;
+  strategyScore?: number;
+  cardAdvantageCount?: number;
+  interactionCount?: number;
+  themeHits?: string[];
+  manaDorks?: { name: string; producedMana: string[]; availableTurn: number }[];
+  coveredColors?: string[];
+  missingColors?: string[];
+  pipWeights?: Record<string, number>;
 }
 
 export type Verdict = "Strong Keep" | "Keepable" | "Marginal" | "Mulligan";
@@ -45,12 +54,116 @@ export interface SimulationStats {
   probT2Play: number;
   probT3Play: number;
   verdictDistribution: Record<Verdict, number>;
+  avgStrategyScore?: number;
 }
 
 export interface RankedHand {
   rank: number;
   hand: DrawnHand;
   cardKey: string;
+}
+
+export interface HandEvaluationContext {
+  deckThemes: DeckTheme[];
+  cardCache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>;
+  pipWeights?: Record<string, number>;
+}
+
+export interface HandWeights {
+  land: number;
+  curve: number;
+  color: number;
+  ramp: number;
+  strategy: number;
+  cardAdvantage: number;
+  interaction: number;
+}
+
+export interface PipRequirement {
+  satisfiedBy: Set<string>;
+}
+
+/**
+ * Parse a Scryfall mana cost string into colored pip requirements.
+ * Each requirement has a set of colors that can satisfy it.
+ *
+ * - Single color pips ({W}, {U}, etc.) → satisfiedBy one color
+ * - Hybrid pips ({W/U}) → satisfiedBy either color
+ * - Phyrexian ({B/P}) → skipped (payable with life)
+ * - Mono-hybrid ({2/W}) → skipped (payable with generic)
+ * - Colorless-specific ({C}) → satisfiedBy "C"
+ * - Generic ({1}, {X}, {0}) → skipped
+ */
+export function parsePipRequirements(manaCost: string): PipRequirement[] {
+  if (!manaCost) return [];
+
+  const pips: PipRequirement[] = [];
+  const symbolRe = /\{([^}]+)\}/g;
+
+  for (const match of manaCost.matchAll(symbolRe)) {
+    const inner = match[1];
+
+    // Hybrid color/color: {W/U}
+    if (/^([WUBRG])\/([WUBRG])$/.test(inner)) {
+      const [c1, c2] = inner.split("/");
+      pips.push({ satisfiedBy: new Set([c1, c2]) });
+      continue;
+    }
+
+    // Phyrexian: {B/P} or {B/H} — skip (payable with life)
+    if (/^[WUBRG]\/[PH]$/.test(inner)) continue;
+
+    // Mono-hybrid: {2/W} — skip (payable with generic)
+    if (/^\d+\/[WUBRG]$/.test(inner)) continue;
+
+    // Single color or colorless-specific: {W}, {C}
+    if (/^[WUBRGC]$/.test(inner)) {
+      pips.push({ satisfiedBy: new Set([inner]) });
+      continue;
+    }
+
+    // Generic mana ({0}, {1}, {X}, etc.) — skip
+  }
+
+  return pips;
+}
+
+/**
+ * Determine if a spell's colored pip requirements can be satisfied
+ * by the given land sources using bipartite matching.
+ *
+ * Each land source is an array of colors that land can produce.
+ */
+export function canCastWithLands(
+  spell: EnrichedCard,
+  landSources: string[][]
+): boolean {
+  const pips = parsePipRequirements(spell.manaCost);
+  if (pips.length === 0) return true;
+  if (pips.length > landSources.length) return false;
+
+  // Sort pips by ascending satisfiedBy size (most constrained first for pruning)
+  const sorted = pips
+    .map((p, i) => ({ idx: i, satisfiedBy: p.satisfiedBy }))
+    .sort((a, b) => a.satisfiedBy.size - b.satisfiedBy.size);
+
+  const usedLands = new Set<number>();
+
+  function backtrack(pipIdx: number): boolean {
+    if (pipIdx >= sorted.length) return true;
+    const pip = sorted[pipIdx];
+    for (let li = 0; li < landSources.length; li++) {
+      if (usedLands.has(li)) continue;
+      const landColors = landSources[li];
+      if (!landColors.some((c) => pip.satisfiedBy.has(c))) continue;
+      usedLands.add(li);
+      if (backtrack(pipIdx + 1)) return true;
+      usedLands.delete(li);
+    }
+    return false;
+  }
+
+  return backtrack(0);
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +187,131 @@ function hasRampTag(card: EnrichedCard): boolean {
 
 function getProducedColors(card: EnrichedCard): Set<string> {
   return new Set(card.producedMana.filter((c) => c !== "C"));
+}
+
+function getTagsForCard(
+  card: EnrichedCard,
+  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>
+): string[] {
+  if (cache) {
+    const cached = cache.get(card.name);
+    if (cached) return cached.tags;
+  }
+  return generateTags(card);
+}
+
+function getAxisScoresForCard(
+  card: EnrichedCard,
+  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>
+): Map<string, number> {
+  if (cache) {
+    const cached = cache.get(card.name);
+    if (cached) return cached.axisScores;
+  }
+  const scores = new Map<string, number>();
+  for (const axis of SYNERGY_AXES) {
+    const score = axis.detect(card);
+    if (score > 0) scores.set(axis.id, score);
+  }
+  return scores;
+}
+
+// ---------------------------------------------------------------------------
+// computePipWeights
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute per-color weights based on pip demand.
+ * Colors with more pips in the deck get higher weight (sum to 1.0).
+ * Used for weighted color coverage scoring.
+ */
+export function computePipWeights(
+  pips: Record<string, number>,
+  commanderIdentity: Set<string>
+): Record<string, number> {
+  if (commanderIdentity.size === 0) return {};
+
+  const totalPips = Array.from(commanderIdentity).reduce(
+    (sum, c) => sum + (pips[c] ?? 0),
+    0
+  );
+
+  if (totalPips === 0) {
+    // No pips at all → equal weights
+    const w = 1.0 / commanderIdentity.size;
+    const result: Record<string, number> = {};
+    for (const c of commanderIdentity) result[c] = w;
+    return result;
+  }
+
+  const result: Record<string, number> = {};
+  for (const c of commanderIdentity) {
+    result[c] = (pips[c] ?? 0) / totalPips;
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// getManaProducers
+// ---------------------------------------------------------------------------
+
+/**
+ * Identify mana dorks in the hand and compute which additional mana sources
+ * they contribute on T2 and T3, accounting for summoning sickness (one-turn delay).
+ *
+ * A non-land card is a mana dork if:
+ * - producedMana.length > 0
+ * - !typeLine.includes("Land")
+ * - cmc <= 2
+ *
+ * T2 sources: land sources + CMC ≤ 1 dorks castable T1 with untapped lands
+ * T3 sources: land sources + CMC ≤ 2 dorks castable by T2 with all lands
+ */
+export function getManaProducers(
+  hand: HandCard[],
+  untappedLandSources: string[][],
+  allLandSources: string[][]
+): {
+  t2Sources: string[][];
+  t3Sources: string[][];
+  t2DorkCount: number;
+  t3DorkCount: number;
+  dorks: { name: string; producedMana: string[]; availableTurn: number }[];
+} {
+  const t2Sources = [...allLandSources];
+  const t3Sources = [...allLandSources];
+  let t2DorkCount = 0;
+  let t3DorkCount = 0;
+  const dorks: { name: string; producedMana: string[]; availableTurn: number }[] = [];
+
+  for (const card of hand) {
+    const e = card.enriched;
+    // Must produce mana, not be a land, and CMC ≤ 2
+    if (e.producedMana.length === 0) continue;
+    if (isLand(e)) continue;
+    if (e.cmc > 2) continue;
+
+    if (e.cmc <= 1) {
+      // CMC ≤ 1: can be cast T1 with untapped lands → contributes T2
+      if (canCastWithLands(e, untappedLandSources)) {
+        t2Sources.push(e.producedMana);
+        t2DorkCount++;
+        // Also contributes T3
+        t3Sources.push(e.producedMana);
+        t3DorkCount++;
+        dorks.push({ name: card.name, producedMana: e.producedMana, availableTurn: 2 });
+      }
+    } else {
+      // CMC 2: can be cast T2 with all lands → contributes T3 only
+      if (canCastWithLands(e, allLandSources)) {
+        t3Sources.push(e.producedMana);
+        t3DorkCount++;
+        dorks.push({ name: card.name, producedMana: e.producedMana, availableTurn: 3 });
+      }
+    }
+  }
+
+  return { t2Sources, t3Sources, t2DorkCount, t3DorkCount, dorks };
 }
 
 // ---------------------------------------------------------------------------
@@ -134,6 +372,30 @@ export function buildCommandZone(
   return zone;
 }
 
+/**
+ * Pre-compute tags and axis scores for all cards in a pool.
+ * Call once before simulation loops to avoid redundant regex work.
+ */
+export function buildCardCache(
+  pool: HandCard[]
+): Map<string, { tags: string[]; axisScores: Map<string, number> }> {
+  const cache = new Map<
+    string,
+    { tags: string[]; axisScores: Map<string, number> }
+  >();
+  for (const card of pool) {
+    if (cache.has(card.name)) continue;
+    const tags = generateTags(card.enriched);
+    const axisScores = new Map<string, number>();
+    for (const axis of SYNERGY_AXES) {
+      const score = axis.detect(card.enriched);
+      if (score > 0) axisScores.set(axis.id, score);
+    }
+    cache.set(card.name, { tags, axisScores });
+  }
+  return cache;
+}
+
 // ---------------------------------------------------------------------------
 // drawHand
 // ---------------------------------------------------------------------------
@@ -157,23 +419,474 @@ export function drawHand(pool: HandCard[], count: number): HandCard[] {
 }
 
 // ---------------------------------------------------------------------------
+// New scoring helpers
+// ---------------------------------------------------------------------------
+
+const CA_TAGS = new Set(["Card Draw", "Card Advantage", "Tutor"]);
+const INTERACTION_TAGS = new Set(["Removal", "Board Wipe", "Counterspell"]);
+
+/**
+ * Tempo-weighted ramp scoring.
+ * CMC ≤ 2 → 1.0, CMC 3 → 0.8, CMC 4 → 0.5, CMC 5+ → 0.2
+ */
+export function scoreRamp(
+  hand: HandCard[],
+  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>
+): number {
+  let effectiveCount = 0;
+  for (const card of hand) {
+    if (isLand(card.enriched)) continue;
+    const tags = getTagsForCard(card.enriched, cache);
+    if (!tags.includes("Ramp")) continue;
+    const cmc = card.enriched.cmc;
+    let weight: number;
+    if (cmc <= 2) weight = 1.0;
+    else if (cmc === 3) weight = 0.8;
+    else if (cmc === 4) weight = 0.5;
+    else weight = 0.2;
+    effectiveCount += weight;
+  }
+
+  if (effectiveCount >= 2.0) return 100;
+  if (effectiveCount >= 1.0) return 70;
+  if (effectiveCount >= 0.5) return 50;
+  return 30;
+}
+
+/**
+ * Tempo-weighted card advantage scoring.
+ * Tags: "Card Draw", "Card Advantage", "Tutor"
+ * CMC ≤ 3 → 1.0, CMC 4-5 → 0.7, CMC 6+ → 0.4
+ */
+export function scoreCardAdvantage(
+  hand: HandCard[],
+  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>
+): number {
+  let effectiveCount = 0;
+  for (const card of hand) {
+    if (isLand(card.enriched)) continue;
+    const tags = getTagsForCard(card.enriched, cache);
+    if (!tags.some((t) => CA_TAGS.has(t))) continue;
+    const cmc = card.enriched.cmc;
+    let weight: number;
+    if (cmc <= 3) weight = 1.0;
+    else if (cmc <= 5) weight = 0.7;
+    else weight = 0.4;
+    effectiveCount += weight;
+  }
+
+  if (effectiveCount >= 2.0) return 100;
+  if (effectiveCount >= 1.0) return 70;
+  if (effectiveCount >= 0.5) return 50;
+  return 25;
+}
+
+/**
+ * Tempo-weighted interaction scoring.
+ * Tags: "Removal", "Board Wipe", "Counterspell"
+ * CMC ≤ 3 → 1.0, CMC 4-5 → 0.7, CMC 6+ → 0.4
+ */
+export function scoreInteraction(
+  hand: HandCard[],
+  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>
+): number {
+  let effectiveCount = 0;
+  for (const card of hand) {
+    if (isLand(card.enriched)) continue;
+    const tags = getTagsForCard(card.enriched, cache);
+    if (!tags.some((t) => INTERACTION_TAGS.has(t))) continue;
+    const cmc = card.enriched.cmc;
+    let weight: number;
+    if (cmc <= 3) weight = 1.0;
+    else if (cmc <= 5) weight = 0.7;
+    else weight = 0.4;
+    effectiveCount += weight;
+  }
+
+  if (effectiveCount >= 2.0) return 100;
+  if (effectiveCount >= 1.0) return 70;
+  if (effectiveCount >= 0.5) return 50;
+  return 20;
+}
+
+/**
+ * Strategy alignment scoring: do hand cards match deck themes and
+ * can the hand actually deploy them early?
+ *
+ * Returns { score: 0-100, themeHits: string[] }
+ */
+export function scoreStrategy(
+  hand: HandCard[],
+  deckThemes: DeckTheme[],
+  landCount: number,
+  rampCount: number,
+  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>
+): number {
+  if (deckThemes.length === 0) return 50; // neutral for goodstuff decks
+
+  const availableManaByT4 = landCount + rampCount;
+  const topThemes = deckThemes.slice(0, 3);
+
+  // Compute tempo-weighted relevance for each non-land card
+  const spells = hand.filter((c) => !isLand(c.enriched));
+  const cardRelevances: { themeIds: Set<string>; tempoWeight: number }[] = [];
+
+  for (const card of spells) {
+    const axisScores = getAxisScoresForCard(card.enriched, cache);
+    const matchedThemeIds = new Set<string>();
+    let maxRelevance = 0;
+
+    for (const theme of topThemes) {
+      const axisScore = axisScores.get(theme.axisId) ?? 0;
+      if (axisScore > 0) {
+        matchedThemeIds.add(theme.axisId);
+        maxRelevance = Math.max(maxRelevance, axisScore);
+      }
+    }
+
+    if (matchedThemeIds.size === 0) continue;
+
+    // Tempo discount based on castability
+    const cmc = card.enriched.cmc;
+    let tempoWeight: number;
+    if (cmc <= availableManaByT4) tempoWeight = 1.0;
+    else if (cmc <= availableManaByT4 + 2) tempoWeight = 0.4;
+    else tempoWeight = 0.15;
+
+    cardRelevances.push({
+      themeIds: matchedThemeIds,
+      tempoWeight: maxRelevance * tempoWeight,
+    });
+  }
+
+  // Theme hit rate: fraction of top themes with ≥1 tempo-weighted relevant card ≥ 0.2
+  const themesHit = new Set<string>();
+  for (const cr of cardRelevances) {
+    if (cr.tempoWeight >= 0.2) {
+      cr.themeIds.forEach((id) => themesHit.add(id));
+    }
+  }
+  const themeHitRate =
+    topThemes.length > 0 ? themesHit.size / topThemes.length : 0;
+
+  // Average tempo-weighted relevance
+  const avgRelevance =
+    cardRelevances.length > 0
+      ? cardRelevances.reduce((sum, cr) => sum + cr.tempoWeight, 0) /
+        cardRelevances.length
+      : 0;
+
+  // Combined: 60% theme hit rate + 40% average relevance
+  const rawScore = themeHitRate * 0.6 + avgRelevance * 0.4;
+  return Math.round(rawScore * 100);
+}
+
+/**
+ * Get theme names that are represented in the hand.
+ */
+function getThemeHits(
+  hand: HandCard[],
+  deckThemes: DeckTheme[],
+  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>
+): string[] {
+  if (deckThemes.length === 0) return [];
+  const topThemes = deckThemes.slice(0, 3);
+  const hits = new Set<string>();
+  const spells = hand.filter((c) => !isLand(c.enriched));
+
+  for (const card of spells) {
+    const axisScores = getAxisScoresForCard(card.enriched, cache);
+    for (const theme of topThemes) {
+      const score = axisScores.get(theme.axisId) ?? 0;
+      if (score > 0) hits.add(theme.axisName);
+    }
+  }
+  return Array.from(hits);
+}
+
+// ---------------------------------------------------------------------------
+// getAbilityReliability
+// ---------------------------------------------------------------------------
+
+const ETB_TRIGGERED_RE = /\b(?:enters the battlefield|enters|whenever|at the beginning)\b/i;
+const ACTIVATED_COST_RE = /^((?:\{[^}]+\}|[^:{}])*?):\s*/;
+const MANA_SYMBOL_RE = /\{([^}]+)\}/g;
+
+/**
+ * Determine how reliably a commander provides a capability.
+ * Returns a reliability scale factor:
+ *   ETB/triggered → 1.0
+ *   Cheap activated (≤2 mana) → 0.8
+ *   Moderate activated (3-4 mana) → 0.5
+ *   Expensive activated (5+ mana) → 0.3
+ *   No matching ability → 1.0 (fallback)
+ */
+export function getAbilityReliability(
+  card: EnrichedCard,
+  tagType: "cardAdvantage" | "interaction" | "ramp"
+): number {
+  const text = card.oracleText;
+  if (!text) return 1.0;
+
+  // Determine which patterns to look for based on tag type
+  let relevantPatterns: RegExp[];
+  if (tagType === "cardAdvantage") {
+    relevantPatterns = [/\bdraw\b/i, /\binto your hand\b/i, /\bsearch your library\b/i];
+  } else if (tagType === "interaction") {
+    relevantPatterns = [/\bdestroy\b/i, /\bexile\b/i, /\bcounter\b/i, /\breturn\b.*\bto\b/i];
+  } else {
+    // ramp
+    relevantPatterns = [/\bAdd\s+\{/i, /\bsearch\b.*\bland\b/i];
+  }
+
+  // Check if any relevant pattern matches
+  const hasRelevantAbility = relevantPatterns.some((p) => p.test(text));
+  if (!hasRelevantAbility) return 1.0; // fallback
+
+  // Check for ETB/triggered abilities
+  if (ETB_TRIGGERED_RE.test(text)) {
+    // Check if the relevant pattern is in a triggered/ETB clause
+    const clauses = text.split("\n");
+    for (const clause of clauses) {
+      const hasRelevant = relevantPatterns.some((p) => p.test(clause));
+      if (!hasRelevant) continue;
+
+      // If this clause starts with an activation cost (mana/tap before colon),
+      // it's an activated ability, not triggered
+      const match = clause.trim().match(ACTIVATED_COST_RE);
+      if (match) {
+        // Has an activation cost — compute its mana cost
+        const costPart = match[1];
+        const manaCost = computeActivationManaCost(costPart);
+        if (manaCost <= 2) return 0.8;
+        if (manaCost <= 4) return 0.5;
+        return 0.3;
+      }
+      // No activation cost prefix → it's triggered
+      return 1.0;
+    }
+  }
+
+  // Check for activated abilities (cost: effect pattern)
+  const clauses = text.split("\n");
+  for (const clause of clauses) {
+    const hasRelevant = relevantPatterns.some((p) => p.test(clause));
+    if (!hasRelevant) continue;
+
+    const match = clause.trim().match(ACTIVATED_COST_RE);
+    if (match) {
+      const costPart = match[1];
+      const manaCost = computeActivationManaCost(costPart);
+      if (manaCost <= 2) return 0.8;
+      if (manaCost <= 4) return 0.5;
+      return 0.3;
+    }
+  }
+
+  // Fallback: has the ability but couldn't classify it
+  return 1.0;
+}
+
+/**
+ * Sum the total mana cost from an activation cost string like "{2}{U}{G}" or "{5}".
+ */
+function computeActivationManaCost(costStr: string): number {
+  let total = 0;
+  let match: RegExpExecArray | null;
+  const re = new RegExp(MANA_SYMBOL_RE.source, "g");
+  while ((match = re.exec(costStr)) !== null) {
+    const sym = match[1];
+    if (sym === "T" || sym === "Q") continue; // tap/untap symbols
+    const num = parseInt(sym, 10);
+    if (!isNaN(num)) {
+      total += num;
+    } else {
+      // Colored pip or hybrid — counts as 1
+      total += 1;
+    }
+  }
+  return total;
+}
+
+// ---------------------------------------------------------------------------
+// computeAdjustedWeights
+// ---------------------------------------------------------------------------
+
+const BASE_WEIGHTS: HandWeights = {
+  land: 0.25,
+  curve: 0.20,
+  color: 0.15,
+  ramp: 0.10,
+  strategy: 0.15,
+  cardAdvantage: 0.08,
+  interaction: 0.07,
+};
+
+function getCmcScale(cmc: number): number {
+  if (cmc <= 3) return 1.0;
+  if (cmc <= 5) return 0.6;
+  return 0.25;
+}
+
+/**
+ * Compute dynamically adjusted weights based on what commanders provide.
+ * Returns adjusted weights and reasoning strings explaining adjustments.
+ */
+export function computeAdjustedWeights(
+  commandZone: HandCard[],
+  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>
+): { weights: HandWeights; reasoning: string[] } {
+  const weights = { ...BASE_WEIGHTS };
+  const reasoning: string[] = [];
+
+  if (commandZone.length === 0) {
+    return { weights, reasoning };
+  }
+
+  // Analyze each commander's capabilities
+  interface CommanderCapability {
+    name: string;
+    cmc: number;
+    hasCA: boolean;
+    hasInteraction: boolean;
+    hasRamp: boolean;
+    caReliability: number;
+    interactionReliability: number;
+    rampReliability: number;
+  }
+
+  const commanders: CommanderCapability[] = commandZone.map((cmd) => {
+    const tags = getTagsForCard(cmd.enriched, cache);
+    return {
+      name: cmd.name,
+      cmc: cmd.enriched.cmc,
+      hasCA: tags.some((t) => CA_TAGS.has(t)),
+      hasInteraction: tags.some((t) => INTERACTION_TAGS.has(t)),
+      hasRamp: tags.includes("Ramp"),
+      caReliability: getAbilityReliability(cmd.enriched, "cardAdvantage"),
+      interactionReliability: getAbilityReliability(cmd.enriched, "interaction"),
+      rampReliability: getAbilityReliability(cmd.enriched, "ramp"),
+    };
+  });
+
+  // Track total weight surplus to redistribute
+  let surplus = 0;
+
+  // Card advantage adjustment — use most favorable commander
+  const caCommanders = commanders.filter((c) => c.hasCA);
+  if (caCommanders.length > 0) {
+    // Pick commander with lowest effective cost (cmcScale × reliability = highest)
+    let bestScale = 0;
+    let bestCmd: CommanderCapability | null = null;
+    for (const cmd of caCommanders) {
+      const scale = getCmcScale(cmd.cmc) * cmd.caReliability;
+      if (scale > bestScale) {
+        bestScale = scale;
+        bestCmd = cmd;
+      }
+    }
+    if (bestCmd && bestScale >= 0.2) {
+      const reduction = weights.cardAdvantage * 0.5 * bestScale;
+      weights.cardAdvantage -= reduction;
+      surplus += reduction;
+
+      if (bestScale >= 0.8) {
+        reasoning.push(
+          `Commander (${bestCmd.name}, CMC ${bestCmd.cmc}) provides card advantage -- hand card draw less critical`
+        );
+      } else if (bestCmd.caReliability < 0.8) {
+        reasoning.push(
+          `Commander (${bestCmd.name}, CMC ${bestCmd.cmc}) has card draw via expensive ability -- hand still benefits from card advantage sources`
+        );
+      } else {
+        reasoning.push(
+          `Commander (${bestCmd.name}, CMC ${bestCmd.cmc}) provides card draw but is expensive to cast -- hand still needs card advantage sources`
+        );
+      }
+    }
+  }
+
+  // Interaction adjustment
+  const interactionCommanders = commanders.filter((c) => c.hasInteraction);
+  if (interactionCommanders.length > 0) {
+    let bestScale = 0;
+    let bestCmd: CommanderCapability | null = null;
+    for (const cmd of interactionCommanders) {
+      const scale = getCmcScale(cmd.cmc) * cmd.interactionReliability;
+      if (scale > bestScale) {
+        bestScale = scale;
+        bestCmd = cmd;
+      }
+    }
+    if (bestCmd && bestScale >= 0.2) {
+      const reduction = weights.interaction * 0.5 * bestScale;
+      weights.interaction -= reduction;
+      surplus += reduction;
+
+      if (bestScale >= 0.8) {
+        reasoning.push(
+          `Commander (${bestCmd.name}, CMC ${bestCmd.cmc}) provides interaction -- hand removal less critical`
+        );
+      } else if (bestCmd.cmc > 5) {
+        reasoning.push(
+          `Commander (${bestCmd.name}, CMC ${bestCmd.cmc}) provides interaction but is expensive to cast -- hand still needs answers`
+        );
+      } else {
+        reasoning.push(
+          `Commander (${bestCmd.name}, CMC ${bestCmd.cmc}) provides interaction -- hand removal less critical`
+        );
+      }
+    }
+  }
+
+  // Ramp adjustment
+  const rampCommanders = commanders.filter((c) => c.hasRamp);
+  if (rampCommanders.length > 0) {
+    let bestScale = 0;
+    let bestCmd: CommanderCapability | null = null;
+    for (const cmd of rampCommanders) {
+      const scale = getCmcScale(cmd.cmc) * cmd.rampReliability;
+      if (scale > bestScale) {
+        bestScale = scale;
+        bestCmd = cmd;
+      }
+    }
+    if (bestCmd && bestScale >= 0.2) {
+      const reduction = weights.ramp * 0.4 * bestScale;
+      weights.ramp -= reduction;
+      // Ramp surplus goes to curve playability
+      weights.curve += reduction;
+
+      reasoning.push(
+        `Commander (${bestCmd.name}, CMC ${bestCmd.cmc}) provides ramp -- early acceleration less critical`
+      );
+    }
+  }
+
+  // Redistribute CA/interaction surplus to strategy
+  if (surplus > 0) {
+    weights.strategy += surplus;
+  }
+
+  return { weights, reasoning };
+}
+
+// ---------------------------------------------------------------------------
 // evaluateHandQuality
 // ---------------------------------------------------------------------------
 
 /**
  * Evaluate a drawn hand's quality using weighted heuristic scoring.
  *
- * Weights:
- * - Land count: 35%
- * - Curve playability: 30%
- * - Color coverage: 20%
- * - Ramp availability: 15%
+ * Without context: original 4-factor weights (35/30/20/15)
+ * With context: 7-factor weights (25/20/15/10/15/8/7) with commander adjustments
  */
 export function evaluateHandQuality(
   hand: HandCard[],
   mulliganNumber: number,
   commanderIdentity: Set<MtgColor | string>,
-  commandZone: HandCard[] = []
+  commandZone: HandCard[] = [],
+  context?: HandEvaluationContext
 ): HandQualityResult {
   const handSize = hand.length;
   if (handSize === 0) {
@@ -212,76 +925,87 @@ export function evaluateHandQuality(
   const untappedLands = lands.filter((c) => isUntappedLand(c.enriched));
   const untappedCount = untappedLands.length;
 
-  // Determine untapped mana colors
-  const untappedColors = new Set<string>();
-  for (const land of untappedLands) {
-    for (const color of getProducedColors(land.enriched)) {
-      untappedColors.add(color);
+  // Build land source arrays for proper pip-to-land matching
+  const allLandSources = lands.map((l) => l.enriched.producedMana);
+  const untappedLandSources = untappedLands.map((l) => l.enriched.producedMana);
+
+  // --- Mana dork detection ---
+  const { t2Sources, t3Sources, t2DorkCount, t3DorkCount, dorks } =
+    getManaProducers(hand, untappedLandSources, allLandSources);
+
+  // Add dork-produced colors to available colors for coverage
+  for (const dork of dorks) {
+    for (const color of dork.producedMana) {
+      if (color !== "C") {
+        availableColors.add(color);
+      }
     }
   }
 
   // --- Playable turns analysis ---
-  // Turn 1: need 1 untapped land + spell with CMC <= 1 castable with that land's colors
-  // Turn 2: need 2 lands (at least 1 untapped initially) + spell CMC <= 2
-  // Turn 3: need 3 lands + spell CMC <= 3
-  // Commanders in the command zone are always available as castable spells.
   const allSpells = [...spells, ...commandZone];
   const playableTurns: boolean[] = [];
 
-  // Turn 1
+  // Turn 1 — land sources only (dorks have summoning sickness)
   const t1Playable =
     untappedCount >= 1 &&
     allSpells.some((s) => {
       if (s.enriched.cmc > 1) return false;
-      // Check if the spell's color requirements can be met by untapped lands
-      return canCastSpell(s.enriched, untappedColors);
+      return canCastWithLands(s.enriched, untappedLandSources);
     });
   playableTurns.push(t1Playable);
 
-  // Turn 2
+  // Turn 2 — lands + CMC ≤ 1 dorks cast T1
   const t2Playable =
-    landCount >= 2 &&
+    landCount + t2DorkCount >= 2 &&
     allSpells.some((s) => {
       if (s.enriched.cmc > 2) return false;
-      return canCastSpell(s.enriched, availableColors);
+      return canCastWithLands(s.enriched, t2Sources);
     });
   playableTurns.push(t2Playable);
 
-  // Turn 3
+  // Turn 3 — lands + CMC ≤ 2 dorks cast by T2
   const t3Playable =
-    landCount >= 3 &&
+    landCount + t3DorkCount >= 3 &&
     allSpells.some((s) => {
       if (s.enriched.cmc > 3) return false;
-      return canCastSpell(s.enriched, availableColors);
+      return canCastWithLands(s.enriched, t3Sources);
     });
   playableTurns.push(t3Playable);
 
   // --- Color coverage ---
-  // What fraction of the deck's required colors are present in the hand's lands?
   const neededColors = Array.from(commanderIdentity);
   let colorCoverage = 1.0;
   if (neededColors.length > 0 && landCount > 0) {
-    const coveredCount = neededColors.filter((c) =>
-      availableColors.has(c)
-    ).length;
-    colorCoverage = coveredCount / neededColors.length;
+    const pw = context?.pipWeights;
+    if (pw && Object.keys(pw).length > 0) {
+      // Weighted coverage: sum weights of covered colors
+      colorCoverage = 0;
+      for (const c of neededColors) {
+        if (availableColors.has(c)) {
+          colorCoverage += pw[c] ?? 0;
+        }
+      }
+    } else {
+      const coveredCount = neededColors.filter((c) =>
+        availableColors.has(c)
+      ).length;
+      colorCoverage = coveredCount / neededColors.length;
+    }
   } else if (neededColors.length > 0 && landCount === 0) {
     colorCoverage = 0;
   }
-  // Colorless decks get full marks
   if (neededColors.length === 0) {
     colorCoverage = 1.0;
   }
 
   // --- Curve playability ---
-  // Fraction of turns 1-3 with a playable spell
   const curvePlayability =
     playableTurns.length > 0
       ? playableTurns.filter(Boolean).length / playableTurns.length
       : 0;
 
   // --- Land count scoring ---
-  // Adjust ideal land count based on hand size
   const idealLandMin = Math.max(1, Math.round((handSize * 2) / 7));
   const idealLandMax = Math.min(handSize - 1, Math.round((handSize * 4) / 7));
 
@@ -289,20 +1013,16 @@ export function evaluateHandQuality(
   if (landCount === 0) {
     landScore = 0;
   } else if (landCount >= handSize) {
-    // All lands, no spells
     landScore = 0;
   } else if (landCount >= idealLandMin && landCount <= idealLandMax) {
-    // Ideal range: score based on how close to center
     const center = (idealLandMin + idealLandMax) / 2;
     const range = (idealLandMax - idealLandMin) / 2 || 1;
     const distFromCenter = Math.abs(landCount - center) / range;
     landScore = 100 * (1 - distFromCenter * 0.15);
   } else if (landCount < idealLandMin) {
-    // Too few lands
     const deficit = idealLandMin - landCount;
     landScore = Math.max(0, 50 - deficit * 30);
   } else {
-    // Too many lands
     const excess = landCount - idealLandMax;
     landScore = Math.max(0, 60 - excess * 25);
   }
@@ -312,44 +1032,94 @@ export function evaluateHandQuality(
     landScore = Math.min(100, landScore + 15);
   }
 
-  // --- Ramp scoring ---
-  let rampScore: number;
-  if (rampCount >= 2) {
-    rampScore = 100;
-  } else if (rampCount === 1) {
-    rampScore = 70;
-  } else {
-    // No ramp is not terrible, just not ideal
-    rampScore = 30;
-  }
-
   // --- Curve score ---
   const curveScore = curvePlayability * 100;
 
   // --- Color score ---
   const colorScore = colorCoverage * 100;
 
-  // --- Weighted total ---
-  const score = Math.round(
-    landScore * 0.35 +
-      curveScore * 0.3 +
-      colorScore * 0.2 +
-      rampScore * 0.15
-  );
-
-  // Clamp to 0-100
-  const clampedScore = Math.max(0, Math.min(100, score));
-
+  // --- Build factors ---
   const factors: HandQualityFactors = {
     landCount,
     rampCount,
     playableTurns,
     colorCoverage,
     curvePlayability,
+    manaDorks: dorks,
+    coveredColors: neededColors.filter((c) => availableColors.has(c)),
+    missingColors: neededColors.filter((c) => !availableColors.has(c)),
   };
 
+  // Pass pip weights through to reasoning when available
+  if (context?.pipWeights && Object.keys(context.pipWeights).length > 0) {
+    factors.pipWeights = context.pipWeights;
+  }
+
+  let clampedScore: number;
+  let commanderAdjustments: string[] = [];
+
+  if (!context) {
+    // --- Original 4-factor scoring (backward compatible) ---
+    let rampScore: number;
+    if (rampCount >= 2) {
+      rampScore = 100;
+    } else if (rampCount === 1) {
+      rampScore = 70;
+    } else {
+      rampScore = 30;
+    }
+
+    const score = Math.round(
+      landScore * 0.35 +
+        curveScore * 0.3 +
+        colorScore * 0.2 +
+        rampScore * 0.15
+    );
+    clampedScore = Math.max(0, Math.min(100, score));
+  } else {
+    // --- 7-factor scoring with context ---
+    const rampScoreVal = scoreRamp(hand, context.cardCache);
+    const caScoreVal = scoreCardAdvantage(hand, context.cardCache);
+    const interactionScoreVal = scoreInteraction(hand, context.cardCache);
+    const strategyScoreVal = scoreStrategy(
+      hand,
+      context.deckThemes,
+      landCount,
+      rampCount,
+      context.cardCache
+    );
+
+    // Extend factors with new fields
+    factors.strategyScore = strategyScoreVal;
+    factors.cardAdvantageCount = caScoreVal;
+    factors.interactionCount = interactionScoreVal;
+    factors.themeHits = getThemeHits(hand, context.deckThemes, context.cardCache);
+
+    // Get adjusted weights for commander awareness
+    const { weights, reasoning: cmdReasoning } = computeAdjustedWeights(
+      commandZone,
+      context.cardCache
+    );
+    commanderAdjustments = cmdReasoning;
+
+    const score = Math.round(
+      landScore * weights.land +
+        curveScore * weights.curve +
+        colorScore * weights.color +
+        rampScoreVal * weights.ramp +
+        strategyScoreVal * weights.strategy +
+        caScoreVal * weights.cardAdvantage +
+        interactionScoreVal * weights.interaction
+    );
+    clampedScore = Math.max(0, Math.min(100, score));
+  }
+
   const verdict = getVerdict(clampedScore);
-  const reasoning = generateReasoning(factors, mulliganNumber);
+  const reasoning = generateReasoning(
+    factors,
+    mulliganNumber,
+    context ? commanderAdjustments : undefined
+  );
 
   return {
     score: clampedScore,
@@ -357,28 +1127,6 @@ export function evaluateHandQuality(
     factors,
     reasoning,
   };
-}
-
-/**
- * Check if a spell can be cast given available mana colors.
- * A spell with no colored pips (all generic/colorless) is always castable.
- */
-function canCastSpell(
-  spell: EnrichedCard,
-  availableColors: Set<string>
-): boolean {
-  const pips = spell.manaPips;
-  const needed: string[] = [];
-  if (pips.W > 0) needed.push("W");
-  if (pips.U > 0) needed.push("U");
-  if (pips.B > 0) needed.push("B");
-  if (pips.R > 0) needed.push("R");
-  if (pips.G > 0) needed.push("G");
-
-  // If no colored pips required, spell is castable with any mana source
-  if (needed.length === 0) return true;
-
-  return needed.every((c) => availableColors.has(c));
 }
 
 // ---------------------------------------------------------------------------
@@ -398,17 +1146,35 @@ export function getVerdict(score: number): Verdict {
 
 export function generateReasoning(
   factors: HandQualityFactors,
-  mulliganNumber: number
+  mulliganNumber: number,
+  commanderAdjustments?: string[]
 ): string[] {
   const reasoning: string[] = [];
 
   // Land assessment
+  const dorks = factors.manaDorks ?? [];
   if (factors.landCount === 0) {
     reasoning.push("No lands in hand -- cannot cast any spells");
   } else if (factors.landCount === 1) {
-    reasoning.push(
-      "Only 1 land -- risky without early land draws"
-    );
+    if (dorks.length === 1) {
+      const d = dorks[0];
+      const colors = d.producedMana.join(", ");
+      reasoning.push(
+        `Only 1 land but ${d.name} provides ${colors} on T${d.availableTurn}`
+      );
+    } else if (dorks.length > 1) {
+      const dorkDescs = dorks
+        .map((d) => `${d.name} (${d.producedMana.join(", ")}, T${d.availableTurn})`)
+        .join(" and ");
+      reasoning.push(`Only 1 land but ${dorkDescs} provide additional mana`);
+    } else {
+      reasoning.push("Only 1 land -- risky without early land draws");
+    }
+  } else if (factors.landCount === 2 && dorks.length > 0) {
+    const dorkDescs = dorks
+      .map((d) => `${d.name} adding ${d.producedMana.join(", ")} on T${d.availableTurn}`)
+      .join(", ");
+    reasoning.push(`2 lands with ${dorkDescs}`);
   } else if (factors.landCount >= 5) {
     reasoning.push(
       `${factors.landCount} lands -- too many, not enough spells`
@@ -430,9 +1196,31 @@ export function generateReasoning(
   if (factors.colorCoverage >= 1.0) {
     reasoning.push("Full color coverage -- all deck colors available");
   } else if (factors.colorCoverage > 0) {
-    reasoning.push(
-      `Partial color coverage (${Math.round(factors.colorCoverage * 100)}%) -- missing some deck colors`
-    );
+    const covered = factors.coveredColors;
+    const missing = factors.missingColors;
+    const pw = factors.pipWeights;
+
+    if (covered && missing && pw && Object.keys(pw).length > 0) {
+      const pct = Math.round(factors.colorCoverage * 100);
+      const coveredStr = covered
+        .map((c) => `${c} (${Math.round((pw[c] ?? 0) * 100)}%)`)
+        .join(", ");
+      const missingStr = missing
+        .map((c) => `${c} (${Math.round((pw[c] ?? 0) * 100)}%)`)
+        .join(", ");
+      reasoning.push(
+        `Partial color coverage (${pct}%) -- covers ${coveredStr} but missing ${missingStr}`
+      );
+    } else if (covered && missing && covered.length > 0 && missing.length > 0) {
+      const pct = Math.round(factors.colorCoverage * 100);
+      reasoning.push(
+        `Partial color coverage (${pct}%) -- producing ${covered.join(", ")} but missing ${missing.join(", ")}`
+      );
+    } else {
+      reasoning.push(
+        `Partial color coverage (${Math.round(factors.colorCoverage * 100)}%) -- missing some deck colors`
+      );
+    }
   } else if (factors.landCount > 0) {
     reasoning.push("No color coverage -- lands do not produce needed colors");
   }
@@ -451,11 +1239,67 @@ export function generateReasoning(
     reasoning.push("No early plays available in first 3 turns");
   }
 
+  // --- New factor reasoning (only when context was provided) ---
+
+  // Strategy alignment
+  if (factors.strategyScore !== undefined && factors.themeHits !== undefined) {
+    const hits = factors.themeHits;
+    if (hits.length >= 2) {
+      reasoning.push(
+        `${hits.length} cards support deck themes (${hits.join(", ")}) -- strong game plan setup`
+      );
+    } else if (hits.length === 1) {
+      reasoning.push(
+        `1 card supports ${hits[0]} theme -- partial game plan`
+      );
+    } else if (factors.strategyScore < 50) {
+      reasoning.push(
+        "No cards align with deck themes -- hand lacks strategic direction"
+      );
+    }
+    // When strategyScore is 50 (no themes detected), omit reasoning
+  }
+
+  // Card advantage
+  if (factors.cardAdvantageCount !== undefined) {
+    if (factors.cardAdvantageCount >= 100) {
+      reasoning.push("2 card advantage sources for hand refill");
+    } else if (factors.cardAdvantageCount >= 70) {
+      reasoning.push("1 card advantage source available");
+    } else if (factors.cardAdvantageCount >= 50) {
+      reasoning.push("1 card advantage source available");
+    } else {
+      reasoning.push("No card draw or selection -- may run out of gas");
+    }
+  }
+
+  // Interaction
+  if (factors.interactionCount !== undefined) {
+    if (factors.interactionCount >= 100) {
+      reasoning.push("2 interaction pieces to answer threats");
+    } else if (factors.interactionCount >= 70) {
+      reasoning.push("1 interaction piece available");
+    } else if (factors.interactionCount >= 50) {
+      reasoning.push("1 interaction piece available");
+    } else {
+      reasoning.push(
+        "No interaction -- vulnerable to opponent threats"
+      );
+    }
+  }
+
   // Mulligan penalty
   if (mulliganNumber > 0) {
     reasoning.push(
       `Mulligan ${mulliganNumber} -- starting with ${7 - mulliganNumber} cards`
     );
+  }
+
+  // Commander awareness reasoning (appended at end)
+  if (commanderAdjustments && commanderAdjustments.length > 0) {
+    for (const adj of commanderAdjustments) {
+      reasoning.push(adj);
+    }
   }
 
   return reasoning;
@@ -476,8 +1320,18 @@ export function runSimulation(
   pool: HandCard[],
   commanderIdentity: Set<MtgColor | string>,
   iterations = 1000,
-  commandZone: HandCard[] = []
+  commandZone: HandCard[] = [],
+  context?: HandEvaluationContext
 ): SimulationStats {
+
+  // Pre-compute card cache if context is provided but cache is missing
+  let effectiveContext = context;
+  if (context && !context.cardCache) {
+    effectiveContext = {
+      ...context,
+      cardCache: buildCardCache(pool),
+    };
+  }
 
   const verdictDistribution: Record<Verdict, number> = {
     "Strong Keep": 0,
@@ -488,17 +1342,27 @@ export function runSimulation(
 
   let totalLands = 0;
   let totalScore = 0;
+  let totalStrategyScore = 0;
   let t1Plays = 0;
   let t2Plays = 0;
   let t3Plays = 0;
 
   for (let i = 0; i < iterations; i++) {
     const hand = drawHand(pool, 7);
-    const quality = evaluateHandQuality(hand, 0, commanderIdentity, commandZone);
+    const quality = evaluateHandQuality(
+      hand,
+      0,
+      commanderIdentity,
+      commandZone,
+      effectiveContext
+    );
 
     verdictDistribution[quality.verdict]++;
     totalScore += quality.score;
     totalLands += quality.factors.landCount;
+    if (quality.factors.strategyScore !== undefined) {
+      totalStrategyScore += quality.factors.strategyScore;
+    }
 
     if (quality.factors.playableTurns[0]) t1Plays++;
     if (quality.factors.playableTurns[1]) t2Plays++;
@@ -508,7 +1372,7 @@ export function runSimulation(
   const keepable =
     verdictDistribution["Strong Keep"] + verdictDistribution["Keepable"];
 
-  return {
+  const stats: SimulationStats = {
     totalSimulations: iterations,
     keepableRate: iterations > 0 ? keepable / iterations : 0,
     avgLandsInOpener: iterations > 0 ? totalLands / iterations : 0,
@@ -518,6 +1382,13 @@ export function runSimulation(
     probT3Play: iterations > 0 ? t3Plays / iterations : 0,
     verdictDistribution,
   };
+
+  if (effectiveContext) {
+    stats.avgStrategyScore =
+      iterations > 0 ? Math.round(totalStrategyScore / iterations) : 0;
+  }
+
+  return stats;
 }
 
 // ---------------------------------------------------------------------------
@@ -533,9 +1404,19 @@ export function findTopHands(
   commanderIdentity: Set<MtgColor | string>,
   topN = 5,
   iterations = 2000,
-  commandZone: HandCard[] = []
+  commandZone: HandCard[] = [],
+  context?: HandEvaluationContext
 ): RankedHand[] {
   if (pool.length === 0) return [];
+
+  // Pre-compute card cache if context is provided but cache is missing
+  let effectiveContext = context;
+  if (context && !context.cardCache) {
+    effectiveContext = {
+      ...context,
+      cardCache: buildCardCache(pool),
+    };
+  }
 
   // Buffer of top hands, sorted ascending by score (worst first for easy eviction)
   const buffer: { hand: DrawnHand; cardKey: string }[] = [];
@@ -543,7 +1424,13 @@ export function findTopHands(
 
   for (let i = 0; i < iterations; i++) {
     const cards = drawHand(pool, 7);
-    const quality = evaluateHandQuality(cards, 0, commanderIdentity, commandZone);
+    const quality = evaluateHandQuality(
+      cards,
+      0,
+      commanderIdentity,
+      commandZone,
+      effectiveContext
+    );
 
     // Dedup key: sorted card names joined
     const cardKey = cards

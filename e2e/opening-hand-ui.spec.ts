@@ -26,6 +26,7 @@ const MOCK_HAND_ENRICH_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["C"],
       flavorName: null,
+      isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
     },
     "Command Tower": {
@@ -52,6 +53,7 @@ const MOCK_HAND_ENRICH_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
+      isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
     },
     "Arcane Signet": {
@@ -78,6 +80,7 @@ const MOCK_HAND_ENRICH_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
+      isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
     },
     "Swords to Plowshares": {
@@ -104,6 +107,7 @@ const MOCK_HAND_ENRICH_RESPONSE = {
       manaPips: { W: 1, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
     },
     Counterspell: {
@@ -129,6 +133,7 @@ const MOCK_HAND_ENRICH_RESPONSE = {
       manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
       producedMana: [],
       flavorName: null,
+      isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
     },
     "Atraxa, Praetors' Voice": {
@@ -155,6 +160,7 @@ const MOCK_HAND_ENRICH_RESPONSE = {
       manaPips: { W: 1, U: 1, B: 1, R: 0, G: 1, C: 0 },
       producedMana: [],
       flavorName: null,
+      isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
     },
   },
@@ -481,5 +487,59 @@ test.describe("Opening Hand Simulator", () => {
     const panel = page.locator("#tabpanel-deck-hands");
     await expect(panel).toHaveAttribute("role", "tabpanel");
     await expect(panel).toHaveAttribute("aria-labelledby", "tab-deck-hands");
+  });
+
+  test("Hand reasoning includes card advantage and interaction assessment", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await deckPage.goto();
+    await deckPage.fillDecklist(DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Hands");
+    await deckPage.waitForHandsPanel();
+    await deckPage.expandHandsSection("draw-hand");
+    await page.getByTestId("draw-hand-btn").click();
+
+    // Reasoning should include card advantage and interaction assessment
+    const reasoning = page.getByTestId("hand-reasoning");
+    await expect(reasoning).toBeVisible();
+    const text = await reasoning.textContent();
+    // Should mention card advantage/draw
+    expect(text).toMatch(/card advantage|card draw|run out of gas/i);
+    // Should mention interaction/threats
+    expect(text).toMatch(/interaction|threat|answer/i);
+  });
+
+  test("Simulation stats show average strategy score", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await deckPage.goto();
+    await deckPage.fillDecklist(DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Hands");
+    await deckPage.waitForHandsPanel();
+    await deckPage.expandHandsSection("sim-stats");
+
+    // Wait for simulation to complete
+    await expect(page.getByTestId("stat-keepable-rate")).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // Average strategy score stat should be visible
+    await expect(page.getByTestId("stat-avg-strategy")).toBeVisible();
   });
 });
