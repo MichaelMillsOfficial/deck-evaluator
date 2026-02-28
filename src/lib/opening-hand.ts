@@ -74,6 +74,93 @@ export interface HandWeights {
   interaction: number;
 }
 
+export interface PipRequirement {
+  satisfiedBy: Set<string>;
+}
+
+/**
+ * Parse a Scryfall mana cost string into colored pip requirements.
+ * Each requirement has a set of colors that can satisfy it.
+ *
+ * - Single color pips ({W}, {U}, etc.) → satisfiedBy one color
+ * - Hybrid pips ({W/U}) → satisfiedBy either color
+ * - Phyrexian ({B/P}) → skipped (payable with life)
+ * - Mono-hybrid ({2/W}) → skipped (payable with generic)
+ * - Colorless-specific ({C}) → satisfiedBy "C"
+ * - Generic ({1}, {X}, {0}) → skipped
+ */
+export function parsePipRequirements(manaCost: string): PipRequirement[] {
+  if (!manaCost) return [];
+
+  const pips: PipRequirement[] = [];
+  const symbolRe = /\{([^}]+)\}/g;
+
+  for (const match of manaCost.matchAll(symbolRe)) {
+    const inner = match[1];
+
+    // Hybrid color/color: {W/U}
+    if (/^([WUBRG])\/([WUBRG])$/.test(inner)) {
+      const [c1, c2] = inner.split("/");
+      pips.push({ satisfiedBy: new Set([c1, c2]) });
+      continue;
+    }
+
+    // Phyrexian: {B/P} or {B/H} — skip (payable with life)
+    if (/^[WUBRG]\/[PH]$/.test(inner)) continue;
+
+    // Mono-hybrid: {2/W} — skip (payable with generic)
+    if (/^\d+\/[WUBRG]$/.test(inner)) continue;
+
+    // Single color or colorless-specific: {W}, {C}
+    if (/^[WUBRGC]$/.test(inner)) {
+      pips.push({ satisfiedBy: new Set([inner]) });
+      continue;
+    }
+
+    // Generic mana ({0}, {1}, {X}, etc.) — skip
+  }
+
+  return pips;
+}
+
+/**
+ * Determine if a spell's colored pip requirements can be satisfied
+ * by the given land sources using bipartite matching.
+ *
+ * Each land source is an array of colors that land can produce.
+ */
+export function canCastWithLands(
+  spell: EnrichedCard,
+  landSources: string[][]
+): boolean {
+  const pips = parsePipRequirements(spell.manaCost);
+  if (pips.length === 0) return true;
+  if (pips.length > landSources.length) return false;
+
+  // Sort pips by ascending satisfiedBy size (most constrained first for pruning)
+  const sorted = pips
+    .map((p, i) => ({ idx: i, satisfiedBy: p.satisfiedBy }))
+    .sort((a, b) => a.satisfiedBy.size - b.satisfiedBy.size);
+
+  const usedLands = new Set<number>();
+
+  function backtrack(pipIdx: number): boolean {
+    if (pipIdx >= sorted.length) return true;
+    const pip = sorted[pipIdx];
+    for (let li = 0; li < landSources.length; li++) {
+      if (usedLands.has(li)) continue;
+      const landColors = landSources[li];
+      if (!landColors.some((c) => pip.satisfiedBy.has(c))) continue;
+      usedLands.add(li);
+      if (backtrack(pipIdx + 1)) return true;
+      usedLands.delete(li);
+    }
+    return false;
+  }
+
+  return backtrack(0);
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -735,13 +822,9 @@ export function evaluateHandQuality(
   const untappedLands = lands.filter((c) => isUntappedLand(c.enriched));
   const untappedCount = untappedLands.length;
 
-  // Determine untapped mana colors
-  const untappedColors = new Set<string>();
-  for (const land of untappedLands) {
-    for (const color of getProducedColors(land.enriched)) {
-      untappedColors.add(color);
-    }
-  }
+  // Build land source arrays for proper pip-to-land matching
+  const allLandSources = lands.map((l) => l.enriched.producedMana);
+  const untappedLandSources = untappedLands.map((l) => l.enriched.producedMana);
 
   // --- Playable turns analysis ---
   const allSpells = [...spells, ...commandZone];
@@ -752,7 +835,7 @@ export function evaluateHandQuality(
     untappedCount >= 1 &&
     allSpells.some((s) => {
       if (s.enriched.cmc > 1) return false;
-      return canCastSpell(s.enriched, untappedColors);
+      return canCastWithLands(s.enriched, untappedLandSources);
     });
   playableTurns.push(t1Playable);
 
@@ -761,7 +844,7 @@ export function evaluateHandQuality(
     landCount >= 2 &&
     allSpells.some((s) => {
       if (s.enriched.cmc > 2) return false;
-      return canCastSpell(s.enriched, availableColors);
+      return canCastWithLands(s.enriched, allLandSources);
     });
   playableTurns.push(t2Playable);
 
@@ -770,7 +853,7 @@ export function evaluateHandQuality(
     landCount >= 3 &&
     allSpells.some((s) => {
       if (s.enriched.cmc > 3) return false;
-      return canCastSpell(s.enriched, availableColors);
+      return canCastWithLands(s.enriched, allLandSources);
     });
   playableTurns.push(t3Playable);
 
@@ -909,28 +992,6 @@ export function evaluateHandQuality(
     factors,
     reasoning,
   };
-}
-
-/**
- * Check if a spell can be cast given available mana colors.
- * A spell with no colored pips (all generic/colorless) is always castable.
- */
-function canCastSpell(
-  spell: EnrichedCard,
-  availableColors: Set<string>
-): boolean {
-  const pips = spell.manaPips;
-  const needed: string[] = [];
-  if (pips.W > 0) needed.push("W");
-  if (pips.U > 0) needed.push("U");
-  if (pips.B > 0) needed.push("B");
-  if (pips.R > 0) needed.push("R");
-  if (pips.G > 0) needed.push("G");
-
-  // If no colored pips required, spell is castable with any mana source
-  if (needed.length === 0) return true;
-
-  return needed.every((c) => availableColors.has(c));
 }
 
 // ---------------------------------------------------------------------------

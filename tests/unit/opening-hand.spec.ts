@@ -14,8 +14,10 @@ import {
   scoreStrategy,
   getAbilityReliability,
   computeAdjustedWeights,
+  parsePipRequirements,
+  canCastWithLands,
 } from "../../src/lib/opening-hand";
-import type { HandCard, HandEvaluationContext } from "../../src/lib/opening-hand";
+import type { HandCard, HandEvaluationContext, PipRequirement } from "../../src/lib/opening-hand";
 import type { EnrichedCard, DeckTheme } from "../../src/lib/types";
 import { makeCard, makeDeck } from "../helpers";
 
@@ -1996,5 +1998,363 @@ test.describe("reasoning output with context", () => {
     const context: HandEvaluationContext = { deckThemes: [] };
     const result = evaluateHandQuality(hand, 0, new Set(["G"]), [], context);
     expect(result.reasoning.some((r) => /interaction|threat|answer/i.test(r))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parsePipRequirements
+// ---------------------------------------------------------------------------
+
+test.describe("parsePipRequirements", () => {
+  test("{R}{G} → 2 single-color pips", () => {
+    const pips = parsePipRequirements("{R}{G}");
+    expect(pips).toHaveLength(2);
+    expect(pips.some((p) => p.satisfiedBy.has("R") && p.satisfiedBy.size === 1)).toBe(true);
+    expect(pips.some((p) => p.satisfiedBy.has("G") && p.satisfiedBy.size === 1)).toBe(true);
+  });
+
+  test("{1}{W} → 1 pip (generic skipped)", () => {
+    const pips = parsePipRequirements("{1}{W}");
+    expect(pips).toHaveLength(1);
+    expect(pips[0].satisfiedBy.has("W")).toBe(true);
+    expect(pips[0].satisfiedBy.size).toBe(1);
+  });
+
+  test("{W}{W}{U} → 3 pips (multi-pip same color)", () => {
+    const pips = parsePipRequirements("{W}{W}{U}");
+    expect(pips).toHaveLength(3);
+    const wPips = pips.filter((p) => p.satisfiedBy.has("W") && p.satisfiedBy.size === 1);
+    const uPips = pips.filter((p) => p.satisfiedBy.has("U") && p.satisfiedBy.size === 1);
+    expect(wPips).toHaveLength(2);
+    expect(uPips).toHaveLength(1);
+  });
+
+  test("{1}{G/W}{G/W} → 2 hybrid pips", () => {
+    const pips = parsePipRequirements("{1}{G/W}{G/W}");
+    expect(pips).toHaveLength(2);
+    for (const p of pips) {
+      expect(p.satisfiedBy.has("G")).toBe(true);
+      expect(p.satisfiedBy.has("W")).toBe(true);
+      expect(p.satisfiedBy.size).toBe(2);
+    }
+  });
+
+  test("{1}{B/P}{B/P} → 0 pips (phyrexian skipped)", () => {
+    const pips = parsePipRequirements("{1}{B/P}{B/P}");
+    expect(pips).toHaveLength(0);
+  });
+
+  test("{3}{C} → 1 colorless-specific pip", () => {
+    const pips = parsePipRequirements("{3}{C}");
+    expect(pips).toHaveLength(1);
+    expect(pips[0].satisfiedBy.has("C")).toBe(true);
+    expect(pips[0].satisfiedBy.size).toBe(1);
+  });
+
+  test("{2/W}{2/W}{2/W} → 0 pips (mono-hybrid skipped)", () => {
+    const pips = parsePipRequirements("{2/W}{2/W}{2/W}");
+    expect(pips).toHaveLength(0);
+  });
+
+  test("{X}{R} → 1 pip", () => {
+    const pips = parsePipRequirements("{X}{R}");
+    expect(pips).toHaveLength(1);
+    expect(pips[0].satisfiedBy.has("R")).toBe(true);
+  });
+
+  test("empty string → 0 pips", () => {
+    const pips = parsePipRequirements("");
+    expect(pips).toHaveLength(0);
+  });
+
+  test("{0} → 0 pips", () => {
+    const pips = parsePipRequirements("{0}");
+    expect(pips).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// canCastWithLands
+// ---------------------------------------------------------------------------
+
+test.describe("canCastWithLands", () => {
+  test("Hull Breach bug: {R}{G} + Swamp+Karplusan → false", () => {
+    const spell = makeCard({
+      name: "Hull Breach",
+      manaCost: "{R}{G}",
+      cmc: 2,
+      manaPips: { W: 0, U: 0, B: 0, R: 1, G: 1, C: 0 },
+    });
+    // Swamp produces B, Karplusan Forest produces R or G (one per tap)
+    const landSources = [["B"], ["R", "G"]];
+    expect(canCastWithLands(spell, landSources)).toBe(false);
+  });
+
+  test("Same spell, two duals: {R}{G} + Karplusan+Stomping → true", () => {
+    const spell = makeCard({
+      name: "Hull Breach",
+      manaCost: "{R}{G}",
+      cmc: 2,
+      manaPips: { W: 0, U: 0, B: 0, R: 1, G: 1, C: 0 },
+    });
+    const landSources = [["R", "G"], ["R", "G"]];
+    expect(canCastWithLands(spell, landSources)).toBe(true);
+  });
+
+  test("Double-pip fail: {W}{W} + Plains+Island → false", () => {
+    const spell = makeCard({
+      name: "WW Spell",
+      manaCost: "{W}{W}",
+      cmc: 2,
+      manaPips: { W: 2, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    });
+    const landSources = [["W"], ["U"]];
+    expect(canCastWithLands(spell, landSources)).toBe(false);
+  });
+
+  test("Double-pip pass: {W}{W} + Plains+Plains → true", () => {
+    const spell = makeCard({
+      name: "WW Spell",
+      manaCost: "{W}{W}",
+      cmc: 2,
+      manaPips: { W: 2, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    });
+    const landSources = [["W"], ["W"]];
+    expect(canCastWithLands(spell, landSources)).toBe(true);
+  });
+
+  test("Triple-pip allocation: {W}{W}{U} + Plains+HallowedFountain+Island → true", () => {
+    const spell = makeCard({
+      name: "WWU Spell",
+      manaCost: "{W}{W}{U}",
+      cmc: 3,
+      manaPips: { W: 2, U: 1, B: 0, R: 0, G: 0, C: 0 },
+    });
+    // Plains=W, Hallowed Fountain=W/U, Island=U
+    const landSources = [["W"], ["W", "U"], ["U"]];
+    expect(canCastWithLands(spell, landSources)).toBe(true);
+  });
+
+  test("Hybrid either: {1}{G/W}{G/W} + Forest+Forest → true", () => {
+    const spell = makeCard({
+      name: "Hybrid Spell",
+      manaCost: "{1}{G/W}{G/W}",
+      cmc: 3,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    });
+    const landSources = [["G"], ["G"]];
+    expect(canCastWithLands(spell, landSources)).toBe(true);
+  });
+
+  test("Hybrid mixed: {1}{G/W}{G/W} + Plains+Forest → true", () => {
+    const spell = makeCard({
+      name: "Hybrid Spell",
+      manaCost: "{1}{G/W}{G/W}",
+      cmc: 3,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    });
+    const landSources = [["W"], ["G"]];
+    expect(canCastWithLands(spell, landSources)).toBe(true);
+  });
+
+  test("Phyrexian: {1}{B/P}{B/P} + Mountain → true (no colored pips needed)", () => {
+    const spell = makeCard({
+      name: "Phyrexian Spell",
+      manaCost: "{1}{B/P}{B/P}",
+      cmc: 3,
+      manaPips: { W: 0, U: 0, B: 2, R: 0, G: 0, C: 0 },
+    });
+    const landSources = [["R"]];
+    expect(canCastWithLands(spell, landSources)).toBe(true);
+  });
+
+  test("Colorless satisfied: {3}{C} + Wastes+3×Plains → true", () => {
+    const spell = makeCard({
+      name: "Colorless Spell",
+      manaCost: "{3}{C}",
+      cmc: 4,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 1 },
+    });
+    // Wastes produces C
+    const landSources = [["C"], ["W"], ["W"], ["W"]];
+    expect(canCastWithLands(spell, landSources)).toBe(true);
+  });
+
+  test("Colorless unsatisfied: {3}{C} + 4×Plains → false", () => {
+    const spell = makeCard({
+      name: "Colorless Spell",
+      manaCost: "{3}{C}",
+      cmc: 4,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 1 },
+    });
+    const landSources = [["W"], ["W"], ["W"], ["W"]];
+    expect(canCastWithLands(spell, landSources)).toBe(false);
+  });
+
+  test("5-color wildcard: {R}{G} + 2×CommandTower → true", () => {
+    const spell = makeCard({
+      name: "Hull Breach",
+      manaCost: "{R}{G}",
+      cmc: 2,
+      manaPips: { W: 0, U: 0, B: 0, R: 1, G: 1, C: 0 },
+    });
+    // Command Tower produces all 5 colors
+    const landSources = [
+      ["W", "U", "B", "R", "G"],
+      ["W", "U", "B", "R", "G"],
+    ];
+    expect(canCastWithLands(spell, landSources)).toBe(true);
+  });
+
+  test("No pips: {4} + any lands → true", () => {
+    const spell = makeCard({
+      name: "Generic Spell",
+      manaCost: "{4}",
+      cmc: 4,
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    });
+    const landSources = [["R"]];
+    expect(canCastWithLands(spell, landSources)).toBe(true);
+  });
+
+  test("No lands: {R} + [] → false", () => {
+    const spell = makeCard({
+      name: "Red Spell",
+      manaCost: "{R}",
+      cmc: 1,
+      manaPips: { W: 0, U: 0, B: 0, R: 1, G: 0, C: 0 },
+    });
+    expect(canCastWithLands(spell, [])).toBe(false);
+  });
+
+  test("Backtracking needed: {R}{W}{G} + [RG, WR, WG] → true", () => {
+    const spell = makeCard({
+      name: "Naya Spell",
+      manaCost: "{R}{W}{G}",
+      cmc: 3,
+      manaPips: { W: 1, U: 0, B: 0, R: 1, G: 1, C: 0 },
+    });
+    // Each dual can produce 2 of the needed colors.
+    // Correct assignment: RG→G, WR→R, WG→W (or similar)
+    const landSources = [["R", "G"], ["W", "R"], ["W", "G"]];
+    expect(canCastWithLands(spell, landSources)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: evaluateHandQuality with proper land-to-pip allocation
+// ---------------------------------------------------------------------------
+
+test.describe("evaluateHandQuality land-to-pip integration", () => {
+  test("Swamp+Karplusan+Hull Breach → playableTurns[1] is false", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Swamp",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Swamp",
+          typeLine: "Basic Land — Swamp",
+          supertypes: ["Basic"],
+          producedMana: ["B"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Karplusan Forest",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Karplusan Forest",
+          typeLine: "Land",
+          producedMana: ["R", "G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Hull Breach",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Hull Breach",
+          typeLine: "Sorcery",
+          manaCost: "{R}{G}",
+          cmc: 2,
+          manaPips: { W: 0, U: 0, B: 0, R: 1, G: 1, C: 0 },
+          oracleText: "Choose one — Destroy target artifact; or destroy target enchantment.",
+        }),
+      },
+    ];
+    const result = evaluateHandQuality(hand, 0, new Set(["B", "R", "G"]));
+    // Only one land produces R or G — can't satisfy both {R} and {G}
+    expect(result.factors.playableTurns[1]).toBe(false);
+  });
+
+  test("Karplusan+Stomping Ground+Hull Breach → playableTurns[1] is true", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Karplusan Forest",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Karplusan Forest",
+          typeLine: "Land",
+          producedMana: ["R", "G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Stomping Ground",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Stomping Ground",
+          typeLine: "Land — Mountain Forest",
+          producedMana: ["R", "G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Hull Breach",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Hull Breach",
+          typeLine: "Sorcery",
+          manaCost: "{R}{G}",
+          cmc: 2,
+          manaPips: { W: 0, U: 0, B: 0, R: 1, G: 1, C: 0 },
+          oracleText: "Choose one — Destroy target artifact; or destroy target enchantment.",
+        }),
+      },
+    ];
+    const result = evaluateHandQuality(hand, 0, new Set(["R", "G"]));
+    // Two dual lands can each provide one of R/G
+    expect(result.factors.playableTurns[1]).toBe(true);
+  });
+
+  test("Hybrid spell + single-color land → playableTurns[0] is true", () => {
+    const hand: HandCard[] = [
+      {
+        name: "Forest",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Hybrid 1-drop",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Hybrid 1-drop",
+          typeLine: "Creature",
+          manaCost: "{G/W}",
+          cmc: 1,
+          manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+          oracleText: "",
+        }),
+      },
+    ];
+    const result = evaluateHandQuality(hand, 0, new Set(["G", "W"]));
+    // Forest produces G which satisfies {G/W}
+    expect(result.factors.playableTurns[0]).toBe(true);
   });
 });
