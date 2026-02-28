@@ -79,4 +79,28 @@ test.describe("findCombosInDeck", () => {
     const found = findCombosInDeck(cardNames);
     expect(found.length).toBeGreaterThanOrEqual(1);
   });
+
+  test("finds Krenko + Thornbite Staff tribal combo", () => {
+    const cardNames = ["Krenko, Mob Boss", "Thornbite Staff", "Mountain"];
+    const found = findCombosInDeck(cardNames);
+    const krenko = found.find(
+      (c) =>
+        c.cards.includes("Krenko, Mob Boss") &&
+        c.cards.includes("Thornbite Staff")
+    );
+    expect(krenko).toBeDefined();
+    expect(krenko!.type).toBe("infinite");
+  });
+
+  test("finds Conspiracy + Turntimber Ranger tribal combo", () => {
+    const cardNames = ["Conspiracy", "Turntimber Ranger", "Forest"];
+    const found = findCombosInDeck(cardNames);
+    const combo = found.find(
+      (c) =>
+        c.cards.includes("Conspiracy") &&
+        c.cards.includes("Turntimber Ranger")
+    );
+    expect(combo).toBeDefined();
+    expect(combo!.type).toBe("infinite");
+  });
 });

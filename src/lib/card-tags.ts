@@ -1,5 +1,6 @@
 import type { EnrichedCard } from "./types";
 import { CONDITIONAL_PATTERNS } from "./land-base-efficiency";
+import { CREATURE_TYPE_PATTERN } from "./creature-types";
 
 export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   Ramp: { bg: "bg-emerald-500/20", text: "text-emerald-300" },
@@ -24,6 +25,8 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   "Game Changer": { bg: "bg-red-500/20", text: "text-red-300" },
   "Extra Turn": { bg: "bg-amber-600/20", text: "text-amber-200" },
   "Mass Land Denial": { bg: "bg-orange-600/20", text: "text-orange-200" },
+  Lord: { bg: "bg-teal-600/20", text: "text-teal-200" },
+  "Tribal Payoff": { bg: "bg-teal-500/20", text: "text-teal-300" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -85,6 +88,19 @@ const EXTRA_TURN_RE = /\bextra turn\b/i;
 const FULL_MLD_RE = /\bdestroy all\b[^.]*\blands\b/i;
 const SACRIFICE_MLD_RE =
   /\beach player\b[^.]*(?:\bsacrifices?\b[^.]*\bland|\bland[^.]*\bsacrifices?\b)/i;
+// --- Tribal tag patterns ---
+const LORD_TYPE_SPECIFIC_RE = new RegExp(
+  `(?:other )?(?:${CREATURE_TYPE_PATTERN})(?:s| creatures?) you control get \\+`,
+  "i"
+);
+const LORD_CHOSEN_TYPE_RE =
+  /(?:other )?creatures? you control of the chosen type get \+/i;
+const TRIBAL_PAYOFF_KINDRED_RE = /^Kindred\b/i;
+const TRIBAL_PAYOFF_CHOOSE_RE = /\bchoose a creature type\b/i;
+const TRIBAL_PAYOFF_SHARE_RE = /shares? (?:at least one |a )?creature type/i;
+const TRIBAL_PAYOFF_OF_TYPE_RE = /creature (?:spell|card)s? (?:of|you cast of) the chosen type/i;
+const TRIBAL_PAYOFF_EVERY_TYPE_RE = /\bevery creature type\b/i;
+
 const RESOURCE_DENIAL_NAMES = new Set([
   "Blood Moon",
   "Back to Basics",
@@ -271,6 +287,26 @@ export function generateTags(card: EnrichedCard): string[] {
     RESOURCE_DENIAL_NAMES.has(card.name)
   ) {
     tags.add("Mass Land Denial");
+  }
+
+  // --- Tribal tags ---
+
+  // Lord — type-specific buff ("Other Elf creatures you control get +1/+1")
+  // or chosen-type lord ("Other creatures you control of the chosen type get +1/+1")
+  if (LORD_TYPE_SPECIFIC_RE.test(text) || LORD_CHOSEN_TYPE_RE.test(text)) {
+    tags.add("Lord");
+  }
+
+  // Tribal Payoff — any card that rewards a specific creature type strategy
+  if (
+    TRIBAL_PAYOFF_KINDRED_RE.test(card.typeLine) ||
+    TRIBAL_PAYOFF_CHOOSE_RE.test(text) ||
+    TRIBAL_PAYOFF_SHARE_RE.test(text) ||
+    TRIBAL_PAYOFF_OF_TYPE_RE.test(text) ||
+    TRIBAL_PAYOFF_EVERY_TYPE_RE.test(text) ||
+    LORD_TYPE_SPECIFIC_RE.test(text)
+  ) {
+    tags.add("Tribal Payoff");
   }
 
   return Array.from(tags).sort();

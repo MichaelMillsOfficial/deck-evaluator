@@ -10,6 +10,11 @@ import type {
 import { SYNERGY_AXES } from "./synergy-axes";
 import { findCombosInDeck } from "./known-combos";
 import { generateTags } from "./card-tags";
+import {
+  identifyTribalAnchors,
+  getCreatureSubtypes,
+  isChangeling,
+} from "./creature-types";
 
 const BASE_SCORE = 50;
 const AXIS_WEIGHT = 3;
@@ -267,9 +272,72 @@ function computeCardScores(
   return scores;
 }
 
+/**
+ * Boost tribal axis scores for creatures sharing subtypes with tribal anchors.
+ * This bridges the gap between individual-card detection (which only catches
+ * explicit payoff cards) and deck-level tribal synergy (plain creatures of the
+ * right type should also participate).
+ */
+function boostTribalScores(
+  deck: DeckData,
+  cardNames: string[],
+  cardMap: Record<string, EnrichedCard>,
+  axisScores: Map<string, CardAxisScore[]>
+): void {
+  // Resolve commanders
+  const commanders: EnrichedCard[] = [];
+  for (const cmd of deck.commanders) {
+    const card = cardMap[cmd.name];
+    if (card) commanders.push(card);
+  }
+
+  // Identify which types the deck is built around
+  const anchors = identifyTribalAnchors(commanders, cardNames, cardMap);
+  if (anchors.length === 0) return;
+
+  const anchorSet = new Set(anchors);
+  const tribalAxis = SYNERGY_AXES.find((a) => a.id === "tribal");
+  if (!tribalAxis) return;
+
+  for (const name of cardNames) {
+    const card = cardMap[name];
+    if (!card) continue;
+
+    const subtypes = getCreatureSubtypes(card);
+    const changeling = isChangeling(card);
+
+    // Changelings match all anchor types; regular creatures match by subtype
+    const matchCount = changeling
+      ? anchors.length
+      : subtypes.filter((st) => anchorSet.has(st)).length;
+
+    if (matchCount === 0) continue;
+
+    // Compute boost: enough to cross the 0.2 threshold for synergy pairing
+    const boost = Math.min(0.4, matchCount * 0.15);
+
+    const cardAxes = axisScores.get(name) ?? [];
+    const existing = cardAxes.find((a) => a.axisId === "tribal");
+
+    if (existing) {
+      // Add to existing tribal score (still cap at 1)
+      existing.relevance = Math.min(1, existing.relevance + boost);
+    } else {
+      // Add new tribal axis score
+      cardAxes.push({
+        axisId: "tribal",
+        axisName: tribalAxis.name,
+        relevance: boost,
+      });
+      axisScores.set(name, cardAxes);
+    }
+  }
+}
+
 /** Identify deck themes from axis strengths */
 function identifyDeckThemes(
-  axisScores: Map<string, CardAxisScore[]>
+  axisScores: Map<string, CardAxisScore[]>,
+  anchors?: string[]
 ): DeckTheme[] {
   const axisCardCounts = new Map<string, number>();
   const axisStrengths = new Map<string, number>();
@@ -288,12 +356,18 @@ function identifyDeckThemes(
     if (cardCount < DECK_THEME_MIN_CARDS) continue;
     const axisDef = SYNERGY_AXES.find((a) => a.id === axisId);
     if (!axisDef) continue;
-    themes.push({
+    const theme: DeckTheme = {
       axisId,
       axisName: axisDef.name,
       strength: axisStrengths.get(axisId) ?? 0,
       cardCount,
-    });
+    };
+    // Annotate tribal themes with the primary anchor type
+    if (axisId === "tribal" && anchors && anchors.length > 0) {
+      theme.detail = anchors[0];
+      theme.axisName = `${anchors[0]} Tribal`;
+    }
+    themes.push(theme);
   }
 
   return themes.sort((a, b) => b.strength - a.strength);
@@ -308,6 +382,9 @@ export function analyzeDeckSynergy(
 
   // Step 1: Score every card against every axis
   const axisScores = computeAxisScores(cardNames, cardMap);
+
+  // Step 1b: Boost tribal scores for creatures sharing subtypes with anchors
+  boostTribalScores(deck, cardNames, cardMap, axisScores);
 
   // Step 2: Compute deck-level axis strengths
   const deckAxisStrengths = computeDeckAxisStrengths(axisScores);
@@ -331,8 +408,14 @@ export function analyzeDeckSynergy(
     comboPairs
   );
 
-  // Step 7: Identify deck themes
-  const deckThemes = identifyDeckThemes(axisScores);
+  // Step 7: Identify deck themes (pass tribal anchors for labeling)
+  const commanders: EnrichedCard[] = [];
+  for (const cmd of deck.commanders) {
+    const card = cardMap[cmd.name];
+    if (card) commanders.push(card);
+  }
+  const tribalAnchors = identifyTribalAnchors(commanders, cardNames, cardMap);
+  const deckThemes = identifyDeckThemes(axisScores, tribalAnchors);
 
   // Step 8: Sort and return
   const topSynergies = [...synergyPairs, ...comboPairs]

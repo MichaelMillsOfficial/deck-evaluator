@@ -1,4 +1,5 @@
 import type { EnrichedCard } from "./types";
+import { CREATURE_TYPE_PATTERN } from "./creature-types";
 
 export interface SynergyAxisDefinition {
   id: string;
@@ -53,12 +54,31 @@ const SAC_ARISTOCRAT_RE = /whenever you sacrifice/i;
 const SAC_KEYWORDS = new Set(["Exploit"]);
 
 // --- Tribal ---
-const TRIBAL_LORD_RE =
-  /other.+?(?:creature|creatures).+?(?:you control )?get \+/i;
+const TRIBAL_CHOSEN_TYPE_LORD_RE =
+  /other.+?creatures? you control of the chosen type get \+/i;
 const TRIBAL_KINDRED_RE = /^Kindred\b/i;
 const TRIBAL_CHOOSE_TYPE_RE = /\bchoose a creature type\b/i;
 const TRIBAL_TYPE_MATTERS_RE =
   /(?:creatures? (?:you control )?(?:of the chosen|that share a creature) type)/i;
+// Dynamic type-specific patterns built from CREATURE_TYPE_PATTERN
+const TRIBAL_TYPE_SPECIFIC_LORD_RE = new RegExp(
+  `(?:other )?(?:${CREATURE_TYPE_PATTERN})(?:s| creatures?) you control get \\+`,
+  "i"
+);
+const TRIBAL_TYPE_TRIGGER_RE = new RegExp(
+  `\\bwhenever (?:a |an )(?:${CREATURE_TYPE_PATTERN})\\b`,
+  "i"
+);
+const TRIBAL_FOR_EACH_TYPE_RE = new RegExp(
+  `\\b(?:for each|number of) (?:${CREATURE_TYPE_PATTERN})s?\\b`,
+  "i"
+);
+const TRIBAL_CREATURE_SPELL_OF_TYPE_RE =
+  /creature (?:spell|card)s? (?:of the chosen type|you cast of the chosen type)/i;
+const TRIBAL_SHARE_TYPE_RE =
+  /shares? (?:at least one |a )?creature type/i;
+const TRIBAL_EVERY_TYPE_RE =
+  /\bevery creature type\b/i;
 
 // --- Landfall ---
 const LANDFALL_TRIGGER_RE =
@@ -194,15 +214,33 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
   {
     id: "tribal",
     name: "Tribal",
-    description: "Creature type lords, tribal payoffs",
+    description: "Creature type lords, tribal payoffs, kindred synergies",
     color: { bg: "bg-teal-500/20", text: "text-teal-300" },
     detect(card) {
       const text = card.oracleText;
       let score = 0;
-      if (TRIBAL_LORD_RE.test(text)) score += 0.8;
+      // "of the chosen type" lord (e.g. Adaptive Automaton)
+      if (TRIBAL_CHOSEN_TYPE_LORD_RE.test(text)) score += 0.7;
+      // Kindred type line (e.g. "Kindred Sorcery")
       if (TRIBAL_KINDRED_RE.test(card.typeLine)) score += 0.7;
+      // "Choose a creature type"
       if (TRIBAL_CHOOSE_TYPE_RE.test(text)) score += 0.5;
+      // "creatures of the chosen/that share a creature type"
       if (TRIBAL_TYPE_MATTERS_RE.test(text)) score += 0.6;
+      // Type-specific lord ("Other Elf creatures you control get +1/+1")
+      if (TRIBAL_TYPE_SPECIFIC_LORD_RE.test(text)) score += 0.7;
+      // Type-specific trigger ("Whenever a Warrior attacks")
+      if (TRIBAL_TYPE_TRIGGER_RE.test(text)) score += 0.6;
+      // "for each Elf" / "number of Goblins"
+      if (TRIBAL_FOR_EACH_TYPE_RE.test(text)) score += 0.5;
+      // "creature spells of the chosen type"
+      if (TRIBAL_CREATURE_SPELL_OF_TYPE_RE.test(text)) score += 0.5;
+      // "shares a creature type" (e.g. Coat of Arms)
+      if (TRIBAL_SHARE_TYPE_RE.test(text)) score += 0.6;
+      // "every creature type" (e.g. Maskwood Nexus)
+      if (TRIBAL_EVERY_TYPE_RE.test(text)) score += 0.6;
+      // Changeling keyword — all creature types
+      if (card.keywords.includes("Changeling")) score += 0.3;
       return Math.min(score, 1);
     },
     conflictsWith: [],

@@ -286,4 +286,141 @@ test.describe("analyzeDeckSynergy", () => {
     expect(Array.isArray(score.axes)).toBe(true);
     expect(Array.isArray(score.pairs)).toBe(true);
   });
+
+  test("tribal-heavy deck: Elf lord and Elves score above baseline", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Elvish Archdruid": mockCard({
+        name: "Elvish Archdruid",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "Other Elf creatures you control get +1/+1.\n{T}: Add {G} for each Elf you control.",
+      }),
+      "Llanowar Elves": mockCard({
+        name: "Llanowar Elves",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      "Elvish Mystic": mockCard({
+        name: "Elvish Mystic",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      "Fyndhorn Elves": mockCard({
+        name: "Fyndhorn Elves",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      "Priest of Titania": mockCard({
+        name: "Priest of Titania",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G} for each Elf on the battlefield.",
+      }),
+      "Lightning Bolt": mockCard({
+        name: "Lightning Bolt",
+        typeLine: "Instant",
+        oracleText: "Lightning Bolt deals 3 damage to any target.",
+      }),
+    };
+    const deck = mockDeck(
+      ["Llanowar Elves", "Elvish Mystic", "Fyndhorn Elves", "Priest of Titania", "Lightning Bolt"],
+      ["Elvish Archdruid"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Elf lord should score above baseline (50)
+    const archdruidScore = result.cardScores["Elvish Archdruid"]?.score ?? 0;
+    expect(archdruidScore).toBeGreaterThan(50);
+
+    // Plain Elves should also get a tribal boost above baseline
+    const llanowarScore = result.cardScores["Llanowar Elves"]?.score ?? 0;
+    expect(llanowarScore).toBeGreaterThan(50);
+
+    // Non-tribal card should stay at baseline
+    const boltScore = result.cardScores["Lightning Bolt"]?.score ?? 50;
+    expect(archdruidScore).toBeGreaterThan(boltScore);
+  });
+
+  test("Changeling synergizes with tribal payoffs", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Mirror Entity": mockCard({
+        name: "Mirror Entity",
+        typeLine: "Creature — Shapeshifter",
+        subtypes: ["Shapeshifter"],
+        keywords: ["Changeling"],
+        oracleText: "{X}: Until end of turn, creatures you control have base power and toughness X/X and gain all creature types until end of turn.",
+      }),
+      "Elvish Archdruid": mockCard({
+        name: "Elvish Archdruid",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "Other Elf creatures you control get +1/+1.\n{T}: Add {G} for each Elf you control.",
+      }),
+      "Llanowar Elves": mockCard({
+        name: "Llanowar Elves",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      "Elvish Mystic": mockCard({
+        name: "Elvish Mystic",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Mirror Entity should have synergy with the Elf lord
+    const mirrorScore = result.cardScores["Mirror Entity"]?.score ?? 0;
+    expect(mirrorScore).toBeGreaterThan(50);
+  });
+
+  test("warrior commander establishes tribal anchor and detects tribal theme", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Najeela, the Blade-Blossom": mockCard({
+        name: "Najeela, the Blade-Blossom",
+        typeLine: "Legendary Creature — Human Warrior",
+        subtypes: ["Human", "Warrior"],
+        oracleText: "Whenever a Warrior attacks, you may have its controller create a 1/1 white Warrior creature token that's tapped and attacking.",
+      }),
+      "Warrior A": mockCard({
+        name: "Warrior A",
+        typeLine: "Creature — Human Warrior",
+        subtypes: ["Human", "Warrior"],
+        oracleText: "Haste",
+      }),
+      "Warrior B": mockCard({
+        name: "Warrior B",
+        typeLine: "Creature — Human Warrior",
+        subtypes: ["Human", "Warrior"],
+        oracleText: "First strike",
+      }),
+      "Warrior C": mockCard({
+        name: "Warrior C",
+        typeLine: "Creature — Elf Warrior",
+        subtypes: ["Elf", "Warrior"],
+        oracleText: "Trample",
+      }),
+      "Warrior D": mockCard({
+        name: "Warrior D",
+        typeLine: "Creature — Warrior",
+        subtypes: ["Warrior"],
+        oracleText: "",
+      }),
+    };
+    const deck = mockDeck(
+      ["Warrior A", "Warrior B", "Warrior C", "Warrior D"],
+      ["Najeela, the Blade-Blossom"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Should detect tribal as a deck theme
+    const tribalTheme = result.deckThemes.find((t) => t.axisId === "tribal");
+    expect(tribalTheme).toBeDefined();
+  });
 });

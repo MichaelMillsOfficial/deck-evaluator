@@ -231,12 +231,121 @@ test.describe("Tribal axis", () => {
     expect(axis.detect(card)).toBeGreaterThan(0);
   });
 
+  test("Najeela (type-specific trigger: Whenever a Warrior attacks) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Najeela, the Blade-Blossom",
+      oracleText:
+        "Whenever a Warrior attacks, you may have its controller create a 1/1 white Warrior creature token that's tapped and attacking.",
+      subtypes: ["Human", "Warrior"],
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Goblin Chieftain (type-specific lord + haste) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Goblin Chieftain",
+      oracleText: "Haste\nOther Goblin creatures you control get +1/+1 and have haste.",
+      subtypes: ["Goblin"],
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Kindred Dominance (type-specific board wipe) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Kindred Dominance",
+      typeLine: "Kindred Sorcery",
+      oracleText:
+        "Choose a creature type. Destroy all creatures that aren't of the chosen type.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Mirror Entity (Changeling keyword) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Mirror Entity",
+      keywords: ["Changeling"],
+      typeLine: "Creature — Shapeshifter",
+      subtypes: ["Shapeshifter"],
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Herald's Horn (chosen type cost reduction + card advantage) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Herald's Horn",
+      typeLine: "Artifact",
+      oracleText:
+        "As Herald's Horn enters the battlefield, choose a creature type.\nCreature spells of the chosen type cost {1} less to cast.\nAt the beginning of your upkeep, look at the top card of your library. If it's a creature card of the chosen type, you may reveal it and put it into your hand.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Vanquisher's Banner (chosen type lord + draw) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Vanquisher's Banner",
+      typeLine: "Artifact",
+      oracleText:
+        "As Vanquisher's Banner enters the battlefield, choose a creature type.\nCreatures you control of the chosen type get +1/+1.\nWhenever you cast a creature spell of the chosen type, draw a card.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Coat of Arms (creatures that share type get +1/+1) → detected", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Coat of Arms",
+      typeLine: "Artifact",
+      oracleText:
+        "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
   test("returns 0 for generic creature", () => {
     const axis = getAxisById("tribal")!;
     const card = mockCard({
       typeLine: "Creature — Human",
       oracleText: "Flying",
       subtypes: ["Human"],
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("Glorious Anthem (generic anthem, no type reference) → 0", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Glorious Anthem",
+      typeLine: "Enchantment",
+      oracleText: "Creatures you control get +1/+1.",
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("Maskwood Nexus ('every creature type') scores > 0", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Maskwood Nexus",
+      typeLine: "Artifact",
+      oracleText:
+        "Creatures you control are every creature type. The same is true for creature spells you control and creature cards you own that aren't on the battlefield.\n{4}, {T}: Create a 2/2 colorless Shapeshifter creature token with changeling.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Elesh Norn (generic 'other creatures' buff, no type name) → 0", () => {
+    const axis = getAxisById("tribal")!;
+    const card = mockCard({
+      name: "Elesh Norn, Grand Cenobite",
+      typeLine: "Legendary Creature — Phyrexian Praetor",
+      oracleText:
+        "Vigilance\nOther creatures you control get +2/+2. Creatures your opponents control get -2/-2.",
+      keywords: ["Vigilance"],
     });
     expect(axis.detect(card)).toBe(0);
   });

@@ -1072,3 +1072,129 @@ test.describe("generateTags — Mass Land Denial", () => {
     expect(generateTags(card)).not.toContain("Mass Land Denial");
   });
 });
+
+test.describe("generateTags — Lord", () => {
+  test("Elvish Archdruid (type-specific lord) → Lord", () => {
+    const card = makeCard({
+      name: "Elvish Archdruid",
+      oracleText:
+        "Other Elf creatures you control get +1/+1.\n{T}: Add {G} for each Elf you control.",
+      typeLine: "Creature — Elf Druid",
+      subtypes: ["Elf", "Druid"],
+    });
+    expect(generateTags(card)).toContain("Lord");
+  });
+
+  test("Goblin Chieftain (type-specific lord + haste) → Lord", () => {
+    const card = makeCard({
+      name: "Goblin Chieftain",
+      oracleText: "Haste\nOther Goblin creatures you control get +1/+1 and have haste.",
+      typeLine: "Creature — Goblin",
+      subtypes: ["Goblin"],
+    });
+    expect(generateTags(card)).toContain("Lord");
+  });
+
+  test("Coat of Arms (generic buff, no type-specific lord) → no Lord", () => {
+    const card = makeCard({
+      name: "Coat of Arms",
+      oracleText:
+        "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it.",
+      typeLine: "Artifact",
+    });
+    expect(generateTags(card)).not.toContain("Lord");
+  });
+
+  test("Glorious Anthem (generic anthem, no creature type) → no Lord", () => {
+    const card = makeCard({
+      name: "Glorious Anthem",
+      oracleText: "Creatures you control get +1/+1.",
+      typeLine: "Enchantment",
+    });
+    expect(generateTags(card)).not.toContain("Lord");
+  });
+
+  test("Elesh Norn (generic 'other creatures' buff, no type) → no Lord", () => {
+    const card = makeCard({
+      name: "Elesh Norn, Grand Cenobite",
+      oracleText:
+        "Vigilance\nOther creatures you control get +2/+2. Creatures your opponents control get -2/-2.",
+      typeLine: "Legendary Creature — Phyrexian Praetor",
+      keywords: ["Vigilance"],
+    });
+    expect(generateTags(card)).not.toContain("Lord");
+  });
+
+  test("Adaptive Automaton (chosen type lord) → Lord", () => {
+    const card = makeCard({
+      name: "Adaptive Automaton",
+      oracleText:
+        "As Adaptive Automaton enters the battlefield, choose a creature type. Adaptive Automaton is the chosen type in addition to its other types. Other creatures you control of the chosen type get +1/+1.",
+      typeLine: "Artifact Creature — Construct",
+      subtypes: ["Construct"],
+    });
+    expect(generateTags(card)).toContain("Lord");
+  });
+});
+
+test.describe("generateTags — Tribal Payoff", () => {
+  test("Herald's Horn (chosen type cost reduction) → Tribal Payoff", () => {
+    const card = makeCard({
+      name: "Herald's Horn",
+      typeLine: "Artifact",
+      oracleText:
+        "As Herald's Horn enters the battlefield, choose a creature type.\nCreature spells of the chosen type cost {1} less to cast.\nAt the beginning of your upkeep, look at the top card of your library. If it's a creature card of the chosen type, you may reveal it and put it into your hand.",
+    });
+    expect(generateTags(card)).toContain("Tribal Payoff");
+  });
+
+  test("Kindred Dominance (Kindred type line) → Tribal Payoff", () => {
+    const card = makeCard({
+      name: "Kindred Dominance",
+      typeLine: "Kindred Sorcery",
+      oracleText:
+        "Choose a creature type. Destroy all creatures that aren't of the chosen type.",
+    });
+    expect(generateTags(card)).toContain("Tribal Payoff");
+  });
+
+  test("Coat of Arms (shares creature type) → Tribal Payoff", () => {
+    const card = makeCard({
+      name: "Coat of Arms",
+      oracleText:
+        "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it.",
+      typeLine: "Artifact",
+    });
+    expect(generateTags(card)).toContain("Tribal Payoff");
+  });
+
+  test("Vanquisher's Banner (chosen type lord + draw) → Tribal Payoff", () => {
+    const card = makeCard({
+      name: "Vanquisher's Banner",
+      typeLine: "Artifact",
+      oracleText:
+        "As Vanquisher's Banner enters the battlefield, choose a creature type.\nCreatures you control of the chosen type get +1/+1.\nWhenever you cast a creature spell of the chosen type, draw a card.",
+    });
+    expect(generateTags(card)).toContain("Tribal Payoff");
+  });
+
+  test("Grizzly Bears (generic creature) → no Tribal Payoff", () => {
+    const card = makeCard({
+      name: "Grizzly Bears",
+      typeLine: "Creature — Bear",
+      oracleText: "",
+      subtypes: ["Bear"],
+    });
+    expect(generateTags(card)).not.toContain("Tribal Payoff");
+  });
+
+  test("Maskwood Nexus ('every creature type') → Tribal Payoff", () => {
+    const card = makeCard({
+      name: "Maskwood Nexus",
+      typeLine: "Artifact",
+      oracleText:
+        "Creatures you control are every creature type. The same is true for creature spells you control and creature cards you own that aren't on the battlefield.\n{4}, {T}: Create a 2/2 colorless Shapeshifter creature token with changeling.",
+    });
+    expect(generateTags(card)).toContain("Tribal Payoff");
+  });
+});

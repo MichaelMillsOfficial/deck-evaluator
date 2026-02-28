@@ -3,6 +3,7 @@ import {
   computeCompositionScorecard,
   TEMPLATE_8X8,
   TEMPLATE_COMMAND_ZONE,
+  TEMPLATE_TRIBAL,
   AVAILABLE_TEMPLATES,
 } from "../../src/lib/deck-composition";
 import type { EnrichedCard } from "../../src/lib/types";
@@ -111,11 +112,12 @@ const COMMAND_TOWER = makeCard({
 // ---------------------------------------------------------------------------
 
 test.describe("AVAILABLE_TEMPLATES", () => {
-  test("contains both templates", () => {
-    expect(AVAILABLE_TEMPLATES).toHaveLength(2);
+  test("contains all templates", () => {
+    expect(AVAILABLE_TEMPLATES).toHaveLength(3);
     const ids = AVAILABLE_TEMPLATES.map((t) => t.id);
     expect(ids).toContain("command-zone");
     expect(ids).toContain("8x8");
+    expect(ids).toContain("tribal");
   });
 
   test("Command Zone is first (default)", () => {
@@ -815,5 +817,26 @@ test.describe("computeCompositionScorecard — category metadata", () => {
       const templateCat = TEMPLATE_COMMAND_ZONE.categories.find((c) => c.tag === cat.tag)!;
       expect(cat.label).toBe(templateCat.label);
     }
+  });
+});
+
+test.describe("TEMPLATE_TRIBAL", () => {
+  test("has Lord and Tribal Payoff categories", () => {
+    const tags = TEMPLATE_TRIBAL.categories.map((c) => c.tag);
+    expect(tags).toContain("Lord");
+    expect(tags).toContain("Tribal Payoff");
+  });
+
+  test("has standard categories (Lands, Ramp, Card Draw, Removal)", () => {
+    const tags = TEMPLATE_TRIBAL.categories.map((c) => c.tag);
+    expect(tags).toContain("Lands");
+    expect(tags).toContain("Ramp");
+    expect(tags).toContain("Card Draw");
+    expect(tags).toContain("Removal");
+  });
+
+  test("is included in AVAILABLE_TEMPLATES", () => {
+    const ids = AVAILABLE_TEMPLATES.map((t) => t.id);
+    expect(ids).toContain("tribal");
   });
 });
