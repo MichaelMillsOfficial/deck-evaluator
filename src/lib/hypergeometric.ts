@@ -153,16 +153,17 @@ export function computeProbabilityCurve(
 // ---------------------------------------------------------------------------
 
 /**
- * Get all cards (commanders + mainboard) — excludes sideboard since those
- * cards are not in the library at game start.
+ * Get all cards in the library (mainboard only) — excludes commanders
+ * (command zone) and sideboard since those cards are not in the library
+ * at game start.
  */
 function getLibraryCards(deck: DeckData) {
-  return [...deck.commanders, ...deck.mainboard];
+  return [...deck.mainboard];
 }
 
 /**
- * Count the total quantity of cards in the library (commanders + mainboard).
- * Sideboard is excluded.
+ * Count the total quantity of cards in the library (mainboard only).
+ * Commanders and sideboard are excluded.
  */
 export function getDeckSize(deck: DeckData): number {
   return getLibraryCards(deck).reduce((sum, c) => sum + c.quantity, 0);

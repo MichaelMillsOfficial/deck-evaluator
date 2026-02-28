@@ -569,6 +569,71 @@ test.describe("Hand Builder", () => {
     ).not.toBeVisible();
   });
 
+  test("Hand builder does not list commander in card picker", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await deckPage.goto();
+    await deckPage.fillDecklist(DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await page
+      .locator('[aria-label="Mana cost: 1 generic"]')
+      .first()
+      .waitFor({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Hands");
+    await deckPage.waitForHandsPanel();
+
+    // Expand hand builder
+    await page
+      .getByTestId("panel-hand-builder")
+      .locator("button")
+      .first()
+      .click();
+
+    // Mainboard cards should be visible
+    await expect(
+      page.getByTestId("card-picker-row-sol-ring")
+    ).toBeVisible();
+
+    // Commander should NOT be in the card picker
+    await expect(
+      page.getByTestId("card-picker-row-atraxa-praetors-voice")
+    ).not.toBeVisible();
+  });
+
+  test("Hand builder shows command zone above card picker", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+    await deckPage.goto();
+    await deckPage.fillDecklist(DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    await page
+      .locator('[aria-label="Mana cost: 1 generic"]')
+      .first()
+      .waitFor({ timeout: 10_000 });
+
+    await deckPage.selectDeckViewTab("Hands");
+    await deckPage.waitForHandsPanel();
+
+    // Expand hand builder
+    await page
+      .getByTestId("panel-hand-builder")
+      .locator("button")
+      .first()
+      .click();
+
+    // Command zone display should be visible with commander name
+    const commandZone = page.getByTestId("hand-builder-command-zone");
+    await expect(commandZone).toBeVisible();
+    await expect(commandZone).toContainText("Atraxa");
+  });
+
   test("Search shows no-match message for unmatched query", async ({
     deckPage,
   }) => {

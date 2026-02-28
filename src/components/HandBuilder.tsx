@@ -11,6 +11,7 @@ import HandDisplay from "@/components/HandDisplay";
 interface HandBuilderProps {
   pool: HandCard[];
   commanderIdentity: Set<MtgColor | string>;
+  commandZone?: HandCard[];
 }
 
 interface UniqueCard {
@@ -23,6 +24,7 @@ interface UniqueCard {
 export default function HandBuilder({
   pool,
   commanderIdentity,
+  commandZone = [],
 }: HandBuilderProps) {
   const [selectedCards, setSelectedCards] = useState<Record<string, number>>({});
   const [result, setResult] = useState<DrawnHand | null>(null);
@@ -117,9 +119,9 @@ export default function HandBuilder({
     }
 
     const mulliganNumber = Math.max(0, 7 - hand.length);
-    const quality = evaluateHandQuality(hand, mulliganNumber, commanderIdentity);
+    const quality = evaluateHandQuality(hand, mulliganNumber, commanderIdentity, commandZone);
     setResult({ cards: hand, quality, mulliganNumber });
-  }, [selectedCards, uniqueCards, commanderIdentity]);
+  }, [selectedCards, uniqueCards, commanderIdentity, commandZone]);
 
   return (
     <div data-testid="hand-builder" className="space-y-4">
@@ -151,6 +153,26 @@ export default function HandBuilder({
           </button>
         )}
       </div>
+
+      {/* Command Zone */}
+      {commandZone.length > 0 && (
+        <div
+          data-testid="hand-builder-command-zone"
+          className="rounded-lg border border-purple-500/30 bg-purple-950/20 p-2"
+        >
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-purple-400">
+            Command Zone (always available)
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {commandZone.map((card, idx) => (
+              <div key={`cmd-${card.name}-${idx}`} className="flex items-center gap-1.5">
+                <span className="text-xs text-purple-200">{card.name}</span>
+                <ManaCost cost={card.enriched.manaCost} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">
@@ -232,7 +254,7 @@ export default function HandBuilder({
       {/* Result */}
       {result && (
         <div data-testid="hand-builder-result">
-          <HandDisplay hand={result} />
+          <HandDisplay hand={result} commandZone={commandZone} />
         </div>
       )}
     </div>

@@ -5,6 +5,7 @@ import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { DrawnHand, RankedHand, SimulationStats } from "@/lib/opening-hand";
 import {
   buildPool,
+  buildCommandZone,
   drawHand,
   evaluateHandQuality,
   findTopHands,
@@ -47,6 +48,7 @@ export default function HandSimulator({
   const [simLoading, setSimLoading] = useState(false);
 
   const pool = useMemo(() => buildPool(deck, cardMap), [deck, cardMap]);
+  const commandZone = useMemo(() => buildCommandZone(deck, cardMap), [deck, cardMap]);
   const commanderIdentity = useMemo(
     () => resolveCommanderIdentity(deck, cardMap),
     [deck, cardMap]
@@ -57,14 +59,14 @@ export default function HandSimulator({
     setSimLoading(true);
     // Defer to next frame to avoid blocking render
     const id = requestAnimationFrame(() => {
-      const stats = runSimulation(pool, commanderIdentity, 1000);
-      const top = findTopHands(pool, commanderIdentity, 5, 2000);
+      const stats = runSimulation(pool, commanderIdentity, 1000, commandZone);
+      const top = findTopHands(pool, commanderIdentity, 5, 2000, commandZone);
       setSimStats(stats);
       setTopHands(top);
       setSimLoading(false);
     });
     return () => cancelAnimationFrame(id);
-  }, [pool, commanderIdentity]);
+  }, [pool, commanderIdentity, commandZone]);
 
   const drawNewHand = useCallback(
     (mulliganNumber: number) => {
@@ -73,7 +75,8 @@ export default function HandSimulator({
       const quality = evaluateHandQuality(
         cards,
         mulliganNumber,
-        commanderIdentity
+        commanderIdentity,
+        commandZone
       );
       const hand: DrawnHand = {
         cards,
@@ -82,7 +85,7 @@ export default function HandSimulator({
       };
       setCurrentHand(hand);
     },
-    [pool, commanderIdentity]
+    [pool, commanderIdentity, commandZone]
   );
 
   const handleDrawHand = useCallback(() => {
@@ -174,7 +177,7 @@ export default function HandSimulator({
         {/* Hand display */}
         {currentHand && (
           <div className="mt-4">
-            <HandDisplay hand={currentHand} />
+            <HandDisplay hand={currentHand} commandZone={commandZone} />
           </div>
         )}
       </CollapsiblePanel>
@@ -185,7 +188,7 @@ export default function HandSimulator({
         expanded={expandedSections.has("hand-builder")}
         onToggle={() => onToggleSection("hand-builder")}
       >
-        <HandBuilder pool={pool} commanderIdentity={commanderIdentity} />
+        <HandBuilder pool={pool} commanderIdentity={commanderIdentity} commandZone={commandZone} />
       </CollapsiblePanel>
     </div>
   );

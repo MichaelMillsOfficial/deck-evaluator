@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
   buildPool,
+  buildCommandZone,
   drawHand,
   evaluateHandQuality,
   getVerdict,
@@ -29,7 +30,7 @@ test.describe("buildPool", () => {
     expect(pool.every((c) => c.name === "Sol Ring")).toBe(true);
   });
 
-  test("includes commanders in pool", () => {
+  test("excludes commanders from pool", () => {
     const deck = makeDeck({
       commanders: [{ name: "Atraxa", quantity: 1 }],
       mainboard: [{ name: "Sol Ring", quantity: 1 }],
@@ -39,9 +40,34 @@ test.describe("buildPool", () => {
       "Sol Ring": makeCard({ name: "Sol Ring", typeLine: "Artifact" }),
     };
     const pool = buildPool(deck, cardMap);
-    expect(pool).toHaveLength(2);
-    expect(pool.some((c) => c.name === "Atraxa")).toBe(true);
+    expect(pool).toHaveLength(1);
+    expect(pool.some((c) => c.name === "Atraxa")).toBe(false);
     expect(pool.some((c) => c.name === "Sol Ring")).toBe(true);
+  });
+
+  test("returns correct count for deck with multiple commanders", () => {
+    const deck = makeDeck({
+      commanders: [
+        { name: "Thrasios", quantity: 1 },
+        { name: "Tymna", quantity: 1 },
+      ],
+      mainboard: [
+        { name: "Sol Ring", quantity: 1 },
+        { name: "Mana Crypt", quantity: 1 },
+        { name: "Command Tower", quantity: 1 },
+      ],
+    });
+    const cardMap = {
+      Thrasios: makeCard({ name: "Thrasios", typeLine: "Legendary Creature" }),
+      Tymna: makeCard({ name: "Tymna", typeLine: "Legendary Creature" }),
+      "Sol Ring": makeCard({ name: "Sol Ring", typeLine: "Artifact" }),
+      "Mana Crypt": makeCard({ name: "Mana Crypt", typeLine: "Artifact" }),
+      "Command Tower": makeCard({ name: "Command Tower", typeLine: "Land" }),
+    };
+    const pool = buildPool(deck, cardMap);
+    expect(pool).toHaveLength(3);
+    expect(pool.some((c) => c.name === "Thrasios")).toBe(false);
+    expect(pool.some((c) => c.name === "Tymna")).toBe(false);
   });
 
   test("excludes sideboard from pool", () => {
@@ -76,6 +102,52 @@ test.describe("buildPool", () => {
   test("returns empty pool for empty deck", () => {
     const pool = buildPool(makeDeck(), {});
     expect(pool).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildCommandZone
+// ---------------------------------------------------------------------------
+
+test.describe("buildCommandZone", () => {
+  test("returns only commander cards", () => {
+    const deck = makeDeck({
+      commanders: [{ name: "Atraxa", quantity: 1 }],
+      mainboard: [{ name: "Sol Ring", quantity: 1 }],
+    });
+    const cardMap = {
+      Atraxa: makeCard({ name: "Atraxa", typeLine: "Legendary Creature" }),
+      "Sol Ring": makeCard({ name: "Sol Ring", typeLine: "Artifact" }),
+    };
+    const zone = buildCommandZone(deck, cardMap);
+    expect(zone).toHaveLength(1);
+    expect(zone[0].name).toBe("Atraxa");
+  });
+
+  test("returns empty array when no commanders", () => {
+    const deck = makeDeck({
+      mainboard: [{ name: "Sol Ring", quantity: 1 }],
+    });
+    const cardMap = {
+      "Sol Ring": makeCard({ name: "Sol Ring", typeLine: "Artifact" }),
+    };
+    const zone = buildCommandZone(deck, cardMap);
+    expect(zone).toHaveLength(0);
+  });
+
+  test("returns multiple commanders (partner)", () => {
+    const deck = makeDeck({
+      commanders: [
+        { name: "Thrasios", quantity: 1 },
+        { name: "Tymna", quantity: 1 },
+      ],
+    });
+    const cardMap = {
+      Thrasios: makeCard({ name: "Thrasios", typeLine: "Legendary Creature" }),
+      Tymna: makeCard({ name: "Tymna", typeLine: "Legendary Creature" }),
+    };
+    const zone = buildCommandZone(deck, cardMap);
+    expect(zone).toHaveLength(2);
   });
 });
 
@@ -399,6 +471,72 @@ test.describe("evaluateHandQuality", () => {
     const result = evaluateHandQuality(hand, 1, new Set(["G"]));
     // Should still be reasonable with 2 lands in 6 cards
     expect(result.score).toBeGreaterThan(40);
+  });
+
+  test("command zone commander counts as playable for curve analysis", () => {
+    // Hand with 2 lands and only high-CMC spells — no early plays
+    const hand: HandCard[] = [
+      {
+        name: "Forest",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+      {
+        name: "Forest 2",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Forest 2",
+          typeLine: "Basic Land — Forest",
+          supertypes: ["Basic"],
+          producedMana: ["G"],
+          cmc: 0,
+        }),
+      },
+      ...Array.from({ length: 5 }, (_, i) => ({
+        name: `Big Creature ${i}`,
+        quantity: 1,
+        enriched: makeCard({
+          name: `Big Creature ${i}`,
+          typeLine: "Creature",
+          cmc: 6,
+          manaCost: "{5}{G}",
+          manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+          colors: ["G"],
+        }),
+      })),
+    ];
+
+    // 1-CMC commander in command zone
+    const commandZone: HandCard[] = [
+      {
+        name: "Llanowar Elves Commander",
+        quantity: 1,
+        enriched: makeCard({
+          name: "Llanowar Elves Commander",
+          typeLine: "Legendary Creature",
+          cmc: 1,
+          manaCost: "{G}",
+          manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+          colors: ["G"],
+        }),
+      },
+    ];
+
+    const resultWithout = evaluateHandQuality(hand, 0, new Set(["G"]));
+    const resultWith = evaluateHandQuality(hand, 0, new Set(["G"]), commandZone);
+
+    // Without command zone: no T1 play (all spells CMC 6)
+    expect(resultWithout.factors.playableTurns[0]).toBe(false);
+    // With command zone: T1 play available (commander CMC 1)
+    expect(resultWith.factors.playableTurns[0]).toBe(true);
+    // Score should be higher with command zone
+    expect(resultWith.score).toBeGreaterThan(resultWithout.score);
   });
 
   test("5-card hand (mulligan 2) adjusts land expectations", () => {
