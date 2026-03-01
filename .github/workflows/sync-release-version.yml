@@ -9,22 +9,6 @@ permissions:
   pull-requests: write
 
 jobs:
-  deploy-production:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Vercel production deploy
-        run: |
-          if [ -z "${{ secrets.VERCEL_DEPLOY_HOOK }}" ]; then
-            echo "::error::VERCEL_DEPLOY_HOOK secret is not set. Create a deploy hook in Vercel Project Settings > Git > Deploy Hooks (branch: master) and add the URL as a repository secret."
-            exit 1
-          fi
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}")
-          if [ "$RESPONSE" -ne 200 ] && [ "$RESPONSE" -ne 201 ]; then
-            echo "::error::Deploy hook returned HTTP $RESPONSE"
-            exit 1
-          fi
-          echo "Vercel production deploy triggered (HTTP $RESPONSE)"
-
   bump-version:
     runs-on: ubuntu-latest
     steps:

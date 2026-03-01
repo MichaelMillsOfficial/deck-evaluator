@@ -1,0 +1,26 @@
+name: Deploy Production
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+
+jobs:
+  deploy:
+    if: >
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'chore/bump-version-')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel production deploy
+        run: |
+          if [ -z "${{ secrets.VERCEL_DEPLOY_HOOK }}" ]; then
+            echo "::error::VERCEL_DEPLOY_HOOK secret is not set."
+            exit 1
+          fi
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}")
+          if [ "$RESPONSE" -ne 200 ] && [ "$RESPONSE" -ne 201 ]; then
+            echo "::error::Deploy hook returned HTTP $RESPONSE"
+            exit 1
+          fi
+          echo "Vercel production deploy triggered (HTTP $RESPONSE)"
