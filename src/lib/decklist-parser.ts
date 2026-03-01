@@ -19,16 +19,22 @@ export interface ParseDecklistOptions {
   commanders?: string[];
 }
 
+export interface ParseResult {
+  deck: DeckData;
+  warnings: string[];
+}
+
 export function parseDecklist(
   text: string,
   options?: ParseDecklistOptions
-): DeckData {
+): ParseResult {
   const lines = text.split(/\r?\n/);
   const hasOverride =
     options?.commanders != null && options.commanders.length > 0;
 
   let currentZone: Zone = "mainboard";
   let hadExplicitCommander = false;
+  const warnings: string[] = [];
 
   const zones: Record<Zone, DeckCard[]> = {
     mainboard: [],
@@ -36,8 +42,8 @@ export function parseDecklist(
     commanders: [],
   };
 
-  for (const raw of lines) {
-    const line = raw.trim();
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
     if (!line) continue;
 
     const zoneMatch = line.match(ZONE_LINE);
@@ -62,6 +68,8 @@ export function parseDecklist(
         quantity: parseInt(cardMatch[1], 10),
         name: cardMatch[2].trim(),
       });
+    } else {
+      warnings.push(`Line ${i + 1}: "${line}"`);
     }
   }
 
@@ -77,12 +85,15 @@ export function parseDecklist(
   }
 
   return {
-    name: "Imported Decklist",
-    source: "text",
-    url: "",
-    commanders: zones.commanders,
-    mainboard: zones.mainboard,
-    sideboard: zones.sideboard,
+    deck: {
+      name: "Imported Decklist",
+      source: "text",
+      url: "",
+      commanders: zones.commanders,
+      mainboard: zones.mainboard,
+      sideboard: zones.sideboard,
+    },
+    warnings,
   };
 }
 

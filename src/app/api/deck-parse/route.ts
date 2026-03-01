@@ -58,12 +58,12 @@ export async function POST(request: Request): Promise<Response> {
     commanders = rawCommanders as string[];
   }
 
-  const deckData = parseDecklist(text, commanders ? { commanders } : undefined);
+  const { deck, warnings } = parseDecklist(text, commanders ? { commanders } : undefined);
 
   const totalCards =
-    deckData.commanders.length +
-    deckData.mainboard.length +
-    deckData.sideboard.length;
+    deck.commanders.length +
+    deck.mainboard.length +
+    deck.sideboard.length;
 
   if (totalCards === 0) {
     return Response.json(
@@ -72,5 +72,5 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  return Response.json(deckData);
+  return Response.json({ ...deck, warnings });
 }

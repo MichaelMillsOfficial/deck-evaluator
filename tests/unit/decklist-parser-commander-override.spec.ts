@@ -10,21 +10,19 @@ test.describe("parseDecklist — commander override", () => {
   ].join("\n");
 
   test("override moves named card from mainboard to commanders", () => {
-    const result = parseDecklist(FLAT_DECKLIST, {
+    const { deck } = parseDecklist(FLAT_DECKLIST, {
       commanders: ["Atraxa, Praetors' Voice"],
     });
-    expect(result.commanders).toEqual([
+    expect(deck.commanders).toEqual([
       { name: "Atraxa, Praetors' Voice", quantity: 1 },
     ]);
-    expect(result.mainboard.map((c) => c.name)).not.toContain(
+    expect(deck.mainboard.map((c) => c.name)).not.toContain(
       "Atraxa, Praetors' Voice"
     );
-    expect(result.mainboard).toHaveLength(3);
+    expect(deck.mainboard).toHaveLength(3);
   });
 
   test("override skips heuristic inference even when trailing group exists", () => {
-    // This decklist has a trailing blank-line-separated card that would
-    // normally be inferred as a commander by the heuristic
     const textWithTrailing = [
       "1 Sol Ring",
       "1 Command Tower",
@@ -32,27 +30,23 @@ test.describe("parseDecklist — commander override", () => {
       "1 Thrasios, Triton Hero",
     ].join("\n");
 
-    const result = parseDecklist(textWithTrailing, {
+    const { deck } = parseDecklist(textWithTrailing, {
       commanders: ["Sol Ring"],
     });
-    // Sol Ring should be the commander (from override), not Thrasios
-    expect(result.commanders).toEqual([{ name: "Sol Ring", quantity: 1 }]);
-    // Thrasios should stay in mainboard (heuristic was skipped)
-    expect(result.mainboard.map((c) => c.name)).toContain(
+    expect(deck.commanders).toEqual([{ name: "Sol Ring", quantity: 1 }]);
+    expect(deck.mainboard.map((c) => c.name)).toContain(
       "Thrasios, Triton Hero"
     );
   });
 
   test("override with card not in list adds it as a fresh commander", () => {
-    const result = parseDecklist(FLAT_DECKLIST, {
+    const { deck } = parseDecklist(FLAT_DECKLIST, {
       commanders: ["Nonexistent Card"],
     });
-    // Card not found in any zone — added fresh with quantity 1
-    expect(result.commanders).toEqual([
+    expect(deck.commanders).toEqual([
       { name: "Nonexistent Card", quantity: 1 },
     ]);
-    // Original mainboard is untouched
-    expect(result.mainboard).toHaveLength(4);
+    expect(deck.mainboard).toHaveLength(4);
   });
 
   test("override adds commander not in decklist while mainboard stays intact", () => {
@@ -61,14 +55,14 @@ test.describe("parseDecklist — commander override", () => {
       "1 Command Tower",
       "1 Arcane Signet",
     ].join("\n");
-    const result = parseDecklist(decklist, {
+    const { deck } = parseDecklist(decklist, {
       commanders: ["Suki, Kyoshi Warrior"],
     });
-    expect(result.commanders).toEqual([
+    expect(deck.commanders).toEqual([
       { name: "Suki, Kyoshi Warrior", quantity: 1 },
     ]);
-    expect(result.mainboard).toHaveLength(3);
-    expect(result.mainboard.map((c) => c.name)).toEqual([
+    expect(deck.mainboard).toHaveLength(3);
+    expect(deck.mainboard.map((c) => c.name)).toEqual([
       "Sol Ring",
       "Command Tower",
       "Arcane Signet",
@@ -81,18 +75,17 @@ test.describe("parseDecklist — commander override", () => {
       "1 Sol Ring",
       "1 Command Tower",
     ].join("\n");
-    const result = parseDecklist(decklist, {
+    const { deck } = parseDecklist(decklist, {
       commanders: ["Thrasios, Triton Hero", "Tymna the Weaver"],
     });
-    expect(result.commanders).toHaveLength(2);
-    expect(result.commanders.map((c) => c.name)).toContain(
+    expect(deck.commanders).toHaveLength(2);
+    expect(deck.commanders.map((c) => c.name)).toContain(
       "Thrasios, Triton Hero"
     );
-    expect(result.commanders.map((c) => c.name)).toContain(
+    expect(deck.commanders.map((c) => c.name)).toContain(
       "Tymna the Weaver"
     );
-    // Thrasios moved out, so only Sol Ring and Command Tower remain
-    expect(result.mainboard).toHaveLength(2);
+    expect(deck.mainboard).toHaveLength(2);
   });
 
   test("no override falls back to explicit COMMANDER: header", () => {
@@ -105,11 +98,11 @@ test.describe("parseDecklist — commander override", () => {
       "1 Command Tower",
     ].join("\n");
 
-    const result = parseDecklist(textWithHeader);
-    expect(result.commanders).toEqual([
+    const { deck } = parseDecklist(textWithHeader);
+    expect(deck.commanders).toEqual([
       { name: "Atraxa, Praetors' Voice", quantity: 1 },
     ]);
-    expect(result.mainboard).toHaveLength(2);
+    expect(deck.mainboard).toHaveLength(2);
   });
 
   test("no override falls back to heuristic inference", () => {
@@ -120,15 +113,14 @@ test.describe("parseDecklist — commander override", () => {
       "1 Atraxa, Praetors' Voice",
     ].join("\n");
 
-    const result = parseDecklist(textWithTrailing);
-    expect(result.commanders).toEqual([
+    const { deck } = parseDecklist(textWithTrailing);
+    expect(deck.commanders).toEqual([
       { name: "Atraxa, Praetors' Voice", quantity: 1 },
     ]);
-    expect(result.mainboard).toHaveLength(2);
+    expect(deck.mainboard).toHaveLength(2);
   });
 
   test("override ignores COMMANDER: header in text", () => {
-    // Text has an explicit COMMANDER header for card A, but override says card B
     const textWithHeader = [
       "COMMANDER:",
       "1 Atraxa, Praetors' Voice",
@@ -139,14 +131,13 @@ test.describe("parseDecklist — commander override", () => {
       "1 Thrasios, Triton Hero",
     ].join("\n");
 
-    const result = parseDecklist(textWithHeader, {
+    const { deck } = parseDecklist(textWithHeader, {
       commanders: ["Thrasios, Triton Hero"],
     });
-    expect(result.commanders).toEqual([
+    expect(deck.commanders).toEqual([
       { name: "Thrasios, Triton Hero", quantity: 1 },
     ]);
-    // Atraxa should be in mainboard since override takes precedence
-    expect(result.mainboard.map((c) => c.name)).toContain(
+    expect(deck.mainboard.map((c) => c.name)).toContain(
       "Atraxa, Praetors' Voice"
     );
   });
@@ -159,17 +150,17 @@ test.describe("parseDecklist — commander override", () => {
       "1 Command Tower",
     ].join("\n");
 
-    const result = parseDecklist(text, {
+    const { deck } = parseDecklist(text, {
       commanders: ["Thrasios, Triton Hero", "Tymna the Weaver"],
     });
-    expect(result.commanders).toHaveLength(2);
-    expect(result.commanders.map((c) => c.name)).toContain(
+    expect(deck.commanders).toHaveLength(2);
+    expect(deck.commanders.map((c) => c.name)).toContain(
       "Thrasios, Triton Hero"
     );
-    expect(result.commanders.map((c) => c.name)).toContain(
+    expect(deck.commanders.map((c) => c.name)).toContain(
       "Tymna the Weaver"
     );
-    expect(result.mainboard).toHaveLength(2);
+    expect(deck.mainboard).toHaveLength(2);
   });
 
   test("empty override array falls back to normal parsing", () => {
@@ -181,9 +172,90 @@ test.describe("parseDecklist — commander override", () => {
       "1 Sol Ring",
     ].join("\n");
 
-    const result = parseDecklist(textWithHeader, { commanders: [] });
-    expect(result.commanders).toEqual([
+    const { deck } = parseDecklist(textWithHeader, { commanders: [] });
+    expect(deck.commanders).toEqual([
       { name: "Atraxa, Praetors' Voice", quantity: 1 },
     ]);
+  });
+});
+
+test.describe("parseDecklist — warnings for unparseable lines", () => {
+  test("unparseable lines are returned in warnings with line numbers", () => {
+    const text = [
+      "COMMANDER:",
+      "Suki, Kyoshi Warrior",    // line 2 — missing quantity prefix
+      "",
+      "MAINBOARD:",
+      "1 Sol Ring",
+      "1 Command Tower",
+    ].join("\n");
+
+    const { deck, warnings } = parseDecklist(text);
+    // The unparseable line should appear in warnings
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("Line 2");
+    expect(warnings[0]).toContain("Suki, Kyoshi Warrior");
+    // It should not appear in any zone
+    expect(deck.commanders).toHaveLength(0);
+    expect(deck.mainboard.map((c) => c.name)).not.toContain(
+      "Suki, Kyoshi Warrior"
+    );
+  });
+
+  test("valid decklist returns empty warnings array", () => {
+    const text = [
+      "COMMANDER:",
+      "1 Atraxa, Praetors' Voice",
+      "",
+      "MAINBOARD:",
+      "1 Sol Ring",
+    ].join("\n");
+
+    const { warnings } = parseDecklist(text);
+    expect(warnings).toEqual([]);
+  });
+
+  test("blank lines and zone headers are NOT reported as warnings", () => {
+    const text = [
+      "COMMANDER:",
+      "",
+      "MAINBOARD:",
+      "",
+      "SIDEBOARD:",
+      "COMPANION:",
+    ].join("\n");
+
+    const { warnings } = parseDecklist(text);
+    expect(warnings).toEqual([]);
+  });
+
+  test("multiple unparseable lines are all tracked", () => {
+    const text = [
+      "1 Sol Ring",
+      "Bad Line One",              // line 2
+      "1 Command Tower",
+      "Another Bad Line",          // line 4
+    ].join("\n");
+
+    const { warnings } = parseDecklist(text);
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain("Line 2");
+    expect(warnings[0]).toContain("Bad Line One");
+    expect(warnings[1]).toContain("Line 4");
+    expect(warnings[1]).toContain("Another Bad Line");
+  });
+
+  test("warnings include line with only a card name (no quantity)", () => {
+    const text = [
+      "1 Sol Ring",
+      "Command Tower",  // line 2 — missing quantity
+    ].join("\n");
+
+    const { deck, warnings } = parseDecklist(text);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("Line 2");
+    expect(warnings[0]).toContain("Command Tower");
+    expect(deck.mainboard).toHaveLength(1);
+    expect(deck.mainboard[0].name).toBe("Sol Ring");
   });
 });
