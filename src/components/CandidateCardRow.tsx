@@ -176,17 +176,17 @@ export default function CandidateCardRow({
                   Synergizes With
                 </h4>
                 <div className="flex flex-wrap gap-1.5">
-                  {analysis.pairs.map((p) => {
-                    const partner =
-                      p.cardA === card.name ? p.cardB : p.cardA;
+                  {analysis.pairs.map((p, i) => {
+                    const partners = p.cards.filter((c) => c !== card.name);
+                    if (partners.length === 0) return null;
                     return (
                       <span
-                        key={`${p.cardA}-${p.cardB}`}
+                        key={i}
                         className="rounded bg-slate-700/50 px-2 py-0.5 text-xs text-slate-300"
                       >
-                        {partner}
+                        {partners.join(", ")}
                         <span className="text-slate-500 ml-1">
-                          ({p.reason})
+                          ({p.description})
                         </span>
                       </span>
                     );
