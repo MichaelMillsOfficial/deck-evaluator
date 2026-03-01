@@ -3,7 +3,11 @@
 import { useCallback, useMemo, useState } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { SpellbookCombo } from "@/lib/commander-spellbook";
-import { analyzeDeckSynergy } from "@/lib/synergy-engine";
+import {
+  computeAllAnalyses,
+  type DeckAnalysisResults,
+} from "@/lib/deck-analysis-aggregate";
+import type { ViewTab } from "@/components/DeckHeader";
 import DeckList from "@/components/DeckList";
 import DeckAnalysis from "@/components/DeckAnalysis";
 import SynergySection from "@/components/SynergySection";
@@ -18,16 +22,10 @@ interface DeckViewTabsProps {
     nearCombos: SpellbookCombo[];
   } | null;
   spellbookLoading: boolean;
+  activeTab: ViewTab;
+  onTabChange: (tab: ViewTab) => void;
+  analysisResults: DeckAnalysisResults | null;
 }
-
-type ViewTab = "list" | "analysis" | "synergy" | "hands";
-
-const tabs: { key: ViewTab; label: string }[] = [
-  { key: "list", label: "Deck List" },
-  { key: "analysis", label: "Analysis" },
-  { key: "synergy", label: "Synergy" },
-  { key: "hands", label: "Hands" },
-];
 
 export default function DeckViewTabs({
   deck,
@@ -35,9 +33,9 @@ export default function DeckViewTabs({
   enrichLoading,
   spellbookCombos,
   spellbookLoading,
+  activeTab,
+  analysisResults,
 }: DeckViewTabsProps) {
-  const [activeTab, setActiveTab] = useState<ViewTab>("list");
-
   // Expanded section state persists across tab switches
   const [expandedSections, setExpandedSections] = useState<
     Record<string, Set<string>>
@@ -47,12 +45,7 @@ export default function DeckViewTabs({
     hands: new Set<string>(),
   });
 
-  const analysisDisabled = !cardMap || enrichLoading;
-
-  const synergyAnalysis = useMemo(
-    () => (cardMap ? analyzeDeckSynergy(deck, cardMap) : null),
-    [deck, cardMap]
-  );
+  const synergyAnalysis = analysisResults?.synergyAnalysis ?? null;
 
   const handleToggleSection = useCallback(
     (tab: string, sectionId: string) => {
@@ -70,83 +63,8 @@ export default function DeckViewTabs({
     []
   );
 
-  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    const tabKeys = tabs.map((t) => t.key);
-    const currentIndex = tabKeys.indexOf(activeTab);
-    let newIndex = currentIndex;
-
-    if (e.key === "ArrowRight") {
-      newIndex = (currentIndex + 1) % tabs.length;
-    } else if (e.key === "ArrowLeft") {
-      newIndex = (currentIndex - 1 + tabs.length) % tabs.length;
-    } else if (e.key === "Home") {
-      newIndex = 0;
-    } else if (e.key === "End") {
-      newIndex = tabs.length - 1;
-    } else {
-      return;
-    }
-
-    e.preventDefault();
-
-    // Skip disabled tabs — loop to find next enabled tab in the pressed direction
-    let nextIndex = newIndex;
-    for (let attempts = 0; attempts < tabs.length; attempts++) {
-      const target = tabs[nextIndex];
-      const isDisabled =
-        (target.key === "analysis" || target.key === "synergy" || target.key === "hands") &&
-        analysisDisabled;
-      if (!isDisabled) break;
-      if (e.key === "ArrowRight" || e.key === "Home") {
-        nextIndex = (nextIndex + 1) % tabs.length;
-      } else {
-        nextIndex = (nextIndex - 1 + tabs.length) % tabs.length;
-      }
-    }
-
-    setActiveTab(tabKeys[nextIndex]);
-    const nextButton = document.getElementById(
-      `tab-deck-${tabKeys[nextIndex]}`
-    );
-    nextButton?.focus();
-  };
-
   return (
     <div data-testid="deck-view-tabs">
-      <div
-        role="tablist"
-        aria-label="Deck view"
-        className="mb-4 flex rounded-lg bg-slate-900 p-1"
-      >
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.key;
-          const isDisabled =
-            (tab.key === "analysis" || tab.key === "synergy" || tab.key === "hands") &&
-            analysisDisabled;
-          return (
-            <button
-              key={tab.key}
-              id={`tab-deck-${tab.key}`}
-              role="tab"
-              aria-selected={isActive}
-              aria-controls={`tabpanel-deck-${tab.key}`}
-              tabIndex={isActive ? 0 : -1}
-              type="button"
-              onClick={() => !isDisabled && setActiveTab(tab.key)}
-              onKeyDown={handleTabKeyDown}
-              disabled={isDisabled}
-              className={`flex-1 min-h-[44px] rounded-md px-3 py-2.5 sm:px-4 sm:py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:cursor-not-allowed disabled:opacity-40 ${
-                isActive
-                  ? "bg-slate-600 text-white"
-                  : "text-slate-300 hover:text-white"
-              }`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
       <div
         role="tabpanel"
         id="tabpanel-deck-list"
@@ -175,6 +93,7 @@ export default function DeckViewTabs({
             expandedSections={expandedSections.analysis}
             onToggleSection={(id) => handleToggleSection("analysis", id)}
             spellbookCombos={spellbookCombos}
+            analysisResults={analysisResults ?? undefined}
           />
         )}
       </div>

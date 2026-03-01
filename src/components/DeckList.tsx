@@ -132,39 +132,11 @@ interface DeckListProps {
 }
 
 export default function DeckList({ deck, cardMap, enrichLoading }: DeckListProps) {
-  const totalCards =
-    deck.commanders.reduce((s, c) => s + c.quantity, 0) +
-    deck.mainboard.reduce((s, c) => s + c.quantity, 0) +
-    deck.sideboard.reduce((s, c) => s + c.quantity, 0);
-
   return (
     <section
       data-testid="deck-display"
       aria-label={`Deck: ${deck.name}`}
-      className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-6"
     >
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-white">{deck.name}</h2>
-        <p className="mt-0.5 text-xs text-slate-400">
-          via{" "}
-          {deck.url ? (
-            <a
-              href={deck.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="capitalize text-purple-400 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-400 rounded-sm"
-            >
-              {deck.source}
-              <span className="sr-only"> (opens in a new tab)</span>
-            </a>
-          ) : (
-            <span className="capitalize text-purple-400">{deck.source}</span>
-          )}
-          {" \u00b7 "}
-          {totalCards} cards
-        </p>
-      </div>
-
       {enrichLoading && (
         <div
           role="status"
