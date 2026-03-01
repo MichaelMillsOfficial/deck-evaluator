@@ -293,6 +293,150 @@ test.describe("computeManaBaseImpact", () => {
     // but projected ratio should be lower than current
     expect(result.projectedRatios.U).toBeLessThan(result.currentRatios.U);
   });
+
+  test("does not flag stressed colors for mono-color decks", () => {
+    // Mono-green deck — stress warnings are meaningless with only one color
+    const commander = makeCard({
+      name: "Omnath, Locus of Mana",
+      manaCost: "{2}{G}",
+      cmc: 3,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      typeLine: "Legendary Creature — Elemental",
+      oracleText:
+        "You don't lose unspent green mana as steps and phases end.\nOmnath, Locus of Mana gets +1/+1 for each unspent green mana you have.",
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+
+    const forest = makeCard({
+      name: "Forest",
+      manaCost: "",
+      cmc: 0,
+      colorIdentity: [],
+      typeLine: "Basic Land — Forest",
+      oracleText: "({T}: Add {G}.)",
+      producedMana: ["G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    });
+
+    const elvishMystic = makeCard({
+      name: "Elvish Mystic",
+      manaCost: "{G}",
+      cmc: 1,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      typeLine: "Creature — Elf Druid",
+      oracleText: "{T}: Add {G}.",
+      producedMana: ["G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+
+    const llanowarElves = makeCard({
+      name: "Llanowar Elves",
+      manaCost: "{G}",
+      cmc: 1,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      typeLine: "Creature — Elf Druid",
+      oracleText: "{T}: Add {G}.",
+      producedMana: ["G"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+
+    const beastWithin = makeCard({
+      name: "Beast Within",
+      manaCost: "{2}{G}",
+      cmc: 3,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      typeLine: "Instant",
+      oracleText: "Destroy target permanent. Its controller creates a 3/3 green Beast creature token.",
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 },
+    });
+
+    const monoDeck = makeDeck({
+      commanders: [{ name: "Omnath, Locus of Mana", quantity: 1 }],
+      mainboard: [
+        { name: "Forest", quantity: 5 },
+        { name: "Elvish Mystic", quantity: 4 },
+        { name: "Llanowar Elves", quantity: 4 },
+        { name: "Beast Within", quantity: 10 },
+      ],
+    });
+
+    const monoCardMap: Record<string, EnrichedCard> = {
+      "Omnath, Locus of Mana": commander,
+      Forest: forest,
+      "Elvish Mystic": elvishMystic,
+      "Llanowar Elves": llanowarElves,
+      "Beast Within": beastWithin,
+    };
+
+    // Add a green card — should NOT show stress for green
+    const candidate = makeCard({
+      name: "Craterhoof Behemoth",
+      manaCost: "{5}{G}{G}{G}",
+      cmc: 8,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      typeLine: "Creature — Beast",
+      oracleText:
+        "Haste\nWhen Craterhoof Behemoth enters, creatures you control get +X/+X and gain trample until end of turn, where X is the number of creatures you control.",
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 3, C: 0 },
+    });
+
+    const result = computeManaBaseImpact(candidate, monoDeck, monoCardMap);
+
+    // Mono-color deck should never show stressed colors
+    expect(result.stressedColors).toEqual([]);
+  });
+
+  test("does not flag stressed colors for colorless decks", () => {
+    const commander = makeCard({
+      name: "Kozilek, the Great Distortion",
+      manaCost: "{8}{C}{C}",
+      cmc: 10,
+      colorIdentity: [],
+      typeLine: "Legendary Creature — Eldrazi",
+      oracleText: "When you cast this spell, if you have fewer than seven cards in hand, draw cards equal to the difference.",
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 2 },
+    });
+
+    const wastes = makeCard({
+      name: "Wastes",
+      manaCost: "",
+      cmc: 0,
+      colorIdentity: [],
+      typeLine: "Basic Land",
+      oracleText: "({T}: Add {C}.)",
+      producedMana: ["C"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    });
+
+    const colorlessDeck = makeDeck({
+      commanders: [{ name: "Kozilek, the Great Distortion", quantity: 1 }],
+      mainboard: [{ name: "Wastes", quantity: 30 }],
+    });
+
+    const colorlessMap: Record<string, EnrichedCard> = {
+      "Kozilek, the Great Distortion": commander,
+      Wastes: wastes,
+    };
+
+    const candidate = makeCard({
+      name: "Mind Stone",
+      manaCost: "{2}",
+      cmc: 2,
+      colorIdentity: [],
+      typeLine: "Artifact",
+      oracleText: "{T}: Add {C}.\n{1}, {T}, Sacrifice Mind Stone: Draw a card.",
+      producedMana: ["C"],
+      manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    });
+
+    const result = computeManaBaseImpact(candidate, colorlessDeck, colorlessMap);
+    expect(result.stressedColors).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------

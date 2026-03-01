@@ -132,18 +132,22 @@ export function computeManaBaseImpact(
   const projectedMetrics = computeManaBaseMetrics(projectedDeck, extendedMap);
   const projectedRatios = { ...projectedMetrics.sourceToDemandRatio };
 
-  // Identify stressed colors: where projected ratio < threshold AND there is demand
+  // Identify stressed colors: where projected ratio < threshold AND there is demand.
+  // Skip for mono-color / colorless decks — stress is only meaningful when colors compete.
   const stressedColors: string[] = [];
-  for (const color of MTG_COLORS) {
-    const ratio = projectedRatios[color];
-    // Only flag colors that have demand (ratio is finite and < threshold)
-    if (
-      isFinite(ratio) &&
-      ratio > 0 &&
-      ratio < STRESSED_RATIO_THRESHOLD &&
-      candidate.manaPips[color] > 0
-    ) {
-      stressedColors.push(color);
+  const identity = resolveCommanderIdentity(deck, cardMap);
+  if (identity.size > 1) {
+    for (const color of MTG_COLORS) {
+      const ratio = projectedRatios[color];
+      // Only flag colors that have demand (ratio is finite and < threshold)
+      if (
+        isFinite(ratio) &&
+        ratio > 0 &&
+        ratio < STRESSED_RATIO_THRESHOLD &&
+        candidate.manaPips[color] > 0
+      ) {
+        stressedColors.push(color);
+      }
     }
   }
 
