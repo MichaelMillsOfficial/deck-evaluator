@@ -114,6 +114,77 @@ const LIFEGAIN_TRIGGER_RE = /whenever you gain life/i;
 const LIFEGAIN_PAYOFF_RE = /\byou gain.+?\blife\b/i;
 const LIFEGAIN_KEYWORDS = new Set(["Lifelink"]);
 
+// --- Keyword Matters ---
+// Keywords that can form a deck strategy when a commander/payoff card cares about them
+export const KEYWORD_MATTERS_LIST = [
+  "flying", "menace", "trample", "haste", "vigilance",
+  "deathtouch", "first strike", "double strike", "lifelink",
+  "hexproof", "indestructible", "defender", "reach", "ward",
+  "skulk", "fear", "intimidate", "shadow", "prowess",
+];
+
+const KW_PATTERN = KEYWORD_MATTERS_LIST.join("|");
+
+// "creature(s)/permanent(s) ... with [keyword]" — payoffs, lords, triggers
+const KW_MATTERS_WITH_RE = new RegExp(
+  `(?:creature|permanent)s?[^.\\n]*\\bwith (?:${KW_PATTERN})\\b`,
+  "i"
+);
+
+// "creatures you control have/gain [keyword]" — mass keyword granting
+const KW_MATTERS_GRANT_RE = new RegExp(
+  `(?:creature|permanent)s? you control (?:have|gain) (?:${KW_PATTERN})\\b`,
+  "i"
+);
+
+// "if it has [keyword]" — Akroma-style conditional keyword checks
+const KW_MATTERS_CONDITIONAL_RE = new RegExp(
+  `if [^.\\n]*\\b(?:has|have) (?:${KW_PATTERN})\\b`,
+  "i"
+);
+
+// "you control a creature with [keyword]" — Odric-style checks
+const KW_MATTERS_CONTROL_RE = new RegExp(
+  `you control a (?:creature|permanent) with (?:${KW_PATTERN})\\b`,
+  "i"
+);
+
+// Context words that indicate a line references keywords as a mechanic
+// (not just listing the card's own keyword abilities)
+const KW_CONTEXT_RE =
+  /\b(?:creature|permanent|control|with|have|gain|if|each|for each|whenever|gets?)\b/i;
+
+/** Extract which specific keywords a card references in "matters" context */
+export function extractReferencedKeywords(card: EnrichedCard): string[] {
+  const text = card.oracleText;
+  // Quick bail: does this card reference keywords at all?
+  if (
+    !KW_MATTERS_WITH_RE.test(text) &&
+    !KW_MATTERS_GRANT_RE.test(text) &&
+    !KW_MATTERS_CONDITIONAL_RE.test(text) &&
+    !KW_MATTERS_CONTROL_RE.test(text)
+  ) {
+    return [];
+  }
+
+  const lines = text.split("\n");
+  const referenced = new Set<string>();
+
+  for (const line of lines) {
+    // Skip standalone keyword lines (e.g. "Flying" or "Flying, vigilance")
+    if (!KW_CONTEXT_RE.test(line)) continue;
+
+    const lower = line.toLowerCase();
+    for (const kw of KEYWORD_MATTERS_LIST) {
+      if (lower.includes(kw)) {
+        referenced.add(kw);
+      }
+    }
+  }
+
+  return [...referenced];
+}
+
 // --- Supertype Matters ---
 const SUPERTYPE_LEGENDARY_CAST_RE =
   /whenever you (?:cast|play) a (?:legendary|historic)/i;
@@ -360,6 +431,26 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
       if (SUPERTYPE_SNOW_MANA_RE.test(text)) score += 0.4;
       // {S} in mana cost (not just oracle text)
       if (SUPERTYPE_SNOW_MANA_RE.test(card.manaCost)) score += 0.3;
+      return Math.min(score, 1);
+    },
+    conflictsWith: [],
+  },
+  {
+    id: "keywordMatters",
+    name: "Keyword Matters",
+    description: "Keyword ability payoffs, keyword-sharing effects",
+    color: { bg: "bg-sky-500/20", text: "text-sky-300" },
+    detect(card) {
+      const text = card.oracleText;
+      let score = 0;
+      // "creature(s) with [keyword]" — payoffs, lords, triggers
+      if (KW_MATTERS_WITH_RE.test(text)) score += 0.7;
+      // "creatures you control have/gain [keyword]" — mass granting
+      if (KW_MATTERS_GRANT_RE.test(text)) score += 0.5;
+      // "if it has [keyword]" — conditional keyword checks
+      if (KW_MATTERS_CONDITIONAL_RE.test(text)) score += 0.5;
+      // "you control a creature with [keyword]" — control checks
+      if (KW_MATTERS_CONTROL_RE.test(text)) score += 0.5;
       return Math.min(score, 1);
     },
     conflictsWith: [],
