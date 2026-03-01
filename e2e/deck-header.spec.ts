@@ -161,7 +161,7 @@ test.describe("Deck Header", () => {
 
     const header = deckPage.page.getByTestId("deck-header");
     // deck-themes only rendered when themes > 0; verify it either exists with children or is absent
-    const themesLocator = header.getByTestId("deck-themes");
+    const themesLocator = header.getByTestId("header-themes");
     const count = await themesLocator.count();
     if (count > 0) {
       const children = themesLocator.locator("span");

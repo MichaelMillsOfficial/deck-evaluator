@@ -362,7 +362,7 @@ export default function DeckHeader({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-3">
           {/* Theme pills */}
           {analysisResults.synergyAnalysis.deckThemes.length > 0 && (
-            <div data-testid="deck-themes" className="flex flex-wrap items-center gap-1.5">
+            <div data-testid="header-themes" className="flex flex-wrap items-center gap-1.5">
               {analysisResults.synergyAnalysis.deckThemes.slice(0, 3).map((theme) => {
                 const axisDef = SYNERGY_AXES.find((a) => a.id === theme.axisId);
                 const bg = axisDef?.color.bg ?? "bg-slate-500/20";
