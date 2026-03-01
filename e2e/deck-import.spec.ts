@@ -61,6 +61,31 @@ test.describe("Deck Import — Manual Text Input", () => {
     await expect(deckPage.importButton).toBeEnabled();
   });
 
+  test("shows amber warning banner for unparseable lines", async ({
+    deckPage,
+  }) => {
+    const decklistWithBadLine = [
+      "COMMANDER:",
+      "Suki, Kyoshi Warrior",  // missing quantity prefix
+      "",
+      "MAINBOARD:",
+      "1 Sol Ring",
+      "1 Command Tower",
+    ].join("\n");
+
+    await deckPage.fillDecklist(decklistWithBadLine);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    // Amber warning banner should be visible with the skipped line
+    const warning = deckPage.page.getByTestId("parse-warnings");
+    await expect(warning).toBeVisible();
+    await expect(warning).toContainText("Suki, Kyoshi Warrior");
+
+    // Deck should still render with valid cards
+    await expect(deckPage.deckDisplay.getByText("Sol Ring")).toBeVisible();
+  });
+
   test("shows loading state during submission", async ({
     deckPage,
     page,

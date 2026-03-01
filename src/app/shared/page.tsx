@@ -154,7 +154,7 @@ function SharedDeckContent() {
           }
         } else {
           // v1: existing text-based path
-          const deck = parseDecklist(
+          const { deck } = parseDecklist(
             payload.text,
             payload.commanders ? { commanders: payload.commanders } : undefined
           );

@@ -29,6 +29,7 @@ export default function DeckImportSection() {
     nearCombos: SpellbookCombo[];
   } | null>(null);
   const [spellbookLoading, setSpellbookLoading] = useState(false);
+  const [parseWarnings, setParseWarnings] = useState<string[]>([]);
   const [commanderWarning, setCommanderWarning] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ViewTab>("list");
   const [discordModalOpen, setDiscordModalOpen] = useState(false);
@@ -178,6 +179,7 @@ export default function DeckImportSection() {
     setDeckData(null);
     setCardMap(null);
     setEnrichError(null);
+    setParseWarnings([]);
     setCommanderWarning(null);
     setSpellbookCombos(null);
     setNotFoundCount(0);
@@ -193,8 +195,10 @@ export default function DeckImportSection() {
         return;
       }
 
-      const deck = json as DeckData;
+      const { warnings: w, ...deckFields } = json as DeckData & { warnings?: string[] };
+      const deck = deckFields as DeckData;
       setDeckData(deck);
+      setParseWarnings(w ?? []);
       enrichDeck(deck);
       fetchCombos(deck);
     } catch (err) {
@@ -286,6 +290,43 @@ export default function DeckImportSection() {
             />
           </svg>
           {error}
+        </div>
+      )}
+
+      {parseWarnings.length > 0 && !loading && (
+        <div
+          data-testid="parse-warnings"
+          role="alert"
+          className="mt-8 flex items-start justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400"
+        >
+          <div>
+            <p className="font-medium">
+              Some lines could not be parsed and were skipped:
+            </p>
+            <ul className="mt-1 list-disc pl-5">
+              {parseWarnings.slice(0, 5).map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+              {parseWarnings.length > 5 && (
+                <li>...and {parseWarnings.length - 5} more</li>
+              )}
+            </ul>
+          </div>
+          <button
+            type="button"
+            onClick={() => setParseWarnings([])}
+            className="ml-4 shrink-0 text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
+            aria-label="Dismiss parse warnings"
+          >
+            <svg
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
+          </button>
         </div>
       )}
 

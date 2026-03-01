@@ -293,13 +293,13 @@ test.describe("validateCommanderSelection", () => {
     expect(result.errors[0]).toContain("2");
   });
 
-  test("commander not in decklist fails", () => {
+  test("commander not in decklist is valid (will be added by parser)", () => {
     const result = validateCommanderSelection(
       ["Atraxa, Praetors' Voice"],
       ["Sol Ring", "Command Tower"]
     );
-    expect(result.valid).toBe(false);
-    expect(result.errors[0]).toContain("Atraxa");
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
   });
 
   test("empty commanders array is valid", () => {

@@ -5,14 +5,12 @@ import { useState, useRef, useEffect, useCallback } from "react";
 interface CommanderInputProps {
   value: string[];
   onChange: (commanders: string[]) => void;
-  decklistText: string;
   disabled?: boolean;
 }
 
 export default function CommanderInput({
   value,
   onChange,
-  decklistText,
   disabled = false,
 }: CommanderInputProps) {
   const [query, setQuery] = useState("");
@@ -25,17 +23,6 @@ export default function CommanderInput({
   const listboxRef = useRef<HTMLUListElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-
-  // Parse card names from decklist text for filtering
-  const deckCardNames = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const names = new Set<string>();
-    for (const line of decklistText.split(/\r?\n/)) {
-      const match = line.trim().match(/^\d+x?\s+(.+)$/);
-      if (match) names.add(match[1].trim());
-    }
-    deckCardNames.current = names;
-  }, [decklistText]);
 
   const fetchSuggestions = useCallback(async (q: string) => {
     abortRef.current?.abort();
@@ -53,11 +40,10 @@ export default function CommanderInput({
         return;
       }
       const json = (await res.json()) as { suggestions: string[] };
-      // Filter to cards that exist in the decklist and aren't already selected
+      // Filter out already-selected commanders
       const selectedSet = new Set(value);
       const filtered = json.suggestions.filter(
-        (name) =>
-          deckCardNames.current.has(name) && !selectedSet.has(name)
+        (name) => !selectedSet.has(name)
       );
       setSuggestions(filtered);
       setIsOpen(filtered.length > 0);
@@ -264,8 +250,9 @@ export default function CommanderInput({
       </div>
 
       <p className="mt-1 text-xs text-slate-500">
-        Or include a <code className="text-slate-400">COMMANDER:</code> header
-        in your decklist
+        Tip: You can also add a{" "}
+        <code className="text-slate-400">COMMANDER:</code> section in your
+        decklist text
       </p>
     </div>
   );

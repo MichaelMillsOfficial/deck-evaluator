@@ -159,7 +159,6 @@ export default function DeckInput({
             <CommanderInput
               value={commanders}
               onChange={setCommanders}
-              decklistText={textValue}
               disabled={loading}
             />
           )}

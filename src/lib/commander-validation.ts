@@ -147,7 +147,8 @@ export function isLegalCommander(card: EnrichedCard): boolean {
 
 /**
  * Validate that chosen commander names are acceptable selections.
- * Checks: max 2 commanders, each name must exist in the deck card list.
+ * Checks: max 2 commanders. Commanders don't need to be in the decklist
+ * since the parser will add them automatically.
  */
 export function validateCommanderSelection(
   names: string[],
@@ -159,13 +160,6 @@ export function validateCommanderSelection(
 
   if (names.length > 2) {
     errors.push("A deck can have at most 2 commanders.");
-  }
-
-  const deckSet = new Set(deckCardNames);
-  for (const name of names) {
-    if (!deckSet.has(name)) {
-      errors.push(`"${name}" is not in the decklist.`);
-    }
   }
 
   return { valid: errors.length === 0, errors };

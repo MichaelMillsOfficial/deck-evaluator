@@ -37,7 +37,6 @@ test.describe("Commander Entry — Input UI", () => {
     page,
   }) => {
     await mockAutocomplete(page, ["Atraxa, Praetors' Voice"]);
-    // Must fill decklist first so the card name is available for filtering
     await deckPage.fillDecklist(FLAT_DECKLIST);
 
     await deckPage.commanderInput.fill("Atraxa");
@@ -115,6 +114,30 @@ test.describe("Commander Entry — Input UI", () => {
       deck.getByText("Atraxa, Praetors' Voice")
     ).toBeVisible();
     await expect(deck.getByText("Sol Ring")).toBeVisible();
+  });
+
+  test("selecting a commander NOT in decklist text still adds it to Commander section", async ({
+    deckPage,
+    page,
+  }) => {
+    // Decklist does NOT contain "Suki, Kyoshi Warrior"
+    const decklist = `1 Sol Ring\n1 Command Tower\n1 Arcane Signet`;
+    await deckPage.fillDecklist(decklist);
+
+    // Mock autocomplete to return the commander
+    await mockAutocomplete(page, ["Suki, Kyoshi Warrior"]);
+    await deckPage.fillCommander("Suki, Kyoshi Warrior");
+
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    const deck = deckPage.deckDisplay;
+    // Commander should appear in the rendered deck
+    await expect(deck.getByText("Suki, Kyoshi Warrior")).toBeVisible();
+    // Mainboard cards should still be present
+    await expect(deck.getByText("Sol Ring")).toBeVisible();
+    await expect(deck.getByText("Command Tower")).toBeVisible();
+    await expect(deck.getByText("Arcane Signet")).toBeVisible();
   });
 
   test("input is disabled when 2 commanders are selected", async ({

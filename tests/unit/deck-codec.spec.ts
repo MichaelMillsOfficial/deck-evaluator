@@ -67,7 +67,7 @@ test.describe("reconstructDecklist", () => {
     });
 
     const text = reconstructDecklist(deck);
-    const parsed = parseDecklist(text);
+    const { deck: parsed } = parseDecklist(text);
 
     expect(parsed.commanders.map((c) => c.name)).toEqual(
       deck.commanders.map((c) => c.name)
