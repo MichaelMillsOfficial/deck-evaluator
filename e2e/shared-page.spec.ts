@@ -79,7 +79,7 @@ test.describe("Shared Page", () => {
     ).toBeVisible();
   });
 
-  test("valid encoded deck renders and shows header", async ({
+  test("valid v1 encoded deck renders and shows header", async ({
     deckPage,
   }) => {
     const encoded = await deckPage.page.evaluate(async () => {
@@ -129,5 +129,70 @@ test.describe("Shared Page", () => {
     await expect(
       deckPage.page.getByTestId("deck-display")
     ).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("v2 compact payload renders deck with correct card names", async ({
+    deckPage,
+  }) => {
+    // Encode a v2 compact payload in the browser
+    const encoded = await deckPage.page.evaluate(async () => {
+      const payload = {
+        v: 2,
+        n: "Compact Test Deck",
+        c: [["cmm", "344", 1]],  // Atraxa, Praetors' Voice in CMM
+        m: [
+          ["cmm", "387", 1],    // Sol Ring in CMM
+          ["cmm", "355", 1],    // Command Tower in CMM
+        ],
+      };
+      const json = JSON.stringify(payload);
+      const encodedBytes = new TextEncoder().encode(json);
+
+      const cs = new CompressionStream("gzip");
+      const writer = cs.writable.getWriter();
+      writer.write(encodedBytes);
+      writer.close();
+
+      const chunks: Uint8Array[] = [];
+      const reader = cs.readable.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+
+      const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
+      const compressed = new Uint8Array(totalLen);
+      let offset = 0;
+      for (const chunk of chunks) {
+        compressed.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      let binary = "";
+      for (let i = 0; i < compressed.length; i++) {
+        binary += String.fromCharCode(compressed[i]);
+      }
+      return btoa(binary)
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+    });
+
+    await deckPage.page.goto(`/shared?d=${encoded}`);
+
+    // Should show the deck header with correct deck name
+    await expect(
+      deckPage.page.getByTestId("deck-header")
+    ).toBeVisible({ timeout: 30_000 });
+
+    // The deck should render with actual card names from Scryfall
+    await expect(
+      deckPage.page.getByTestId("deck-display")
+    ).toBeVisible({ timeout: 30_000 });
+
+    // Verify the deck header shows the deck name from the payload
+    const header = deckPage.page.getByTestId("deck-header");
+    await expect(header.getByText("Compact Test Deck")).toBeVisible();
   });
 });

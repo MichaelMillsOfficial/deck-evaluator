@@ -8,8 +8,7 @@ import {
   computeAllAnalyses,
   type DeckAnalysisResults,
 } from "@/lib/deck-analysis-aggregate";
-import { reconstructDecklist } from "@/lib/decklist-parser";
-import { encodeDeckPayload } from "@/lib/deck-codec";
+import { encodeCompactDeckPayload } from "@/lib/deck-codec";
 import DeckInput from "@/components/DeckInput";
 import DeckViewTabs from "@/components/DeckViewTabs";
 import DeckHeader, { type ViewTab } from "@/components/DeckHeader";
@@ -221,21 +220,16 @@ export default function DeckImportSection() {
       })
     );
 
-  // Pre-compute share URL when deck data is available
+  // Compute share URL after enrichment completes (v2 compact codec)
   useEffect(() => {
-    if (!deckData) {
+    if (!deckData || !cardMap) {
       setShareUrl(null);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const text = reconstructDecklist(deckData);
-        const commanders =
-          deckData.commanders.length > 0
-            ? deckData.commanders.map((c) => c.name)
-            : undefined;
-        const encoded = await encodeDeckPayload(text, commanders);
+        const encoded = await encodeCompactDeckPayload(deckData, cardMap);
         if (!cancelled) {
           setShareUrl(`${window.location.origin}/shared?d=${encoded}`);
         }
@@ -244,7 +238,7 @@ export default function DeckImportSection() {
       }
     })();
     return () => { cancelled = true; };
-  }, [deckData]);
+  }, [deckData, cardMap]);
 
   const handleCopyShareLink = useCallback(async () => {
     if (!shareUrl) return;

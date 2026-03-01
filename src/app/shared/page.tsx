@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef, Suspense } from "rea
 import { useSearchParams } from "next/navigation";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { SpellbookCombo } from "@/lib/commander-spellbook";
-import { decodeDeckPayload } from "@/lib/deck-codec";
+import { decodeDeckPayload, buildDeckFromCompactPayload } from "@/lib/deck-codec";
 import { parseDecklist } from "@/lib/decklist-parser";
 import {
   computeAllAnalyses,
@@ -93,12 +93,74 @@ function SharedDeckContent() {
     (async () => {
       try {
         const payload = await decodeDeckPayload(d);
-        const deck = parseDecklist(
-          payload.text,
-          payload.commanders ? { commanders: payload.commanders } : undefined
-        );
-        setDeckData(deck);
-        enrichDeck(deck);
+
+        if (payload.version === 2) {
+          // v2 compact: enrich by set+collector_number
+          const allTuples = [
+            ...payload.commanders,
+            ...payload.mainboard,
+            ...payload.sideboard,
+          ];
+
+          // Separate set+number tuples from fallback name tuples
+          const idTuples = allTuples.filter(([set]) => set !== "_");
+          const nameTuples = allTuples.filter(([set]) => set === "_");
+
+          setEnrichLoading(true);
+          setEnrichError(null);
+
+          try {
+            const cards: Record<string, EnrichedCard> = {};
+
+            // Fetch by set+number identifiers
+            if (idTuples.length > 0) {
+              const res = await fetch("/api/deck-enrich", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  identifiers: idTuples.map(([set, num]) => ({
+                    set,
+                    collector_number: num,
+                  })),
+                }),
+              });
+              if (res.ok) {
+                const json = await res.json();
+                Object.assign(cards, json.cards);
+              }
+            }
+
+            // Fetch fallback name-based cards
+            if (nameTuples.length > 0) {
+              const names = nameTuples.map(([, name]) => name);
+              const res = await fetch("/api/deck-enrich", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ cardNames: names }),
+              });
+              if (res.ok) {
+                const json = await res.json();
+                Object.assign(cards, json.cards);
+              }
+            }
+
+            const deck = buildDeckFromCompactPayload(payload, cards);
+            setDeckData(deck);
+            setCardMap(cards);
+          } catch {
+            setEnrichError("Could not load card details");
+          } finally {
+            setEnrichLoading(false);
+          }
+        } else {
+          // v1: existing text-based path
+          const deck = parseDecklist(
+            payload.text,
+            payload.commanders ? { commanders: payload.commanders } : undefined
+          );
+          setDeckData(deck);
+          enrichDeck(deck);
+        }
       } catch {
         setDecodeError("Invalid or corrupted share link");
       }
