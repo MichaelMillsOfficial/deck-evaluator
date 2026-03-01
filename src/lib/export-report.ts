@@ -102,17 +102,7 @@ function renderCombos(results: DeckAnalysisResults): string {
 }
 
 function renderBudget(results: DeckAnalysisResults): string {
-  const { budgetAnalysis } = results;
-  const lines = [
-    `**Budget:** ${budgetAnalysis.totalCostFormatted}`,
-  ];
-  if (budgetAnalysis.mostExpensive.length > 0) {
-    const top = budgetAnalysis.mostExpensive[0];
-    lines.push(
-      `Most expensive: ${top.name} ($${top.unitPrice.toFixed(2)})`
-    );
-  }
-  return lines.join("\n");
+  return `**Budget:** ${results.budgetAnalysis.totalCostFormatted}`;
 }
 
 function renderColorDistribution(results: DeckAnalysisResults): string {
