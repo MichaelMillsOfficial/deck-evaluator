@@ -35,10 +35,20 @@ export default function CandidateCardRow({
   const isOffIdentity =
     analysis !== null && analysis.offIdentityColors.length > 0;
 
+  const accentColor = !analysis
+    ? "border-l-slate-600"
+    : analysis.synergyScore >= 65
+      ? "border-l-emerald-500"
+      : analysis.synergyScore >= 45
+        ? "border-l-amber-500"
+        : "border-l-red-500";
+
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-800/50 mb-3">
+    <div
+      className={`rounded-lg border border-slate-700 bg-slate-800/50 mb-3 border-l-4 ${accentColor}`}
+    >
       {/* Header row */}
-      <div className="flex items-center gap-2 p-3">
+      <div className="flex items-center gap-2 px-3 pt-2.5 pb-0.5">
         <button
           type="button"
           aria-expanded={open}
@@ -64,6 +74,21 @@ export default function CandidateCardRow({
         </button>
 
         <ManaCost cost={card.manaCost} />
+
+        {analysis && (
+          <span
+            data-testid="synergy-badge"
+            className={`rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${
+              analysis.synergyScore >= 65
+                ? "bg-emerald-500/20 text-emerald-300"
+                : analysis.synergyScore >= 45
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "bg-red-500/20 text-red-300"
+            }`}
+          >
+            {analysis.synergyScore}
+          </span>
+        )}
 
         {isOffIdentity && (
           <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-xs font-medium text-red-300 whitespace-nowrap">
@@ -94,47 +119,88 @@ export default function CandidateCardRow({
         </button>
       </div>
 
-      {/* Tags row */}
-      <div className="px-3 pb-2">
+      {/* Summary row — type, tags, and inline metrics */}
+      <div className="flex items-center gap-1.5 flex-wrap px-3 pb-2.5 ml-6 text-xs">
+        <span className="text-slate-500">{card.typeLine}</span>
         <CardTags card={card} />
-        <span className="text-xs text-slate-400 ml-2">{card.typeLine}</span>
+        {analysis && (
+          <>
+            <span className="text-slate-600" aria-hidden="true">
+              ·
+            </span>
+            <span
+              data-testid="cmc-delta"
+              className={
+                analysis.cmcImpact.delta > 0
+                  ? "text-red-400"
+                  : analysis.cmcImpact.delta < 0
+                    ? "text-emerald-400"
+                    : "text-slate-400"
+              }
+            >
+              CMC {analysis.cmcImpact.delta >= 0 ? "+" : ""}
+              {analysis.cmcImpact.delta.toFixed(2)}
+            </span>
+            {analysis.axes.length > 0 && (
+              <>
+                <span className="text-slate-600" aria-hidden="true">
+                  ·
+                </span>
+                <span className="text-slate-400">
+                  {analysis.axes.map((a) => a.axisName).join(", ")}
+                </span>
+              </>
+            )}
+            {analysis.manaBaseImpact.stressedColors.length > 0 && (
+              <>
+                <span className="text-slate-600" aria-hidden="true">
+                  ·
+                </span>
+                <span className="text-amber-400">
+                  {analysis.manaBaseImpact.stressedColors.join(", ")} stressed
+                </span>
+              </>
+            )}
+          </>
+        )}
       </div>
 
       {/* Expandable details */}
       {open && analysis && (
-        <div id={detailId} className="border-t border-slate-700 p-3">
+        <div id={detailId} className="border-t border-slate-700 p-3 ml-6">
           <div className="space-y-4 text-sm">
-            {/* Synergy Score */}
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-300 mb-1">
-                Synergy Score
-              </h4>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-sm font-bold ${
-                    analysis.synergyScore >= 65
-                      ? "bg-emerald-500/20 text-emerald-300"
-                      : analysis.synergyScore >= 45
-                        ? "bg-amber-500/20 text-amber-300"
-                        : "bg-red-500/20 text-red-300"
-                  }`}
-                >
-                  {analysis.synergyScore}
-                </span>
-                {analysis.axes.length > 0 && (
-                  <span className="text-xs text-slate-400">
-                    Axes: {analysis.axes.map((a) => a.axisName).join(", ")}
-                  </span>
-                )}
+            {/* Synergy Pairs */}
+            {analysis.pairs.length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-300 mb-1.5">
+                  Synergizes With
+                </h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {analysis.pairs.map((p) => {
+                    const partner =
+                      p.cardA === card.name ? p.cardB : p.cardA;
+                    return (
+                      <span
+                        key={`${p.cardA}-${p.cardB}`}
+                        className="rounded bg-slate-700/50 px-2 py-0.5 text-xs text-slate-300"
+                      >
+                        {partner}
+                        <span className="text-slate-500 ml-1">
+                          ({p.reason})
+                        </span>
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* CMC Impact */}
+            {/* CMC Impact detail */}
             <div>
               <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-300 mb-1">
                 CMC Impact
               </h4>
-              <p className="text-slate-400">
+              <p className="text-slate-400 text-xs">
                 Avg CMC: {analysis.cmcImpact.currentAvgCmc.toFixed(2)} →{" "}
                 {analysis.cmcImpact.projectedAvgCmc.toFixed(2)}{" "}
                 <span
@@ -152,7 +218,7 @@ export default function CandidateCardRow({
               </p>
             </div>
 
-            {/* Mana Base Impact */}
+            {/* Mana Base Stress */}
             {analysis.manaBaseImpact.stressedColors.length > 0 && (
               <div>
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-300 mb-1">

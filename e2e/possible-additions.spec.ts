@@ -529,7 +529,38 @@ test.describe("Candidate card display", () => {
     ).toBeVisible();
   });
 
-  test("expands to show analysis details", async ({ deckPage, page }) => {
+  test("shows synergy score and CMC delta in collapsed view", async ({
+    deckPage,
+    page,
+  }) => {
+    await importDeckAndGoToAdditions(deckPage, page);
+    await setupAutocomplete(page, ["Path to Exile"]);
+
+    // Add candidate
+    const searchInput = page.locator("#card-search-input");
+    await searchInput.fill("Pa");
+    const option = page.getByRole("option", { name: "Path to Exile" });
+    await option.waitFor({ timeout: 5_000 });
+    await option.click();
+
+    const panel = page.locator("#tabpanel-deck-additions");
+    await expect(
+      panel.getByText("Path to Exile").first()
+    ).toBeVisible({ timeout: 10_000 });
+
+    // Synergy score badge should be visible without expanding
+    await expect(
+      panel.getByTestId("synergy-badge")
+    ).toBeVisible({ timeout: 5_000 });
+
+    // CMC delta should be visible without expanding
+    await expect(panel.getByTestId("cmc-delta")).toBeVisible();
+  });
+
+  test("expands to show replacement suggestions and CMC detail", async ({
+    deckPage,
+    page,
+  }) => {
     await importDeckAndGoToAdditions(deckPage, page);
     await setupAutocomplete(page, ["Path to Exile"]);
 
@@ -551,13 +582,10 @@ test.describe("Candidate card display", () => {
       .first();
     await expandButton.click();
 
-    // Should show analysis details
+    // Should show CMC detail with current → projected
     await expect(
-      panel.getByText("Synergy Score")
+      panel.getByText("CMC Impact")
     ).toBeVisible({ timeout: 5_000 });
-
-    // Should show CMC impact
-    await expect(panel.getByText("CMC Impact")).toBeVisible();
 
     // Should show replacement suggestions
     await expect(panel.getByText("Replacement Suggestions")).toBeVisible();
