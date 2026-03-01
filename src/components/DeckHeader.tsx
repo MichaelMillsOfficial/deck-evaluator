@@ -9,13 +9,14 @@ import {
 } from "@/lib/export-report";
 import { SYNERGY_AXES } from "@/lib/synergy-axes";
 
-export type ViewTab = "list" | "analysis" | "synergy" | "hands";
+export type ViewTab = "list" | "analysis" | "synergy" | "hands" | "additions";
 
 const tabs: { key: ViewTab; label: string }[] = [
   { key: "list", label: "Deck List" },
   { key: "analysis", label: "Analysis" },
   { key: "synergy", label: "Synergy" },
   { key: "hands", label: "Hands" },
+  { key: "additions", label: "Additions" },
 ];
 
 interface DeckHeaderProps {

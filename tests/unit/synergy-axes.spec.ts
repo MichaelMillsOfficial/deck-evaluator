@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { SYNERGY_AXES, getAxisById } from "../../src/lib/synergy-axes";
+import { SYNERGY_AXES, getAxisById, extractReferencedKeywords } from "../../src/lib/synergy-axes";
 import { makeCard as mockCard } from "../helpers";
 
 test.describe("Synergy Axes", () => {
   test("exports a non-empty array of axes", () => {
-    expect(SYNERGY_AXES.length).toBeGreaterThanOrEqual(12);
+    expect(SYNERGY_AXES.length).toBeGreaterThanOrEqual(13);
   });
 
   test("each axis has required fields", () => {
@@ -480,36 +480,6 @@ test.describe("Lifegain axis", () => {
   });
 });
 
-test.describe("Evasion axis", () => {
-  test("detects flying keyword", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({ keywords: ["Flying"] });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-
-  test("detects unblockable text", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({
-      oracleText: "This creature can't be blocked.",
-    });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-
-  test("detects combat damage triggers", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({
-      oracleText: "Whenever this creature deals combat damage to a player, draw a card.",
-    });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-
-  test("returns 0 for irrelevant card", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({ oracleText: "Destroy target enchantment." });
-    expect(axis.detect(card)).toBe(0);
-  });
-});
-
 // ---------------------------------------------------------------------------
 // Issue #48 — Lifegain axis: drop "pay life" false positives
 // ---------------------------------------------------------------------------
@@ -605,55 +575,173 @@ test.describe("Tribal axis — Tribal Unity verification (Issue #48)", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Issue #48 — Evasion axis: grants-evasion via has/have
-// ---------------------------------------------------------------------------
 
-test.describe("Evasion axis — grants-evasion (Issue #48)", () => {
-  test("Two Headed Sliver ('All Sliver creatures have menace') → evasion score > 0", () => {
-    const axis = getAxisById("evasion")!;
+test.describe("Keyword Matters axis", () => {
+  test("detects keyword lord effect: 'Creatures with flying get +1/+1'", () => {
+    const axis = getAxisById("keywordMatters")!;
     const card = mockCard({
-      name: "Two-Headed Sliver",
+      name: "Kangee, Aerie Keeper",
       oracleText:
-        "All Sliver creatures have menace. (They can't be blocked except by two or more creatures.)",
-      typeLine: "Creature — Sliver",
+        "Flying\nCreatures with flying get +1/+1 for each feather counter on Kangee, Aerie Keeper.",
     });
     expect(axis.detect(card)).toBeGreaterThan(0);
   });
 
-  test("Archetype of Imagination ('Creatures you control have flying') → evasion score > 0", () => {
-    const axis = getAxisById("evasion")!;
+  test("detects keyword trigger: 'Whenever a creature with haste attacks'", () => {
+    const axis = getAxisById("keywordMatters")!;
     const card = mockCard({
-      name: "Archetype of Imagination",
+      name: "Ognis, the Dragon's Lash",
       oracleText:
-        "Creatures you control have flying. Creatures your opponents control lose flying and can't have or gain flying.",
-      typeLine: "Enchantment Creature — Human Wizard",
+        "Haste\nWhenever a creature with haste attacks, create a tapped Treasure token.",
     });
     expect(axis.detect(card)).toBeGreaterThan(0);
   });
 
-  test("Goblin War Drums ('Creatures you control have menace') → evasion score > 0", () => {
-    const axis = getAxisById("evasion")!;
+  test("detects keyword trigger: 'creature you control with deathtouch deals combat damage'", () => {
+    const axis = getAxisById("keywordMatters")!;
     const card = mockCard({
-      name: "Goblin War Drums",
-      oracleText: "Creatures you control have menace.",
-      typeLine: "Enchantment",
+      name: "Fynn, the Fangbearer",
+      oracleText:
+        "Deathtouch\nWhenever a creature you control with deathtouch deals combat damage to a player, that player gets two poison counters.",
     });
     expect(axis.detect(card)).toBeGreaterThan(0);
   });
 
-  test("Flying keyword → still evasion > 0 (no regression)", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({ keywords: ["Flying"] });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-
-  test("Unblockable text → still evasion > 0 (no regression)", () => {
-    const axis = getAxisById("evasion")!;
+  test("detects mass keyword granting: 'Creatures you control have flying'", () => {
+    const axis = getAxisById("keywordMatters")!;
     const card = mockCard({
-      oracleText: "This creature can't be blocked.",
+      oracleText: "Creatures you control have flying.",
     });
     expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("detects conditional keyword check: 'if it has flying'", () => {
+    const axis = getAxisById("keywordMatters")!;
+    const card = mockCard({
+      name: "Akroma, Vision of Ixidor",
+      oracleText:
+        "Flying, first strike, vigilance, trample\nAt the beginning of each combat, until end of turn, each other creature you control gets +1/+1 if it has flying, +1/+1 if it has first strike, and so on for double strike, deathtouch, haste, hexproof, indestructible, lifelink, menace, reach, trample, and vigilance.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("detects keyword check: 'you control a creature with first strike'", () => {
+    const axis = getAxisById("keywordMatters")!;
+    const card = mockCard({
+      name: "Odric, Lunarch Marshal",
+      oracleText:
+        "At the beginning of each combat, creatures you control gain first strike until end of turn if you control a creature with first strike. The same is true for flying, deathtouch, double strike, haste, hexproof, indestructible, lifelink, menace, reach, skulk, trample, and vigilance.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("detects 'Creatures you control with first strike have double strike'", () => {
+    const axis = getAxisById("keywordMatters")!;
+    const card = mockCard({
+      name: "Kwende, Pride of Femeref",
+      oracleText:
+        "Double strike\nCreatures you control with first strike have double strike.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("detects defender-matters: 'creature with defender enters the battlefield'", () => {
+    const axis = getAxisById("keywordMatters")!;
+    const card = mockCard({
+      name: "Arcades, the Strategist",
+      oracleText:
+        "Flying, vigilance\nWhenever a creature with defender enters the battlefield under your control, draw a card.\nEach creature you control with defender assigns combat damage equal to its toughness rather than its power and can attack as though it didn't have defender.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("returns 0 for creature that just HAS flying (no keyword-matters text)", () => {
+    const axis = getAxisById("keywordMatters")!;
+    const card = mockCard({
+      name: "Serra Angel",
+      keywords: ["Flying", "Vigilance"],
+      oracleText: "Flying, vigilance",
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("returns 0 for generic creature with no keyword references", () => {
+    const axis = getAxisById("keywordMatters")!;
+    const card = mockCard({
+      name: "Grizzly Bears",
+      oracleText: "",
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+
+  test("returns 0 for Thalia (mentions noncreature spells, not keyword-matters)", () => {
+    const axis = getAxisById("keywordMatters")!;
+    const card = mockCard({
+      name: "Thalia, Guardian of Thraben",
+      keywords: ["First Strike"],
+      oracleText: "First strike\nNoncreature spells cost {1} more to cast.",
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+});
+
+test.describe("extractReferencedKeywords", () => {
+  test("extracts 'flying' from Kangee", () => {
+    const card = mockCard({
+      oracleText:
+        "Flying\nCreatures with flying get +1/+1 for each feather counter on Kangee, Aerie Keeper.",
+    });
+    const keywords = extractReferencedKeywords(card);
+    expect(keywords).toContain("flying");
+  });
+
+  test("extracts 'haste' from Ognis", () => {
+    const card = mockCard({
+      oracleText:
+        "Haste\nWhenever a creature with haste attacks, create a tapped Treasure token.",
+    });
+    const keywords = extractReferencedKeywords(card);
+    expect(keywords).toContain("haste");
+  });
+
+  test("extracts 'deathtouch' from Fynn", () => {
+    const card = mockCard({
+      oracleText:
+        "Deathtouch\nWhenever a creature you control with deathtouch deals combat damage to a player, that player gets two poison counters.",
+    });
+    const keywords = extractReferencedKeywords(card);
+    expect(keywords).toContain("deathtouch");
+  });
+
+  test("extracts multiple keywords from Akroma", () => {
+    const card = mockCard({
+      oracleText:
+        "Flying, first strike, vigilance, trample\nAt the beginning of each combat, until end of turn, each other creature you control gets +1/+1 if it has flying, +1/+1 if it has first strike, and so on for double strike, deathtouch, haste, hexproof, indestructible, lifelink, menace, reach, trample, and vigilance.",
+    });
+    const keywords = extractReferencedKeywords(card);
+    expect(keywords).toContain("flying");
+    expect(keywords).toContain("first strike");
+    expect(keywords).toContain("haste");
+    expect(keywords).toContain("deathtouch");
+    expect(keywords).toContain("vigilance");
+    expect(keywords).toContain("trample");
+  });
+
+  test("extracts 'defender' from Arcades", () => {
+    const card = mockCard({
+      oracleText:
+        "Flying, vigilance\nWhenever a creature with defender enters the battlefield under your control, draw a card.\nEach creature you control with defender assigns combat damage equal to its toughness rather than its power and can attack as though it didn't have defender.",
+    });
+    const keywords = extractReferencedKeywords(card);
+    expect(keywords).toContain("defender");
+  });
+
+  test("returns empty array for card with no keyword references", () => {
+    const card = mockCard({
+      keywords: ["Flying"],
+      oracleText: "Flying",
+    });
+    expect(extractReferencedKeywords(card)).toHaveLength(0);
   });
 });
 

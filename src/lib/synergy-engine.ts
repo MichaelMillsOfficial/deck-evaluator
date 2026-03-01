@@ -7,7 +7,7 @@ import type {
   DeckTheme,
   DeckSynergyAnalysis,
 } from "./types";
-import { SYNERGY_AXES } from "./synergy-axes";
+import { SYNERGY_AXES, extractReferencedKeywords } from "./synergy-axes";
 import { findCombosInDeck } from "./known-combos";
 import { generateTags } from "./card-tags";
 import {
@@ -416,6 +416,98 @@ function boostSupertypeScores(
   return anchors;
 }
 
+/**
+ * Boost keywordMatters axis scores for cards that HAVE keywords anchored
+ * by payoff cards (commanders or other keyword-matters cards).
+ * A flying creature alone doesn't score on keywordMatters, but in a deck
+ * with Kangee (flying payoff), every flying creature becomes synergistic.
+ */
+function boostKeywordScores(
+  deck: DeckData,
+  cardNames: string[],
+  cardMap: Record<string, EnrichedCard>,
+  axisScores: Map<string, CardAxisScore[]>
+): string[] {
+  // Resolve commanders
+  const commanders: EnrichedCard[] = [];
+  for (const cmd of deck.commanders) {
+    const card = cardMap[cmd.name];
+    if (card) commanders.push(card);
+  }
+
+  // Identify which keywords are "anchored" by payoff cards
+  const keywordCounts = new Map<string, number>();
+
+  // Commander mentions are weighted heavily (count as 3)
+  for (const cmd of commanders) {
+    for (const kw of extractReferencedKeywords(cmd)) {
+      keywordCounts.set(kw, (keywordCounts.get(kw) ?? 0) + 3);
+    }
+  }
+
+  // Non-commander cards that scored on keywordMatters axis also anchor
+  for (const name of cardNames) {
+    const card = cardMap[name];
+    if (!card) continue;
+    const cardAxes = axisScores.get(name) ?? [];
+    if (!cardAxes.some((a) => a.axisId === "keywordMatters" && a.relevance >= 0.2)) continue;
+    for (const kw of extractReferencedKeywords(card)) {
+      keywordCounts.set(kw, (keywordCounts.get(kw) ?? 0) + 1);
+    }
+  }
+
+  // A keyword is an anchor if commander references it (count >= 3) or 2+ cards reference it
+  const anchors = [...keywordCounts.entries()]
+    .filter(([, count]) => count >= 2)
+    .map(([kw]) => kw);
+
+  if (anchors.length === 0) return anchors;
+
+  const kwAxis = SYNERGY_AXES.find((a) => a.id === "keywordMatters");
+  if (!kwAxis) return anchors;
+
+  // Boost cards that HAVE the anchored keywords
+  for (const name of cardNames) {
+    const card = cardMap[name];
+    if (!card) continue;
+
+    const cardKeywords = card.keywords.map((k) => k.toLowerCase());
+    const matchingAnchors = anchors.filter((anchor) =>
+      cardKeywords.includes(anchor)
+    );
+
+    if (matchingAnchors.length === 0) continue;
+
+    // Commander-referenced keywords get higher boost
+    let boost = 0;
+    for (const kw of matchingAnchors) {
+      const count = keywordCounts.get(kw) ?? 0;
+      if (count >= 3) {
+        boost += 0.25; // Commander references this keyword
+      } else {
+        boost += 0.15; // Non-commander cards reference it
+      }
+    }
+    boost = Math.min(0.5, boost);
+
+    const cardAxes = axisScores.get(name) ?? [];
+    const existing = cardAxes.find((a) => a.axisId === "keywordMatters");
+
+    if (existing) {
+      existing.relevance = Math.min(1, existing.relevance + boost);
+    } else {
+      cardAxes.push({
+        axisId: "keywordMatters",
+        axisName: kwAxis.name,
+        relevance: boost,
+      });
+      axisScores.set(name, cardAxes);
+    }
+  }
+
+  return anchors;
+}
+
 /** Supertype anchor name to theme display name */
 const SUPERTYPE_THEME_NAMES: Record<string, string> = {
   legendary: "Legendary Matters",
@@ -427,7 +519,8 @@ const SUPERTYPE_THEME_NAMES: Record<string, string> = {
 function identifyDeckThemes(
   axisScores: Map<string, CardAxisScore[]>,
   anchors?: string[],
-  supertypeAnchors?: string[]
+  supertypeAnchors?: string[],
+  keywordAnchors?: string[]
 ): DeckTheme[] {
   const axisCardCounts = new Map<string, number>();
   const axisStrengths = new Map<string, number>();
@@ -462,6 +555,15 @@ function identifyDeckThemes(
       theme.detail = supertypeAnchors[0];
       theme.axisName = SUPERTYPE_THEME_NAMES[supertypeAnchors[0]] ?? "Supertype Matters";
     }
+    // Annotate keywordMatters themes with the primary keyword anchor
+    if (axisId === "keywordMatters" && keywordAnchors && keywordAnchors.length > 0) {
+      theme.detail = keywordAnchors[0];
+      const kwDisplay = keywordAnchors[0]
+        .split(" ")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+      theme.axisName = `${kwDisplay} Matters`;
+    }
     themes.push(theme);
   }
 
@@ -483,6 +585,9 @@ export function analyzeDeckSynergy(
 
   // Step 1c: Boost supertype scores for cards matching supertype anchors
   const supertypeAnchors = boostSupertypeScores(deck, cardNames, cardMap, axisScores);
+
+  // Step 1d: Boost keyword scores for cards with keywords anchored by payoff cards
+  const keywordAnchors = boostKeywordScores(deck, cardNames, cardMap, axisScores);
 
   // Step 2: Compute deck-level axis strengths
   const deckAxisStrengths = computeDeckAxisStrengths(axisScores);
@@ -513,7 +618,7 @@ export function analyzeDeckSynergy(
     if (card) commanders.push(card);
   }
   const tribalAnchors = identifyTribalAnchors(commanders, cardNames, cardMap);
-  const deckThemes = identifyDeckThemes(axisScores, tribalAnchors, supertypeAnchors);
+  const deckThemes = identifyDeckThemes(axisScores, tribalAnchors, supertypeAnchors, keywordAnchors);
 
   // Step 8: Sort and return
   const topSynergies = [...synergyPairs, ...comboPairs]

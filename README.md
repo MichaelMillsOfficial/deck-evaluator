@@ -4,6 +4,8 @@ A web application for importing, parsing, and analyzing Magic: The Gathering dec
 
 Import decks via manual text entry, Moxfield export, or Archidekt URL. Cards are automatically enriched with data from the Scryfall API, including mana costs rendered as official MTG symbols, oracle text with inline symbol images, heuristic card tags (Ramp, Removal, Card Draw, etc.), and expandable card detail rows.
 
+See [Promises to You](./PROMISES.md) for how this tool handles your data and what drives the analysis.
+
 ## Getting Started
 
 ### Prerequisites

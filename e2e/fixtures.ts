@@ -108,8 +108,8 @@ export class DeckPage {
     return this.page.locator('[class*="red"]');
   }
 
-  /** Click a deck view tab (Deck List, Analysis, Synergy, or Hands) */
-  async selectDeckViewTab(tab: "Deck List" | "Analysis" | "Synergy" | "Hands") {
+  /** Click a deck view tab */
+  async selectDeckViewTab(tab: "Deck List" | "Analysis" | "Synergy" | "Hands" | "Additions") {
     await this.page
       .getByTestId("deck-header")
       .getByRole("tab", { name: tab })
@@ -222,6 +222,11 @@ export class DeckPage {
   /** Locator for the near combos section */
   get nearCombosSection() {
     return this.page.getByTestId("near-combos-section");
+  }
+
+  /** Locator for the additions panel */
+  get additionsPanel() {
+    return this.page.locator("#tabpanel-deck-additions");
   }
 
   /** Locator for the commander input field */
