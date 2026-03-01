@@ -92,24 +92,25 @@ test.describe("Discord Export Modal", () => {
     await expect(modal).toHaveAttribute("aria-label", "Export to Discord");
   });
 
-  test("modal shows Analysis Link checkbox that is checked by default", async ({
+  test("modal shows Analysis Link checkbox checked for small decks", async ({
     deckPage,
   }) => {
     await deckPage.shareButton.click();
     await deckPage.page.getByText("Export to Discord...").click();
 
     const modal = deckPage.page.getByTestId("discord-export-modal");
-    const linkCheckbox = modal
+    const linkLabel = modal
       .locator("label")
-      .filter({ hasText: "Analysis Link" })
-      .locator('input[type="checkbox"]');
-    await expect(linkCheckbox).toBeVisible();
+      .filter({ hasText: "Analysis Link" });
+    await expect(linkLabel).toBeVisible();
+
+    // Small test deck has a short share URL that fits within budget
+    const linkCheckbox = linkLabel.locator('input[type="checkbox"]');
     await expect(linkCheckbox).toBeChecked();
+    await expect(linkCheckbox).not.toBeDisabled();
   });
 
-  test("preview includes share URL when Analysis Link is checked", async ({
-    deckPage,
-  }) => {
+  test("preview includes share URL for small decks", async ({ deckPage }) => {
     await deckPage.shareButton.click();
     await deckPage.page.getByText("Export to Discord...").click();
 
@@ -130,7 +131,6 @@ test.describe("Discord Export Modal", () => {
       .filter({ hasText: "Analysis Link" })
       .locator('input[type="checkbox"]');
 
-    // Uncheck
     await linkCheckbox.click();
     await expect(linkCheckbox).not.toBeChecked();
 

@@ -243,13 +243,14 @@ test.describe("Discord formatter", () => {
     }
   });
 
-  test("appends share URL footer when shareUrl is provided", () => {
+  test("appends share URL footer when shareUrl fits", () => {
     const { deck, results } = buildTestResults();
     const shareUrl = "https://example.com/shared?d=abc123";
     const result = formatDiscordReport(results, deck, undefined, shareUrl);
 
     expect(result.text).toContain(shareUrl);
     expect(result.text.endsWith(shareUrl)).toBe(true);
+    expect(result.linkIncluded).toBe(true);
   });
 
   test("share URL is included in character count", () => {
@@ -270,14 +271,26 @@ test.describe("Discord formatter", () => {
     expect(result.text.length).toBeLessThanOrEqual(2000);
   });
 
-  test("share URL reserves budget and may exclude sections to fit", () => {
+  test("short share URL reserves budget and may exclude sections to fit", () => {
     const { deck, results } = buildTestResults();
-    // Use a long URL to eat into budget
-    const longUrl = "https://example.com/shared?d=" + "x".repeat(500);
+    // A URL under 1000 chars (half the budget) fits
+    const shortUrl = "https://example.com/shared?d=" + "x".repeat(500);
     const allIds = new Set(DISCORD_SECTIONS.map((s) => s.id));
-    const result = formatDiscordReport(results, deck, allIds, longUrl);
+    const result = formatDiscordReport(results, deck, allIds, shortUrl);
 
-    expect(result.text).toContain(longUrl);
+    expect(result.text).toContain(shortUrl);
+    expect(result.linkIncluded).toBe(true);
+    expect(result.charCount).toBeLessThanOrEqual(2000);
+  });
+
+  test("drops share URL when it exceeds half the budget", () => {
+    const { deck, results } = buildTestResults();
+    // A URL over 1000 chars (half of 2000) is too long
+    const longUrl = "https://example.com/shared?d=" + "x".repeat(1500);
+    const result = formatDiscordReport(results, deck, undefined, longUrl);
+
+    expect(result.text).not.toContain(longUrl);
+    expect(result.linkIncluded).toBe(false);
     expect(result.charCount).toBeLessThanOrEqual(2000);
   });
 
@@ -286,5 +299,6 @@ test.describe("Discord formatter", () => {
     const result = formatDiscordReport(results, deck);
 
     expect(result.text).not.toContain("View full analysis");
+    expect(result.linkIncluded).toBe(false);
   });
 });

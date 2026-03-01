@@ -169,11 +169,25 @@ export default function DiscordExportModal({
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    checked={includeLink}
+                    checked={includeLink && result.linkIncluded}
+                    disabled={!result.linkIncluded && includeLink}
                     onChange={() => setIncludeLink((prev) => !prev)}
-                    className="rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-400"
+                    className="rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-400 disabled:opacity-50"
                   />
-                  <span className="text-slate-300">Analysis Link</span>
+                  <span
+                    className={
+                      !result.linkIncluded && includeLink
+                        ? "text-slate-500"
+                        : "text-slate-300"
+                    }
+                  >
+                    Analysis Link
+                    {!result.linkIncluded && includeLink && (
+                      <span className="ml-1 text-xs text-slate-500">
+                        (URL too long)
+                      </span>
+                    )}
+                  </span>
                 </label>
               </>
             )}

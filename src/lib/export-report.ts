@@ -242,15 +242,16 @@ export function allocateDiscordSections(
   enabledSections: Set<string>,
   maxChars = 2000,
   shareUrl?: string
-): { included: string[]; excluded: string[]; text: string; charCount: number } {
+): { included: string[]; excluded: string[]; text: string; charCount: number; linkIncluded: boolean } {
   const included: string[] = [];
   const excluded: string[] = [];
   const rendered: string[] = [];
   let totalChars = 0;
 
-  // Reserve space for share URL footer if provided
+  // Reserve space for share URL footer if it fits
   const footerText = shareUrl ? `\n\nView full analysis: ${shareUrl}` : "";
-  const effectiveMax = maxChars - footerText.length;
+  const footerFits = footerText.length > 0 && footerText.length < maxChars / 2;
+  const effectiveMax = footerFits ? maxChars - footerText.length : maxChars;
 
   // Always include header first
   const headerSection = DISCORD_SECTIONS.find((s) => s.id === "header")!;
@@ -286,14 +287,14 @@ export function allocateDiscordSections(
     }
   }
 
-  // Append share URL footer
-  if (footerText) {
+  // Append share URL footer only if it fits
+  if (footerFits) {
     rendered.push(footerText);
     totalChars += footerText.length;
   }
 
   const text = rendered.join("");
-  return { included, excluded, text, charCount: text.length };
+  return { included, excluded, text, charCount: text.length, linkIncluded: footerFits };
 }
 
 // ---------------------------------------------------------------------------
@@ -571,7 +572,7 @@ export function formatDiscordReport(
   deck: DeckData,
   enabledSections?: Set<string>,
   shareUrl?: string
-): { text: string; charCount: number; included: string[]; excluded: string[] } {
+): { text: string; charCount: number; included: string[]; excluded: string[]; linkIncluded: boolean } {
   const enabled =
     enabledSections ??
     new Set(
