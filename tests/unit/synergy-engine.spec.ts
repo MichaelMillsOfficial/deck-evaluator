@@ -772,6 +772,172 @@ test.describe("analyzeDeckSynergy", () => {
     expect(sagaScore).toBeGreaterThan(regularScore);
   });
 
+  test("flying-matters commander boosts flying creatures above baseline", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Kangee, Aerie Keeper": mockCard({
+        name: "Kangee, Aerie Keeper",
+        typeLine: "Legendary Creature — Bird Wizard",
+        supertypes: ["Legendary"],
+        subtypes: ["Bird", "Wizard"],
+        keywords: ["Flying"],
+        oracleText:
+          "Flying\nCreatures with flying get +1/+1 for each feather counter on Kangee, Aerie Keeper.",
+      }),
+      "Serra Angel": mockCard({
+        name: "Serra Angel",
+        typeLine: "Creature — Angel",
+        subtypes: ["Angel"],
+        keywords: ["Flying", "Vigilance"],
+        oracleText: "Flying, vigilance",
+      }),
+      "Air Elemental": mockCard({
+        name: "Air Elemental",
+        typeLine: "Creature — Elemental",
+        subtypes: ["Elemental"],
+        keywords: ["Flying"],
+        oracleText: "Flying",
+      }),
+      "Favorable Winds": mockCard({
+        name: "Favorable Winds",
+        typeLine: "Enchantment",
+        oracleText: "Creatures you control with flying get +1/+1.",
+      }),
+      "Grizzly Bears": mockCard({
+        name: "Grizzly Bears",
+        typeLine: "Creature — Bear",
+        subtypes: ["Bear"],
+        oracleText: "",
+      }),
+    };
+    const deck = mockDeck(
+      ["Serra Angel", "Air Elemental", "Favorable Winds", "Grizzly Bears"],
+      ["Kangee, Aerie Keeper"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Flying creatures should score above Grizzly Bears
+    const angelScore = result.cardScores["Serra Angel"]?.score ?? 50;
+    const airScore = result.cardScores["Air Elemental"]?.score ?? 50;
+    const bearScore = result.cardScores["Grizzly Bears"]?.score ?? 50;
+    expect(angelScore).toBeGreaterThan(bearScore);
+    expect(airScore).toBeGreaterThan(bearScore);
+  });
+
+  test("haste-matters commander boosts haste creatures", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Ognis, the Dragon's Lash": mockCard({
+        name: "Ognis, the Dragon's Lash",
+        typeLine: "Legendary Creature — Viashino Warrior",
+        supertypes: ["Legendary"],
+        subtypes: ["Viashino", "Warrior"],
+        keywords: ["Haste"],
+        oracleText:
+          "Haste\nWhenever a creature with haste attacks, create a tapped Treasure token.",
+      }),
+      "Goblin Guide": mockCard({
+        name: "Goblin Guide",
+        typeLine: "Creature — Goblin Scout",
+        subtypes: ["Goblin", "Scout"],
+        keywords: ["Haste"],
+        oracleText: "Haste\nWhenever Goblin Guide attacks, defending player reveals the top card of their library.",
+      }),
+      "Monastery Swiftspear": mockCard({
+        name: "Monastery Swiftspear",
+        typeLine: "Creature — Human Monk",
+        subtypes: ["Human", "Monk"],
+        keywords: ["Haste", "Prowess"],
+        oracleText: "Haste\nProwess",
+      }),
+      "Wall of Omens": mockCard({
+        name: "Wall of Omens",
+        typeLine: "Creature — Wall",
+        subtypes: ["Wall"],
+        keywords: ["Defender"],
+        oracleText: "Defender\nWhen Wall of Omens enters the battlefield, draw a card.",
+      }),
+    };
+    const deck = mockDeck(
+      ["Goblin Guide", "Monastery Swiftspear", "Wall of Omens"],
+      ["Ognis, the Dragon's Lash"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Haste creatures should score higher than Wall of Omens
+    const goblinScore = result.cardScores["Goblin Guide"]?.score ?? 50;
+    const wallScore = result.cardScores["Wall of Omens"]?.score ?? 50;
+    expect(goblinScore).toBeGreaterThan(wallScore);
+  });
+
+  test("keyword-matters theme detected with proper display name", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Kangee, Aerie Keeper": mockCard({
+        name: "Kangee, Aerie Keeper",
+        typeLine: "Legendary Creature — Bird Wizard",
+        supertypes: ["Legendary"],
+        subtypes: ["Bird", "Wizard"],
+        keywords: ["Flying"],
+        oracleText:
+          "Flying\nCreatures with flying get +1/+1 for each feather counter on Kangee, Aerie Keeper.",
+      }),
+      ...Object.fromEntries(
+        Array.from({ length: 5 }, (_, i) => [
+          `Flyer ${i}`,
+          mockCard({
+            name: `Flyer ${i}`,
+            typeLine: "Creature — Bird",
+            subtypes: ["Bird"],
+            keywords: ["Flying"],
+            oracleText: "Flying",
+          }),
+        ])
+      ),
+    };
+    const flyerNames = Array.from({ length: 5 }, (_, i) => `Flyer ${i}`);
+    const deck = mockDeck(flyerNames, ["Kangee, Aerie Keeper"]);
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const kwTheme = result.deckThemes.find(
+      (t) => t.axisId === "keywordMatters"
+    );
+    expect(kwTheme).toBeDefined();
+    expect(kwTheme!.axisName).toBe("Flying Matters");
+    expect(kwTheme!.detail).toBe("flying");
+  });
+
+  test("no keyword-matters boost without payoff cards", () => {
+    // A deck with flying creatures but NO flying-matters payoffs
+    const cards: Record<string, EnrichedCard> = {
+      Commander: mockCard({
+        name: "Commander",
+        typeLine: "Legendary Creature — Human",
+        supertypes: ["Legendary"],
+        subtypes: ["Human"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      ...Object.fromEntries(
+        Array.from({ length: 5 }, (_, i) => [
+          `Flyer ${i}`,
+          mockCard({
+            name: `Flyer ${i}`,
+            typeLine: "Creature — Bird",
+            subtypes: ["Bird"],
+            keywords: ["Flying"],
+            oracleText: "Flying",
+          }),
+        ])
+      ),
+    };
+    const flyerNames = Array.from({ length: 5 }, (_, i) => `Flyer ${i}`);
+    const deck = mockDeck(flyerNames, ["Commander"]);
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Should NOT detect keywordMatters theme — no payoff cards
+    const kwTheme = result.deckThemes.find(
+      (t) => t.axisId === "keywordMatters"
+    );
+    expect(kwTheme).toBeUndefined();
+  });
+
   test("Yarok with 10 legendaries does NOT get supertypeMatter theme", () => {
     const cards: Record<string, EnrichedCard> = {
       "Yarok, the Desecrated": mockCard({

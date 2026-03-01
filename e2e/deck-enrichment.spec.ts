@@ -168,15 +168,15 @@ test.describe("Deck Enrichment", () => {
     // Basic decklist should still be visible
     await expect(deckPage.deckDisplay.getByText("Sol Ring")).toBeVisible();
 
-    // Warning should appear
+    // Warning should appear (502 gives specific message)
     await expect(
-      page.getByText("Could not load card details")
+      page.getByText("Card data service temporarily unavailable")
     ).toBeVisible({ timeout: 10_000 });
 
     // Dismiss button should work
     await page.getByLabel("Dismiss warning").click();
     await expect(
-      page.getByText("Could not load card details")
+      page.getByText("Card data service temporarily unavailable")
     ).not.toBeVisible();
   });
 
@@ -692,7 +692,7 @@ test.describe("Deck Enrichment — Accessibility", () => {
     await deckPage.waitForDeckDisplay();
 
     const warning = page.locator('[role="alert"]').filter({
-      hasText: "Could not load card details",
+      hasText: "Card data service temporarily unavailable",
     });
     await expect(warning).toBeVisible({ timeout: 10_000 });
   });

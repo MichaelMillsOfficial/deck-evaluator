@@ -63,7 +63,7 @@ test.describe("Deck Display", () => {
     await expect(deck.getByText("Grafdigger's Cage")).toBeVisible();
   });
 
-  test("displays correct total card count across all sections", async ({
+  test("displays correct total card count in header", async ({
     deckPage,
   }) => {
     // 1 commander + 2 mainboard + 2 sideboard = 5
@@ -71,7 +71,7 @@ test.describe("Deck Display", () => {
     await deckPage.submitImport();
     await deckPage.waitForDeckDisplay();
 
-    await expect(deckPage.deckDisplay.getByText("5 cards")).toBeVisible();
+    await expect(deckPage.deckHeader.getByText("5 cards")).toBeVisible();
   });
 
   test("shows source as text for manually imported decks", async ({
@@ -82,7 +82,7 @@ test.describe("Deck Display", () => {
     await deckPage.waitForDeckDisplay();
 
     // Text-sourced decks have no URL, so source is rendered as plain text (not a link)
-    await expect(deckPage.deckDisplay.getByText("text")).toBeVisible();
+    await expect(deckPage.deckHeader.getByText("text")).toBeVisible();
   });
 
   test("does not render sideboard section when no sideboard cards", async ({

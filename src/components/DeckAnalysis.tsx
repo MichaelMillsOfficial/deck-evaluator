@@ -20,6 +20,7 @@ import { computeBracketEstimate } from "@/lib/bracket-estimator";
 import { STATIC_CEDH_STAPLES } from "@/lib/cedh-staples";
 import type { SpellbookCombo } from "@/lib/commander-spellbook";
 import { computeBudgetAnalysis } from "@/lib/budget-analysis";
+import type { DeckAnalysisResults } from "@/lib/deck-analysis-aggregate";
 import ManaCurveChart from "@/components/ManaCurveChart";
 import TypeFilterBar from "@/components/TypeFilterBar";
 import ColorDistributionChart from "@/components/ColorDistributionChart";
@@ -60,6 +61,7 @@ interface DeckAnalysisProps {
     exactCombos: SpellbookCombo[];
     nearCombos: SpellbookCombo[];
   } | null;
+  analysisResults?: DeckAnalysisResults;
 }
 
 export default function DeckAnalysis({
@@ -68,6 +70,7 @@ export default function DeckAnalysis({
   expandedSections,
   onToggleSection,
   spellbookCombos,
+  analysisResults,
 }: DeckAnalysisProps) {
   const [enabledTypes, setEnabledTypes] = useState<Set<CardType>>(
     () => new Set(CARD_TYPES)
@@ -99,37 +102,38 @@ export default function DeckAnalysis({
   );
 
   const colorDistribution = useMemo(
-    () => computeColorDistribution(deck, cardMap),
-    [deck, cardMap]
+    () => analysisResults?.colorDistribution ?? computeColorDistribution(deck, cardMap),
+    [deck, cardMap, analysisResults]
   );
 
   const metrics = useMemo(
-    () => computeManaBaseMetrics(deck, cardMap),
-    [deck, cardMap]
+    () => analysisResults?.manaBaseMetrics ?? computeManaBaseMetrics(deck, cardMap),
+    [deck, cardMap, analysisResults]
   );
 
   const commanderIdentity = useMemo(
-    () => resolveCommanderIdentity(deck, cardMap),
-    [deck, cardMap]
+    () => analysisResults?.commanderIdentity ?? resolveCommanderIdentity(deck, cardMap),
+    [deck, cardMap, analysisResults]
   );
 
   const landEfficiency = useMemo(
-    () => computeLandBaseEfficiency(deck, cardMap),
-    [deck, cardMap]
+    () => analysisResults?.landEfficiency ?? computeLandBaseEfficiency(deck, cardMap),
+    [deck, cardMap, analysisResults]
   );
 
   const manaRecommendations = useMemo(
-    () => computeManaBaseRecommendations(deck, cardMap),
-    [deck, cardMap]
+    () => analysisResults?.manaRecommendations ?? computeManaBaseRecommendations(deck, cardMap),
+    [deck, cardMap, analysisResults]
   );
 
   const powerLevel = useMemo(
-    () => computePowerLevel(deck, cardMap),
-    [deck, cardMap]
+    () => analysisResults?.powerLevel ?? computePowerLevel(deck, cardMap),
+    [deck, cardMap, analysisResults]
   );
 
   const bracketResult = useMemo(
     () =>
+      analysisResults?.bracketResult ??
       computeBracketEstimate(
         deck,
         cardMap,
@@ -137,12 +141,12 @@ export default function DeckAnalysis({
         STATIC_CEDH_STAPLES,
         spellbookCombos?.exactCombos ?? null
       ),
-    [deck, cardMap, powerLevel, spellbookCombos]
+    [deck, cardMap, powerLevel, spellbookCombos, analysisResults]
   );
 
   const budgetAnalysis = useMemo(
-    () => computeBudgetAnalysis(deck, cardMap),
-    [deck, cardMap]
+    () => analysisResults?.budgetAnalysis ?? computeBudgetAnalysis(deck, cardMap),
+    [deck, cardMap, analysisResults]
   );
 
   const filteredSpells = curveData.reduce(

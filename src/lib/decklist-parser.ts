@@ -122,6 +122,40 @@ function applyCommanderOverride(
 }
 
 /**
+ * Converts DeckData back into standard decklist text format.
+ */
+export function reconstructDecklist(deck: DeckData): string {
+  const lines: string[] = [];
+
+  if (deck.commanders.length > 0) {
+    lines.push("COMMANDER:");
+    for (const card of deck.commanders) {
+      lines.push(`${card.quantity} ${card.name}`);
+    }
+    lines.push("");
+  }
+
+  if (deck.mainboard.length > 0) {
+    if (deck.commanders.length > 0) {
+      lines.push("MAINBOARD:");
+    }
+    for (const card of deck.mainboard) {
+      lines.push(`${card.quantity} ${card.name}`);
+    }
+  }
+
+  if (deck.sideboard.length > 0) {
+    lines.push("");
+    lines.push("SIDEBOARD:");
+    for (const card of deck.sideboard) {
+      lines.push(`${card.quantity} ${card.name}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/**
  * Scans backwards from the end of the decklist looking for a small group of
  * cards (1-2 total quantity) separated from the rest by a blank line. If found,
  * moves them from their parsed zone into the commanders zone.

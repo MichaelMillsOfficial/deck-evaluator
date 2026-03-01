@@ -1,11 +1,13 @@
 import {
   fetchCardCollection,
+  fetchCardCollectionByIds,
   normalizeToEnrichedCard,
 } from "@/lib/scryfall";
 import type { EnrichedCard } from "@/lib/types";
 
 const MAX_UNIQUE_NAMES = 250;
 const MAX_NAME_LENGTH = 200;
+const MAX_IDENTIFIERS = 250;
 
 export async function POST(request: Request): Promise<Response> {
   let body: unknown;
@@ -18,20 +20,83 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  if (
-    body === null ||
-    typeof body !== "object" ||
-    !("cardNames" in body) ||
-    !Array.isArray((body as Record<string, unknown>).cardNames)
-  ) {
+  if (body === null || typeof body !== "object") {
     return Response.json(
-      { error: "Missing required field: cardNames (must be an array)" },
+      { error: "Invalid request body" },
       { status: 400 }
     );
   }
 
-  const rawNames = (body as { cardNames: unknown[] }).cardNames;
+  const obj = body as Record<string, unknown>;
 
+  // Branch: set+collector_number identifiers (v2 compact share URLs)
+  if (Array.isArray(obj.identifiers)) {
+    return handleIdentifiers(obj.identifiers);
+  }
+
+  // Branch: card names (original path)
+  if (Array.isArray(obj.cardNames)) {
+    return handleCardNames(obj.cardNames);
+  }
+
+  return Response.json(
+    { error: "Missing required field: cardNames (array) or identifiers (array)" },
+    { status: 400 }
+  );
+}
+
+async function handleIdentifiers(rawIds: unknown[]): Promise<Response> {
+  const cleaned: Array<{ set: string; collector_number: string }> = [];
+  for (const id of rawIds) {
+    if (
+      typeof id !== "object" ||
+      id === null ||
+      typeof (id as Record<string, unknown>).set !== "string" ||
+      typeof (id as Record<string, unknown>).collector_number !== "string"
+    ) {
+      continue;
+    }
+    const { set, collector_number } = id as { set: string; collector_number: string };
+    if (set && collector_number) {
+      cleaned.push({ set, collector_number });
+    }
+  }
+
+  if (cleaned.length === 0) {
+    return Response.json(
+      { error: "No valid identifiers provided" },
+      { status: 400 }
+    );
+  }
+
+  if (cleaned.length > MAX_IDENTIFIERS) {
+    return Response.json(
+      { error: `Too many identifiers (${cleaned.length}). Maximum is ${MAX_IDENTIFIERS}.` },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const { data: scryfallCards, not_found } =
+      await fetchCardCollectionByIds(cleaned);
+
+    const cards: Record<string, EnrichedCard> = {};
+    for (const card of scryfallCards) {
+      cards[card.name] = normalizeToEnrichedCard(card);
+    }
+
+    return Response.json({ cards, notFound: not_found });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[deck-enrich] error:", message);
+    return Response.json(
+      { error: "Failed to fetch card data from Scryfall" },
+      { status: 502 }
+    );
+  }
+}
+
+async function handleCardNames(rawNames: unknown[]): Promise<Response> {
   // Validate, trim, and filter
   const cleaned: string[] = [];
   for (const name of rawNames) {
