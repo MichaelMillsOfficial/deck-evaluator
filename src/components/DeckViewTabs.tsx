@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { SpellbookCombo } from "@/lib/commander-spellbook";
+import type { CandidateAnalysis } from "@/lib/candidate-analysis";
 import { analyzeDeckSynergy } from "@/lib/synergy-engine";
+import { analyzeCandidateCard } from "@/lib/candidate-analysis";
 import DeckList from "@/components/DeckList";
 import DeckAnalysis from "@/components/DeckAnalysis";
 import SynergySection from "@/components/SynergySection";
 import HandSimulator from "@/components/HandSimulator";
+import AdditionsPanel from "@/components/AdditionsPanel";
 
 interface DeckViewTabsProps {
   deck: DeckData;
@@ -20,13 +23,14 @@ interface DeckViewTabsProps {
   spellbookLoading: boolean;
 }
 
-type ViewTab = "list" | "analysis" | "synergy" | "hands";
+type ViewTab = "list" | "analysis" | "synergy" | "hands" | "additions";
 
 const tabs: { key: ViewTab; label: string }[] = [
   { key: "list", label: "Deck List" },
   { key: "analysis", label: "Analysis" },
   { key: "synergy", label: "Synergy" },
   { key: "hands", label: "Hands" },
+  { key: "additions", label: "Additions" },
 ];
 
 export default function DeckViewTabs({
@@ -53,6 +57,95 @@ export default function DeckViewTabs({
     () => (cardMap ? analyzeDeckSynergy(deck, cardMap) : null),
     [deck, cardMap]
   );
+
+  // --- Candidate state (persists across tab switches) ---
+  const [candidates, setCandidates] = useState<string[]>([]);
+  const [candidateCardMap, setCandidateCardMap] = useState<
+    Record<string, EnrichedCard>
+  >({});
+  const [candidateAnalyses, setCandidateAnalyses] = useState<
+    Record<string, CandidateAnalysis>
+  >({});
+
+  // Reset candidate state when deck or cardMap changes (new import)
+  const prevDeckRef = useRef(deck);
+  const prevCardMapRef = useRef(cardMap);
+  useEffect(() => {
+    if (deck !== prevDeckRef.current || cardMap !== prevCardMapRef.current) {
+      prevDeckRef.current = deck;
+      prevCardMapRef.current = cardMap;
+      setCandidates([]);
+      setCandidateCardMap({});
+      setCandidateAnalyses({});
+    }
+  }, [deck, cardMap]);
+
+  // Compute deck card names for filtering autocomplete
+  const deckCardNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const section of [deck.commanders, deck.mainboard, deck.sideboard]) {
+      for (const card of section) {
+        names.add(card.name);
+      }
+    }
+    return names;
+  }, [deck]);
+
+  const handleAddCandidate = useCallback(
+    async (name: string) => {
+      if (!cardMap || !synergyAnalysis) return;
+      if (candidates.includes(name)) return;
+
+      // Optimistically add the candidate name
+      setCandidates((prev) => [...prev, name]);
+
+      try {
+        // Enrich the candidate card
+        const res = await fetch("/api/deck-enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ names: [name] }),
+        });
+        if (!res.ok) return;
+
+        const json = (await res.json()) as {
+          cards: Record<string, EnrichedCard>;
+        };
+        const enrichedCard = json.cards[name];
+        if (!enrichedCard) return;
+
+        setCandidateCardMap((prev) => ({ ...prev, [name]: enrichedCard }));
+
+        // Run analysis
+        const fullMap = { ...cardMap, [name]: enrichedCard };
+        const analysis = analyzeCandidateCard(
+          enrichedCard,
+          deck,
+          fullMap,
+          synergyAnalysis
+        );
+        setCandidateAnalyses((prev) => ({ ...prev, [name]: analysis }));
+      } catch {
+        // Remove candidate on failure
+        setCandidates((prev) => prev.filter((c) => c !== name));
+      }
+    },
+    [cardMap, synergyAnalysis, candidates, deck]
+  );
+
+  const handleRemoveCandidate = useCallback((name: string) => {
+    setCandidates((prev) => prev.filter((c) => c !== name));
+    setCandidateCardMap((prev) => {
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+    setCandidateAnalyses((prev) => {
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  }, []);
 
   const handleToggleSection = useCallback(
     (tab: string, sectionId: string) => {
@@ -94,8 +187,7 @@ export default function DeckViewTabs({
     for (let attempts = 0; attempts < tabs.length; attempts++) {
       const target = tabs[nextIndex];
       const isDisabled =
-        (target.key === "analysis" || target.key === "synergy" || target.key === "hands") &&
-        analysisDisabled;
+        target.key !== "list" && analysisDisabled;
       if (!isDisabled) break;
       if (e.key === "ArrowRight" || e.key === "Home") {
         nextIndex = (nextIndex + 1) % tabs.length;
@@ -235,6 +327,24 @@ export default function DeckViewTabs({
               onToggleSection={(id) => handleToggleSection("hands", id)}
             />
           </section>
+        )}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="tabpanel-deck-additions"
+        aria-labelledby="tab-deck-additions"
+        hidden={activeTab !== "additions"}
+      >
+        {activeTab === "additions" && cardMap && !enrichLoading && (
+          <AdditionsPanel
+            candidates={candidates}
+            candidateCardMap={candidateCardMap}
+            analyses={candidateAnalyses}
+            onAddCard={handleAddCandidate}
+            onRemoveCard={handleRemoveCandidate}
+            deckCardNames={deckCardNames}
+          />
         )}
       </div>
     </div>
