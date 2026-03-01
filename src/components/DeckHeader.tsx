@@ -165,7 +165,7 @@ export default function DeckHeader({
   return (
     <div
       data-testid="deck-header"
-      className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700 rounded-t-xl px-6 pt-4 pb-0"
+      className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-sm border border-slate-700 rounded-t-xl px-6 pt-4 pb-0"
     >
       {/* Deck identity row */}
       <div className="flex items-start justify-between gap-4 mb-3">

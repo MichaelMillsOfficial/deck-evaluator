@@ -282,20 +282,20 @@ export default function DeckImportSection() {
           className="mt-10 focus:outline-none"
           aria-label="Deck import results"
         >
-          <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
-            <DeckHeader
-              deck={deckData}
-              cardMap={cardMap}
-              enrichLoading={enrichLoading}
-              enrichError={enrichError}
-              notFoundCount={notFoundCount}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              analysisResults={analysisResults}
-              onOpenDiscordModal={() => setDiscordModalOpen(true)}
-              onCopyShareLink={handleCopyShareLink}
-            />
+          <DeckHeader
+            deck={deckData}
+            cardMap={cardMap}
+            enrichLoading={enrichLoading}
+            enrichError={enrichError}
+            notFoundCount={notFoundCount}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            analysisResults={analysisResults}
+            onOpenDiscordModal={() => setDiscordModalOpen(true)}
+            onCopyShareLink={handleCopyShareLink}
+          />
 
+          <div className="rounded-xl rounded-t-none border border-t-0 border-slate-700 bg-slate-800/50 overflow-hidden">
             <div className="p-6">
               <DeckViewTabs
                 deck={deckData}
