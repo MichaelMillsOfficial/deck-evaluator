@@ -43,14 +43,56 @@ test.describe("parseDecklist — commander override", () => {
     );
   });
 
-  test("override with card not in list leaves commanders as empty", () => {
+  test("override with card not in list adds it as a fresh commander", () => {
     const result = parseDecklist(FLAT_DECKLIST, {
       commanders: ["Nonexistent Card"],
     });
-    // Card not found — nothing to move
-    expect(result.commanders).toHaveLength(0);
+    // Card not found in any zone — added fresh with quantity 1
+    expect(result.commanders).toEqual([
+      { name: "Nonexistent Card", quantity: 1 },
+    ]);
     // Original mainboard is untouched
     expect(result.mainboard).toHaveLength(4);
+  });
+
+  test("override adds commander not in decklist while mainboard stays intact", () => {
+    const decklist = [
+      "1 Sol Ring",
+      "1 Command Tower",
+      "1 Arcane Signet",
+    ].join("\n");
+    const result = parseDecklist(decklist, {
+      commanders: ["Suki, Kyoshi Warrior"],
+    });
+    expect(result.commanders).toEqual([
+      { name: "Suki, Kyoshi Warrior", quantity: 1 },
+    ]);
+    expect(result.mainboard).toHaveLength(3);
+    expect(result.mainboard.map((c) => c.name)).toEqual([
+      "Sol Ring",
+      "Command Tower",
+      "Arcane Signet",
+    ]);
+  });
+
+  test("partner pair: one in mainboard (moved) and one not (added fresh)", () => {
+    const decklist = [
+      "1 Thrasios, Triton Hero",
+      "1 Sol Ring",
+      "1 Command Tower",
+    ].join("\n");
+    const result = parseDecklist(decklist, {
+      commanders: ["Thrasios, Triton Hero", "Tymna the Weaver"],
+    });
+    expect(result.commanders).toHaveLength(2);
+    expect(result.commanders.map((c) => c.name)).toContain(
+      "Thrasios, Triton Hero"
+    );
+    expect(result.commanders.map((c) => c.name)).toContain(
+      "Tymna the Weaver"
+    );
+    // Thrasios moved out, so only Sol Ring and Command Tower remain
+    expect(result.mainboard).toHaveLength(2);
   });
 
   test("no override falls back to explicit COMMANDER: header", () => {

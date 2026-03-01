@@ -95,12 +95,17 @@ function applyCommanderOverride(
   zones: Record<Zone, DeckCard[]>
 ): void {
   for (const name of names) {
+    let found = false;
     for (const zone of ["mainboard", "sideboard"] as Zone[]) {
       const idx = zones[zone].findIndex((c) => c.name === name);
       if (idx !== -1) {
         zones.commanders.push(zones[zone].splice(idx, 1)[0]);
+        found = true;
         break;
       }
+    }
+    if (!found) {
+      zones.commanders.push({ name, quantity: 1 });
     }
   }
 }
