@@ -30,6 +30,8 @@ export interface ScryfallCard {
   toughness?: string;
   loyalty?: string;
   rarity: string;
+  set: string;
+  collector_number: string;
   image_uris?: {
     small: string;
     normal: string;
@@ -72,9 +74,13 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
+type ScryfallIdentifier =
+  | { name: string }
+  | { set: string; collector_number: string };
+
 interface CollectionResponse {
   data: ScryfallCard[];
-  not_found: Array<{ name?: string }>;
+  not_found: Array<{ name?: string; set?: string; collector_number?: string }>;
 }
 
 /**
@@ -135,11 +141,45 @@ export async function fetchCardCollection(
   return { data: allCards, not_found: allNotFound };
 }
 
+/**
+ * Fetches card data by set+collector_number identifiers using Scryfall's /cards/collection.
+ * Same batching/retry pattern as fetchCardCollection.
+ */
+export async function fetchCardCollectionByIds(
+  ids: Array<{ set: string; collector_number: string }>
+): Promise<{ data: ScryfallCard[]; not_found: Array<{ set: string; collector_number: string }> }> {
+  const batches = chunk(ids, BATCH_SIZE);
+  const allCards: ScryfallCard[] = [];
+  const allNotFound: Array<{ set: string; collector_number: string }> = [];
+
+  for (let i = 0; i < batches.length; i++) {
+    if (i > 0) await delay(BATCH_DELAY_MS);
+
+    try {
+      const result = await fetchBatchWithRetry(batches[i]);
+      allCards.push(...result.data);
+      for (const nf of result.not_found) {
+        if (nf.set && nf.collector_number) {
+          allNotFound.push({ set: nf.set, collector_number: nf.collector_number });
+        }
+      }
+    } catch (err) {
+      console.error(
+        `[scryfall] batch ${i + 1}/${batches.length} failed:`,
+        err instanceof Error ? err.message : err
+      );
+      allNotFound.push(...batches[i]);
+    }
+  }
+
+  return { data: allCards, not_found: allNotFound };
+}
+
 // TODO: add server-side LRU cache for card data
 const MAX_RETRIES = 2;
 
 async function fetchBatchWithRetry(
-  identifiers: Array<{ name: string }>,
+  identifiers: ScryfallIdentifier[],
   signal?: AbortSignal
 ): Promise<CollectionResponse> {
   let lastError: Error | null = null;
@@ -233,5 +273,7 @@ export function normalizeToEnrichedCard(card: ScryfallCard): EnrichedCard {
       usdFoil: parsePrice(card.prices?.usd_foil),
       eur: parsePrice(card.prices?.eur),
     },
+    setCode: card.set ?? "",
+    collectorNumber: card.collector_number ?? "",
   };
 }

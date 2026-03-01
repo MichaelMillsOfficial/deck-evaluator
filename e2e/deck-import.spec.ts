@@ -35,8 +35,8 @@ test.describe("Deck Import — Manual Text Input", () => {
     await deckPage.submitImport();
     await deckPage.waitForDeckDisplay();
 
-    // Total card count should appear (1 commander + 5 mainboard = 6)
-    await expect(deckPage.deckDisplay.getByText("6 cards")).toBeVisible();
+    // Total card count should appear in the header (1 commander + 5 mainboard = 6)
+    await expect(deckPage.deckHeader.getByText("6 cards")).toBeVisible();
   });
 
   test("handles a minimal single-card decklist", async ({ deckPage }) => {
@@ -45,7 +45,7 @@ test.describe("Deck Import — Manual Text Input", () => {
     await deckPage.waitForDeckDisplay();
 
     await expect(deckPage.deckDisplay.getByText("Sol Ring")).toBeVisible();
-    await expect(deckPage.deckDisplay.getByText("1 cards")).toBeVisible();
+    await expect(deckPage.deckHeader.getByText("1 cards")).toBeVisible();
   });
 
   test("import button is disabled when textarea is empty", async ({

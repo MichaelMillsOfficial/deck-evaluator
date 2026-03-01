@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { SpellbookCombo } from "@/lib/commander-spellbook";
 import { validateCommanderLegality } from "@/lib/commander-validation";
+import {
+  computeAllAnalyses,
+  type DeckAnalysisResults,
+} from "@/lib/deck-analysis-aggregate";
+import { encodeCompactDeckPayload } from "@/lib/deck-codec";
 import DeckInput from "@/components/DeckInput";
 import DeckViewTabs from "@/components/DeckViewTabs";
+import DeckHeader, { type ViewTab } from "@/components/DeckHeader";
+import DiscordExportModal from "@/components/DiscordExportModal";
 
 export default function DeckImportSection() {
   const [deckData, setDeckData] = useState<DeckData | null>(null);
@@ -16,12 +23,16 @@ export default function DeckImportSection() {
   );
   const [enrichLoading, setEnrichLoading] = useState(false);
   const [enrichError, setEnrichError] = useState<string | null>(null);
+  const [notFoundCount, setNotFoundCount] = useState<number>(0);
   const [spellbookCombos, setSpellbookCombos] = useState<{
     exactCombos: SpellbookCombo[];
     nearCombos: SpellbookCombo[];
   } | null>(null);
   const [spellbookLoading, setSpellbookLoading] = useState(false);
   const [commanderWarning, setCommanderWarning] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ViewTab>("list");
+  const [discordModalOpen, setDiscordModalOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const deckResultRef = useRef<HTMLDivElement>(null);
   const enrichAbortRef = useRef<AbortController | null>(null);
   const spellbookAbortRef = useRef<AbortController | null>(null);
@@ -47,6 +58,15 @@ export default function DeckImportSection() {
     setCommanderWarning(warnings.length > 0 ? warnings.join(" ") : null);
   }, [deckData, cardMap, enrichLoading]);
 
+  // Compute analysis results when cardMap is available
+  const analysisResults: DeckAnalysisResults | null = useMemo(
+    () =>
+      deckData && cardMap
+        ? computeAllAnalyses({ deck: deckData, cardMap, spellbookCombos })
+        : null,
+    [deckData, cardMap, spellbookCombos]
+  );
+
   const enrichDeck = useCallback(async (deck: DeckData) => {
     const allCards = [
       ...deck.commanders,
@@ -65,6 +85,7 @@ export default function DeckImportSection() {
     setEnrichLoading(true);
     setEnrichError(null);
     setCardMap(null);
+    setNotFoundCount(0);
 
     try {
       const res = await fetch("/api/deck-enrich", {
@@ -78,16 +99,25 @@ export default function DeckImportSection() {
       });
 
       if (!res.ok) {
-        setEnrichError("Could not load card details");
+        if (res.status === 502) {
+          setEnrichError("Card data service temporarily unavailable");
+        } else {
+          setEnrichError("Could not load card details");
+        }
         return;
       }
 
       const json = await res.json();
       setCardMap(json.cards as Record<string, EnrichedCard>);
+      setNotFoundCount(json.notFound?.length ?? 0);
     } catch (err) {
       // Don't update state for aborted requests
       if (err instanceof DOMException && err.name === "AbortError") return;
-      setEnrichError("Could not load card details");
+      if (err instanceof TypeError) {
+        setEnrichError("Network error — could not reach card data service");
+      } else {
+        setEnrichError("Could not load card details");
+      }
     } finally {
       setEnrichLoading(false);
     }
@@ -125,7 +155,6 @@ export default function DeckImportSection() {
       });
 
       if (!res.ok) {
-        // Non-200 means validation error; set empty arrays so UI shows "Local Combos"
         setSpellbookCombos({ exactCombos: [], nearCombos: [] });
         return;
       }
@@ -136,9 +165,7 @@ export default function DeckImportSection() {
         nearCombos: json.nearCombos ?? [],
       });
     } catch (err) {
-      // Don't update state for aborted requests
       if (err instanceof DOMException && err.name === "AbortError") return;
-      // Graceful fallback: empty arrays trigger "Local Combos" label
       setSpellbookCombos({ exactCombos: [], nearCombos: [] });
     } finally {
       setSpellbookLoading(false);
@@ -153,6 +180,9 @@ export default function DeckImportSection() {
     setEnrichError(null);
     setCommanderWarning(null);
     setSpellbookCombos(null);
+    setNotFoundCount(0);
+    setShareUrl(null);
+    setActiveTab("list");
 
     try {
       const res = await fetcher();
@@ -165,7 +195,6 @@ export default function DeckImportSection() {
 
       const deck = json as DeckData;
       setDeckData(deck);
-      // Form re-enables immediately; enrichment and spellbook fetch are background
       enrichDeck(deck);
       fetchCombos(deck);
     } catch (err) {
@@ -190,6 +219,35 @@ export default function DeckImportSection() {
         body: JSON.stringify({ text, ...(commanders ? { commanders } : {}) }),
       })
     );
+
+  // Compute share URL after enrichment completes (v2 compact codec)
+  useEffect(() => {
+    if (!deckData || !cardMap) {
+      setShareUrl(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const encoded = await encodeCompactDeckPayload(deckData, cardMap);
+        if (!cancelled) {
+          setShareUrl(`${window.location.origin}/shared?d=${encoded}`);
+        }
+      } catch {
+        // Encoding error — leave shareUrl null
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [deckData, cardMap]);
+
+  const handleCopyShareLink = useCallback(async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      // Clipboard error — silently fail
+    }
+  }, [shareUrl]);
 
   return (
     <>
@@ -238,13 +296,33 @@ export default function DeckImportSection() {
           className="mt-10 focus:outline-none"
           aria-label="Deck import results"
         >
-          <DeckViewTabs
+          <DeckHeader
             deck={deckData}
             cardMap={cardMap}
             enrichLoading={enrichLoading}
-            spellbookCombos={spellbookCombos}
-            spellbookLoading={spellbookLoading}
+            enrichError={enrichError}
+            notFoundCount={notFoundCount}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            analysisResults={analysisResults}
+            onOpenDiscordModal={() => setDiscordModalOpen(true)}
+            onCopyShareLink={handleCopyShareLink}
           />
+
+          <div className="rounded-xl rounded-t-none border border-t-0 border-slate-700 bg-slate-800/50 overflow-hidden">
+            <div className="p-6">
+              <DeckViewTabs
+                deck={deckData}
+                cardMap={cardMap}
+                enrichLoading={enrichLoading}
+                spellbookCombos={spellbookCombos}
+                spellbookLoading={spellbookLoading}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                analysisResults={analysisResults}
+              />
+            </div>
+          </div>
 
           {enrichError && !enrichLoading && (
             <div
@@ -252,12 +330,53 @@ export default function DeckImportSection() {
               className="mt-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400"
             >
               <span>{enrichError}. The basic decklist is still available.</span>
+              <div className="flex items-center gap-2 ml-4 shrink-0">
+                <button
+                  type="button"
+                  data-testid="enrich-retry-btn"
+                  disabled={enrichLoading}
+                  onClick={() => {
+                    if (deckData) enrichDeck(deckData);
+                  }}
+                  className="rounded-md bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Try Again
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEnrichError(null);
+                    deckResultRef.current?.focus();
+                  }}
+                  className="text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
+                  aria-label="Dismiss warning"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {notFoundCount > 0 && !enrichError && !enrichLoading && (
+            <div
+              role="alert"
+              className="mt-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400"
+            >
+              <span>
+                {notFoundCount} {notFoundCount === 1 ? "card" : "cards"} could
+                not be found and {notFoundCount === 1 ? "is" : "are"} shown
+                without details
+              </span>
               <button
                 type="button"
-                onClick={() => {
-                  setEnrichError(null);
-                  deckResultRef.current?.focus();
-                }}
+                onClick={() => setNotFoundCount(0)}
                 className="ml-4 shrink-0 text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
                 aria-label="Dismiss warning"
               >
@@ -305,6 +424,16 @@ export default function DeckImportSection() {
             {cardMap && !enrichLoading ? "Card details loaded" : ""}
           </p>
         </div>
+      )}
+
+      {deckData && analysisResults && (
+        <DiscordExportModal
+          open={discordModalOpen}
+          onClose={() => setDiscordModalOpen(false)}
+          analysisResults={analysisResults}
+          deck={deckData}
+          shareUrl={shareUrl ?? undefined}
+        />
       )}
     </>
   );

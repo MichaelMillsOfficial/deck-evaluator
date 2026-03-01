@@ -87,10 +87,10 @@ export class DeckPage {
     return this.page.getByLabel("Decklist");
   }
 
-  /** Wait for the deck list panel to appear after a successful import */
+  /** Wait for the deck header to appear after a successful import */
   async waitForDeckDisplay() {
     await this.page
-      .getByRole("heading", { name: "Imported Decklist" })
+      .getByTestId("deck-header")
       .waitFor({ timeout: 15_000 });
   }
 
@@ -111,9 +111,24 @@ export class DeckPage {
   /** Click a deck view tab */
   async selectDeckViewTab(tab: "Deck List" | "Analysis" | "Synergy" | "Hands" | "Additions") {
     await this.page
-      .getByRole("tablist", { name: "Deck view" })
+      .getByTestId("deck-header")
       .getByRole("tab", { name: tab })
       .click();
+  }
+
+  /** Locator for the deck header */
+  get deckHeader() {
+    return this.page.getByTestId("deck-header");
+  }
+
+  /** Locator for the share button */
+  get shareButton() {
+    return this.page.getByTestId("share-button");
+  }
+
+  /** Locator for the bracket/power badge */
+  get bracketBadge() {
+    return this.page.getByTestId("bracket-power-badge");
   }
 
   /** Wait for the analysis panel to appear (section nav is visible) */

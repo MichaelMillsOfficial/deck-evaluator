@@ -22,6 +22,8 @@ export function makeCard(overrides: Partial<EnrichedCard> = {}): EnrichedCard {
     flavorName: null,
     isGameChanger: false,
     prices: { usd: null, usdFoil: null, eur: null },
+    setCode: "",
+    collectorNumber: "",
     ...overrides,
   };
 }

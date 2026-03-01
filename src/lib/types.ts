@@ -61,6 +61,8 @@ export interface EnrichedCard {
   flavorName: string | null;
   isGameChanger: boolean;
   prices: CardPrices;
+  setCode: string;
+  collectorNumber: string;
 }
 
 // Synergy analysis types
