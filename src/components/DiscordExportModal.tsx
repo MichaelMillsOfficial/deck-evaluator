@@ -13,6 +13,7 @@ interface DiscordExportModalProps {
   onClose: () => void;
   analysisResults: DeckAnalysisResults;
   deck: DeckData;
+  shareUrl?: string;
 }
 
 export default function DiscordExportModal({
@@ -20,6 +21,7 @@ export default function DiscordExportModal({
   onClose,
   analysisResults,
   deck,
+  shareUrl,
 }: DiscordExportModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [enabledSections, setEnabledSections] = useState<Set<string>>(
@@ -29,6 +31,7 @@ export default function DiscordExportModal({
       )
   );
   const [copied, setCopied] = useState(false);
+  const [includeLink, setIncludeLink] = useState(true);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -54,7 +57,9 @@ export default function DiscordExportModal({
   const result = allocateDiscordSections(
     analysisResults,
     deck,
-    enabledSections
+    enabledSections,
+    2000,
+    includeLink && shareUrl ? shareUrl : undefined
   );
 
   const handleToggle = useCallback((sectionId: string) => {
@@ -158,6 +163,20 @@ export default function DiscordExportModal({
                 </label>
               );
             })}
+            {shareUrl && (
+              <>
+                <div className="border-t border-slate-700 my-1" />
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={includeLink}
+                    onChange={() => setIncludeLink((prev) => !prev)}
+                    className="rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-400"
+                  />
+                  <span className="text-slate-300">Analysis Link</span>
+                </label>
+              </>
+            )}
           </div>
 
           {/* Preview pane */}

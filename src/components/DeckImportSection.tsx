@@ -33,6 +33,7 @@ export default function DeckImportSection() {
   const [commanderWarning, setCommanderWarning] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ViewTab>("list");
   const [discordModalOpen, setDiscordModalOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const deckResultRef = useRef<HTMLDivElement>(null);
   const enrichAbortRef = useRef<AbortController | null>(null);
   const spellbookAbortRef = useRef<AbortController | null>(null);
@@ -181,6 +182,7 @@ export default function DeckImportSection() {
     setCommanderWarning(null);
     setSpellbookCombos(null);
     setNotFoundCount(0);
+    setShareUrl(null);
     setActiveTab("list");
 
     try {
@@ -219,21 +221,39 @@ export default function DeckImportSection() {
       })
     );
 
-  const handleCopyShareLink = useCallback(async () => {
-    if (!deckData) return;
-    try {
-      const text = reconstructDecklist(deckData);
-      const commanders =
-        deckData.commanders.length > 0
-          ? deckData.commanders.map((c) => c.name)
-          : undefined;
-      const encoded = await encodeDeckPayload(text, commanders);
-      const url = `${window.location.origin}/shared?d=${encoded}`;
-      await navigator.clipboard.writeText(url);
-    } catch {
-      // Clipboard or encoding error — silently fail
+  // Pre-compute share URL when deck data is available
+  useEffect(() => {
+    if (!deckData) {
+      setShareUrl(null);
+      return;
     }
+    let cancelled = false;
+    (async () => {
+      try {
+        const text = reconstructDecklist(deckData);
+        const commanders =
+          deckData.commanders.length > 0
+            ? deckData.commanders.map((c) => c.name)
+            : undefined;
+        const encoded = await encodeDeckPayload(text, commanders);
+        if (!cancelled) {
+          setShareUrl(`${window.location.origin}/shared?d=${encoded}`);
+        }
+      } catch {
+        // Encoding error — leave shareUrl null
+      }
+    })();
+    return () => { cancelled = true; };
   }, [deckData]);
+
+  const handleCopyShareLink = useCallback(async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      // Clipboard error — silently fail
+    }
+  }, [shareUrl]);
 
   return (
     <>
@@ -418,6 +438,7 @@ export default function DeckImportSection() {
           onClose={() => setDiscordModalOpen(false)}
           analysisResults={analysisResults}
           deck={deckData}
+          shareUrl={shareUrl ?? undefined}
         />
       )}
     </>

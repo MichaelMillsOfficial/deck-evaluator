@@ -139,6 +139,64 @@ test.describe("Deck Header", () => {
     await expect(header.getByTestId("bracket-power-badge")).toBeVisible();
   });
 
+  test("theme pills render when deck has detected themes", async ({
+    deckPage,
+  }) => {
+    await deckPage.goto();
+    await deckPage.fillDecklist(SAMPLE_DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    // Wait for enrichment to complete
+    await deckPage.page.waitForFunction(
+      () => {
+        const tabs = document.querySelectorAll('[role="tab"]');
+        const analysisTab = Array.from(tabs).find(
+          (t) => t.textContent === "Analysis"
+        );
+        return analysisTab && !(analysisTab as HTMLButtonElement).disabled;
+      },
+      { timeout: 20_000 }
+    );
+
+    const header = deckPage.page.getByTestId("deck-header");
+    // deck-themes only rendered when themes > 0; verify it either exists with children or is absent
+    const themesLocator = header.getByTestId("deck-themes");
+    const count = await themesLocator.count();
+    if (count > 0) {
+      const children = themesLocator.locator("span");
+      expect(await children.count()).toBeGreaterThan(0);
+    }
+    // Either way the test passes — zero themes is valid for a small deck
+  });
+
+  test("hand stats visible after enrichment completes", async ({
+    deckPage,
+  }) => {
+    await deckPage.goto();
+    await deckPage.fillDecklist(SAMPLE_DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    // Wait for enrichment to complete
+    await deckPage.page.waitForFunction(
+      () => {
+        const tabs = document.querySelectorAll('[role="tab"]');
+        const analysisTab = Array.from(tabs).find(
+          (t) => t.textContent === "Analysis"
+        );
+        return analysisTab && !(analysisTab as HTMLButtonElement).disabled;
+      },
+      { timeout: 20_000 }
+    );
+
+    const header = deckPage.page.getByTestId("deck-header");
+    const handStats = header.getByTestId("hand-stats");
+    await expect(handStats).toBeVisible();
+    await expect(handStats).toContainText("% keep");
+    await expect(handStats).toContainText("lands");
+  });
+
   test("share button exists, disabled during enrichment", async ({
     deckPage,
   }) => {

@@ -12,6 +12,7 @@ import type { PowerLevelResult } from "./power-level";
 import type { BracketResult } from "./bracket-estimator";
 import type { BudgetAnalysisResult } from "./budget-analysis";
 import type { CompositionScorecardResult } from "./deck-composition";
+import type { SimulationStats } from "./opening-hand";
 
 import { computeManaCurve } from "./mana-curve";
 import {
@@ -32,6 +33,13 @@ import {
 } from "./deck-composition";
 import { computeCreatureTypeBreakdown } from "./creature-types";
 import { computeSupertypeBreakdown } from "./supertypes";
+import {
+  buildPool,
+  buildCommandZone,
+  buildCardCache,
+  runSimulation,
+  computePipWeights,
+} from "./opening-hand";
 
 export interface DeckAnalysisResults {
   manaCurve: ManaCurveBucket[];
@@ -47,6 +55,7 @@ export interface DeckAnalysisResults {
   compositionScorecard: CompositionScorecardResult;
   creatureTypes: string[];
   supertypes: string[];
+  simulationStats: SimulationStats;
 }
 
 export interface ComputeAllAnalysesInput {
@@ -114,6 +123,19 @@ export function computeAllAnalyses(
   const creatureTypes = Array.from(creatureTypeMap.keys());
   const supertypes = Array.from(supertypeMap.keys());
 
+  // Phase 9: Opening hand simulation
+  const pool = buildPool(deck, cardMap);
+  const commandZone = buildCommandZone(deck, cardMap);
+  const pipWeights = computePipWeights(
+    { ...colorDistribution.pips },
+    commanderIdentity
+  );
+  const simulationStats = runSimulation(pool, commanderIdentity, 1000, commandZone, {
+    deckThemes: synergyAnalysis.deckThemes,
+    cardCache: buildCardCache(pool),
+    pipWeights,
+  });
+
   return {
     manaCurve,
     colorDistribution,
@@ -128,5 +150,6 @@ export function computeAllAnalyses(
     compositionScorecard,
     creatureTypes,
     supertypes,
+    simulationStats,
   };
 }

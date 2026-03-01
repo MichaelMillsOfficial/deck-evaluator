@@ -7,6 +7,7 @@ import {
   formatMarkdownReport,
   formatJsonReport,
 } from "@/lib/export-report";
+import { SYNERGY_AXES } from "@/lib/synergy-axes";
 
 export type ViewTab = "list" | "analysis" | "synergy" | "hands";
 
@@ -355,6 +356,42 @@ export default function DeckHeader({
           </div>
         </div>
       </div>
+
+      {/* Theme pills + hand stats */}
+      {analysisResults && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-3">
+          {/* Theme pills */}
+          {analysisResults.synergyAnalysis.deckThemes.length > 0 && (
+            <div data-testid="deck-themes" className="flex flex-wrap items-center gap-1.5">
+              {analysisResults.synergyAnalysis.deckThemes.slice(0, 3).map((theme) => {
+                const axisDef = SYNERGY_AXES.find((a) => a.id === theme.axisId);
+                const bg = axisDef?.color.bg ?? "bg-slate-500/20";
+                const text = axisDef?.color.text ?? "text-slate-300";
+                const label = theme.detail
+                  ? `${theme.axisName} — ${theme.detail} (${theme.cardCount})`
+                  : `${theme.axisName} (${theme.cardCount})`;
+                return (
+                  <span
+                    key={theme.axisId}
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${bg} ${text}`}
+                  >
+                    {label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Hand simulation stats */}
+          {analysisResults.simulationStats && (
+            <div data-testid="hand-stats" className="flex items-center gap-2 text-xs text-slate-400">
+              <span>{Math.round(analysisResults.simulationStats.keepableRate * 100)}% keep</span>
+              <span aria-hidden="true">·</span>
+              <span>{analysisResults.simulationStats.avgLandsInOpener.toFixed(1)} lands</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tab bar */}
       <div

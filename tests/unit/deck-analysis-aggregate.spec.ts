@@ -115,6 +115,7 @@ test.describe("computeAllAnalyses", () => {
       "compositionScorecard",
       "creatureTypes",
       "supertypes",
+      "simulationStats",
     ];
 
     for (const key of expectedKeys) {
@@ -183,5 +184,20 @@ test.describe("computeAllAnalyses", () => {
 
     expect(Array.isArray(results.creatureTypes)).toBe(true);
     expect(Array.isArray(results.supertypes)).toBe(true);
+  });
+
+  test("simulationStats has expected shape", () => {
+    const { deck, cardMap } = buildTestDeck();
+    const results = computeAllAnalyses({ deck, cardMap });
+
+    expect(results.simulationStats).toBeDefined();
+    expect(results.simulationStats.totalSimulations).toBe(1000);
+    expect(results.simulationStats.keepableRate).toBeGreaterThanOrEqual(0);
+    expect(results.simulationStats.keepableRate).toBeLessThanOrEqual(1);
+    expect(results.simulationStats.avgLandsInOpener).toBeGreaterThanOrEqual(0);
+    expect(results.simulationStats.verdictDistribution).toHaveProperty("Strong Keep");
+    expect(results.simulationStats.verdictDistribution).toHaveProperty("Keepable");
+    expect(results.simulationStats.verdictDistribution).toHaveProperty("Marginal");
+    expect(results.simulationStats.verdictDistribution).toHaveProperty("Mulligan");
   });
 });

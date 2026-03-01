@@ -125,6 +125,15 @@ test.describe("Markdown formatter", () => {
     expect(md).toContain("## Budget");
     expect(md).toContain("## Composition");
   });
+
+  test("includes Opening Hands section", () => {
+    const { deck, results } = buildTestResults();
+    const md = formatMarkdownReport(results, deck);
+
+    expect(md).toContain("## Opening Hands");
+    expect(md).toContain("Keepable Rate:");
+    expect(md).toContain("Avg Lands:");
+  });
 });
 
 test.describe("JSON formatter", () => {
@@ -150,6 +159,20 @@ test.describe("JSON formatter", () => {
     expect(parsed).toHaveProperty("synergyThemes");
     expect(parsed).toHaveProperty("compositionHealth");
   });
+
+  test("contains openingHands key with numeric values", () => {
+    const { deck, results } = buildTestResults();
+    const parsed = JSON.parse(formatJsonReport(results, deck));
+
+    expect(parsed).toHaveProperty("openingHands");
+    expect(typeof parsed.openingHands.keepableRate).toBe("number");
+    expect(typeof parsed.openingHands.avgLandsInOpener).toBe("number");
+    expect(typeof parsed.openingHands.avgScore).toBe("number");
+    expect(typeof parsed.openingHands.probT1Play).toBe("number");
+    expect(typeof parsed.openingHands.probT2Play).toBe("number");
+    expect(typeof parsed.openingHands.probT3Play).toBe("number");
+    expect(parsed.openingHands).toHaveProperty("verdictDistribution");
+  });
 });
 
 test.describe("Discord formatter", () => {
@@ -159,6 +182,7 @@ test.describe("Discord formatter", () => {
     expect(ids).toContain("curve");
     expect(ids).toContain("land-efficiency");
     expect(ids).toContain("synergy-themes");
+    expect(ids).toContain("opening-hands");
   });
 
   test("returns text, charCount, included, excluded", () => {
@@ -217,5 +241,50 @@ test.describe("Discord formatter", () => {
       const output = section.render(results, deck);
       expect(output.length).toBeGreaterThan(0);
     }
+  });
+
+  test("appends share URL footer when shareUrl is provided", () => {
+    const { deck, results } = buildTestResults();
+    const shareUrl = "https://example.com/shared?d=abc123";
+    const result = formatDiscordReport(results, deck, undefined, shareUrl);
+
+    expect(result.text).toContain(shareUrl);
+    expect(result.text.endsWith(shareUrl)).toBe(true);
+  });
+
+  test("share URL is included in character count", () => {
+    const { deck, results } = buildTestResults();
+    const shareUrl = "https://example.com/shared?d=abc123";
+    const withUrl = formatDiscordReport(results, deck, undefined, shareUrl);
+    const withoutUrl = formatDiscordReport(results, deck);
+
+    expect(withUrl.charCount).toBeGreaterThan(withoutUrl.charCount);
+  });
+
+  test("output with share URL is still <= 2000 characters", () => {
+    const { deck, results } = buildTestResults();
+    const shareUrl = "https://example.com/shared?d=abc123";
+    const result = formatDiscordReport(results, deck, undefined, shareUrl);
+
+    expect(result.charCount).toBeLessThanOrEqual(2000);
+    expect(result.text.length).toBeLessThanOrEqual(2000);
+  });
+
+  test("share URL reserves budget and may exclude sections to fit", () => {
+    const { deck, results } = buildTestResults();
+    // Use a long URL to eat into budget
+    const longUrl = "https://example.com/shared?d=" + "x".repeat(500);
+    const allIds = new Set(DISCORD_SECTIONS.map((s) => s.id));
+    const result = formatDiscordReport(results, deck, allIds, longUrl);
+
+    expect(result.text).toContain(longUrl);
+    expect(result.charCount).toBeLessThanOrEqual(2000);
+  });
+
+  test("omits share URL footer when shareUrl is not provided", () => {
+    const { deck, results } = buildTestResults();
+    const result = formatDiscordReport(results, deck);
+
+    expect(result.text).not.toContain("View full analysis");
   });
 });

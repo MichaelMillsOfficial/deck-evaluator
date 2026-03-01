@@ -91,4 +91,50 @@ test.describe("Discord Export Modal", () => {
     const modal = deckPage.page.getByTestId("discord-export-modal");
     await expect(modal).toHaveAttribute("aria-label", "Export to Discord");
   });
+
+  test("modal shows Analysis Link checkbox that is checked by default", async ({
+    deckPage,
+  }) => {
+    await deckPage.shareButton.click();
+    await deckPage.page.getByText("Export to Discord...").click();
+
+    const modal = deckPage.page.getByTestId("discord-export-modal");
+    const linkCheckbox = modal
+      .locator("label")
+      .filter({ hasText: "Analysis Link" })
+      .locator('input[type="checkbox"]');
+    await expect(linkCheckbox).toBeVisible();
+    await expect(linkCheckbox).toBeChecked();
+  });
+
+  test("preview includes share URL when Analysis Link is checked", async ({
+    deckPage,
+  }) => {
+    await deckPage.shareButton.click();
+    await deckPage.page.getByText("Export to Discord...").click();
+
+    const preview = deckPage.page.getByTestId("discord-preview");
+    await expect(preview).toContainText("View full analysis:");
+    await expect(preview).toContainText("/shared?d=");
+  });
+
+  test("unchecking Analysis Link removes URL from preview", async ({
+    deckPage,
+  }) => {
+    await deckPage.shareButton.click();
+    await deckPage.page.getByText("Export to Discord...").click();
+
+    const modal = deckPage.page.getByTestId("discord-export-modal");
+    const linkCheckbox = modal
+      .locator("label")
+      .filter({ hasText: "Analysis Link" })
+      .locator('input[type="checkbox"]');
+
+    // Uncheck
+    await linkCheckbox.click();
+    await expect(linkCheckbox).not.toBeChecked();
+
+    const preview = deckPage.page.getByTestId("discord-preview");
+    await expect(preview).not.toContainText("View full analysis:");
+  });
 });

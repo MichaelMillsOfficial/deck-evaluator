@@ -60,6 +60,21 @@ function renderSynergyThemes(results: DeckAnalysisResults): string {
   return lines.join("\n");
 }
 
+function renderOpeningHands(results: DeckAnalysisResults): string {
+  const { simulationStats } = results;
+  const keepPct = Math.round(simulationStats.keepableRate * 100);
+  const avgLands = simulationStats.avgLandsInOpener.toFixed(1);
+  const t1 = Math.round(simulationStats.probT1Play * 100);
+  const t2 = Math.round(simulationStats.probT2Play * 100);
+  const t3 = Math.round(simulationStats.probT3Play * 100);
+  const lines = [
+    `**Opening Hands** (${simulationStats.totalSimulations} sims)`,
+    `Keep rate: ${keepPct}% | Avg lands: ${avgLands}`,
+    `T1 play: ${t1}% | T2: ${t2}% | T3: ${t3}%`,
+  ];
+  return lines.join("\n");
+}
+
 function renderCompositionGaps(results: DeckAnalysisResults): string {
   const { compositionScorecard } = results;
   const gaps = compositionScorecard.categories.filter(
@@ -167,44 +182,51 @@ export const DISCORD_SECTIONS: DiscordSection[] = [
     render: renderSynergyThemes,
   },
   {
+    id: "opening-hands",
+    label: "Opening Hands",
+    priority: 5,
+    enabledByDefault: true,
+    render: renderOpeningHands,
+  },
+  {
     id: "composition-gaps",
     label: "Composition Gaps",
-    priority: 5,
+    priority: 6,
     enabledByDefault: true,
     render: renderCompositionGaps,
   },
   {
     id: "combos",
     label: "Known Combos",
-    priority: 6,
+    priority: 7,
     enabledByDefault: true,
     render: renderCombos,
   },
   {
     id: "budget",
     label: "Budget",
-    priority: 7,
+    priority: 8,
     enabledByDefault: true,
     render: renderBudget,
   },
   {
     id: "color-distribution",
     label: "Color Distribution",
-    priority: 8,
+    priority: 9,
     enabledByDefault: false,
     render: renderColorDistribution,
   },
   {
     id: "power-bracket",
     label: "Power & Bracket",
-    priority: 9,
+    priority: 10,
     enabledByDefault: false,
     render: renderPowerBracket,
   },
   {
     id: "recommendations",
     label: "Mana Recommendations",
-    priority: 10,
+    priority: 11,
     enabledByDefault: false,
     render: renderRecommendations,
   },
@@ -218,12 +240,17 @@ export function allocateDiscordSections(
   results: DeckAnalysisResults,
   deck: DeckData,
   enabledSections: Set<string>,
-  maxChars = 2000
+  maxChars = 2000,
+  shareUrl?: string
 ): { included: string[]; excluded: string[]; text: string; charCount: number } {
   const included: string[] = [];
   const excluded: string[] = [];
   const rendered: string[] = [];
   let totalChars = 0;
+
+  // Reserve space for share URL footer if provided
+  const footerText = shareUrl ? `\n\nView full analysis: ${shareUrl}` : "";
+  const effectiveMax = maxChars - footerText.length;
 
   // Always include header first
   const headerSection = DISCORD_SECTIONS.find((s) => s.id === "header")!;
@@ -239,7 +266,7 @@ export function allocateDiscordSections(
 
   for (const section of remaining) {
     const sectionText = "\n\n" + section.render(results, deck);
-    if (totalChars + sectionText.length <= maxChars) {
+    if (totalChars + sectionText.length <= effectiveMax) {
       rendered.push(sectionText);
       totalChars += sectionText.length;
       included.push(section.id);
@@ -257,6 +284,12 @@ export function allocateDiscordSections(
     ) {
       excluded.push(section.id);
     }
+  }
+
+  // Append share URL footer
+  if (footerText) {
+    rendered.push(footerText);
+    totalChars += footerText.length;
   }
 
   const text = rendered.join("");
@@ -347,6 +380,25 @@ export function formatMarkdownReport(
     }
     lines.push("");
   }
+
+  // Opening Hands
+  lines.push("## Opening Hands");
+  lines.push("");
+  const { simulationStats } = results;
+  lines.push(
+    `**Keepable Rate:** ${Math.round(simulationStats.keepableRate * 100)}% | **Avg Lands:** ${simulationStats.avgLandsInOpener.toFixed(1)} | **Avg Score:** ${Math.round(simulationStats.avgScore)}`
+  );
+  lines.push(
+    `**T1 Play:** ${Math.round(simulationStats.probT1Play * 100)}% | **T2:** ${Math.round(simulationStats.probT2Play * 100)}% | **T3:** ${Math.round(simulationStats.probT3Play * 100)}%`
+  );
+  lines.push("");
+  const verdicts = simulationStats.verdictDistribution;
+  lines.push("| Verdict | Count |");
+  lines.push("|---------|-------|");
+  for (const [verdict, count] of Object.entries(verdicts)) {
+    lines.push(`| ${verdict} | ${count} |`);
+  }
+  lines.push("");
 
   // Known Combos
   if (results.synergyAnalysis.knownCombos.length > 0) {
@@ -469,6 +521,15 @@ export function formatJsonReport(
         (c) => ({ name: c.name, price: c.unitPrice })
       ),
     },
+    openingHands: {
+      keepableRate: results.simulationStats.keepableRate,
+      avgLandsInOpener: results.simulationStats.avgLandsInOpener,
+      avgScore: results.simulationStats.avgScore,
+      probT1Play: results.simulationStats.probT1Play,
+      probT2Play: results.simulationStats.probT2Play,
+      probT3Play: results.simulationStats.probT3Play,
+      verdictDistribution: results.simulationStats.verdictDistribution,
+    },
     synergyThemes: results.synergyAnalysis.deckThemes.map((t) => ({
       axis: t.axisName,
       cardCount: t.cardCount,
@@ -508,7 +569,8 @@ export function formatJsonReport(
 export function formatDiscordReport(
   results: DeckAnalysisResults,
   deck: DeckData,
-  enabledSections?: Set<string>
+  enabledSections?: Set<string>,
+  shareUrl?: string
 ): { text: string; charCount: number; included: string[]; excluded: string[] } {
   const enabled =
     enabledSections ??
@@ -516,5 +578,5 @@ export function formatDiscordReport(
       DISCORD_SECTIONS.filter((s) => s.enabledByDefault).map((s) => s.id)
     );
 
-  return allocateDiscordSections(results, deck, enabled);
+  return allocateDiscordSections(results, deck, enabled, 2000, shareUrl);
 }
