@@ -480,36 +480,6 @@ test.describe("Lifegain axis", () => {
   });
 });
 
-test.describe("Evasion axis", () => {
-  test("detects flying keyword", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({ keywords: ["Flying"] });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-
-  test("detects unblockable text", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({
-      oracleText: "This creature can't be blocked.",
-    });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-
-  test("detects combat damage triggers", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({
-      oracleText: "Whenever this creature deals combat damage to a player, draw a card.",
-    });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-
-  test("returns 0 for irrelevant card", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({ oracleText: "Destroy target enchantment." });
-    expect(axis.detect(card)).toBe(0);
-  });
-});
-
 // ---------------------------------------------------------------------------
 // Issue #48 — Lifegain axis: drop "pay life" false positives
 // ---------------------------------------------------------------------------
@@ -605,57 +575,6 @@ test.describe("Tribal axis — Tribal Unity verification (Issue #48)", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Issue #48 — Evasion axis: grants-evasion via has/have
-// ---------------------------------------------------------------------------
-
-test.describe("Evasion axis — grants-evasion (Issue #48)", () => {
-  test("Two Headed Sliver ('All Sliver creatures have menace') → evasion score > 0", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({
-      name: "Two-Headed Sliver",
-      oracleText:
-        "All Sliver creatures have menace. (They can't be blocked except by two or more creatures.)",
-      typeLine: "Creature — Sliver",
-    });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-
-  test("Archetype of Imagination ('Creatures you control have flying') → evasion score > 0", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({
-      name: "Archetype of Imagination",
-      oracleText:
-        "Creatures you control have flying. Creatures your opponents control lose flying and can't have or gain flying.",
-      typeLine: "Enchantment Creature — Human Wizard",
-    });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-
-  test("Goblin War Drums ('Creatures you control have menace') → evasion score > 0", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({
-      name: "Goblin War Drums",
-      oracleText: "Creatures you control have menace.",
-      typeLine: "Enchantment",
-    });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-
-  test("Flying keyword → still evasion > 0 (no regression)", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({ keywords: ["Flying"] });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-
-  test("Unblockable text → still evasion > 0 (no regression)", () => {
-    const axis = getAxisById("evasion")!;
-    const card = mockCard({
-      oracleText: "This creature can't be blocked.",
-    });
-    expect(axis.detect(card)).toBeGreaterThan(0);
-  });
-});
 
 test.describe("Axis conflict declarations", () => {
   test("graveyard and graveyardHate conflict with each other", () => {

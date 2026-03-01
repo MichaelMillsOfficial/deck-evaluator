@@ -114,21 +114,6 @@ const LIFEGAIN_TRIGGER_RE = /whenever you gain life/i;
 const LIFEGAIN_PAYOFF_RE = /\byou gain.+?\blife\b/i;
 const LIFEGAIN_KEYWORDS = new Set(["Lifelink"]);
 
-// --- Evasion ---
-const EVASION_UNBLOCKABLE_RE = /can't be blocked/i;
-const EVASION_COMBAT_DAMAGE_RE = /deals? combat damage to.+?(?:player|opponent)/i;
-const EVASION_GRANTS_RE =
-  /\b(?:ha[sv]e?|gains?)\s+(?:flying|menace|trample|shadow|fear|intimidate|skulk)\b/i;
-const EVASION_KEYWORDS = new Set([
-  "Flying",
-  "Menace",
-  "Trample",
-  "Shadow",
-  "Fear",
-  "Intimidate",
-  "Skulk",
-]);
-
 // --- Supertype Matters ---
 const SUPERTYPE_LEGENDARY_CAST_RE =
   /whenever you (?:cast|play) a (?:legendary|historic)/i;
@@ -345,22 +330,6 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
       if (LIFEGAIN_TRIGGER_RE.test(text)) score += 0.8;
       if (card.keywords.some((kw) => LIFEGAIN_KEYWORDS.has(kw))) score += 0.4;
       if (LIFEGAIN_PAYOFF_RE.test(text)) score += 0.3;
-      return Math.min(score, 1);
-    },
-    conflictsWith: [],
-  },
-  {
-    id: "evasion",
-    name: "Evasion",
-    description: "Flying, unblockable, combat damage triggers",
-    color: { bg: "bg-sky-500/20", text: "text-sky-300" },
-    detect(card) {
-      const text = card.oracleText;
-      let score = 0;
-      if (card.keywords.some((kw) => EVASION_KEYWORDS.has(kw))) score += 0.4;
-      if (EVASION_UNBLOCKABLE_RE.test(text)) score += 0.6;
-      if (EVASION_COMBAT_DAMAGE_RE.test(text)) score += 0.5;
-      if (EVASION_GRANTS_RE.test(text)) score += 0.5;
       return Math.min(score, 1);
     },
     conflictsWith: [],
