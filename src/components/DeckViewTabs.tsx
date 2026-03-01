@@ -66,6 +66,9 @@ export default function DeckViewTabs({
   const [candidateAnalyses, setCandidateAnalyses] = useState<
     Record<string, CandidateAnalysis>
   >({});
+  const [candidateErrors, setCandidateErrors] = useState<
+    Record<string, string>
+  >({});
 
   // Reset candidate state when deck or cardMap changes (new import)
   const prevDeckRef = useRef(deck);
@@ -77,6 +80,7 @@ export default function DeckViewTabs({
       setCandidates([]);
       setCandidateCardMap({});
       setCandidateAnalyses({});
+      setCandidateErrors({});
     }
   }, [deck, cardMap]);
 
@@ -91,32 +95,46 @@ export default function DeckViewTabs({
     return names;
   }, [deck]);
 
-  const handleAddCandidate = useCallback(
+  const enrichCandidate = useCallback(
     async (name: string) => {
       if (!cardMap || !synergyAnalysis) return;
-      if (candidates.includes(name)) return;
 
-      // Optimistically add the candidate name
-      setCandidates((prev) => [...prev, name]);
+      // Clear any previous error for this card
+      setCandidateErrors((prev) => {
+        if (!(name in prev)) return prev;
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
 
       try {
-        // Enrich the candidate card
         const res = await fetch("/api/deck-enrich", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ names: [name] }),
+          body: JSON.stringify({ cardNames: [name] }),
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          setCandidateErrors((prev) => ({
+            ...prev,
+            [name]: "Failed to fetch card data",
+          }));
+          return;
+        }
 
         const json = (await res.json()) as {
           cards: Record<string, EnrichedCard>;
         };
         const enrichedCard = json.cards[name];
-        if (!enrichedCard) return;
+        if (!enrichedCard) {
+          setCandidateErrors((prev) => ({
+            ...prev,
+            [name]: "Card not found",
+          }));
+          return;
+        }
 
         setCandidateCardMap((prev) => ({ ...prev, [name]: enrichedCard }));
 
-        // Run analysis
         const fullMap = { ...cardMap, [name]: enrichedCard };
         const analysis = analyzeCandidateCard(
           enrichedCard,
@@ -126,11 +144,30 @@ export default function DeckViewTabs({
         );
         setCandidateAnalyses((prev) => ({ ...prev, [name]: analysis }));
       } catch {
-        // Remove candidate on failure
-        setCandidates((prev) => prev.filter((c) => c !== name));
+        setCandidateErrors((prev) => ({
+          ...prev,
+          [name]: "Network error — check your connection",
+        }));
       }
     },
-    [cardMap, synergyAnalysis, candidates, deck]
+    [cardMap, synergyAnalysis, deck]
+  );
+
+  const handleAddCandidate = useCallback(
+    async (name: string) => {
+      if (!cardMap || !synergyAnalysis) return;
+      if (candidates.includes(name)) return;
+      setCandidates((prev) => [...prev, name]);
+      await enrichCandidate(name);
+    },
+    [cardMap, synergyAnalysis, candidates, enrichCandidate]
+  );
+
+  const handleRetryCandidate = useCallback(
+    async (name: string) => {
+      await enrichCandidate(name);
+    },
+    [enrichCandidate]
   );
 
   const handleRemoveCandidate = useCallback((name: string) => {
@@ -141,6 +178,12 @@ export default function DeckViewTabs({
       return next;
     });
     setCandidateAnalyses((prev) => {
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+    setCandidateErrors((prev) => {
+      if (!(name in prev)) return prev;
       const next = { ...prev };
       delete next[name];
       return next;
@@ -341,8 +384,10 @@ export default function DeckViewTabs({
             candidates={candidates}
             candidateCardMap={candidateCardMap}
             analyses={candidateAnalyses}
+            errors={candidateErrors}
             onAddCard={handleAddCandidate}
             onRemoveCard={handleRemoveCandidate}
+            onRetryCard={handleRetryCandidate}
             deckCardNames={deckCardNames}
           />
         )}

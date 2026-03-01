@@ -216,7 +216,7 @@ async function setupMocks(page: import("@playwright/test").Page) {
   await page.route("**/api/deck-enrich", async (route) => {
     enrichCallCount++;
     const body = await route.request().postDataJSON();
-    const names: string[] = body.names ?? [];
+    const names: string[] = body.cardNames ?? [];
 
     // If request contains candidate cards, return candidate enrichment
     if (names.includes("Path to Exile")) {
@@ -561,6 +561,250 @@ test.describe("Candidate card display", () => {
 
     // Should show replacement suggestions
     await expect(panel.getByText("Replacement Suggestions")).toBeVisible();
+  });
+});
+
+test.describe("Candidate error handling", () => {
+  test("shows loading state while enrichment is in progress", async ({
+    deckPage,
+    page,
+  }) => {
+    // Set up mocks but delay the candidate enrichment response
+    await page.route("**/api/deck-enrich", async (route) => {
+      const body = await route.request().postDataJSON();
+      const names: string[] = body.cardNames ?? [];
+
+      if (names.includes("Path to Exile")) {
+        // Delay response to make loading state observable
+        await new Promise((r) => setTimeout(r, 2000));
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(CANDIDATE_ENRICH_RESPONSE),
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(MOCK_ENRICH_RESPONSE),
+        });
+      }
+    });
+    await page.route("**/api/commander-spellbook*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ exactCombos: [], nearCombos: [] }),
+      })
+    );
+    await setupAutocomplete(page, ["Path to Exile"]);
+
+    await deckPage.goto();
+    await deckPage.fillDecklist(SAMPLE_DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+    await deckPage.selectDeckViewTab("Additions");
+
+    // Select a candidate
+    const searchInput = page.locator("#card-search-input");
+    await searchInput.fill("Pa");
+    const option = page.getByRole("option", { name: "Path to Exile" });
+    await option.waitFor({ timeout: 5_000 });
+    await option.click();
+
+    // Should show loading state
+    const loading = page.getByTestId("candidate-loading");
+    await expect(loading).toBeVisible();
+    await expect(loading.getByText("Loading Path to Exile...")).toBeVisible();
+
+    // Eventually the card should load
+    await expect(
+      page.locator("#tabpanel-deck-additions").getByText("$3.00")
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("shows error state when enrichment API fails", async ({
+    deckPage,
+    page,
+  }) => {
+    // Return 500 for candidate enrichment
+    await page.route("**/api/deck-enrich", async (route) => {
+      const body = await route.request().postDataJSON();
+      const names: string[] = body.cardNames ?? [];
+
+      if (names.includes("Path to Exile")) {
+        await route.fulfill({ status: 500 });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(MOCK_ENRICH_RESPONSE),
+        });
+      }
+    });
+    await page.route("**/api/commander-spellbook*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ exactCombos: [], nearCombos: [] }),
+      })
+    );
+    await setupAutocomplete(page, ["Path to Exile"]);
+
+    await deckPage.goto();
+    await deckPage.fillDecklist(SAMPLE_DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+    await deckPage.selectDeckViewTab("Additions");
+
+    // Select a candidate
+    const searchInput = page.locator("#card-search-input");
+    await searchInput.fill("Pa");
+    const option = page.getByRole("option", { name: "Path to Exile" });
+    await option.waitFor({ timeout: 5_000 });
+    await option.click();
+
+    // Should show error state
+    const errorRow = page.getByTestId("candidate-error");
+    await expect(errorRow).toBeVisible({ timeout: 10_000 });
+    await expect(errorRow.getByText("Path to Exile")).toBeVisible();
+    await expect(
+      errorRow.getByText("Failed to fetch card data")
+    ).toBeVisible();
+
+    // Should have retry and remove buttons
+    await expect(errorRow.getByText("Retry")).toBeVisible();
+    await expect(
+      errorRow.getByRole("button", { name: "Remove Path to Exile" })
+    ).toBeVisible();
+  });
+
+  test("retry button re-attempts enrichment", async ({ deckPage, page }) => {
+    let enrichAttempts = 0;
+
+    await page.route("**/api/deck-enrich", async (route) => {
+      const body = await route.request().postDataJSON();
+      const names: string[] = body.cardNames ?? [];
+
+      if (names.includes("Path to Exile")) {
+        enrichAttempts++;
+        if (enrichAttempts === 1) {
+          // First attempt fails
+          await route.fulfill({ status: 500 });
+        } else {
+          // Second attempt succeeds
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(CANDIDATE_ENRICH_RESPONSE),
+          });
+        }
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(MOCK_ENRICH_RESPONSE),
+        });
+      }
+    });
+    await page.route("**/api/commander-spellbook*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ exactCombos: [], nearCombos: [] }),
+      })
+    );
+    await setupAutocomplete(page, ["Path to Exile"]);
+
+    await deckPage.goto();
+    await deckPage.fillDecklist(SAMPLE_DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+    await deckPage.selectDeckViewTab("Additions");
+
+    // Select a candidate
+    const searchInput = page.locator("#card-search-input");
+    await searchInput.fill("Pa");
+    const option = page.getByRole("option", { name: "Path to Exile" });
+    await option.waitFor({ timeout: 5_000 });
+    await option.click();
+
+    // Wait for error state
+    const errorRow = page.getByTestId("candidate-error");
+    await expect(errorRow).toBeVisible({ timeout: 10_000 });
+
+    // Click retry
+    await errorRow.getByText("Retry").click();
+
+    // Should now show the loaded card
+    const panel = page.locator("#tabpanel-deck-additions");
+    await expect(panel.getByText("$3.00")).toBeVisible({ timeout: 10_000 });
+    await expect(errorRow).not.toBeVisible();
+  });
+
+  test("remove button dismisses error row", async ({ deckPage, page }) => {
+    await page.route("**/api/deck-enrich", async (route) => {
+      const body = await route.request().postDataJSON();
+      const names: string[] = body.cardNames ?? [];
+
+      if (names.includes("Path to Exile")) {
+        await route.fulfill({ status: 500 });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(MOCK_ENRICH_RESPONSE),
+        });
+      }
+    });
+    await page.route("**/api/commander-spellbook*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ exactCombos: [], nearCombos: [] }),
+      })
+    );
+    await setupAutocomplete(page, ["Path to Exile"]);
+
+    await deckPage.goto();
+    await deckPage.fillDecklist(SAMPLE_DECKLIST);
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+    await expect(
+      page.locator('[aria-label="Mana cost: 1 generic"]')
+    ).toBeVisible({ timeout: 10_000 });
+    await deckPage.selectDeckViewTab("Additions");
+
+    // Select a candidate
+    const searchInput = page.locator("#card-search-input");
+    await searchInput.fill("Pa");
+    const option = page.getByRole("option", { name: "Path to Exile" });
+    await option.waitFor({ timeout: 5_000 });
+    await option.click();
+
+    // Wait for error
+    const errorRow = page.getByTestId("candidate-error");
+    await expect(errorRow).toBeVisible({ timeout: 10_000 });
+
+    // Click remove
+    await errorRow
+      .getByRole("button", { name: "Remove Path to Exile" })
+      .click();
+
+    // Error row should be gone, empty state should show
+    await expect(errorRow).not.toBeVisible();
+    await expect(
+      page.getByText("Search for cards to evaluate as possible additions")
+    ).toBeVisible();
   });
 });
 
