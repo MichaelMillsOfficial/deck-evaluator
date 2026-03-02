@@ -114,4 +114,13 @@ test.describe("parseTypeLine", () => {
     expect(result.cardType).toBe("Creature");
     expect(result.subtypes).toEqual(["Human", "Cleric"]);
   });
+
+  test("handles modal DFC where back face is a different card type", () => {
+    const result = parseTypeLine(
+      "Legendary Creature — God // Legendary Enchantment"
+    );
+    expect(result.supertypes).toEqual(["Legendary"]);
+    expect(result.cardType).toBe("Creature");
+    expect(result.subtypes).toEqual(["God"]);
+  });
 });

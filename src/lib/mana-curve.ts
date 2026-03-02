@@ -88,3 +88,31 @@ export function computeManaCurve(
     nonPermanents: nonPermanents.get(label) ?? 0,
   }));
 }
+
+/**
+ * Counts how many cards in the deck are modal DFCs with a Land back face.
+ * These cards are counted in the mana curve at their front-face CMC but also
+ * function as lands, so the count is useful as an annotation.
+ */
+export function countMdfcLands(
+  deck: DeckData,
+  cardMap: Record<string, EnrichedCard>
+): number {
+  const allCards = [...deck.commanders, ...deck.mainboard, ...deck.sideboard];
+  let count = 0;
+
+  for (const card of allCards) {
+    const enriched = cardMap[card.name];
+    if (!enriched) continue;
+
+    if (
+      enriched.layout === "modal_dfc" &&
+      enriched.cardFaces.length >= 2 &&
+      /\bLand\b/.test(enriched.cardFaces[1].typeLine)
+    ) {
+      count += card.quantity;
+    }
+  }
+
+  return count;
+}

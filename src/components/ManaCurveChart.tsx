@@ -16,6 +16,7 @@ import type { ManaCurveBucket } from "@/lib/mana-curve";
 interface ManaCurveChartProps {
   data: ManaCurveBucket[];
   totalSpells: number;
+  mdfcLandCount?: number;
 }
 
 function CustomTooltip({
@@ -76,6 +77,7 @@ function renderTotalLabel(props: any) {
 export default function ManaCurveChart({
   data,
   totalSpells,
+  mdfcLandCount = 0,
 }: ManaCurveChartProps) {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
@@ -148,6 +150,11 @@ export default function ManaCurveChart({
           Non-permanents
         </span>
       </div>
+      {mdfcLandCount > 0 && (
+        <p className="mt-2 text-center text-xs text-slate-500" data-testid="mdfc-land-annotation">
+          {mdfcLandCount} {mdfcLandCount === 1 ? "card" : "cards"} in this curve {mdfcLandCount === 1 ? "is" : "are"} also MDFC {mdfcLandCount === 1 ? "land" : "lands"}
+        </p>
+      )}
     </div>
   );
 }

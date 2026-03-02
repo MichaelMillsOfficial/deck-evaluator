@@ -28,6 +28,21 @@ const MOCK_HAND_ENRICH_RESPONSE = {
       flavorName: null,
       isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
+      setCode: "c21",
+      collectorNumber: "263",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Sol Ring",
+          manaCost: "{1}",
+          typeLine: "Artifact",
+          oracleText: "{T}: Add {C}{C}.",
+          power: null,
+          toughness: null,
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
     "Command Tower": {
       name: "Command Tower",
@@ -55,6 +70,22 @@ const MOCK_HAND_ENRICH_RESPONSE = {
       flavorName: null,
       isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
+      setCode: "c21",
+      collectorNumber: "264",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Command Tower",
+          manaCost: "",
+          typeLine: "Land",
+          oracleText:
+            "{T}: Add one mana of any color in your commander's color identity.",
+          power: null,
+          toughness: null,
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
     "Arcane Signet": {
       name: "Arcane Signet",
@@ -82,6 +113,22 @@ const MOCK_HAND_ENRICH_RESPONSE = {
       flavorName: null,
       isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
+      setCode: "eld",
+      collectorNumber: "331",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Arcane Signet",
+          manaCost: "{2}",
+          typeLine: "Artifact",
+          oracleText:
+            "{T}: Add one mana of any color in your commander's color identity.",
+          power: null,
+          toughness: null,
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
     "Swords to Plowshares": {
       name: "Swords to Plowshares",
@@ -109,6 +156,22 @@ const MOCK_HAND_ENRICH_RESPONSE = {
       flavorName: null,
       isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
+      setCode: "ice",
+      collectorNumber: "274",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Swords to Plowshares",
+          manaCost: "{W}",
+          typeLine: "Instant",
+          oracleText:
+            "Exile target creature. Its controller gains life equal to its power.",
+          power: null,
+          toughness: null,
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
     Counterspell: {
       name: "Counterspell",
@@ -135,6 +198,21 @@ const MOCK_HAND_ENRICH_RESPONSE = {
       flavorName: null,
       isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
+      setCode: "tmp",
+      collectorNumber: "64",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Counterspell",
+          manaCost: "{U}{U}",
+          typeLine: "Instant",
+          oracleText: "Counter target spell.",
+          power: null,
+          toughness: null,
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
     "Atraxa, Praetors' Voice": {
       name: "Atraxa, Praetors' Voice",
@@ -162,6 +240,22 @@ const MOCK_HAND_ENRICH_RESPONSE = {
       flavorName: null,
       isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
+      setCode: "cm2",
+      collectorNumber: "10",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Atraxa, Praetors' Voice",
+          manaCost: "{G}{W}{U}{B}",
+          typeLine: "Legendary Creature — Phyrexian Angel Horror",
+          oracleText:
+            "Flying, vigilance, deathtouch, lifelink\nAt the beginning of your end step, proliferate.",
+          power: "4",
+          toughness: "4",
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
   },
   notFound: [],
