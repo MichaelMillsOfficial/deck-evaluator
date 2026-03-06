@@ -33,6 +33,23 @@ const MOCK_SYNERGY_RESPONSE = {
       producedMana: [],
       flavorName: null,
       prices: { usd: null, usdFoil: null, eur: null },
+      isGameChanger: false,
+      setCode: "ktk",
+      collectorNumber: "133",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Hardened Scales",
+          manaCost: "{G}",
+          typeLine: "Enchantment",
+          oracleText:
+            "If one or more +1/+1 counters would be put on a creature you control, that many plus one +1/+1 counters are put on it instead.",
+          power: null,
+          toughness: null,
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
     "Walking Ballista": {
       name: "Walking Ballista",
@@ -59,6 +76,23 @@ const MOCK_SYNERGY_RESPONSE = {
       producedMana: [],
       flavorName: null,
       prices: { usd: null, usdFoil: null, eur: null },
+      isGameChanger: false,
+      setCode: "aer",
+      collectorNumber: "181",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Walking Ballista",
+          manaCost: "{X}{X}",
+          typeLine: "Artifact Creature — Construct",
+          oracleText:
+            "Walking Ballista enters the battlefield with X +1/+1 counters on it.\n{4}: Put a +1/+1 counter on Walking Ballista.\nRemove a +1/+1 counter from Walking Ballista: It deals 1 damage to any target.",
+          power: "0",
+          toughness: "0",
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
     "Doubling Season": {
       name: "Doubling Season",
@@ -85,6 +119,23 @@ const MOCK_SYNERGY_RESPONSE = {
       producedMana: [],
       flavorName: null,
       prices: { usd: null, usdFoil: null, eur: null },
+      isGameChanger: false,
+      setCode: "rav",
+      collectorNumber: "158",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Doubling Season",
+          manaCost: "{4}{G}",
+          typeLine: "Enchantment",
+          oracleText:
+            "If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.\nIf an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead.",
+          power: null,
+          toughness: null,
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
     Reanimate: {
       name: "Reanimate",
@@ -111,6 +162,23 @@ const MOCK_SYNERGY_RESPONSE = {
       producedMana: [],
       flavorName: null,
       prices: { usd: null, usdFoil: null, eur: null },
+      isGameChanger: false,
+      setCode: "tmp",
+      collectorNumber: "151",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Reanimate",
+          manaCost: "{B}",
+          typeLine: "Sorcery",
+          oracleText:
+            "Put target creature card from a graveyard onto the battlefield under your control. You lose life equal to its mana value.",
+          power: null,
+          toughness: null,
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
     "Rest in Peace": {
       name: "Rest in Peace",
@@ -137,6 +205,23 @@ const MOCK_SYNERGY_RESPONSE = {
       producedMana: [],
       flavorName: null,
       prices: { usd: null, usdFoil: null, eur: null },
+      isGameChanger: false,
+      setCode: "rtr",
+      collectorNumber: "18",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Rest in Peace",
+          manaCost: "{1}{W}",
+          typeLine: "Enchantment",
+          oracleText:
+            "When Rest in Peace enters the battlefield, exile all cards from all graveyards.\nIf a card or token would be put into a graveyard from anywhere, exile it instead.",
+          power: null,
+          toughness: null,
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
     "Thassa's Oracle": {
       name: "Thassa's Oracle",
@@ -163,6 +248,23 @@ const MOCK_SYNERGY_RESPONSE = {
       producedMana: [],
       flavorName: null,
       prices: { usd: null, usdFoil: null, eur: null },
+      isGameChanger: false,
+      setCode: "thb",
+      collectorNumber: "73",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Thassa's Oracle",
+          manaCost: "{U}{U}",
+          typeLine: "Creature — Merfolk Wizard",
+          oracleText:
+            "When Thassa's Oracle enters the battlefield, look at the top X cards of your library, where X is your devotion to blue. Put up to one of them on top of your library and the rest on the bottom of your library in a random order. If X is greater than or equal to the number of cards in your library, you win the game.",
+          power: "1",
+          toughness: "3",
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
     "Demonic Consultation": {
       name: "Demonic Consultation",
@@ -189,6 +291,23 @@ const MOCK_SYNERGY_RESPONSE = {
       producedMana: [],
       flavorName: null,
       prices: { usd: null, usdFoil: null, eur: null },
+      isGameChanger: false,
+      setCode: "ice",
+      collectorNumber: "120",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Demonic Consultation",
+          manaCost: "{B}",
+          typeLine: "Instant",
+          oracleText:
+            "Name a card. Exile the top six cards of your library, then reveal cards from the top of your library until you reveal the named card. Put that card into your hand and exile all other cards revealed this way.",
+          power: null,
+          toughness: null,
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
     "Command Tower": {
       name: "Command Tower",
@@ -210,7 +329,24 @@ const MOCK_SYNERGY_RESPONSE = {
       manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       producedMana: ["W", "U", "B", "R", "G"],
       flavorName: null,
+      isGameChanger: false,
       prices: { usd: null, usdFoil: null, eur: null },
+      setCode: "c21",
+      collectorNumber: "264",
+      layout: "normal",
+      cardFaces: [
+        {
+          name: "Command Tower",
+          manaCost: "",
+          typeLine: "Land",
+          oracleText:
+            "{T}: Add one mana of any color in your commander's color identity.",
+          power: null,
+          toughness: null,
+          loyalty: null,
+          imageUris: null,
+        },
+      ],
     },
   },
   notFound: [],

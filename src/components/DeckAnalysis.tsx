@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import {
   computeManaCurve,
+  countMdfcLands,
   extractCardType,
   CARD_TYPES,
   type CardType,
@@ -99,6 +100,11 @@ export default function DeckAnalysis({
   const curveData = useMemo(
     () => computeManaCurve(deck, cardMap, enabledTypes),
     [deck, cardMap, enabledTypes]
+  );
+
+  const mdfcLandCount = useMemo(
+    () => countMdfcLands(deck, cardMap),
+    [deck, cardMap]
   );
 
   const colorDistribution = useMemo(
@@ -261,7 +267,7 @@ export default function DeckAnalysis({
               typeCounts={typeCounts}
             />
           </div>
-          <ManaCurveChart data={curveData} totalSpells={filteredSpells} />
+          <ManaCurveChart data={curveData} totalSpells={filteredSpells} mdfcLandCount={mdfcLandCount} />
         </section>
       </CollapsiblePanel>
 

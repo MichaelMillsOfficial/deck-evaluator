@@ -258,3 +258,26 @@ test.describe("identifyTribalAnchors", () => {
     expect(anchors).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Multi-face card tribal reference detection (combined oracle text)
+// ---------------------------------------------------------------------------
+
+test.describe("extractReferencedTypes — multi-face cards", () => {
+  test("DFC with tribal reference on back face detects the type", () => {
+    // Combined oracle text from a transform DFC where back face references Elves
+    const combinedText =
+      "When this creature enters the battlefield, create a 1/1 green Elf token.\n\n" +
+      "Other Elf creatures you control get +1/+1.";
+    const types = extractReferencedTypes(combinedText);
+    expect(types).toContain("Elf");
+  });
+
+  test("adventure card with tribal reference on adventure half detects the type", () => {
+    const combinedText =
+      "Flying, lifelink\n\n" +
+      "Whenever a Dragon you control deals combat damage, draw a card.";
+    const types = extractReferencedTypes(combinedText);
+    expect(types).toContain("Dragon");
+  });
+});

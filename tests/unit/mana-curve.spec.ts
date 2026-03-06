@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { computeManaCurve, extractCardType } from "../../src/lib/mana-curve";
+import { computeManaCurve, countMdfcLands, extractCardType } from "../../src/lib/mana-curve";
 import type { EnrichedCard } from "../../src/lib/types";
 import { makeCard, makeDeck } from "../helpers";
 
@@ -308,5 +308,205 @@ test.describe("computeManaCurve with enabledTypes filter", () => {
     const result = computeManaCurve(mixedDeck, mixedCardMap, new Set());
     const total = result.reduce((s, b) => s + b.permanents + b.nonPermanents, 0);
     expect(total).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// countMdfcLands
+// ---------------------------------------------------------------------------
+
+test.describe("countMdfcLands", () => {
+  test("counts modal DFC with land back face", () => {
+    const deck = makeDeck({
+      mainboard: [
+        { name: "Emeria's Call", quantity: 1 },
+        { name: "Shatterskull Smashing", quantity: 1 },
+      ],
+    });
+    const cardMap: Record<string, EnrichedCard> = {
+      "Emeria's Call": makeCard({
+        name: "Emeria's Call",
+        layout: "modal_dfc",
+        typeLine: "Sorcery // Land",
+        cmc: 7,
+        cardFaces: [
+          {
+            name: "Emeria's Call",
+            manaCost: "{4}{W}{W}{W}",
+            typeLine: "Sorcery",
+            oracleText: "Create two 4/4 white Angel Warrior creature tokens with flying.",
+            power: null,
+            toughness: null,
+            loyalty: null,
+            imageUris: null,
+          },
+          {
+            name: "Emeria, Shattered Skyclave",
+            manaCost: "",
+            typeLine: "Land",
+            oracleText: "Emeria, Shattered Skyclave enters the battlefield tapped.\n{T}: Add {W}.",
+            power: null,
+            toughness: null,
+            loyalty: null,
+            imageUris: null,
+          },
+        ],
+      }),
+      "Shatterskull Smashing": makeCard({
+        name: "Shatterskull Smashing",
+        layout: "modal_dfc",
+        typeLine: "Sorcery // Land",
+        cmc: 2,
+        cardFaces: [
+          {
+            name: "Shatterskull Smashing",
+            manaCost: "{X}{R}{R}",
+            typeLine: "Sorcery",
+            oracleText: "Shatterskull Smashing deals X damage divided as you choose among up to two target creatures and/or planeswalkers.",
+            power: null,
+            toughness: null,
+            loyalty: null,
+            imageUris: null,
+          },
+          {
+            name: "Shatterskull, the Hammer Pass",
+            manaCost: "",
+            typeLine: "Land",
+            oracleText: "Shatterskull, the Hammer Pass enters the battlefield tapped.\n{T}: Add {R}.",
+            power: null,
+            toughness: null,
+            loyalty: null,
+            imageUris: null,
+          },
+        ],
+      }),
+    };
+    expect(countMdfcLands(deck, cardMap)).toBe(2);
+  });
+
+  test("does not count non-MDFC lands", () => {
+    const deck = makeDeck({
+      mainboard: [{ name: "Command Tower", quantity: 1 }],
+    });
+    const cardMap: Record<string, EnrichedCard> = {
+      "Command Tower": makeCard({
+        name: "Command Tower",
+        layout: "normal",
+        typeLine: "Land",
+      }),
+    };
+    expect(countMdfcLands(deck, cardMap)).toBe(0);
+  });
+
+  test("does not count transform DFCs with land back face", () => {
+    const deck = makeDeck({
+      mainboard: [{ name: "Westvale Abbey", quantity: 1 }],
+    });
+    const cardMap: Record<string, EnrichedCard> = {
+      "Westvale Abbey": makeCard({
+        name: "Westvale Abbey",
+        layout: "transform",
+        typeLine: "Land // Legendary Creature — Demon",
+        cardFaces: [
+          {
+            name: "Westvale Abbey",
+            manaCost: "",
+            typeLine: "Land",
+            oracleText: "{T}: Add {C}.",
+            power: null,
+            toughness: null,
+            loyalty: null,
+            imageUris: null,
+          },
+          {
+            name: "Ormendahl, Profane Prince",
+            manaCost: "",
+            typeLine: "Legendary Creature — Demon",
+            oracleText: "Flying, lifelink, indestructible, haste",
+            power: "9",
+            toughness: "7",
+            loyalty: null,
+            imageUris: null,
+          },
+        ],
+      }),
+    };
+    expect(countMdfcLands(deck, cardMap)).toBe(0);
+  });
+
+  test("MDFC with non-land back face is not counted", () => {
+    const deck = makeDeck({
+      mainboard: [{ name: "Esika, God of the Tree", quantity: 1 }],
+    });
+    const cardMap: Record<string, EnrichedCard> = {
+      "Esika, God of the Tree": makeCard({
+        name: "Esika, God of the Tree",
+        layout: "modal_dfc",
+        typeLine: "Legendary Creature — God // Legendary Enchantment",
+        cardFaces: [
+          {
+            name: "Esika, God of the Tree",
+            manaCost: "{1}{G}{G}",
+            typeLine: "Legendary Creature — God",
+            oracleText: "Vigilance",
+            power: "1",
+            toughness: "4",
+            loyalty: null,
+            imageUris: null,
+          },
+          {
+            name: "The Prismatic Bridge",
+            manaCost: "{W}{U}{B}{R}{G}",
+            typeLine: "Legendary Enchantment",
+            oracleText: "At the beginning of your upkeep, reveal cards...",
+            power: null,
+            toughness: null,
+            loyalty: null,
+            imageUris: null,
+          },
+        ],
+      }),
+    };
+    expect(countMdfcLands(deck, cardMap)).toBe(0);
+  });
+
+  test("returns 0 for empty deck", () => {
+    expect(countMdfcLands(makeDeck(), {})).toBe(0);
+  });
+
+  test("respects card quantity", () => {
+    const deck = makeDeck({
+      mainboard: [{ name: "Emeria's Call", quantity: 3 }],
+    });
+    const cardMap: Record<string, EnrichedCard> = {
+      "Emeria's Call": makeCard({
+        name: "Emeria's Call",
+        layout: "modal_dfc",
+        typeLine: "Sorcery // Land",
+        cardFaces: [
+          {
+            name: "Emeria's Call",
+            manaCost: "{4}{W}{W}{W}",
+            typeLine: "Sorcery",
+            oracleText: "Create two 4/4 Angel tokens.",
+            power: null,
+            toughness: null,
+            loyalty: null,
+            imageUris: null,
+          },
+          {
+            name: "Emeria, Shattered Skyclave",
+            manaCost: "",
+            typeLine: "Land",
+            oracleText: "{T}: Add {W}.",
+            power: null,
+            toughness: null,
+            loyalty: null,
+            imageUris: null,
+          },
+        ],
+      }),
+    };
+    expect(countMdfcLands(deck, cardMap)).toBe(3);
   });
 });

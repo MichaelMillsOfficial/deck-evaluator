@@ -30,6 +30,18 @@ export interface CardPrices {
   eur: number | null;
 }
 
+// Per-face data for multi-faced cards (DFCs, adventures, splits, etc.)
+export interface CardFace {
+  name: string;
+  manaCost: string;
+  typeLine: string;
+  oracleText: string;
+  power: string | null;
+  toughness: string | null;
+  loyalty: string | null;
+  imageUris: { small: string; normal: string; large: string } | null;
+}
+
 // Enriched card data (from Scryfall)
 export interface ManaPips {
   W: number;
@@ -63,6 +75,8 @@ export interface EnrichedCard {
   prices: CardPrices;
   setCode: string;
   collectorNumber: string;
+  layout: string;
+  cardFaces: CardFace[];
 }
 
 // Synergy analysis types

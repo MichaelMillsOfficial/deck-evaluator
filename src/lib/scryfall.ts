@@ -1,4 +1,4 @@
-import type { EnrichedCard } from "./types";
+import type { CardFace, EnrichedCard } from "./types";
 import { parseManaPips, parseTypeLine } from "./mana";
 
 const SCRYFALL_API_BASE = "https://api.scryfall.com";
@@ -6,8 +6,13 @@ const BATCH_SIZE = 75;
 const BATCH_DELAY_MS = 100;
 
 export interface ScryfallCardFace {
+  name?: string;
   mana_cost?: string;
+  type_line?: string;
   oracle_text?: string;
+  power?: string;
+  toughness?: string;
+  loyalty?: string;
   produced_mana?: string[];
   image_uris?: {
     small: string;
@@ -19,6 +24,7 @@ export interface ScryfallCardFace {
 export interface ScryfallCard {
   id: string;
   name: string;
+  layout?: string;
   mana_cost?: string;
   cmc: number;
   type_line: string;
@@ -232,15 +238,66 @@ function parsePrice(val: string | null | undefined): number | null {
 }
 
 /**
+ * Builds a CardFace from a ScryfallCardFace (used for multi-face cards).
+ */
+function buildCardFace(
+  face: ScryfallCardFace,
+  fallbackName: string
+): CardFace {
+  const img = face.image_uris;
+  return {
+    name: face.name ?? fallbackName,
+    manaCost: face.mana_cost ?? "",
+    typeLine: face.type_line ?? "",
+    oracleText: face.oracle_text ?? "",
+    power: face.power ?? null,
+    toughness: face.toughness ?? null,
+    loyalty: face.loyalty ?? null,
+    imageUris: img
+      ? { small: img.small, normal: img.normal, large: img.large }
+      : null,
+  };
+}
+
+/**
  * Normalizes a Scryfall card response into our EnrichedCard type.
- * Handles DFCs by falling back to card_faces[0] when top-level fields are undefined.
+ * Handles multi-face cards by building a cardFaces array and combining oracle text.
+ * Top-level fields (manaCost, power, toughness, etc.) remain front-face values.
  */
 export function normalizeToEnrichedCard(card: ScryfallCard): EnrichedCard {
+  const layout = card.layout ?? "normal";
   const frontFace = card.card_faces?.[0];
 
+  // Build cardFaces array
+  const cardFaces: CardFace[] =
+    card.card_faces && card.card_faces.length > 0
+      ? card.card_faces.map((f) => buildCardFace(f, card.name))
+      : [
+          {
+            name: card.name,
+            manaCost: card.mana_cost ?? "",
+            typeLine: card.type_line,
+            oracleText: card.oracle_text ?? "",
+            power: card.power ?? null,
+            toughness: card.toughness ?? null,
+            loyalty: card.loyalty ?? null,
+            imageUris: card.image_uris
+              ? { small: card.image_uris.small, normal: card.image_uris.normal, large: card.image_uris.large }
+              : null,
+          },
+        ];
+
+  // Front-face values for table row display
   const manaCost = card.mana_cost ?? frontFace?.mana_cost ?? "";
-  const oracleText = card.oracle_text ?? frontFace?.oracle_text ?? "";
   const imageUris = card.image_uris ?? frontFace?.image_uris ?? null;
+
+  // Combined oracle text from all faces for analysis
+  const oracleText = card.card_faces && card.card_faces.length > 1
+    ? card.card_faces
+        .map((f) => f.oracle_text ?? "")
+        .filter(Boolean)
+        .join("\n\n")
+    : card.oracle_text ?? frontFace?.oracle_text ?? "";
 
   const { supertypes, cardType: _cardType, subtypes } = parseTypeLine(
     card.type_line
@@ -257,9 +314,9 @@ export function normalizeToEnrichedCard(card: ScryfallCard): EnrichedCard {
     subtypes,
     oracleText,
     keywords: card.keywords,
-    power: card.power ?? null,
-    toughness: card.toughness ?? null,
-    loyalty: card.loyalty ?? null,
+    power: card.power ?? frontFace?.power ?? null,
+    toughness: card.toughness ?? frontFace?.toughness ?? null,
+    loyalty: card.loyalty ?? frontFace?.loyalty ?? null,
     rarity: card.rarity,
     imageUris: imageUris
       ? { small: imageUris.small, normal: imageUris.normal, large: imageUris.large }
@@ -275,5 +332,7 @@ export function normalizeToEnrichedCard(card: ScryfallCard): EnrichedCard {
     },
     setCode: card.set ?? "",
     collectorNumber: card.collector_number ?? "",
+    layout,
+    cardFaces,
   };
 }

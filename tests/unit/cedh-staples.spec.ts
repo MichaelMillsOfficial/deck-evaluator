@@ -29,6 +29,21 @@ function mockCard(overrides: Partial<EnrichedCard> = {}): EnrichedCard {
     flavorName: null,
     isGameChanger: false,
     prices: { usd: null, usdFoil: null, eur: null },
+    setCode: "",
+    collectorNumber: "",
+    layout: "normal",
+    cardFaces: [
+      {
+        name: overrides.name ?? "Test Card",
+        manaCost: overrides.manaCost ?? "",
+        typeLine: overrides.typeLine ?? "Creature",
+        oracleText: overrides.oracleText ?? "",
+        power: overrides.power ?? null,
+        toughness: overrides.toughness ?? null,
+        loyalty: overrides.loyalty ?? null,
+        imageUris: overrides.imageUris ?? null,
+      },
+    ],
     ...overrides,
   };
 }

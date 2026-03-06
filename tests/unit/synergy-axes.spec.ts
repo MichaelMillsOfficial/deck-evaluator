@@ -902,3 +902,62 @@ test.describe("Supertype Matters axis", () => {
     expect(axis.detect(card)).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Multi-face card synergy detection (combined oracle text)
+// ---------------------------------------------------------------------------
+
+test.describe("Multi-face card synergy detection", () => {
+  test("transform DFC with graveyard text on back face scores on graveyard axis", () => {
+    const axis = getAxisById("graveyard")!;
+    const card = mockCard({
+      name: "Henrika Domnathi // Henrika, Infernal Seer",
+      typeLine: "Legendary Creature — Vampire // Legendary Creature — Vampire",
+      // Combined oracle text from both faces
+      oracleText:
+        "At the beginning of combat on your turn, choose one that hasn't been chosen —\n• Each player sacrifices a creature.\n• You draw a card and you lose 1 life.\n• Transform Henrika Domnathi.\n\n" +
+        "Flying, deathtouch, lifelink\nWhenever Henrika, Infernal Seer attacks, return target creature card from your graveyard to the battlefield tapped and attacking.",
+      layout: "transform",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("modal DFC with spellslinger text on back face scores on spellslinger axis", () => {
+    const axis = getAxisById("spellslinger")!;
+    const card = mockCard({
+      name: "Fblthp, Lost on the Range // Fblthp, Found on the Range",
+      typeLine: "Legendary Creature — Homunculus // Legendary Creature — Homunculus",
+      // Front face is vanilla-ish; back face has "whenever you cast an instant or sorcery"
+      oracleText:
+        "When Fblthp enters the battlefield, draw a card.\n\n" +
+        "Whenever you cast an instant or sorcery spell, copy it. You may choose new targets for the copy.",
+      layout: "modal_dfc",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("adventure card with sacrifice text on adventure half scores on sacrifice axis", () => {
+    const axis = getAxisById("sacrifice")!;
+    const card = mockCard({
+      name: "Flamekin Herald // Stoke Genius",
+      typeLine: "Creature — Elemental // Sorcery — Adventure",
+      oracleText:
+        "Sacrifice a creature: Add {R}{R}.\n\n" +
+        "Draw two cards, then discard a card.",
+      layout: "adventure",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("normal card still works as graveyard baseline", () => {
+    const axis = getAxisById("graveyard")!;
+    const card = mockCard({
+      name: "Reanimate",
+      typeLine: "Sorcery",
+      oracleText:
+        "Put target creature card from a graveyard onto the battlefield under your control. You lose life equal to its mana value.",
+      layout: "normal",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+});
