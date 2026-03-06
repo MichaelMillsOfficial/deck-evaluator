@@ -1,5 +1,5 @@
 import type { DeckData, EnrichedCard } from "./types";
-import { generateTags } from "./card-tags";
+import { getTagsCached } from "./card-tags";
 import { findCombosInDeck, type KnownCombo } from "./known-combos";
 import { computeManaBaseMetrics } from "./color-distribution";
 import { computeLandBaseEfficiency } from "./land-base-efficiency";
@@ -78,7 +78,8 @@ function getAllCards(deck: DeckData) {
 export function countTaggedCards(
   deck: DeckData,
   cardMap: Record<string, EnrichedCard>,
-  tags: string[]
+  tags: string[],
+  tagCache?: Map<string, string[]>
 ): number {
   const tagSet = new Set(tags);
   const allCards = getAllCards(deck);
@@ -87,7 +88,7 @@ export function countTaggedCards(
   for (const card of allCards) {
     const enriched = cardMap[card.name];
     if (!enriched) continue;
-    const cardTags = generateTags(enriched);
+    const cardTags = getTagsCached(enriched, tagCache);
     if (cardTags.some((t) => tagSet.has(t))) {
       count += card.quantity;
     }
@@ -446,7 +447,8 @@ export function rawScoreToPowerLevel(rawScore: number): PowerLevelBand {
  */
 export function computePowerLevel(
   deck: DeckData,
-  cardMap: Record<string, EnrichedCard>
+  cardMap: Record<string, EnrichedCard>,
+  tagCache?: Map<string, string[]>
 ): PowerLevelResult {
   // Gather inputs
   const allCards = getAllCards(deck);
@@ -456,17 +458,17 @@ export function computePowerLevel(
   const landEfficiency = computeLandBaseEfficiency(deck, cardMap);
 
   // Count factors
-  const tutorCount = countTaggedCards(deck, cardMap, ["Tutor"]);
+  const tutorCount = countTaggedCards(deck, cardMap, ["Tutor"], tagCache);
   const fastManaCount = countFastMana(deck, cardMap);
   const interactionCount = countTaggedCards(deck, cardMap, [
     "Removal",
     "Counterspell",
     "Board Wipe",
-  ]);
+  ], tagCache);
   const cardDrawCount = countTaggedCards(deck, cardMap, [
     "Card Draw",
     "Card Advantage",
-  ]);
+  ], tagCache);
 
   // Score each factor
   const tutorResult = scoreTutorDensity(tutorCount);

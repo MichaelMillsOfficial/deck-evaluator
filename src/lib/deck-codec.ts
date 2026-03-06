@@ -155,51 +155,63 @@ function fromBase64Url(str: string): Uint8Array {
 // ---------------------------------------------------------------------------
 
 async function compressGzip(data: Uint8Array): Promise<Uint8Array> {
-  const cs = new CompressionStream("gzip");
-  const writer = cs.writable.getWriter();
-  writer.write(new Uint8Array(data.buffer as ArrayBuffer));
-  writer.close();
+  try {
+    const cs = new CompressionStream("gzip");
+    const writer = cs.writable.getWriter();
+    writer.write(new Uint8Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)));
+    writer.close();
 
-  const chunks: Uint8Array[] = [];
-  const reader = cs.readable.getReader();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-  }
+    const chunks: Uint8Array[] = [];
+    const reader = cs.readable.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
 
-  const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
-  const compressed = new Uint8Array(totalLen);
-  let offset = 0;
-  for (const chunk of chunks) {
-    compressed.set(chunk, offset);
-    offset += chunk.length;
+    const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
+    const compressed = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const chunk of chunks) {
+      compressed.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return compressed;
+  } catch (err) {
+    throw new Error(
+      `Gzip compression failed: ${err instanceof Error ? err.message : "unknown error"}`
+    );
   }
-  return compressed;
 }
 
 async function decompressGzip(data: Uint8Array): Promise<Uint8Array> {
-  const ds = new DecompressionStream("gzip");
-  const writer = ds.writable.getWriter();
-  writer.write(new Uint8Array(data.buffer as ArrayBuffer));
-  writer.close();
+  try {
+    const ds = new DecompressionStream("gzip");
+    const writer = ds.writable.getWriter();
+    writer.write(new Uint8Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)));
+    writer.close();
 
-  const chunks: Uint8Array[] = [];
-  const reader = ds.readable.getReader();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-  }
+    const chunks: Uint8Array[] = [];
+    const reader = ds.readable.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
 
-  const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
-  const decompressed = new Uint8Array(totalLen);
-  let offset = 0;
-  for (const chunk of chunks) {
-    decompressed.set(chunk, offset);
-    offset += chunk.length;
+    const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
+    const decompressed = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const chunk of chunks) {
+      decompressed.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return decompressed;
+  } catch (err) {
+    throw new Error(
+      `Gzip decompression failed: ${err instanceof Error ? err.message : "unknown error"}`
+    );
   }
-  return decompressed;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +242,12 @@ export async function encodeCompactDeckPayload(
 export async function decodeDeckPayload(
   encoded: string
 ): Promise<DecodedPayload> {
-  const compressed = fromBase64Url(encoded);
+  let compressed: Uint8Array;
+  try {
+    compressed = fromBase64Url(encoded);
+  } catch {
+    throw new Error("Invalid share URL: malformed base64url encoding");
+  }
   const decompressed = await decompressGzip(compressed);
   const json = new TextDecoder().decode(decompressed);
   return deserializePayload(json);
@@ -242,34 +259,47 @@ export async function decodeDeckPayload(
 
 function tuplesToDeckCards(
   tuples: [string, string, number][],
-  cardMap: Record<string, EnrichedCard>
+  cardMap: Record<string, EnrichedCard>,
+  setNumberIndex: Map<string, string>
 ): { name: string; quantity: number }[] {
   return tuples.map(([set, numOrName, qty]) => {
     if (set === "_") {
       // Fallback tuple — numOrName is the card name
       return { name: numOrName, quantity: qty };
     }
-    // Find card by set+number in cardMap
-    for (const card of Object.values(cardMap)) {
-      if (card.setCode === set && card.collectorNumber === numOrName) {
-        return { name: card.name, quantity: qty };
-      }
+    // O(1) lookup by set+collectorNumber
+    const name = setNumberIndex.get(`${set}|${numOrName}`);
+    if (name) {
+      return { name, quantity: qty };
     }
     // Card not found in map — use a placeholder
     return { name: `${set}/${numOrName}`, quantity: qty };
   });
 }
 
+function buildSetNumberIndex(
+  cardMap: Record<string, EnrichedCard>
+): Map<string, string> {
+  const index = new Map<string, string>();
+  for (const card of Object.values(cardMap)) {
+    if (card.setCode) {
+      index.set(`${card.setCode}|${card.collectorNumber}`, card.name);
+    }
+  }
+  return index;
+}
+
 export function buildDeckFromCompactPayload(
   payload: Extract<DecodedPayload, { version: 2 }>,
   cardMap: Record<string, EnrichedCard>
 ): DeckData {
+  const index = buildSetNumberIndex(cardMap);
   return {
     name: payload.name,
     source: "text",
     url: "",
-    commanders: tuplesToDeckCards(payload.commanders, cardMap),
-    mainboard: tuplesToDeckCards(payload.mainboard, cardMap),
-    sideboard: tuplesToDeckCards(payload.sideboard, cardMap),
+    commanders: tuplesToDeckCards(payload.commanders, cardMap, index),
+    mainboard: tuplesToDeckCards(payload.mainboard, cardMap, index),
+    sideboard: tuplesToDeckCards(payload.sideboard, cardMap, index),
   };
 }

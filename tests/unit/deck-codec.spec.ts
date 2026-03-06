@@ -293,3 +293,52 @@ test.describe("deserializePayload v1/v2 detection", () => {
     expect(compactJson.length).toBeLessThan(textPayload.length);
   });
 });
+
+test.describe("buildDeckFromCompactPayload", () => {
+  const { buildDeckFromCompactPayload } = require("../../src/lib/deck-codec");
+
+  test("resolves cards by set+collectorNumber via index", () => {
+    const cardMap: Record<string, EnrichedCard> = {
+      "Sol Ring": makeCard({ name: "Sol Ring", setCode: "c21", collectorNumber: "263" }),
+      "Island": makeCard({ name: "Island", setCode: "tst", collectorNumber: "1" }),
+    };
+
+    const payload = {
+      version: 2 as const,
+      name: "Test",
+      commanders: [["c21", "263", 1] as [string, string, number]],
+      mainboard: [["tst", "1", 4] as [string, string, number]],
+      sideboard: [],
+    };
+
+    const deck = buildDeckFromCompactPayload(payload, cardMap);
+    expect(deck.commanders).toEqual([{ name: "Sol Ring", quantity: 1 }]);
+    expect(deck.mainboard).toEqual([{ name: "Island", quantity: 4 }]);
+  });
+
+  test("handles fallback tuples (set='_')", () => {
+    const payload = {
+      version: 2 as const,
+      name: "Test",
+      commanders: [],
+      mainboard: [["_", "Missing Card", 2] as [string, string, number]],
+      sideboard: [],
+    };
+
+    const deck = buildDeckFromCompactPayload(payload, {});
+    expect(deck.mainboard).toEqual([{ name: "Missing Card", quantity: 2 }]);
+  });
+
+  test("produces placeholder name when set+number not found", () => {
+    const payload = {
+      version: 2 as const,
+      name: "Test",
+      commanders: [],
+      mainboard: [["xyz", "99", 1] as [string, string, number]],
+      sideboard: [],
+    };
+
+    const deck = buildDeckFromCompactPayload(payload, {});
+    expect(deck.mainboard[0].name).toBe("xyz/99");
+  });
+});
