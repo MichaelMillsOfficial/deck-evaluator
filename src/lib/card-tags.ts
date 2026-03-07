@@ -369,3 +369,30 @@ export function generateTags(card: EnrichedCard): string[] {
 
   return Array.from(tags).sort();
 }
+
+/**
+ * Pre-compute tags for all cards in a map, returning a reusable cache.
+ * Avoids redundant regex work when multiple analysis modules call generateTags
+ * for the same cards.
+ */
+export function buildTagCache(
+  cardMap: Record<string, EnrichedCard>
+): Map<string, string[]> {
+  const cache = new Map<string, string[]>();
+  for (const [name, card] of Object.entries(cardMap)) {
+    cache.set(name, generateTags(card));
+  }
+  return cache;
+}
+
+/** Look up tags from cache, falling back to generateTags if not cached. */
+export function getTagsCached(
+  card: EnrichedCard,
+  tagCache?: Map<string, string[]>
+): string[] {
+  if (tagCache) {
+    const cached = tagCache.get(card.name);
+    if (cached) return cached;
+  }
+  return generateTags(card);
+}

@@ -7,7 +7,7 @@ import {
   type MtgColor,
 } from "./color-distribution";
 import { computeUntappedRatio, computeManaFixingQuality } from "./land-base-efficiency";
-import { generateTags } from "./card-tags";
+import { getTagsCached } from "./card-tags";
 import { hypergeometricCdf, getDeckSize } from "./hypergeometric";
 
 // ---------------------------------------------------------------------------
@@ -112,14 +112,15 @@ export function getLandCountTarget(avgCmc: number): LandTarget {
 
 function countRampCards(
   deck: DeckData,
-  cardMap: Record<string, EnrichedCard>
+  cardMap: Record<string, EnrichedCard>,
+  tagCache?: Map<string, string[]>
 ): number {
   const allCards = getAllCards(deck);
   let count = 0;
   for (const card of allCards) {
     const enriched = cardMap[card.name];
     if (!enriched) continue;
-    const tags = generateTags(enriched);
+    const tags = getTagsCached(enriched, tagCache);
     if (tags.includes("Ramp")) {
       count += card.quantity;
     }
@@ -129,10 +130,11 @@ function countRampCards(
 
 function checkLandCount(
   deck: DeckData,
-  cardMap: Record<string, EnrichedCard>
+  cardMap: Record<string, EnrichedCard>,
+  tagCache?: Map<string, string[]>
 ): ManaRecommendation[] {
   const metrics = computeManaBaseMetrics(deck, cardMap);
-  const rampCount = countRampCards(deck, cardMap);
+  const rampCount = countRampCards(deck, cardMap, tagCache);
   const target = getLandCountTarget(metrics.averageCmc);
   const rampAdjustment = Math.min(Math.floor(rampCount / 4), 3);
   const adjustedLow = target.low - rampAdjustment;
@@ -421,7 +423,8 @@ const BASIC_LAND_TYPE_REGEX: Record<string, RegExp> = {
 
 function analyzeRampCards(
   deck: DeckData,
-  cardMap: Record<string, EnrichedCard>
+  cardMap: Record<string, EnrichedCard>,
+  tagCache?: Map<string, string[]>
 ): RampAnalysis {
   const allCards = getAllCards(deck);
   let basicOnlyCount = 0;
@@ -432,7 +435,7 @@ function analyzeRampCards(
     const enriched = cardMap[card.name];
     if (!enriched) continue;
 
-    const tags = generateTags(enriched);
+    const tags = getTagsCached(enriched, tagCache);
     const text = enriched.oracleText.toLowerCase();
 
     // Count fetch lands (land cards tagged as Fetch Land)
@@ -465,9 +468,10 @@ function analyzeRampCards(
 
 function checkRampCompatibility(
   deck: DeckData,
-  cardMap: Record<string, EnrichedCard>
+  cardMap: Record<string, EnrichedCard>,
+  tagCache?: Map<string, string[]>
 ): ManaRecommendation[] {
-  const rampAnalysis = analyzeRampCards(deck, cardMap);
+  const rampAnalysis = analyzeRampCards(deck, cardMap, tagCache);
   const allCards = getAllCards(deck);
   const recommendations: ManaRecommendation[] = [];
 
@@ -611,17 +615,18 @@ function checkOpeningHand(
 
 export function computeManaBaseRecommendations(
   deck: DeckData,
-  cardMap: Record<string, EnrichedCard>
+  cardMap: Record<string, EnrichedCard>,
+  tagCache?: Map<string, string[]>
 ): ManaBaseRecommendationsResult {
-  const rampAnalysis = analyzeRampCards(deck, cardMap);
+  const rampAnalysis = analyzeRampCards(deck, cardMap, tagCache);
 
   const allRecs: ManaRecommendation[] = [
-    ...checkLandCount(deck, cardMap),
+    ...checkLandCount(deck, cardMap, tagCache),
     ...checkColorBalance(deck, cardMap),
     ...checkEtbTempo(deck, cardMap),
     ...checkManaFixing(deck, cardMap),
     ...checkBasicLandRatio(deck, cardMap, rampAnalysis.basicOnlyCount),
-    ...checkRampCompatibility(deck, cardMap),
+    ...checkRampCompatibility(deck, cardMap, tagCache),
     ...checkOpeningHand(deck, cardMap),
   ];
 

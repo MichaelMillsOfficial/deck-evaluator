@@ -12,7 +12,7 @@ import {
   MTG_COLORS,
 } from "./color-distribution";
 import { analyzeDeckSynergy } from "./synergy-engine";
-import { generateTags } from "./card-tags";
+import { getTagsCached } from "./card-tags";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -165,7 +165,7 @@ export function findReplacementCandidates(
   synergyAnalysis: DeckSynergyAnalysis
 ): ReplacementCandidate[] {
   const commanderNames = new Set(deck.commanders.map((c) => c.name));
-  const candidateTags = generateTags(candidate);
+  const candidateTags = getTagsCached(candidate);
 
   // Eligible: mainboard, non-commander, non-land
   const eligible = deck.mainboard.filter((card) => {
@@ -182,7 +182,7 @@ export function findReplacementCandidates(
 
   for (const card of eligible) {
     const enriched = cardMap[card.name]!;
-    const cardTags = generateTags(enriched);
+    const cardTags = getTagsCached(enriched);
     const shared = candidateTags.filter((t) => cardTags.includes(t));
 
     if (shared.length === 0) continue;
@@ -278,7 +278,7 @@ export function analyzeCandidateCard(
   );
 
   // Tags
-  const tags = generateTags(candidate);
+  const tags = getTagsCached(candidate);
 
   // Off-identity check
   const commanderIdentity = resolveCommanderIdentity(deck, cardMap);

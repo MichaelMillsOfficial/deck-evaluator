@@ -9,7 +9,7 @@ import type {
 } from "./types";
 import { SYNERGY_AXES, extractReferencedKeywords } from "./synergy-axes";
 import { findCombosInDeck } from "./known-combos";
-import { generateTags } from "./card-tags";
+import { getTagsCached } from "./card-tags";
 import {
   identifyTribalAnchors,
   getCreatureSubtypes,
@@ -82,44 +82,62 @@ function computeDeckAxisStrengths(
   return strengths;
 }
 
+/** Build a lookup map for axis definitions by ID (avoids repeated SYNERGY_AXES.find()) */
+function buildAxisMap(): Map<string, (typeof SYNERGY_AXES)[number]> {
+  const map = new Map<string, (typeof SYNERGY_AXES)[number]>();
+  for (const axis of SYNERGY_AXES) {
+    map.set(axis.id, axis);
+  }
+  return map;
+}
+
+const axisMap = buildAxisMap();
+
 /** Generate heuristic synergy pairs between cards sharing axes */
 function generateSynergyPairs(
   cardNames: string[],
   axisScores: Map<string, CardAxisScore[]>
 ): SynergyPair[] {
+  // Group cards by axis for O(axis × cards_per_axis²) instead of O(cards²)
+  const cardsByAxis = new Map<string, { name: string; relevance: number }[]>();
+
+  for (const name of cardNames) {
+    const axes = axisScores.get(name) ?? [];
+    for (const axis of axes) {
+      if (axis.relevance < AXIS_RELEVANCE_THRESHOLD) continue;
+      let group = cardsByAxis.get(axis.axisId);
+      if (!group) {
+        group = [];
+        cardsByAxis.set(axis.axisId, group);
+      }
+      group.push({ name, relevance: axis.relevance });
+    }
+  }
+
   const pairs: SynergyPair[] = [];
   const seen = new Set<string>();
 
-  for (let i = 0; i < cardNames.length; i++) {
-    const aName = cardNames[i];
-    const aAxes = axisScores.get(aName) ?? [];
+  for (const [axisId, cards] of cardsByAxis) {
+    if (cards.length < 2) continue;
+    const axisInfo = axisMap.get(axisId);
 
-    for (let j = i + 1; j < cardNames.length; j++) {
-      const bName = cardNames[j];
-      const bAxes = axisScores.get(bName) ?? [];
+    for (let i = 0; i < cards.length; i++) {
+      for (let j = i + 1; j < cards.length; j++) {
+        const a = cards[i];
+        const b = cards[j];
 
-      // Find shared axes
-      for (const aAxis of aAxes) {
-        if (aAxis.relevance < AXIS_RELEVANCE_THRESHOLD) continue;
-
-        const bMatch = bAxes.find(
-          (b) => b.axisId === aAxis.axisId && b.relevance >= AXIS_RELEVANCE_THRESHOLD
-        );
-        if (!bMatch) continue;
-
-        const key = `${aAxis.axisId}:${[aName, bName].sort().join("|")}`;
+        const key = `${axisId}:${a.name < b.name ? `${a.name}|${b.name}` : `${b.name}|${a.name}`}`;
         if (seen.has(key)) continue;
         seen.add(key);
 
-        const axisInfo = SYNERGY_AXES.find((a) => a.id === aAxis.axisId);
-        const strength = Math.min(1, (aAxis.relevance + bMatch.relevance) / 2);
+        const strength = Math.min(1, (a.relevance + b.relevance) / 2);
 
         pairs.push({
-          cards: [aName, bName],
-          axisId: aAxis.axisId,
+          cards: [a.name, b.name],
+          axisId,
           type: "synergy",
           strength,
-          description: `Both contribute to ${axisInfo?.name ?? aAxis.axisId} strategy`,
+          description: `Both contribute to ${axisInfo?.name ?? axisId} strategy`,
         });
       }
     }
@@ -132,7 +150,8 @@ function generateSynergyPairs(
 function generateAntiSynergyPairs(
   cardNames: string[],
   axisScores: Map<string, CardAxisScore[]>,
-  cardMap: Record<string, EnrichedCard>
+  cardMap: Record<string, EnrichedCard>,
+  tagCache?: Map<string, string[]>
 ): SynergyPair[] {
   const pairs: SynergyPair[] = [];
   const seen = new Set<string>();
@@ -149,7 +168,7 @@ function generateAntiSynergyPairs(
       for (const aAxis of aAxes) {
         if (aAxis.relevance < AXIS_RELEVANCE_THRESHOLD) continue;
 
-        const axisDef = SYNERGY_AXES.find((a) => a.id === aAxis.axisId);
+        const axisDef = axisMap.get(aAxis.axisId);
         if (!axisDef?.conflictsWith?.length) continue;
 
         for (const conflictId of axisDef.conflictsWith) {
@@ -162,7 +181,7 @@ function generateAntiSynergyPairs(
           if (seen.has(key)) continue;
           seen.add(key);
 
-          const conflictAxis = SYNERGY_AXES.find((a) => a.id === conflictId);
+          const conflictAxis = axisMap.get(conflictId);
           const strength = Math.min(1, (aAxis.relevance + bMatch.relevance) / 2);
 
           pairs.push({
@@ -184,7 +203,7 @@ function generateAntiSynergyPairs(
   for (const name of cardNames) {
     const card = cardMap[name];
     if (!card) continue;
-    const tags = generateTags(card);
+    const tags = getTagsCached(card, tagCache);
     if (tags.includes("Board Wipe")) boardWipeCardNames.push(name);
     const tokenAxes = axisScores.get(name) ?? [];
     if (tokenAxes.some((a) => a.axisId === "tokens" && a.relevance >= AXIS_RELEVANCE_THRESHOLD)) {
@@ -301,7 +320,7 @@ function boostTribalScores(
   if (anchors.length === 0) return;
 
   const anchorSet = new Set(anchors);
-  const tribalAxis = SYNERGY_AXES.find((a) => a.id === "tribal");
+  const tribalAxis = axisMap.get("tribal");
   if (!tribalAxis) return;
 
   // Extract commander type sets for tiered boosting
@@ -376,7 +395,7 @@ function boostSupertypeScores(
   if (anchors.length === 0) return anchors;
 
   const anchorSet = new Set(anchors);
-  const supertypeAxis = SYNERGY_AXES.find((a) => a.id === "supertypeMatter");
+  const supertypeAxis = axisMap.get("supertypeMatter");
   if (!supertypeAxis) return anchors;
 
   for (const name of cardNames) {
@@ -463,7 +482,7 @@ function boostKeywordScores(
 
   if (anchors.length === 0) return anchors;
 
-  const kwAxis = SYNERGY_AXES.find((a) => a.id === "keywordMatters");
+  const kwAxis = axisMap.get("keywordMatters");
   if (!kwAxis) return anchors;
 
   // Boost cards that HAVE the anchored keywords
@@ -537,7 +556,7 @@ function identifyDeckThemes(
   const themes: DeckTheme[] = [];
   for (const [axisId, cardCount] of axisCardCounts) {
     if (cardCount < DECK_THEME_MIN_CARDS) continue;
-    const axisDef = SYNERGY_AXES.find((a) => a.id === axisId);
+    const axisDef = axisMap.get(axisId);
     if (!axisDef) continue;
     const theme: DeckTheme = {
       axisId,
@@ -573,7 +592,8 @@ function identifyDeckThemes(
 /** Main synergy analysis entry point */
 export function analyzeDeckSynergy(
   deck: DeckData,
-  cardMap: Record<string, EnrichedCard>
+  cardMap: Record<string, EnrichedCard>,
+  tagCache?: Map<string, string[]>
 ): DeckSynergyAnalysis {
   const cardNames = getAllCardNames(deck);
 
@@ -599,7 +619,7 @@ export function analyzeDeckSynergy(
   const synergyPairs = generateSynergyPairs(cardNames, axisScores);
 
   // Step 5: Generate anti-synergy pairs
-  const antiSynergyPairs = generateAntiSynergyPairs(cardNames, axisScores, cardMap);
+  const antiSynergyPairs = generateAntiSynergyPairs(cardNames, axisScores, cardMap, tagCache);
 
   // Step 6: Compute per-card scores
   const cardScores = computeCardScores(

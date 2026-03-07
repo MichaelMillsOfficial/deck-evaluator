@@ -1,5 +1,5 @@
 import type { DeckData, DeckTheme, EnrichedCard } from "./types";
-import { generateTags } from "./card-tags";
+import { getTagsCached } from "./card-tags";
 import { type MtgColor } from "./color-distribution";
 import { classifyLandEntry } from "./land-base-efficiency";
 import { SYNERGY_AXES } from "./synergy-axes";
@@ -181,7 +181,7 @@ function isUntappedLand(card: EnrichedCard): boolean {
 }
 
 function hasRampTag(card: EnrichedCard): boolean {
-  const tags = generateTags(card);
+  const tags = getTagsCached(card);
   return tags.includes("Ramp");
 }
 
@@ -197,7 +197,7 @@ function getTagsForCard(
     const cached = cache.get(card.name);
     if (cached) return cached.tags;
   }
-  return generateTags(card);
+  return getTagsCached(card);
 }
 
 function getAxisScoresForCard(
@@ -385,7 +385,7 @@ export function buildCardCache(
   >();
   for (const card of pool) {
     if (cache.has(card.name)) continue;
-    const tags = generateTags(card.enriched);
+    const tags = getTagsCached(card.enriched);
     const axisScores = new Map<string, number>();
     for (const axis of SYNERGY_AXES) {
       const score = axis.detect(card.enriched);

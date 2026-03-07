@@ -1,6 +1,6 @@
 import type { DeckData, EnrichedCard } from "./types";
 import { parseTypeLine } from "./mana";
-import { generateTags } from "./card-tags";
+import { getTagsCached } from "./card-tags";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -188,7 +188,8 @@ export function computePriceByType(
  */
 export function computePriceByRole(
   deck: DeckData,
-  cardMap: Record<string, EnrichedCard>
+  cardMap: Record<string, EnrichedCard>,
+  tagCache?: Map<string, string[]>
 ): RolePriceSummary[] {
   const allCards = [...deck.commanders, ...deck.mainboard, ...deck.sideboard];
   const roleMap = new Map<string, { totalCost: number; cardCount: number }>();
@@ -197,7 +198,7 @@ export function computePriceByRole(
     const enriched = cardMap[card.name];
     if (!enriched || enriched.prices.usd == null) continue;
 
-    const tags = generateTags(enriched);
+    const tags = getTagsCached(enriched, tagCache);
     if (tags.length === 0) continue;
 
     for (const tag of tags) {
@@ -255,7 +256,8 @@ export function formatUSD(amount: number): string {
  */
 export function computeBudgetAnalysis(
   deck: DeckData,
-  cardMap: Record<string, EnrichedCard>
+  cardMap: Record<string, EnrichedCard>,
+  tagCache?: Map<string, string[]>
 ): BudgetAnalysisResult {
   const priceList = buildCardPriceList(deck, cardMap);
   const totalCost = priceList.reduce((sum, e) => sum + e.totalPrice, 0);
@@ -281,6 +283,6 @@ export function computeBudgetAnalysis(
     mostExpensive: priceList,
     distribution: computePriceDistribution(priceList),
     byType: computePriceByType(deck, cardMap),
-    byRole: computePriceByRole(deck, cardMap),
+    byRole: computePriceByRole(deck, cardMap, tagCache),
   };
 }
