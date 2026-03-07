@@ -1048,12 +1048,12 @@ function detectStructuredRestrictionBlock(
 
   if (restriction.restricts === "cast") {
     for (const perm of b.zoneCastPermissions) {
-      if (perm.from !== "hand") {
+      if (perm.fromZone !== "hand") {
         return {
           cards: [a.cardName, b.cardName],
           type: "blocks",
           strength: 0.8,
-          mechanical: `${a.cardName} prevents casting from ${perm.from}, blocking ${b.cardName}`,
+          mechanical: `${a.cardName} prevents casting from ${perm.fromZone}, blocking ${b.cardName}`,
           events: [],
         };
       }
@@ -1216,8 +1216,8 @@ function restrictionBlocksCard(
     case "cast": {
       // Blocks cards that cast from non-standard zones (graveyard, exile, library)
       for (const perm of card.zoneCastPermissions) {
-        if (perm.from !== "hand") {
-          return `can't cast from ${perm.from}`;
+        if (perm.fromZone !== "hand") {
+          return `can't cast from ${perm.fromZone}`;
         }
       }
       return null;
@@ -1245,10 +1245,9 @@ function restrictionBlocksCard(
       // Blocks cards that depend on drawing (scope typically "more than one each turn")
       if (restriction.scope?.includes("more than one")) {
         // Only blocks extra-draw strategies, not normal draw
-        for (const event of card.causesEvents) {
-          if (event.kind === "player_action" && event.action === "draw_card") {
-            return "can't draw more than one card each turn";
-          }
+        // Card draw is modeled as producing CardsResource (category: "cards")
+        if (card.produces.some((p) => p.category === "cards")) {
+          return "can't draw more than one card each turn";
         }
       }
       return null;
@@ -1745,12 +1744,10 @@ function computeNetEffect(
 
     // Collect produced resources
     for (const prod of p.produces) {
-      if ("category" in prod) {
-        if (prod.category === "mana" || prod.category === "life" || prod.category === "cards") {
-          resources.push(prod);
-        } else if (prod.category === "counter" || prod.category === "stat_mod" || prod.category === "keyword_grant") {
-          attributes.push(prod);
-        }
+      if (prod.category === "mana" || prod.category === "life" || prod.category === "cards") {
+        resources.push(prod);
+      } else if (prod.category === "counter" || prod.category === "stat_mod" || prod.category === "keyword_grant") {
+        attributes.push(prod);
       } else if (prod.category === "create_token") {
         // Token creation causes an ETB event
         events.push({
