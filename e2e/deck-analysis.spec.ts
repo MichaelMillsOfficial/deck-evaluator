@@ -450,7 +450,7 @@ test.describe("Deck Analysis — Tab Navigation", () => {
     const deckListTab = tablist.getByRole("tab", { name: "Deck List" });
     const analysisTab = tablist.getByRole("tab", { name: "Analysis" });
 
-    const additionsTab = tablist.getByRole("tab", { name: "Additions" });
+    const interactionsTab = tablist.getByRole("tab", { name: /Interactions/ });
 
     await deckListTab.focus();
     await page.keyboard.press("ArrowRight");
@@ -460,7 +460,7 @@ test.describe("Deck Analysis — Tab Navigation", () => {
     await expect(deckListTab).toBeFocused();
 
     await page.keyboard.press("End");
-    await expect(additionsTab).toBeFocused();
+    await expect(interactionsTab).toBeFocused();
 
     await page.keyboard.press("Home");
     await expect(deckListTab).toBeFocused();

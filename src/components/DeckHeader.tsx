@@ -9,14 +9,15 @@ import {
 } from "@/lib/export-report";
 import { SYNERGY_AXES } from "@/lib/synergy-axes";
 
-export type ViewTab = "list" | "analysis" | "synergy" | "hands" | "additions";
+export type ViewTab = "list" | "analysis" | "synergy" | "hands" | "additions" | "interactions";
 
-const tabs: { key: ViewTab; label: string }[] = [
+const tabs: { key: ViewTab; label: string; badge?: string }[] = [
   { key: "list", label: "Deck List" },
   { key: "analysis", label: "Analysis" },
   { key: "synergy", label: "Synergy" },
   { key: "hands", label: "Hands" },
   { key: "additions", label: "Additions" },
+  { key: "interactions", label: "Interactions", badge: "BETA" },
 ];
 
 interface DeckHeaderProps {
@@ -112,7 +113,8 @@ export default function DeckHeader({
       const isDisabled =
         (target.key === "analysis" ||
           target.key === "synergy" ||
-          target.key === "hands") &&
+          target.key === "hands" ||
+          target.key === "interactions") &&
         analysisDisabled;
       if (!isDisabled) break;
       if (e.key === "ArrowRight" || e.key === "Home") {
@@ -405,7 +407,8 @@ export default function DeckHeader({
           const isDisabled =
             (tab.key === "analysis" ||
               tab.key === "synergy" ||
-              tab.key === "hands") &&
+              tab.key === "hands" ||
+              tab.key === "interactions") &&
             analysisDisabled;
           return (
             <button
@@ -426,6 +429,11 @@ export default function DeckHeader({
               }`}
             >
               {tab.label}
+              {tab.badge && (
+                <span className="ml-1 rounded-full bg-purple-600/80 px-1.5 py-0.5 text-[10px] font-bold leading-none text-purple-100">
+                  {tab.badge}
+                </span>
+              )}
             </button>
           );
         })}
