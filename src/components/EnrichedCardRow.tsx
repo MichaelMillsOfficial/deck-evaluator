@@ -1,11 +1,98 @@
 "use client";
 
 import { useState, useCallback, memo } from "react";
-import type { EnrichedCard } from "@/lib/types";
+import type { CardFace, EnrichedCard } from "@/lib/types";
 import ManaCost from "@/components/ManaCost";
 import CardTags from "@/components/CardTags";
 import OracleText from "@/components/OracleText";
 import { formatUSD } from "@/lib/budget-analysis";
+import { getFaceDisplayMode } from "@/lib/card-layout";
+
+// ---------------------------------------------------------------------------
+// CardFaceDetail — renders a single face's details (reused by tabs & inline)
+// ---------------------------------------------------------------------------
+
+function CardFaceDetail({ face }: { face: CardFace }) {
+  return (
+    <div className="space-y-2 text-sm" data-testid={`face-detail-${face.name.replace(/[^a-zA-Z0-9]/g, "-")}`}>
+      <p className="text-slate-400 text-xs">{face.typeLine}</p>
+      {face.manaCost && (
+        <div>
+          <ManaCost cost={face.manaCost} />
+        </div>
+      )}
+      {face.oracleText && <OracleText text={face.oracleText} />}
+      <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+        {face.power !== null && face.toughness !== null && (
+          <span>
+            P/T: {face.power}/{face.toughness}
+          </span>
+        )}
+        {face.loyalty !== null && <span>Loyalty: {face.loyalty}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Multi-face detail renderers
+// ---------------------------------------------------------------------------
+
+function TabsFaceDetail({
+  faces,
+  activeFace,
+  setActiveFace,
+}: {
+  faces: CardFace[];
+  activeFace: number;
+  setActiveFace: (i: number) => void;
+}) {
+  return (
+    <div>
+      <div className="flex gap-1 mb-2" role="tablist" aria-label="Card faces">
+        {faces.map((face, i) => (
+          <button
+            key={face.name}
+            role="tab"
+            aria-selected={i === activeFace}
+            aria-controls={`face-panel-${i}`}
+            onClick={() => setActiveFace(i)}
+            className={`px-2 py-0.5 text-xs rounded ${
+              i === activeFace
+                ? "text-purple-300 bg-purple-500/20"
+                : "text-slate-400 bg-slate-700/50 hover:bg-slate-700 hover:text-slate-300"
+            }`}
+          >
+            {face.name}
+          </button>
+        ))}
+      </div>
+      <div id={`face-panel-${activeFace}`} role="tabpanel">
+        <CardFaceDetail face={faces[activeFace]} />
+      </div>
+    </div>
+  );
+}
+
+function InlineFaceDetail({ faces }: { faces: CardFace[] }) {
+  return (
+    <div>
+      {faces.map((face, i) => (
+        <div key={face.name}>
+          {i > 0 && <div className="border-t border-slate-700/50 mt-2 pt-2" />}
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">
+            {face.name}
+          </p>
+          <CardFaceDetail face={face} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// EnrichedCardRow
+// ---------------------------------------------------------------------------
 
 interface EnrichedCardRowProps {
   card: EnrichedCard;
@@ -17,8 +104,11 @@ export default memo(function EnrichedCardRow({
   quantity,
 }: EnrichedCardRowProps) {
   const [open, setOpen] = useState(false);
+  const [activeFace, setActiveFace] = useState(0);
 
   const detailId = `card-detail-${card.name.replace(/[^a-zA-Z0-9]/g, "-")}`;
+  const displayMode = getFaceDisplayMode(card.layout);
+  const isMultiFace = (card.cardFaces?.length ?? 0) > 1;
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -82,21 +172,49 @@ export default memo(function EnrichedCardRow({
       {open && (
         <tr id={detailId} className="bg-slate-900/50">
           <td colSpan={4} className="px-4 py-3">
-            <div className="space-y-2 text-sm">
-              {/* Type line (visible on mobile since column is hidden) */}
-              <p className="text-slate-400 sm:hidden">{card.typeLine}</p>
+            {/* Multi-face: tabs or inline based on layout */}
+            {isMultiFace && displayMode === "tabs" && (
+              <TabsFaceDetail
+                faces={card.cardFaces}
+                activeFace={activeFace}
+                setActiveFace={setActiveFace}
+              />
+            )}
+            {isMultiFace && displayMode === "inline" && (
+              <InlineFaceDetail faces={card.cardFaces} />
+            )}
 
-              {/* Oracle text */}
-              {card.oracleText && <OracleText text={card.oracleText} />}
+            {/* Single-face or fallback: original rendering */}
+            {(!isMultiFace || displayMode === "single") && (
+              <div className="space-y-2 text-sm">
+                {/* Type line (visible on mobile since column is hidden) */}
+                <p className="text-slate-400 sm:hidden">{card.typeLine}</p>
 
-              {/* Stats row */}
-              <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-                {card.power !== null && card.toughness !== null && (
-                  <span>
-                    P/T: {card.power}/{card.toughness}
-                  </span>
-                )}
-                {card.loyalty !== null && <span>Loyalty: {card.loyalty}</span>}
+                {/* Oracle text */}
+                {card.oracleText && <OracleText text={card.oracleText} />}
+
+                {/* Stats row */}
+                <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+                  {card.power !== null && card.toughness !== null && (
+                    <span>
+                      P/T: {card.power}/{card.toughness}
+                    </span>
+                  )}
+                  {card.loyalty !== null && <span>Loyalty: {card.loyalty}</span>}
+                  {card.keywords.length > 0 && (
+                    <span>Keywords: {card.keywords.join(", ")}</span>
+                  )}
+                  <span className="capitalize">Rarity: {card.rarity}</span>
+                  {card.prices.usd != null && (
+                    <span data-testid="card-price">Price: {formatUSD(card.prices.usd)}</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Shared stats for multi-face cards (keywords, rarity, price) */}
+            {isMultiFace && displayMode !== "single" && (
+              <div className="flex flex-wrap gap-3 text-xs text-slate-400 mt-2">
                 {card.keywords.length > 0 && (
                   <span>Keywords: {card.keywords.join(", ")}</span>
                 )}
@@ -105,7 +223,7 @@ export default memo(function EnrichedCardRow({
                   <span data-testid="card-price">Price: {formatUSD(card.prices.usd)}</span>
                 )}
               </div>
-            </div>
+            )}
           </td>
         </tr>
       )}

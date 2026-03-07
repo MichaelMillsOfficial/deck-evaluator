@@ -1530,3 +1530,114 @@ test.describe("generateTags — Protection (has/have grants)", () => {
     expect(generateTags(card)).toContain("Protection");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Multi-face card tag detection (combined oracle text)
+// ---------------------------------------------------------------------------
+
+test.describe("generateTags — multi-face cards", () => {
+  test("modal DFC with removal on back face gets Removal tag", () => {
+    // Simulates a creature front / removal back (combined oracle text)
+    const card = makeCard({
+      name: "Valki, God of Lies // Tibalt, Cosmic Impostor",
+      typeLine: "Legendary Creature — God // Legendary Planeswalker — Tibalt",
+      oracleText:
+        "When Valki enters the battlefield, each opponent reveals their hand.\n\n" +
+        "Exile target artifact, creature, or enchantment. You may play cards exiled with Tibalt, Cosmic Impostor.",
+      layout: "modal_dfc",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("adventure card with card draw on adventure half gets Card Draw tag", () => {
+    // Bonecrusher Giant front + adventure with draw effect
+    const card = makeCard({
+      name: "Fae of Wishes // Granted",
+      typeLine: "Creature — Faerie Wizard // Sorcery — Adventure",
+      oracleText:
+        "Flying\n\n" +
+        "You may reveal a noncreature card you own from outside the game and put it into your hand.",
+      layout: "adventure",
+    });
+    // "put it into your hand" should trigger Card Advantage
+    expect(generateTags(card)).toContain("Card Advantage");
+  });
+
+  test("adventure card with card draw on adventure half gets Card Draw", () => {
+    const card = makeCard({
+      name: "Edgewall Innkeeper // Innkeeper's Talent",
+      typeLine: "Creature — Human Peasant",
+      oracleText:
+        "Whenever you cast a creature spell that has an Adventure, draw a card.\n\n" +
+        "Some adventure text here.",
+      layout: "adventure",
+    });
+    expect(generateTags(card)).toContain("Card Draw");
+  });
+
+  test("transform DFC with recursion on back face gets Recursion tag", () => {
+    const card = makeCard({
+      name: "Graveyard Trespasser // Graveyard Glutton",
+      typeLine: "Creature — Human Werewolf // Creature — Werewolf",
+      oracleText:
+        "Ward—Discard a card.\nWhenever Graveyard Trespasser enters the battlefield or attacks, exile target card from a graveyard.\n\n" +
+        "Ward—Discard a card.\nWhenever Graveyard Glutton enters the battlefield or attacks, return target card from a graveyard to your hand.",
+      layout: "transform",
+    });
+    expect(generateTags(card)).toContain("Recursion");
+  });
+
+  test("DFC with non-land front face does not get land-specific tags from back face text", () => {
+    // Modal DFC: creature front / enchantment back with ETB text
+    const card = makeCard({
+      name: "Esika, God of the Tree // The Prismatic Bridge",
+      typeLine: "Legendary Creature — God // Legendary Enchantment",
+      oracleText:
+        'Vigilance\nOther legendary creatures you control have vigilance and "{T}: Add one mana of any color."\n\n' +
+        "At the beginning of your upkeep, reveal cards from the top of your library until you reveal a creature or planeswalker card.",
+      layout: "modal_dfc",
+    });
+    // Front face is Creature, not Land — no land-specific tags
+    const tags = generateTags(card);
+    expect(tags).not.toContain("ETB Tapped");
+    expect(tags).not.toContain("Fetch Land");
+    expect(tags).not.toContain("Utility Land");
+  });
+
+  test("MDFC land front face still gets land tags from combined text", () => {
+    // Modal DFC: land front face
+    const card = makeCard({
+      name: "Emeria, Shattered Skyclave // Emeria's Call",
+      typeLine: "Land // Sorcery",
+      oracleText:
+        "Emeria, Shattered Skyclave enters the battlefield tapped.\n{T}: Add {W}.\n\n" +
+        "Create two 4/4 white Angel Warrior creature tokens with flying.",
+      layout: "modal_dfc",
+      producedMana: ["W"],
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("ETB Tapped");
+  });
+
+  test("split card with counterspell on one half gets Counterspell tag", () => {
+    const card = makeCard({
+      name: "Counterflux // Suffocating Blast",
+      typeLine: "Instant // Instant",
+      oracleText:
+        "Counter target spell. Overload {1}{U}{U}{R}\n\n" +
+        "Counter target spell and deal 3 damage to target creature.",
+      layout: "split",
+    });
+    expect(generateTags(card)).toContain("Counterspell");
+  });
+
+  test("normal layout card is unaffected by multi-face logic", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+      layout: "normal",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+});
