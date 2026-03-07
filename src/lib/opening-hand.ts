@@ -69,6 +69,17 @@ export interface HandEvaluationContext {
   pipWeights?: Record<string, number>;
 }
 
+export interface ManaProjection {
+  t1Mana: number;
+  t2Mana: number;
+  t3Mana: number;
+  t4Mana: number;
+  t2Sources: string[][];
+  t3Sources: string[][];
+  t4Sources: string[][];
+  dorks: { name: string; producedMana: string[]; availableTurn: number }[];
+}
+
 export interface HandWeights {
   land: number;
   curve: number;
@@ -315,6 +326,50 @@ export function getManaProducers(
 }
 
 // ---------------------------------------------------------------------------
+// projectManaByTurn
+// ---------------------------------------------------------------------------
+
+/**
+ * Project available mana sources per turn (T1-T4) for castability checks.
+ *
+ * T1: untapped lands only (1 land drop)
+ * T2: all lands + CMC ≤ 1 dorks (via getManaProducers)
+ * T3: all lands + CMC ≤ 2 dorks (via getManaProducers)
+ * T4: T3 sources (assumes one more land draw from deck)
+ *
+ * Mana counts assume one land drop per turn from those in hand.
+ */
+export function projectManaByTurn(
+  hand: HandCard[],
+  untappedLandSources: string[][],
+  allLandSources: string[][]
+): ManaProjection {
+  const { t2Sources, t3Sources, dorks } = getManaProducers(
+    hand,
+    untappedLandSources,
+    allLandSources
+  );
+
+  const t1Mana = Math.min(untappedLandSources.length, 1);
+  const t2Mana = Math.min(t2Sources.length, t2Sources.length);
+  const t3Mana = t3Sources.length;
+  // T4: assume t3 sources hold (no extra land draw modeled — conservative)
+  const t4Sources = [...t3Sources];
+  const t4Mana = t4Sources.length;
+
+  return {
+    t1Mana,
+    t2Mana,
+    t3Mana,
+    t4Mana,
+    t2Sources,
+    t3Sources,
+    t4Sources,
+    dorks,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // buildPool
 // ---------------------------------------------------------------------------
 
@@ -454,13 +509,48 @@ export function scoreRamp(
 }
 
 /**
+ * Get the mana sources available at the turn a spell could first be cast.
+ * CMC 1 → T1 (untapped lands only, approximated by t2Sources minus dorks)
+ * CMC 2 → T2 sources
+ * CMC 3 → T3 sources
+ * CMC 4+ → T4 sources
+ */
+function getSourcesForCmc(
+  cmc: number,
+  proj: ManaProjection
+): string[][] {
+  if (cmc <= 2) return proj.t2Sources;
+  if (cmc <= 3) return proj.t3Sources;
+  return proj.t4Sources;
+}
+
+/**
+ * Check if a spell is castable given projected mana at the appropriate turn.
+ * Returns 1.0 if castable, 0.3 if not (reduced but not zero — the card
+ * still has value if drawn into mana later).
+ */
+function castabilityFactor(
+  spell: EnrichedCard,
+  proj: ManaProjection
+): number {
+  const sources = getSourcesForCmc(spell.cmc, proj);
+  if (sources.length < spell.cmc) return 0.3;
+  if (canCastWithLands(spell, sources)) return 1.0;
+  return 0.3;
+}
+
+/**
  * Tempo-weighted card advantage scoring.
  * Tags: "Card Draw", "Card Advantage", "Tutor"
  * CMC ≤ 3 → 1.0, CMC 4-5 → 0.7, CMC 6+ → 0.4
+ *
+ * When manaProjection is provided, each spell's weight is multiplied by
+ * a castability factor (1.0 if castable at the appropriate turn, 0.3 if not).
  */
 export function scoreCardAdvantage(
   hand: HandCard[],
-  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>
+  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>,
+  manaProjection?: ManaProjection
 ): number {
   let effectiveCount = 0;
   for (const card of hand) {
@@ -472,6 +562,9 @@ export function scoreCardAdvantage(
     if (cmc <= 3) weight = 1.0;
     else if (cmc <= 5) weight = 0.7;
     else weight = 0.4;
+    if (manaProjection) {
+      weight *= castabilityFactor(card.enriched, manaProjection);
+    }
     effectiveCount += weight;
   }
 
@@ -485,10 +578,14 @@ export function scoreCardAdvantage(
  * Tempo-weighted interaction scoring.
  * Tags: "Removal", "Board Wipe", "Counterspell"
  * CMC ≤ 3 → 1.0, CMC 4-5 → 0.7, CMC 6+ → 0.4
+ *
+ * When manaProjection is provided, each spell's weight is multiplied by
+ * a castability factor (1.0 if castable at the appropriate turn, 0.3 if not).
  */
 export function scoreInteraction(
   hand: HandCard[],
-  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>
+  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>,
+  manaProjection?: ManaProjection
 ): number {
   let effectiveCount = 0;
   for (const card of hand) {
@@ -500,6 +597,9 @@ export function scoreInteraction(
     if (cmc <= 3) weight = 1.0;
     else if (cmc <= 5) weight = 0.7;
     else weight = 0.4;
+    if (manaProjection) {
+      weight *= castabilityFactor(card.enriched, manaProjection);
+    }
     effectiveCount += weight;
   }
 
@@ -513,14 +613,17 @@ export function scoreInteraction(
  * Strategy alignment scoring: do hand cards match deck themes and
  * can the hand actually deploy them early?
  *
- * Returns { score: 0-100, themeHits: string[] }
+ * When commandZone and manaProjection are provided, commanders that match
+ * deck themes and are castable by T4 contribute a bonus to the strategy score.
  */
 export function scoreStrategy(
   hand: HandCard[],
   deckThemes: DeckTheme[],
   landCount: number,
   rampCount: number,
-  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>
+  cache?: Map<string, { tags: string[]; axisScores: Map<string, number> }>,
+  commandZone?: HandCard[],
+  manaProjection?: ManaProjection
 ): number {
   if (deckThemes.length === 0) return 50; // neutral for goodstuff decks
 
@@ -577,8 +680,43 @@ export function scoreStrategy(
       : 0;
 
   // Combined: 60% theme hit rate + 40% average relevance
-  const rawScore = themeHitRate * 0.6 + avgRelevance * 0.4;
-  return Math.round(rawScore * 100);
+  let rawScore = themeHitRate * 0.6 + avgRelevance * 0.4;
+
+  // Commander-as-gameplan bonus: if a commander matches themes and is
+  // castable by T4, it contributes to the strategy score
+  if (commandZone && commandZone.length > 0 && manaProjection) {
+    let bestCmdBonus = 0;
+    for (const cmd of commandZone) {
+      const axisScores = getAxisScoresForCard(cmd.enriched, cache);
+      let maxRelevance = 0;
+      for (const theme of topThemes) {
+        const score = axisScores.get(theme.axisId) ?? 0;
+        maxRelevance = Math.max(maxRelevance, score);
+        if (score > 0) themesHit.add(theme.axisId);
+      }
+      if (maxRelevance === 0) continue;
+
+      // Check if commander is castable by T4
+      const cmc = cmd.enriched.cmc;
+      const sources = getSourcesForCmc(cmc, manaProjection);
+      const castable =
+        sources.length >= cmc && canCastWithLands(cmd.enriched, sources);
+      if (!castable) continue;
+
+      // Tempo weight: cheaper commanders contribute more
+      let tempoWeight: number;
+      if (cmc <= 3) tempoWeight = 1.0;
+      else if (cmc <= 4) tempoWeight = 0.8;
+      else if (cmc <= 5) tempoWeight = 0.5;
+      else tempoWeight = 0.2;
+
+      const bonus = maxRelevance * tempoWeight * 0.3; // 30% contribution cap
+      bestCmdBonus = Math.max(bestCmdBonus, bonus);
+    }
+    rawScore += bestCmdBonus;
+  }
+
+  return Math.min(100, Math.round(rawScore * 100));
 }
 
 /**
@@ -1078,15 +1216,18 @@ export function evaluateHandQuality(
     clampedScore = Math.max(0, Math.min(100, score));
   } else {
     // --- 7-factor scoring with context ---
+    const manaProj = projectManaByTurn(hand, untappedLandSources, allLandSources);
     const rampScoreVal = scoreRamp(hand, context.cardCache);
-    const caScoreVal = scoreCardAdvantage(hand, context.cardCache);
-    const interactionScoreVal = scoreInteraction(hand, context.cardCache);
+    const caScoreVal = scoreCardAdvantage(hand, context.cardCache, manaProj);
+    const interactionScoreVal = scoreInteraction(hand, context.cardCache, manaProj);
     const strategyScoreVal = scoreStrategy(
       hand,
       context.deckThemes,
       landCount,
       rampCount,
-      context.cardCache
+      context.cardCache,
+      commandZone,
+      manaProj
     );
 
     // Extend factors with new fields
