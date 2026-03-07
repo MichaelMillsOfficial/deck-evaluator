@@ -92,7 +92,7 @@ test.describe("normalizeToEnrichedCard", () => {
 
     const result = normalizeToEnrichedCard(card);
     expect(result.manaCost).toBe("{U}");
-    expect(result.oracleText).toBe("At the beginning of your upkeep...");
+    expect(result.oracleText).toBe("At the beginning of your upkeep...\n\nFlying");
     expect(result.imageUris?.small).toBe("https://example.com/front-small.jpg");
   });
 
