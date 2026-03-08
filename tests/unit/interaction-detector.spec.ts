@@ -1254,6 +1254,60 @@ test.describe("type matching — Sliver/fetchland regression", () => {
     expect(enables.length).toBe(0);
   });
 
+  test("Lotus Field self-ETB trigger does NOT match another card entering the battlefield", () => {
+    const lotusField = profile({
+      name: "Lotus Field",
+      typeLine: "Land",
+      oracleText:
+        "Hexproof\nLotus Field enters the battlefield tapped.\nWhen Lotus Field enters the battlefield, sacrifice two lands.\n{T}: Add three mana of any one color.",
+      keywords: ["Hexproof"],
+    });
+    const lazotepSliver = profile({
+      name: "Lazotep Sliver",
+      typeLine: "Creature — Sliver",
+      oracleText:
+        "Sliver creatures you control have afflict 2. (Whenever a creature with afflict 2 becomes blocked, defending player loses 2 life.)",
+      manaCost: "{4}{B}",
+      keywords: ["Afflict"],
+    });
+    const analysis = findInteractions([lotusField, lazotepSliver]);
+
+    // Lotus Field's ETB trigger is self-referencing — it only triggers
+    // when Lotus Field itself enters, not when any other card enters.
+    // No interactions should exist between these two cards.
+    expect(analysis.interactions.length).toBe(0);
+    expect(analysis.loops.length).toBe(0);
+  });
+
+  test("self-ETB triggers do NOT match other cards' ETBs (token creator + ETB-sacrifice land)", () => {
+    const lotusField = profile({
+      name: "Lotus Field",
+      typeLine: "Land",
+      oracleText:
+        "Hexproof\nLotus Field enters the battlefield tapped.\nWhen Lotus Field enters the battlefield, sacrifice two lands.\n{T}: Add three mana of any one color.",
+      keywords: ["Hexproof"],
+    });
+    const avenger = profile({
+      name: "Avenger of Zendikar",
+      typeLine: "Creature — Elemental",
+      oracleText:
+        "When Avenger of Zendikar enters the battlefield, create a 0/1 green Plant creature token for each land you control.\nLandfall — Whenever a land enters the battlefield under your control, put a +1/+1 counter on each Plant you control.",
+      manaCost: "{5}{G}{G}",
+    });
+    const analysis = findInteractions([lotusField, avenger]);
+
+    // Avenger creating tokens causes ETBs, but Lotus Field's self-ETB trigger
+    // should NOT be triggered by Avenger's tokens entering. No trigger interaction.
+    const triggers = analysis.interactions.filter((i) => i.type === "triggers");
+    const falseETBTrigger = triggers.filter(
+      (i) =>
+        i.cards.includes("Avenger of Zendikar") &&
+        i.cards.includes("Lotus Field") &&
+        i.mechanical.includes("triggering Lotus Field")
+    );
+    expect(falseETBTrigger.length).toBe(0);
+  });
+
   test("two lands tapping for mana do NOT form a loop (parallel producers, not a chain)", () => {
     const worldTree = profile({
       name: "The World Tree",

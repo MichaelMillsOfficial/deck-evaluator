@@ -179,6 +179,15 @@ function eventsMatch(caused: GameEvent, trigger: GameEvent): boolean {
   if (caused.kind !== trigger.kind) return false;
 
   if (caused.kind === "zone_transition" && trigger.kind === "zone_transition") {
+    // Self-ONLY triggers ("When ~ enters the battlefield") only trigger on the
+    // card itself — never on another card's events. Detected by self: true with
+    // no additional types (empty types = specifically this card, not a class).
+    // Self-INCLUDED triggers ("Whenever ~ or another creature dies") have types
+    // alongside self, so they DO match other cards' events of those types.
+    if (trigger.object?.self && (!trigger.object.types || trigger.object.types.length === 0)) {
+      return false;
+    }
+
     // Both must agree on from/to zones (undefined = wildcard)
     if (caused.from && trigger.from && caused.from !== trigger.from) return false;
     if (caused.to && trigger.to && caused.to !== trigger.to) return false;
