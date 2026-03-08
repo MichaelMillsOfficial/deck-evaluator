@@ -163,7 +163,7 @@ export {
 export { profileCard } from "./capability-extractor";
 
 // Interaction detector
-export { findInteractions } from "./interaction-detector";
+export { findInteractions, findInteractionsAsync } from "./interaction-detector";
 
 // Keyword database
 export {

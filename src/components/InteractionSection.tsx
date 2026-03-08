@@ -10,8 +10,10 @@ import type {
   InteractionType,
 } from "@/lib/interaction-engine";
 import type { AnalysisStep } from "@/hooks/useInteractionAnalysis";
-import { useMemo, useState } from "react";
+import { useMemo, useState, Component, type ReactNode } from "react";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
+
+const PAGE_SIZE = 20;
 
 interface InteractionSectionProps {
   analysis: InteractionAnalysis | null;
@@ -80,6 +82,82 @@ function strengthPercent(strength: number): number {
 // ═══════════════════════════════════════════════════════════════
 // Sub-components
 // ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+// Error Boundary
+// ═══════════════════════════════════════════════════════════════
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class InteractionErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        this.props.fallback ?? (
+          <div role="alert" className="rounded-lg border border-red-700/50 bg-red-900/20 px-4 py-5">
+            <p className="text-sm font-semibold text-red-300 mb-1">
+              Interaction analysis encountered an error
+            </p>
+            <p className="text-xs text-red-400/80">
+              {this.state.error?.message ?? "An unexpected error occurred while rendering interactions."}
+            </p>
+            <button
+              type="button"
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="mt-3 rounded-md border border-red-700/50 bg-red-900/30 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-900/50 transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        )
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Pagination helper
+// ═══════════════════════════════════════════════════════════════
+
+function ShowMoreButton({
+  shown,
+  total,
+  onShowMore,
+}: {
+  shown: number;
+  total: number;
+  onShowMore: () => void;
+}) {
+  if (shown >= total) return null;
+  const remaining = total - shown;
+  return (
+    <button
+      type="button"
+      onClick={onShowMore}
+      className="w-full rounded-lg border border-slate-700 bg-slate-800/50 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:border-slate-600 hover:bg-slate-700/50 transition-colors cursor-pointer"
+    >
+      Show {Math.min(remaining, PAGE_SIZE)} more ({remaining} remaining)
+    </button>
+  );
+}
 
 function StrengthBar({ strength }: { strength: number }) {
   const pct = strengthPercent(strength);
@@ -639,7 +717,15 @@ function buildGroups(interactions: Interaction[], mode: GroupMode): DisplayGroup
 // Main Component
 // ═══════════════════════════════════════════════════════════════
 
-export default function InteractionSection({
+export default function InteractionSection(props: InteractionSectionProps) {
+  return (
+    <InteractionErrorBoundary>
+      <InteractionSectionInner {...props} />
+    </InteractionErrorBoundary>
+  );
+}
+
+function InteractionSectionInner({
   analysis,
   loading,
   error,
@@ -654,6 +740,19 @@ export default function InteractionSection({
   const [minStrength, setMinStrength] = useState(0);
   const [groupMode, setGroupMode] = useState<GroupMode>("type");
 
+  // Pagination state — per-group limits for interactions, plus section-level for others
+  const [groupPages, setGroupPages] = useState<Record<string, number>>({});
+  const [chainPage, setChainPage] = useState(PAGE_SIZE);
+  const [blockerPage, setBlockerPage] = useState(PAGE_SIZE);
+  const [enablerPage, setEnablerPage] = useState(PAGE_SIZE);
+
+  const getGroupLimit = (groupId: string) => groupPages[groupId] ?? PAGE_SIZE;
+  const showMoreGroup = (groupId: string) =>
+    setGroupPages((prev) => ({
+      ...prev,
+      [groupId]: (prev[groupId] ?? PAGE_SIZE) + PAGE_SIZE,
+    }));
+
   const toggleType = (type: InteractionType) => {
     setActiveTypes((prev) => {
       const next = new Set(prev);
@@ -663,8 +762,10 @@ export default function InteractionSection({
     });
   };
 
-  // Filtered interactions
+  // Filtered interactions — reset pagination when filters change
   const filteredInteractions = useMemo(() => {
+    // Reset group pagination on filter change
+    setGroupPages({});
     if (!analysis) return [];
     return analysis.interactions.filter((i) => {
       if (activeTypes.size > 0 && !activeTypes.has(i.type)) return false;
@@ -798,9 +899,14 @@ export default function InteractionSection({
                 onToggle={() => onToggleSection("ie-enablers")}
               >
                 <div className="space-y-2">
-                  {analysis.enablers.map((enabler, i) => (
+                  {analysis.enablers.slice(0, enablerPage).map((enabler, i) => (
                     <EnablerItem key={enabler.enabler} enabler={enabler} index={i} />
                   ))}
+                  <ShowMoreButton
+                    shown={Math.min(enablerPage, analysis.enablers.length)}
+                    total={analysis.enablers.length}
+                    onShowMore={() => setEnablerPage((p) => p + PAGE_SIZE)}
+                  />
                 </div>
               </CollapsiblePanel>
             )}
@@ -827,28 +933,37 @@ export default function InteractionSection({
                 />
               ) : (
                 <div className="space-y-4">
-                  {groups.map((group) => (
-                    <div key={group.id}>
-                      <h4
-                        className={`mb-2 text-[10px] font-bold uppercase tracking-widest ${group.accentColor}`}
-                      >
-                        {group.label}{" "}
-                        <span className="text-slate-500 font-normal">
-                          ({group.interactions.length})
-                        </span>
-                      </h4>
-                      <div className="space-y-2">
-                        {group.interactions.map((interaction, i) => (
-                          <InteractionItem
-                            key={`${interaction.cards[0]}-${interaction.cards[1]}-${interaction.type}`}
-                            interaction={interaction}
-                            index={i}
-                            type={group.id}
+                  {groups.map((group) => {
+                    const limit = getGroupLimit(group.id);
+                    const visible = group.interactions.slice(0, limit);
+                    return (
+                      <div key={group.id}>
+                        <h4
+                          className={`mb-2 text-[10px] font-bold uppercase tracking-widest ${group.accentColor}`}
+                        >
+                          {group.label}{" "}
+                          <span className="text-slate-500 font-normal">
+                            ({group.interactions.length})
+                          </span>
+                        </h4>
+                        <div className="space-y-2">
+                          {visible.map((interaction, i) => (
+                            <InteractionItem
+                              key={`${interaction.cards[0]}-${interaction.cards[1]}-${interaction.type}`}
+                              interaction={interaction}
+                              index={i}
+                              type={group.id}
+                            />
+                          ))}
+                          <ShowMoreButton
+                            shown={visible.length}
+                            total={group.interactions.length}
+                            onShowMore={() => showMoreGroup(group.id)}
                           />
-                        ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CollapsiblePanel>
@@ -863,9 +978,14 @@ export default function InteractionSection({
                 onToggle={() => onToggleSection("ie-chains")}
               >
                 <div className="space-y-2">
-                  {analysis.chains.map((chain, i) => (
+                  {analysis.chains.slice(0, chainPage).map((chain, i) => (
                     <ChainItem key={chain.cards.join("-")} chain={chain} index={i} />
                   ))}
+                  <ShowMoreButton
+                    shown={Math.min(chainPage, analysis.chains.length)}
+                    total={analysis.chains.length}
+                    onShowMore={() => setChainPage((p) => p + PAGE_SIZE)}
+                  />
                 </div>
               </CollapsiblePanel>
             )}
@@ -880,9 +1000,14 @@ export default function InteractionSection({
                 onToggle={() => onToggleSection("ie-blockers")}
               >
                 <div className="space-y-2">
-                  {analysis.blockers.map((blocker, i) => (
+                  {analysis.blockers.slice(0, blockerPage).map((blocker, i) => (
                     <BlockerItem key={blocker.blocker} blocker={blocker} index={i} />
                   ))}
+                  <ShowMoreButton
+                    shown={Math.min(blockerPage, analysis.blockers.length)}
+                    total={analysis.blockers.length}
+                    onShowMore={() => setBlockerPage((p) => p + PAGE_SIZE)}
+                  />
                 </div>
               </CollapsiblePanel>
             )}

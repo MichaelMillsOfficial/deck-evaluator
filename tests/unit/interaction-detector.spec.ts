@@ -145,20 +145,20 @@ test.describe("enables detection", () => {
     expect(enables[0].mechanical).toBeTruthy();
   });
 
-  test("mana producer enables high-cost card (Sol Ring + Avenger of Zendikar)", () => {
+  test("mana producer does NOT create low-value enables interaction (disabled for noise reduction)", () => {
     const ring = solRing();
     const avenger = avengerOfZendikar();
     const analysis = findInteractions([ring, avenger]);
 
-    // Sol Ring produces mana -> Avenger has a mana cost
+    // Generic "mana helps cast" interactions are disabled to reduce noise —
+    // they produce ~N interactions per mana producer, overwhelming real synergies.
     const enables = findDirectional(
       analysis,
       "enables",
       "Sol Ring",
       "Avenger of Zendikar"
     );
-    expect(enables.length).toBeGreaterThanOrEqual(1);
-    expect(enables[0].strength).toBeGreaterThanOrEqual(0.4);
+    expect(enables.length).toBe(0);
   });
 
   test("Ashnod's Altar consumes creature — any creature enables it", () => {

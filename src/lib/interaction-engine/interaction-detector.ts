@@ -45,6 +45,58 @@ import { PERMANENT_TYPES, matchesCompositeType } from "./game-model";
  * Analyze a set of card profiles and find all pairwise mechanical
  * interactions between them.
  */
+/**
+ * Detect pairwise interactions for a single pair (both directions).
+ * Extracted to allow batching in async mode.
+ */
+function detectPairInteractions(a: CardProfile, b: CardProfile): Interaction[] {
+  const results: Interaction[] = [];
+  results.push(...detectEnables(a, b));
+  results.push(...detectEnables(b, a));
+  results.push(...detectTriggers(a, b));
+  results.push(...detectTriggers(b, a));
+  results.push(...detectProtects(a, b));
+  results.push(...detectProtects(b, a));
+  results.push(...detectRecurs(a, b));
+  results.push(...detectRecurs(b, a));
+  results.push(...detectTutorsFor(a, b));
+  results.push(...detectTutorsFor(b, a));
+  results.push(...detectReducesCost(a, b));
+  results.push(...detectReducesCost(b, a));
+  results.push(...detectBlocks(a, b));
+  results.push(...detectBlocks(b, a));
+  return results;
+}
+
+/**
+ * Build the final analysis result from pairwise interactions.
+ */
+function buildAnalysisResult(
+  profileMap: Record<string, CardProfile>,
+  interactions: Interaction[],
+  profiles: CardProfile[]
+): InteractionAnalysis {
+  // Derive conflicts from blocks (bidirectional view of blocking)
+  interactions.push(...deriveConflicts(interactions));
+
+  // Build InteractionBlocker entries from blocks interactions
+  const blockers = buildBlockerEntries(interactions, profiles);
+
+  // Detect chains, loops, and enablers
+  const chains = detectChains(interactions, profiles);
+  const loops = detectLoops(interactions, profiles);
+  const enablers = detectEnablers(interactions, profiles);
+
+  return {
+    profiles: profileMap,
+    interactions,
+    chains,
+    loops,
+    blockers,
+    enablers,
+  };
+}
+
 export function findInteractions(profiles: CardProfile[]): InteractionAnalysis {
   const profileMap: Record<string, CardProfile> = {};
   for (const p of profiles) {
@@ -58,46 +110,60 @@ export function findInteractions(profiles: CardProfile[]): InteractionAnalysis {
   // Check every pair (i, j) where i < j
   for (let i = 0; i < profiles.length; i++) {
     for (let j = i + 1; j < profiles.length; j++) {
-      const a = profiles[i];
-      const b = profiles[j];
-
-      // Check A->B and B->A for asymmetric interactions
-      interactions.push(...detectEnables(a, b));
-      interactions.push(...detectEnables(b, a));
-      interactions.push(...detectTriggers(a, b));
-      interactions.push(...detectTriggers(b, a));
-      interactions.push(...detectProtects(a, b));
-      interactions.push(...detectProtects(b, a));
-      interactions.push(...detectRecurs(a, b));
-      interactions.push(...detectRecurs(b, a));
-      interactions.push(...detectTutorsFor(a, b));
-      interactions.push(...detectTutorsFor(b, a));
-      interactions.push(...detectReducesCost(a, b));
-      interactions.push(...detectReducesCost(b, a));
-      interactions.push(...detectBlocks(a, b));
-      interactions.push(...detectBlocks(b, a));
+      interactions.push(...detectPairInteractions(profiles[i], profiles[j]));
     }
   }
 
-  // Derive conflicts from blocks (bidirectional view of blocking)
-  interactions.push(...deriveConflicts(interactions));
+  return buildAnalysisResult(profileMap, interactions, profiles);
+}
 
-  // Build InteractionBlocker entries from blocks interactions
-  const blockers = buildBlockerEntries(interactions, profiles);
+/**
+ * Async version of findInteractions that yields to the browser between
+ * batches of pair checks to prevent main thread blocking.
+ *
+ * @param onProgress - Called with (0-1) progress during pair detection
+ * @param cancelled  - Function returning true if computation should abort
+ */
+export async function findInteractionsAsync(
+  profiles: CardProfile[],
+  onProgress?: (progress: number) => void,
+  cancelled?: () => boolean
+): Promise<InteractionAnalysis> {
+  const profileMap: Record<string, CardProfile> = {};
+  for (const p of profiles) {
+    if (!profileMap[p.cardName]) {
+      profileMap[p.cardName] = p;
+    }
+  }
 
-  // Slice C: detect chains, loops, and enablers
-  const chains = detectChains(interactions, profiles);
-  const loops = detectLoops(interactions, profiles);
-  const enablers = detectEnablers(interactions, profiles);
+  const interactions: Interaction[] = [];
+  const totalPairs = (profiles.length * (profiles.length - 1)) / 2;
+  let pairsDone = 0;
 
-  return {
-    profiles: profileMap,
-    interactions,
-    chains,
-    loops,
-    blockers,
-    enablers,
-  };
+  // Process pairs in batches, yielding between batches
+  const PAIR_BATCH_SIZE = 50;
+  const yield_ = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+  for (let i = 0; i < profiles.length; i++) {
+    for (let j = i + 1; j < profiles.length; j++) {
+      if (cancelled?.()) {
+        return buildAnalysisResult(profileMap, interactions, profiles);
+      }
+
+      interactions.push(...detectPairInteractions(profiles[i], profiles[j]));
+      pairsDone++;
+
+      if (pairsDone % PAIR_BATCH_SIZE === 0) {
+        onProgress?.(pairsDone / totalPairs);
+        await yield_();
+      }
+    }
+  }
+
+  onProgress?.(1);
+  await yield_();
+
+  return buildAnalysisResult(profileMap, interactions, profiles);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -403,24 +469,8 @@ function detectEnables(a: CardProfile, b: CardProfile): Interaction[] {
   }
 
   // 3. A produces mana -> B has a casting cost with mana
-  if (
-    a.produces.some((p) => p.category === "mana") &&
-    b.castingCost &&
-    b.castingCost.manaValue > 0
-  ) {
-    // Check we haven't already found a mana enables from produces/consumes
-    const manaDedupKey = `enables:mana:${a.cardName}:${b.cardName}`;
-    if (!seen.has(manaDedupKey)) {
-      seen.add(manaDedupKey);
-      results.push({
-        cards: [a.cardName, b.cardName],
-        type: "enables",
-        strength: 0.4,
-        mechanical: `${a.cardName} produces mana to help cast ${b.cardName}`,
-        events: [],
-      });
-    }
-  }
+  // Disabled: too noisy — "Sol Ring helps cast everything" generates ~N
+  // interactions per mana producer, drowning out real synergies.
 
   return results;
 }
@@ -1342,6 +1392,27 @@ function buildBlockerEntries(
   interactions: Interaction[],
   profiles: CardProfile[]
 ): InteractionBlocker[] {
+  // Pre-index: interactions by card name (excluding blocks/conflicts)
+  const interactionsByCard = new Map<string, Interaction[]>();
+  // Pre-index: blocks interactions by blocker name
+  const blocksByBlocker = new Map<string, Interaction[]>();
+
+  for (const inter of interactions) {
+    if (inter.type === "blocks") {
+      const arr = blocksByBlocker.get(inter.cards[0]);
+      if (arr) arr.push(inter);
+      else blocksByBlocker.set(inter.cards[0], [inter]);
+      continue;
+    }
+    if (inter.type === "conflicts") continue;
+    for (const card of inter.cards) {
+      const arr = interactionsByCard.get(card);
+      if (arr) arr.push(inter);
+      else interactionsByCard.set(card, [inter]);
+    }
+  }
+
+  const pMap = profilesByName(profiles);
   const blockerMap = new Map<string, InteractionBlocker>();
 
   for (const block of interactions) {
@@ -1351,8 +1422,7 @@ function buildBlockerEntries(
     const blockedName = block.cards[1];
 
     if (!blockerMap.has(blockerName)) {
-      // Find the mechanism (replacement or restriction) from the blocker's profile
-      const blockerProfile = profiles.find((p) => p.cardName === blockerName);
+      const blockerProfile = pMap.get(blockerName);
       const { mechanism, mechanismType } = findBlockingMechanism(blockerProfile, block);
 
       blockerMap.set(blockerName, {
@@ -1367,35 +1437,30 @@ function buildBlockerEntries(
 
     const entry = blockerMap.get(blockerName)!;
 
-    // Add blocked events
     for (const event of block.events) {
       entry.blockedEvents.push(event);
     }
 
-    // Find interactions that involve the blocked card and are actually disrupted
-    // Only include interactions whose events overlap with what the blocker prevents
-    const affectedInteractions = interactions.filter(
-      (i) =>
-        i.type !== "blocks" &&
-        i.type !== "conflicts" &&
-        (i.cards[0] === blockedName || i.cards[1] === blockedName) &&
-        interactionDisruptedByBlocker(i, block.events)
-    );
-    for (const affected of affectedInteractions) {
-      if (!entry.blockedInteractions.some((bi) =>
-        bi.cards[0] === affected.cards[0] &&
-        bi.cards[1] === affected.cards[1] &&
-        bi.type === affected.type
-      )) {
-        entry.blockedInteractions.push(affected);
+    // Use pre-indexed lookup instead of filtering all interactions
+    const candidates = interactionsByCard.get(blockedName) || [];
+    for (const candidate of candidates) {
+      if (
+        interactionDisruptedByBlocker(candidate, block.events) &&
+        !entry.blockedInteractions.some((bi) =>
+          bi.cards[0] === candidate.cards[0] &&
+          bi.cards[1] === candidate.cards[1] &&
+          bi.type === candidate.type
+        )
+      ) {
+        entry.blockedInteractions.push(candidate);
       }
     }
+  }
 
-    // Update description with all blocked cards
-    const allBlocked = interactions
-      .filter((i) => i.type === "blocks" && i.cards[0] === blockerName)
-      .map((i) => i.cards[1]);
-    const uniqueBlocked = [...new Set(allBlocked)];
+  // Update descriptions using pre-indexed blocks
+  for (const [blockerName, entry] of blockerMap) {
+    const blocksForThis = blocksByBlocker.get(blockerName) || [];
+    const uniqueBlocked = [...new Set(blocksForThis.map((i) => i.cards[1]))];
     entry.description = `${blockerName} blocks interactions for: ${uniqueBlocked.join(", ")}`;
   }
 
@@ -1542,6 +1607,8 @@ function interactionDisruptedByBlocker(
  *   A enables/triggers B AND B enables/triggers C
  *   forming a causal sequence.
  */
+const MAX_CHAINS = 200;
+
 function detectChains(
   interactions: Interaction[],
   profiles: CardProfile[]
@@ -1549,6 +1616,7 @@ function detectChains(
   if (profiles.length < 3) return [];
 
   // Build adjacency list from causal interactions (directional)
+  // Filter to only meaningful-strength edges to prevent explosion
   const causalTypes = new Set<string>([
     "enables", "triggers", "recurs", "reduces_cost",
   ]);
@@ -1556,6 +1624,7 @@ function detectChains(
 
   for (const inter of interactions) {
     if (!causalTypes.has(inter.type)) continue;
+    if (inter.strength < 0.3) continue; // Skip weak edges to limit DFS explosion
     const from = inter.cards[0];
     const to = inter.cards[1];
     if (!adjacency.has(from)) adjacency.set(from, new Map());
@@ -1571,17 +1640,22 @@ function detectChains(
 
   // DFS from each node to find paths of length >= 3
   for (const startCard of adjacency.keys()) {
+    if (chains.length >= MAX_CHAINS) break;
+
     const stack: { path: string[]; interactions: Interaction[] }[] = [
       { path: [startCard], interactions: [] },
     ];
 
     while (stack.length > 0) {
+      if (chains.length >= MAX_CHAINS) break;
+
       const { path, interactions: pathInteractions } = stack.pop()!;
       const current = path[path.length - 1];
       const neighbors = adjacency.get(current);
       if (!neighbors) continue;
 
       for (const [next, inter] of neighbors) {
+        if (chains.length >= MAX_CHAINS) break;
         // Avoid revisiting nodes in this path (no cycles — that's loops)
         if (path.includes(next)) continue;
 
@@ -1643,6 +1717,8 @@ function buildChain(
  * 2. The cycle involves "enables" or "triggers" interactions
  * 3. Net resource computation determines if the loop is infinite
  */
+const MAX_LOOPS = 50;
+
 function detectLoops(
   interactions: Interaction[],
   profiles: CardProfile[]
@@ -1655,6 +1731,7 @@ function detectLoops(
 
   for (const inter of interactions) {
     if (!causalTypes.has(inter.type)) continue;
+    if (inter.strength < 0.3) continue; // Skip weak edges
     const from = inter.cards[0];
     const to = inter.cards[1];
     if (!adjacency.has(from)) adjacency.set(from, new Map());
@@ -1667,6 +1744,7 @@ function detectLoops(
 
   // Find cycles using DFS from each node
   for (const startCard of adjacency.keys()) {
+    if (loops.length >= MAX_LOOPS) break;
     findCycles(startCard, [startCard], adjacency, loops, seen, profiles);
   }
 
@@ -1681,11 +1759,15 @@ function findCycles(
   seen: Set<string>,
   profiles: CardProfile[]
 ): void {
+  if (loops.length >= MAX_LOOPS) return;
+
   const current = path[path.length - 1];
   const neighbors = adjacency.get(current);
   if (!neighbors) return;
 
-  for (const [next, inters] of neighbors) {
+  for (const [next] of neighbors) {
+    if (loops.length >= MAX_LOOPS) return;
+
     if (next === start && path.length >= 2) {
       // Found a cycle back to start
       const key = [...path].sort().join("+");
@@ -1697,6 +1779,12 @@ function findCycles(
       findCycles(start, [...path, next], adjacency, loops, seen, profiles);
     }
   }
+}
+
+function profilesByName(profiles: CardProfile[]): Map<string, CardProfile> {
+  const map = new Map<string, CardProfile>();
+  for (const p of profiles) map.set(p.cardName, p);
+  return map;
 }
 
 function buildLoop(
@@ -1748,9 +1836,10 @@ function computeNetEffect(
   const resources: PlayerResource[] = [];
   const attributes: ObjectAttribute[] = [];
   const events: GameEvent[] = [];
+  const pMap = profilesByName(profiles);
 
   for (const cardName of loopCards) {
-    const p = profiles.find((pr) => pr.cardName === cardName);
+    const p = pMap.get(cardName);
     if (!p) continue;
 
     // Collect produced resources
@@ -1788,9 +1877,10 @@ function checkInfinite(
   let totalManaCost = 0;
   const producedColors = new Set<string>();
   const requiredColors = new Set<string>();
+  const pMap = profilesByName(profiles);
 
   for (const cardName of loopCards) {
-    const p = profiles.find((pr) => pr.cardName === cardName);
+    const p = pMap.get(cardName);
     if (!p) continue;
 
     for (const prod of p.produces) {
