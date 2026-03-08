@@ -269,7 +269,220 @@ function ChainItem({ chain, index }: { chain: InteractionChain; index: number })
   );
 }
 
+// ─── Loop "How it works" expandable panel ───────────────────────
+// Renders step-by-step gameplay instructions for a loop with a
+// vertical connector line, net effect summary, and prerequisites.
+
+function LoopHowItWorks({ loop, id }: { loop: InteractionLoop; id: string }) {
+  const [open, setOpen] = useState(false);
+  const contentId = `loop-howto-${id}`;
+
+  const hasSteps = loop.steps.length > 0;
+  const hasNet =
+    loop.netEffect.resources.length > 0 ||
+    loop.netEffect.attributes.length > 0;
+  const hasRequires = (loop.requires ?? []).length > 0;
+
+  if (!hasSteps && !hasNet && !hasRequires) return null;
+
+  return (
+    <div className="mt-2.5">
+      {/* Disclosure button */}
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={contentId}
+        onClick={() => setOpen((v) => !v)}
+        className="group flex items-center gap-1 text-xs text-slate-500 hover:text-fuchsia-300 transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-fuchsia-400 rounded"
+      >
+        {/* Chevron */}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className={`h-3 w-3 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${
+            open ? "rotate-90" : ""
+          }`}
+        >
+          <path
+            fillRule="evenodd"
+            d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+            clipRule="evenodd"
+          />
+        </svg>
+        <span className="underline-offset-2 group-hover:underline">
+          How it works
+        </span>
+      </button>
+
+      {/* Expandable content — grid trick for smooth height animation */}
+      <div
+        id={contentId}
+        className={`grid transition-[grid-template-rows] duration-200 motion-reduce:transition-none ease-out ${
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+        aria-hidden={!open}
+      >
+        <div className="overflow-hidden">
+          <div className="mt-2.5 rounded-md border border-slate-700/60 bg-slate-900/60 px-3 pt-3 pb-2.5 space-y-3">
+            {/* Steps */}
+            {hasSteps && (
+              <ol className="space-y-0" aria-label="Loop steps">
+                {loop.steps.map((step, i) => {
+                  const isLast = i === loop.steps.length - 1;
+                  return (
+                    <li key={i} className="flex gap-2.5">
+                      {/* Step number + vertical connector */}
+                      <div className="flex flex-col items-center shrink-0">
+                        <span
+                          className="flex h-5 w-5 items-center justify-center rounded-full bg-fuchsia-900/60 border border-fuchsia-700/40 text-[9px] font-bold tabular-nums text-fuchsia-300 shrink-0"
+                          aria-hidden="true"
+                        >
+                          {i + 1}
+                        </span>
+                        {/* Connector line — hidden after last step */}
+                        {!isLast && (
+                          <span
+                            className="mt-0.5 mb-0.5 w-px flex-1 min-h-[10px] bg-fuchsia-800/30"
+                            aria-hidden="true"
+                          />
+                        )}
+                      </div>
+
+                      {/* Step content */}
+                      <div className={`${isLast ? "pb-0" : "pb-2"} min-w-0`}>
+                        {/* From → To card reference */}
+                        <div className="flex flex-wrap items-center gap-1 mb-0.5">
+                          <span className="rounded bg-slate-700/70 border border-slate-600/40 px-1.5 py-px text-[10px] font-medium text-slate-200 leading-none shrink-0">
+                            {step.from}
+                          </span>
+                          {step.to && step.to !== step.from && (
+                            <>
+                              <span
+                                className="text-slate-600 text-[10px]"
+                                aria-hidden="true"
+                              >
+                                &rarr;
+                              </span>
+                              <span className="rounded bg-slate-700/70 border border-slate-600/40 px-1.5 py-px text-[10px] font-medium text-slate-200 leading-none shrink-0">
+                                {step.to}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        {/* Step description */}
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                          {step.description}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+
+                {/* Loop-back indicator */}
+                <li className="flex gap-2.5">
+                  <div className="flex flex-col items-center shrink-0">
+                    <span
+                      className="flex h-5 w-5 items-center justify-center text-fuchsia-400 text-sm font-bold"
+                      aria-hidden="true"
+                    >
+                      &#8634;
+                    </span>
+                  </div>
+                  <div className="pt-0.5 min-w-0">
+                    <p className="text-[10px] text-fuchsia-400/70 italic leading-relaxed">
+                      {loop.isInfinite
+                        ? "Repeat indefinitely — the loop has no natural stopping point."
+                        : `Returns to step 1 — repeat as desired.`}
+                    </p>
+                  </div>
+                </li>
+              </ol>
+            )}
+
+            {/* Net effect */}
+            {hasNet && (
+              <div className="border-t border-slate-700/50 pt-2">
+                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                  Net per cycle
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {loop.netEffect.resources.map((r, i) => {
+                    let label: string;
+                    if (r.category === "mana") {
+                      label = `+${r.quantity} {${r.color}} mana`;
+                    } else if (r.category === "life") {
+                      const isNegative = typeof r.quantity === "number" && r.quantity < 0;
+                      label = isNegative ? `${r.quantity} life` : `+${r.quantity} life`;
+                    } else if (r.category === "cards") {
+                      label = `+${r.quantity} card${r.quantity !== 1 ? "s" : ""}`;
+                    } else {
+                      label = `resource \u00d7${(r as { quantity?: unknown }).quantity ?? "?"}`;
+                    }
+                    return (
+                      <span
+                        key={`res-${i}`}
+                        className="rounded bg-slate-800/80 border border-slate-600/40 px-2 py-0.5 text-xs text-slate-300 tabular-nums"
+                      >
+                        {label}
+                      </span>
+                    );
+                  })}
+                  {loop.netEffect.attributes.map((a, i) => {
+                    let label: string;
+                    if (a.category === "counter") {
+                      label = `+${a.quantity} ${a.counterType} counter`;
+                    } else if (a.category === "stat_mod") {
+                      label = `+${a.power}/+${a.toughness}`;
+                    } else {
+                      // KeywordGrant — show the granted keyword
+                      label = a.keyword;
+                    }
+                    return (
+                      <span
+                        key={`attr-${i}`}
+                        className="rounded bg-slate-800/80 border border-slate-600/40 px-2 py-0.5 text-xs text-slate-300"
+                      >
+                        {label}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Prerequisites */}
+            {hasRequires && (
+              <div className="border-t border-slate-700/50 pt-2">
+                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+                  Requires each iteration
+                </div>
+                <ul className="space-y-0.5">
+                  {(loop.requires ?? []).map((cond, i) => (
+                    <li
+                      key={i}
+                      className="flex items-start gap-1.5 text-xs text-slate-400"
+                    >
+                      <span
+                        className="mt-1 h-1 w-1 rounded-full bg-slate-500 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <span>{cond.predicate}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LoopItem({ loop, index }: { loop: InteractionLoop; index: number }) {
+  const loopId = loop.cards.join("-") + `-${index}`;
+
   return (
     <div
       data-testid={`loop-${index}`}
@@ -306,26 +519,9 @@ function LoopItem({ loop, index }: { loop: InteractionLoop; index: number }) {
         </span>
       </div>
       <p className="text-xs text-slate-400 leading-relaxed">{loop.description}</p>
-      {loop.netEffect.resources.length > 0 && (
-        <div className="mt-2 rounded-md border border-slate-600/50 bg-slate-900/50 px-3 py-2">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
-            Net per cycle
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {loop.netEffect.resources.map((r, i) => {
-              const colorStr = r.category === "mana" ? ` ${r.color}` : "";
-              return (
-                <span
-                  key={`${r.category}-${i}`}
-                  className="rounded bg-slate-700/60 border border-slate-600/40 px-2 py-0.5 text-xs text-slate-300"
-                >
-                  {r.category}{colorStr} &times;{r.quantity}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
+
+      {/* "How it works" expandable section */}
+      <LoopHowItWorks loop={loop} id={loopId} />
     </div>
   );
 }

@@ -511,10 +511,29 @@ function parseEffects(tokens: Token[]): Effect[] {
       token.type === "PLAYER_ACTION" &&
       token.normalized === "search_library"
     ) {
-      effects.push({ type: "search_library" });
-      i++;
+      // Look ahead for "for a [TYPE/SUBTYPE] card" to capture search target
+      let searchTarget: GameObjectRef | undefined;
+      let j = i + 1;
+      // Find "for" keyword in the remaining tokens
+      while (j < tokens.length && tokens[j].type !== "PUNCTUATION") {
+        if (tokens[j].type === "TEXT" && tokens[j].value.toLowerCase() === "for") {
+          const targetRef = parseObjectRefFrom(tokens, j + 1);
+          // Only use target if we found meaningful type info
+          if (targetRef.ref.types.length > 0 || (targetRef.ref.subtypes && targetRef.ref.subtypes.length > 0)) {
+            searchTarget = targetRef.ref;
+          }
+          j = targetRef.endIndex;
+          break;
+        }
+        j++;
+      }
+      effects.push({
+        type: "search_library",
+        target: searchTarget,
+      });
       // Skip rest of the search clause
-      while (i < tokens.length && tokens[i].type !== "PUNCTUATION") i++;
+      while (j < tokens.length && tokens[j].type !== "PUNCTUATION") j++;
+      i = j;
       continue;
     }
 
@@ -1158,6 +1177,8 @@ function parseObjectRefFrom(tokens: Token[], startIndex: number): ObjectRefResul
       // "noncreature", "nonland", "nonartifact" etc.
       // Store as modifier for now — Capability Extractor will handle exclusion
       ref.modifiers.push(token.normalized as RefModifier);
+    } else if (token.type === "MODIFIER" && token.normalized === "self") {
+      ref.self = true;
     } else if (token.type === "MODIFIER" && token.normalized === "token") {
       ref.modifiers.push("token" as RefModifier);
     } else if (token.type === "MODIFIER" && token.normalized === "nontoken") {

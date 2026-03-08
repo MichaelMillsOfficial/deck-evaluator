@@ -267,9 +267,13 @@ function expandCompositeTypes(types: string[]): readonly string[] {
 }
 
 /**
- * Two GameObjectRef match if one's types overlap with the other's.
+ * Check if a filter/target ref (a) matches a card's ref (b).
  * Empty types = matches anything (wildcard).
  * Handles composite types like "permanent" by expanding them.
+ *
+ * Subtype handling: if the filter (a) requires subtypes, the card (b)
+ * must have at least one matching subtype. This prevents "search for a
+ * Sliver" from matching non-Sliver cards.
  */
 function objectTypesMatch(
   a: GameObjectRef | undefined,
@@ -282,9 +286,11 @@ function objectTypesMatch(
     const expandedB = expandCompositeTypes(b.types);
     if (!expandedA.some((t) => expandedB.includes(t))) return false;
   }
-  // Subtype check - if one side specifies subtypes and the other does too, they must overlap
-  if (a.subtypes && a.subtypes.length > 0 && b.subtypes && b.subtypes.length > 0) {
-    if (!a.subtypes.some((st) => b.subtypes!.includes(st))) return false;
+  // Subtype check — if the filter (a) requires subtypes, the card (b) must have them
+  if (a.subtypes && a.subtypes.length > 0) {
+    if (!b.subtypes || !a.subtypes.some((st) => b.subtypes!.includes(st))) {
+      return false;
+    }
   }
   return true;
 }
@@ -358,8 +364,18 @@ function resourceMatchesCost(
 
   // Token creation matches sacrifice cost
   if (resource.category === "create_token" && cost.costType === "sacrifice") {
+    // Self-sacrifice costs never match other cards' tokens
+    if (cost.object.self) return false;
     const tokenTypes = resource.token.types;
     const sacTypes = cost.object.types;
+    const sacSubtypes = cost.object.subtypes || [];
+    // If sacrifice requires specific subtypes (e.g. "Sacrifice a Sliver"),
+    // the token must have that subtype
+    if (sacSubtypes.length > 0) {
+      const tokenSubtypes = resource.token.subtypes || [];
+      const subtypeMatch = sacSubtypes.some((s) => tokenSubtypes.includes(s));
+      if (!subtypeMatch) return false;
+    }
     // Empty sacrifice target = "sacrifice a permanent" — any token works
     if (sacTypes.length === 0) return true;
     return tokenTypes.some((t) => sacTypes.includes(t));
@@ -388,6 +404,11 @@ function cardSatisfiesSacrificeCost(
   cardSubtypes?: Subtype[],
   cardSupertypes?: Supertype[]
 ): boolean {
+  // Self-sacrifice ("Sacrifice ~") only sacrifices the card itself,
+  // never other cards — no pairwise interaction
+  if (cost.object.self) {
+    return false;
+  }
   if (cost.object.types.length === 0 && (!cost.object.subtypes || cost.object.subtypes.length === 0)) {
     return isPermanentCard(cardTypes);
   }
@@ -673,7 +694,7 @@ function detectRecurs(a: CardProfile, b: CardProfile): Interaction[] {
       (event.to === "battlefield" || event.to === "hand")
     ) {
       // Check if B's types match the object reference
-      if (objectTypesMatch(event.object, { types: b.cardTypes, quantity: "one", modifiers: [] })) {
+      if (objectTypesMatch(event.object, { types: b.cardTypes, subtypes: b.subtypes, quantity: "one", modifiers: [] })) {
         results.push({
           cards: [a.cardName, b.cardName],
           type: "recurs",

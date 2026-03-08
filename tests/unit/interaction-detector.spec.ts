@@ -1151,3 +1151,106 @@ test.describe("enabler detection", () => {
     expect(analysis.enablers).toHaveLength(0);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// REGRESSION: TYPE-MATCHING FALSE POSITIVES
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("type matching — Sliver/fetchland regression", () => {
+  function basalSliver(): CardProfile {
+    return profile({
+      name: "Basal Sliver",
+      typeLine: "Creature — Sliver",
+      oracleText: "All Slivers have \"Sacrifice this permanent: Add {B}{B}.\"",
+      manaCost: "{2}{B}",
+    });
+  }
+
+  function pollutedDelta(): CardProfile {
+    return profile({
+      name: "Polluted Delta",
+      typeLine: "Land",
+      oracleText: "{T}, Pay 1 life, Sacrifice Polluted Delta: Search your library for an Island or Swamp card, put it onto the battlefield, then shuffle.",
+    });
+  }
+
+  function sliverOverlord(): CardProfile {
+    return profile({
+      name: "Sliver Overlord",
+      typeLine: "Legendary Creature — Sliver Mutant",
+      oracleText: "{3}: Search your library for a Sliver card, reveal that card, put it into your hand, then shuffle.\n{3}: Gain control of target Sliver.",
+      manaCost: "{W}{U}{B}{R}{G}",
+    });
+  }
+
+  function sliverLegion(): CardProfile {
+    return profile({
+      name: "Sliver Legion",
+      typeLine: "Legendary Creature — Sliver",
+      oracleText: "All Slivers get +1/+1 for each other Sliver on the battlefield.",
+      manaCost: "{W}{U}{B}{R}{G}",
+    });
+  }
+
+  test("Basal Sliver self-sacrifice cost does NOT enable sacrificing a fetchland", () => {
+    const basal = basalSliver();
+    const delta = pollutedDelta();
+    const analysis = findInteractions([basal, delta]);
+
+    // Basal Sliver grants sacrifice to Slivers only — a fetchland is not a Sliver
+    const enables = findDirectional(analysis, "enables", "Basal Sliver", "Polluted Delta");
+    expect(enables.length).toBe(0);
+  });
+
+  test("Polluted Delta self-sacrifice does NOT enable sacrificing Basal Sliver", () => {
+    const basal = basalSliver();
+    const delta = pollutedDelta();
+    const analysis = findInteractions([basal, delta]);
+
+    // Polluted Delta sacrifices itself — it can't sacrifice other cards
+    const enables = findDirectional(analysis, "enables", "Polluted Delta", "Basal Sliver");
+    expect(enables.length).toBe(0);
+  });
+
+  test("Basal Sliver + fetchland does NOT form a loop", () => {
+    const basal = basalSliver();
+    const delta = pollutedDelta();
+    const analysis = findInteractions([basal, delta]);
+
+    expect(analysis.loops.length).toBe(0);
+  });
+
+  test("Sliver Overlord search does NOT match a fetchland (not a Sliver)", () => {
+    const overlord = sliverOverlord();
+    const delta = pollutedDelta();
+    const analysis = findInteractions([overlord, delta]);
+
+    // No tutor/recur/enables interactions — fetchlands aren't Slivers
+    const allInteractions = analysis.interactions.filter(
+      (i) => i.cards.includes("Sliver Overlord") && i.cards.includes("Polluted Delta")
+    );
+    // Only valid interaction might be "triggers" from sacrifice causing zone transitions
+    // but NOT enables or recurs
+    const enables = allInteractions.filter((i) => i.type === "enables");
+    const recurs = allInteractions.filter((i) => i.type === "recurs");
+    expect(enables.length).toBe(0);
+    expect(recurs.length).toBe(0);
+  });
+
+  test("two Slivers do NOT create false sacrifice interactions with each other", () => {
+    const overlord = sliverOverlord();
+    const legion = sliverLegion();
+    const analysis = findInteractions([overlord, legion]);
+
+    // Neither Sliver should show false "enables sacrifice" with the other.
+    // Sliver Overlord's abilities are search (tutor) and control — neither
+    // should create enables interactions with Sliver Legion.
+    const enables = analysis.interactions.filter(
+      (i) =>
+        i.type === "enables" &&
+        i.cards.includes("Sliver Overlord") &&
+        i.cards.includes("Sliver Legion")
+    );
+    expect(enables.length).toBe(0);
+  });
+});
