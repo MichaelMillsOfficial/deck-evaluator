@@ -674,7 +674,9 @@ export interface ModalConfig {
 // ─── Triggered Ability ───
 export interface TriggeredAbility {
   abilityType: "triggered";
-  trigger: GameEvent;
+  /** undefined when the parser couldn't classify the trigger — the ability's
+   *  effects are still parsed, but no triggersOn entry is created. */
+  trigger?: GameEvent;
   effects: Effect[];
   condition?: Condition;
   speed: "instant";

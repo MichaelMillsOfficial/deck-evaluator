@@ -351,7 +351,10 @@ function extractTriggersOn(abilities: AbilityNode[]): GameEvent[] {
   for (const ability of abilities) {
     if (ability.abilityType === "triggered") {
       const triggered = ability as TriggeredAbility;
-      triggersOn.push(triggered.trigger);
+      // Skip abilities where the parser couldn't classify the trigger
+      if (triggered.trigger) {
+        triggersOn.push(triggered.trigger);
+      }
     }
   }
 

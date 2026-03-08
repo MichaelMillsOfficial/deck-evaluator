@@ -112,6 +112,20 @@ function classifyAbility(tokens: Token[]): AbilityClass {
     return "replacement";
   }
 
+  // ─── Intervening-if triggered: "If [zone_transition], [effect]" ───
+  // e.g. "If Gaea's Blessing is put into a graveyard from a library, ..."
+  // These are triggered abilities phrased with "If" instead of "When/Whenever".
+  // Must NOT have "would" (that's a replacement effect) and MUST contain a
+  // zone transition to distinguish from other conditionals.
+  if (
+    first.type === "CONDITIONAL" &&
+    first.normalized === "if" &&
+    !hasNormalized(tokens, "would") &&
+    hasType(tokens, "ZONE_TRANSITION")
+  ) {
+    return "triggered";
+  }
+
   // ─── Triggered: starts with "when", "whenever", or "at" (phase trigger) ───
   if (first.type === "TRIGGER_WORD") {
     return "triggered";
@@ -908,7 +922,7 @@ function parseEffects(tokens: Token[]): Effect[] {
  * Parse a trigger clause (tokens before the comma in a triggered ability)
  * into a GameEvent.
  */
-function parseTrigger(tokens: Token[]): GameEvent {
+function parseTrigger(tokens: Token[]): GameEvent | null {
   // ─── Phase triggers: "At the beginning of ..." ───
   const phaseTriggerToken = tokens.find(
     (t) =>
@@ -976,12 +990,9 @@ function parseTrigger(tokens: Token[]): GameEvent {
     };
   }
 
-  // Fallback: generic event — use zone transition as placeholder
-  return {
-    kind: "zone_transition",
-    to: "battlefield",
-    object: buildObjectRefFromTokens(tokens),
-  } as ZoneTransition;
+  // Fallback: return null — we cannot confidently classify this trigger.
+  // Returning a false ETB placeholder would pollute the entire interaction graph.
+  return null;
 }
 
 function parsePhaseTrigger(token: Token): PhaseTrigger {
@@ -1044,10 +1055,22 @@ function parseZoneTransitionTrigger(
     transition.to = "exile";
   } else if (normalized === "put_into_graveyard" || normalized === "put_into_graveyard_from_anywhere") {
     transition.to = "graveyard";
-  } else {
-    // Default fallback for unknown zone transitions
+  } else if (normalized === "milled") {
+    transition.from = "library";
+    transition.to = "graveyard";
+  } else if (normalized === "bounced") {
+    transition.from = "battlefield";
+    transition.to = "hand";
+  } else if (normalized === "tucked") {
+    transition.from = "battlefield";
+    transition.to = "library";
+  } else if (normalized === "returns_from_exile") {
+    transition.from = "exile";
     transition.to = "battlefield";
   }
+  // No else fallback — if we don't recognize the zone transition,
+  // leave from/to undefined. The caller (parseTrigger) already
+  // returns null for fully unrecognized patterns.
 
   return transition;
 }
@@ -1970,7 +1993,7 @@ function parseTriggeredAbility(tokens: Token[]): TriggeredAbility {
 
   return {
     abilityType: "triggered",
-    trigger,
+    trigger: trigger ?? undefined,
     effects,
     speed: "instant",
     condition,

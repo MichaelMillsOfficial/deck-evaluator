@@ -34,6 +34,8 @@ interface AliasEntry {
 const MULTI_WORD_ALIASES: AliasEntry[] = [
   // Zone transitions (longest first)
   { pattern: "is put into a graveyard from the battlefield", type: "ZONE_TRANSITION", normalized: "dies" },
+  { pattern: "is put into a graveyard from a library", type: "ZONE_TRANSITION", normalized: "milled" },
+  { pattern: "is put into a graveyard from your library", type: "ZONE_TRANSITION", normalized: "milled" },
   { pattern: "is put into a graveyard from anywhere", type: "ZONE_TRANSITION", normalized: "put_into_graveyard_from_anywhere" },
   { pattern: "be put into a graveyard from anywhere", type: "ZONE_TRANSITION", normalized: "put_into_graveyard_from_anywhere" },
   { pattern: "is put into a graveyard", type: "ZONE_TRANSITION", normalized: "put_into_graveyard" },
@@ -72,8 +74,11 @@ const MULTI_WORD_ALIASES: AliasEntry[] = [
   { pattern: "cast a spell", type: "PLAYER_ACTION", normalized: "cast_spell" },
   { pattern: "casts a spell", type: "PLAYER_ACTION", normalized: "cast_spell" },
   { pattern: "cast a creature spell", type: "PLAYER_ACTION", normalized: "cast_creature_spell" },
+  { pattern: "casts a creature spell", type: "PLAYER_ACTION", normalized: "cast_creature_spell" },
+  { pattern: "casts an instant or sorcery spell", type: "PLAYER_ACTION", normalized: "cast_instant_sorcery" },
   { pattern: "cast an instant or sorcery spell", type: "PLAYER_ACTION", normalized: "cast_instant_sorcery" },
   { pattern: "cast a noncreature spell", type: "PLAYER_ACTION", normalized: "cast_noncreature_spell" },
+  { pattern: "casts a noncreature spell", type: "PLAYER_ACTION", normalized: "cast_noncreature_spell" },
   { pattern: "play a land", type: "PLAYER_ACTION", normalized: "play_land" },
   { pattern: "plays a land", type: "PLAYER_ACTION", normalized: "play_land" },
   { pattern: "search your library", type: "PLAYER_ACTION", normalized: "search_library" },
@@ -84,6 +89,8 @@ const MULTI_WORD_ALIASES: AliasEntry[] = [
   { pattern: "deals damage to a player", type: "PLAYER_ACTION", normalized: "damage_to_player" },
   { pattern: "deals damage to an opponent", type: "PLAYER_ACTION", normalized: "damage_to_opponent" },
   { pattern: "deals damage", type: "PLAYER_ACTION", normalized: "deals_damage" },
+  { pattern: "damage is dealt to", type: "PLAYER_ACTION", normalized: "is_dealt_damage" },
+  { pattern: "damage is dealt", type: "PLAYER_ACTION", normalized: "is_dealt_damage" },
   { pattern: "is dealt damage", type: "PLAYER_ACTION", normalized: "is_dealt_damage" },
 
   // Controller (multi-word)

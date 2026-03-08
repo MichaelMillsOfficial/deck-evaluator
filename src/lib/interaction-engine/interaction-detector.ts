@@ -91,6 +91,12 @@ function buildAnalysisResult(
   // Global dedup: keep highest-strength interaction per (type, cardA, cardB) triple
   interactions = deduplicateInteractions(interactions);
 
+  // Quality gate: remove interactions below minimum confidence threshold.
+  // This filters out vague-to-vague matches (scored 0.3) and other low-confidence
+  // results that would pollute chains, loops, and enablers.
+  const MIN_PAIRWISE_STRENGTH = 0.5;
+  interactions = interactions.filter((i) => i.strength >= MIN_PAIRWISE_STRENGTH);
+
   // Derive conflicts from blocks (bidirectional view of blocking)
   interactions.push(...deriveConflicts(interactions));
 
@@ -605,12 +611,17 @@ function computeTriggerStrength(
   trigger: GameEvent
 ): number {
   if (caused.kind === "zone_transition" && trigger.kind === "zone_transition") {
+    const causedHasZones = !!(caused.from || caused.to);
+    const triggerHasZones = !!(trigger.from || trigger.to);
+    const causedHasTypes = caused.object.types.length > 0;
+    const triggerHasTypes = trigger.object.types.length > 0;
+
     // Both specify from AND to zones -> strong match
     if (caused.from && caused.to && trigger.from && trigger.to) {
       // Check if object types match specifically
       if (
-        caused.object.types.length > 0 &&
-        trigger.object.types.length > 0 &&
+        causedHasTypes &&
+        triggerHasTypes &&
         caused.object.types.some((ct) => trigger.object.types.includes(ct))
       ) {
         return 1.0; // Perfect: specific zones + specific types
@@ -619,11 +630,17 @@ function computeTriggerStrength(
     }
 
     // One side specifies zones -> good match
-    if ((caused.from || caused.to) && (trigger.from || trigger.to)) {
-      return 0.8;
+    if (causedHasZones && triggerHasZones) {
+      return causedHasTypes || triggerHasTypes ? 0.8 : 0.7;
     }
 
-    return 0.6;
+    // At least one side has zones but the other doesn't
+    if (causedHasZones || triggerHasZones) {
+      return causedHasTypes || triggerHasTypes ? 0.5 : 0.4;
+    }
+
+    // Neither side has zones — vague-to-vague
+    return causedHasTypes || triggerHasTypes ? 0.5 : 0.3;
   }
 
   if (caused.kind === "state_change" && trigger.kind === "state_change") {
