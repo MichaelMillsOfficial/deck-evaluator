@@ -247,12 +247,27 @@ function InteractionItem({
 }
 
 function ChainItem({ chain, index }: { chain: InteractionChain; index: number }) {
+  const [open, setOpen] = useState(false);
+  const contentId = `chain-detail-${index}`;
+
+  // Map interaction types to readable labels and colors
+  const typeLabel = (t: string) => {
+    switch (t) {
+      case "enables": return { text: "enables", color: "text-emerald-400" };
+      case "triggers": return { text: "triggers", color: "text-amber-400" };
+      case "recurs": return { text: "recurs", color: "text-violet-400" };
+      case "reduces_cost": return { text: "reduces cost of", color: "text-cyan-400" };
+      default: return { text: t, color: "text-slate-400" };
+    }
+  };
+
   return (
     <div
       data-testid={`chain-${index}`}
       className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 hover:bg-slate-700/30 hover:border-slate-600 transition-colors duration-150"
     >
-      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+      {/* Card flow header */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
         {chain.cards.map((card, i) => (
           <span key={card} className="flex items-center gap-1.5">
             {i > 0 && (
@@ -263,8 +278,97 @@ function ChainItem({ chain, index }: { chain: InteractionChain; index: number })
             <CardPill name={card} />
           </span>
         ))}
+        {chain.strength !== undefined && (
+          <span className="ml-auto text-[10px] text-slate-500 tabular-nums">
+            {Math.round(chain.strength * 100)}%
+          </span>
+        )}
       </div>
-      <p className="text-xs text-slate-400 leading-relaxed">{chain.description}</p>
+
+      {/* Reasoning summary */}
+      {chain.reasoning && (
+        <p className="text-xs text-slate-300 leading-relaxed mb-1.5 italic">
+          {chain.reasoning}
+        </p>
+      )}
+
+      {/* Expandable step-by-step detail */}
+      {chain.steps.length > 0 && (
+        <>
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls={contentId}
+            onClick={() => setOpen((v) => !v)}
+            className="group flex items-center gap-1 text-xs text-slate-500 hover:text-sky-300 transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-sky-400 rounded"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className={`h-3 w-3 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${
+                open ? "rotate-90" : ""
+              }`}
+            >
+              <path
+                fillRule="evenodd"
+                d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span className="underline-offset-2 group-hover:underline">
+              Step-by-step breakdown
+            </span>
+          </button>
+
+          <div
+            id={contentId}
+            className={`grid transition-[grid-template-rows] duration-200 motion-reduce:transition-none ease-out ${
+              open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`}
+            aria-hidden={!open}
+          >
+            <div className="overflow-hidden">
+              <ol className="mt-2 space-y-0" aria-label="Chain steps">
+                {chain.steps.map((step, i) => {
+                  const label = typeLabel(step.interactionType);
+                  return (
+                    <li key={i} className="relative pl-8 pb-3 last:pb-0">
+                      {/* Vertical connector */}
+                      {i < chain.steps.length - 1 && (
+                        <span
+                          aria-hidden="true"
+                          className="absolute left-[13px] top-6 bottom-0 w-px bg-slate-700"
+                        />
+                      )}
+                      {/* Step number circle */}
+                      <span
+                        aria-hidden="true"
+                        className="absolute left-0 top-0.5 flex h-[26px] w-[26px] items-center justify-center rounded-full bg-sky-900/60 text-[11px] font-semibold text-sky-300 ring-1 ring-sky-700/60"
+                      >
+                        {i + 1}
+                      </span>
+                      {/* Step content */}
+                      <div className="pt-0.5">
+                        <div className="flex flex-wrap items-center gap-1 text-xs">
+                          <CardPill name={step.from} />
+                          <span className={`font-medium ${label.color}`}>
+                            {label.text}
+                          </span>
+                          <CardPill name={step.to} />
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                          {step.description}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

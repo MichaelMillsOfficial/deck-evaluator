@@ -1661,7 +1661,9 @@ function interactionDisruptedByBlocker(
  *   A enables/triggers B AND B enables/triggers C
  *   forming a causal sequence.
  */
-const MAX_CHAINS = 200;
+const MAX_CHAINS = 30;
+const MIN_CHAIN_EDGE_STRENGTH = 0.6;
+const MIN_CHAIN_AVG_STRENGTH = 0.65;
 
 function detectChains(
   interactions: Interaction[],
@@ -1670,7 +1672,8 @@ function detectChains(
   if (profiles.length < 3) return [];
 
   // Build adjacency list from causal interactions (directional)
-  // Filter to only meaningful-strength edges to prevent explosion
+  // Only include meaningful-strength edges — a chain is only as strong
+  // as its weakest link, so weak edges produce weak chains.
   const causalTypes = new Set<string>([
     "enables", "triggers", "recurs", "reduces_cost",
   ]);
@@ -1678,7 +1681,7 @@ function detectChains(
 
   for (const inter of interactions) {
     if (!causalTypes.has(inter.type)) continue;
-    if (inter.strength < 0.3) continue; // Skip weak edges to limit DFS explosion
+    if (inter.strength < MIN_CHAIN_EDGE_STRENGTH) continue;
     const from = inter.cards[0];
     const to = inter.cards[1];
     if (!adjacency.has(from)) adjacency.set(from, new Map());
@@ -1689,19 +1692,19 @@ function detectChains(
     }
   }
 
-  const chains: InteractionChain[] = [];
+  const candidates: InteractionChain[] = [];
   const seen = new Set<string>();
 
   // DFS from each node to find paths of length >= 3
   for (const startCard of adjacency.keys()) {
-    if (chains.length >= MAX_CHAINS) break;
+    if (candidates.length >= MAX_CHAINS * 3) break; // collect extras to sort
 
     const stack: { path: string[]; interactions: Interaction[] }[] = [
       { path: [startCard], interactions: [] },
     ];
 
     while (stack.length > 0) {
-      if (chains.length >= MAX_CHAINS) break;
+      if (candidates.length >= MAX_CHAINS * 3) break;
 
       const { path, interactions: pathInteractions } = stack.pop()!;
       const current = path[path.length - 1];
@@ -1709,7 +1712,7 @@ function detectChains(
       if (!neighbors) continue;
 
       for (const [next, inter] of neighbors) {
-        if (chains.length >= MAX_CHAINS) break;
+        if (candidates.length >= MAX_CHAINS * 3) break;
         // Avoid revisiting nodes in this path (no cycles — that's loops)
         if (path.includes(next)) continue;
 
@@ -1721,7 +1724,11 @@ function detectChains(
           const key = newPath.join(" → ");
           if (!seen.has(key)) {
             seen.add(key);
-            chains.push(buildChain(newPath, newInteractions));
+            const chain = buildChain(newPath, newInteractions);
+            // Only keep chains where every edge is meaningful
+            if (chain.strength >= MIN_CHAIN_AVG_STRENGTH) {
+              candidates.push(chain);
+            }
           }
         }
 
@@ -1733,7 +1740,50 @@ function detectChains(
     }
   }
 
-  return chains;
+  // Sort by strength descending — best chains first
+  candidates.sort((a, b) => b.strength - a.strength);
+  return candidates.slice(0, MAX_CHAINS);
+}
+
+/**
+ * Generate a strategic reasoning for why a chain matters in gameplay.
+ */
+function generateChainReasoning(
+  path: string[],
+  interactions: Interaction[]
+): string {
+  const types = interactions.map((i) => i.type);
+
+  // Classify the chain pattern
+  if (types.every((t) => t === "triggers")) {
+    return `Trigger cascade — each card's effect triggers the next. ${path[0]} starts the chain, and each subsequent card fires automatically.`;
+  }
+
+  if (types.every((t) => t === "enables")) {
+    return `Resource pipeline — each card produces what the next card needs. ${path[0]} feeds ${path[1]}, which feeds ${path[path.length - 1]}.`;
+  }
+
+  if (types.includes("enables") && types.includes("triggers")) {
+    const enablerIdx = types.indexOf("enables");
+    const triggerIdx = types.indexOf("triggers");
+    if (enablerIdx < triggerIdx) {
+      return `Resource-to-trigger chain — ${path[enablerIdx]} produces resources for ${path[enablerIdx + 1]}, which then causes events that trigger ${path[triggerIdx + 1]}.`;
+    }
+    return `Trigger-to-resource chain — ${path[triggerIdx]} triggers ${path[triggerIdx + 1]}, which produces resources enabling ${path[enablerIdx + 1]}.`;
+  }
+
+  if (types.includes("recurs")) {
+    const recursIdx = types.indexOf("recurs");
+    return `Recursion chain — ${path[recursIdx]} brings back ${path[recursIdx + 1]} from the graveyard, enabling continued synergy with ${path[path.length - 1]}.`;
+  }
+
+  if (types.includes("reduces_cost")) {
+    const costIdx = types.indexOf("reduces_cost");
+    return `Cost reduction chain — ${path[costIdx]} makes ${path[costIdx + 1]} cheaper, enabling more efficient play with ${path[path.length - 1]}.`;
+  }
+
+  // Fallback: describe the flow
+  return `Multi-card synergy — ${path[0]} ${types[0]} ${path[1]}, which ${types[types.length - 1]} ${path[path.length - 1]}.`;
 }
 
 function buildChain(
@@ -1752,12 +1802,22 @@ function buildChain(
         object: { types: [], quantity: "one" as const, modifiers: [] },
       },
       description: inter.mechanical,
+      interactionType: inter.type,
     });
   }
+
+  // Chain strength = minimum edge strength (weakest link)
+  const strength = interactions.length > 0
+    ? Math.min(...interactions.map((i) => i.strength))
+    : 0;
+
+  const reasoning = generateChainReasoning(path, interactions);
 
   return {
     cards: path,
     description: `${path.join(" → ")}: ${steps.map((s) => s.description).join("; ")}`,
+    reasoning,
+    strength,
     steps,
   };
 }
@@ -1864,6 +1924,7 @@ function buildLoop(
         object: { types: [], quantity: "one" as const, modifiers: [] },
       },
       description: best?.mechanical || `${from} interacts with ${to}`,
+      interactionType: best?.type || "enables",
     });
   }
 

@@ -959,13 +959,20 @@ test.describe("chain detection", () => {
     expect(tripleChain!.description.length).toBeGreaterThan(0);
   });
 
-  test("chain steps have from, to, event, and description", () => {
+  test("chain steps have from, to, event, description, and interactionType", () => {
     const avenger = avengerOfZendikar();
     const altar = ashnodAltar();
     const artist = bloodArtist();
     const analysis = findInteractions([avenger, altar, artist]);
 
     for (const chain of analysis.chains) {
+      // Chains have reasoning and strength
+      expect(typeof chain.reasoning).toBe("string");
+      expect(chain.reasoning.length).toBeGreaterThan(0);
+      expect(typeof chain.strength).toBe("number");
+      expect(chain.strength).toBeGreaterThanOrEqual(0);
+      expect(chain.strength).toBeLessThanOrEqual(1);
+
       for (const step of chain.steps) {
         expect(typeof step.from).toBe("string");
         expect(typeof step.to).toBe("string");
@@ -973,6 +980,8 @@ test.describe("chain detection", () => {
         expect(step.event.kind).toBeTruthy();
         expect(typeof step.description).toBe("string");
         expect(step.description.length).toBeGreaterThan(0);
+        expect(typeof step.interactionType).toBe("string");
+        expect(step.interactionType.length).toBeGreaterThan(0);
       }
     }
   });

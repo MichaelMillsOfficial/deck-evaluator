@@ -950,11 +950,14 @@ export interface Interaction {
 export interface InteractionChain {
   cards: string[];
   description: string;
+  reasoning: string;
+  strength: number;
   steps: {
     from: string;
     to: string;
     event: GameEvent;
     description: string;
+    interactionType: string;
   }[];
 }
 
