@@ -10,8 +10,14 @@ import type {
   InteractionType,
 } from "@/lib/interaction-engine";
 import type { AnalysisStep } from "@/hooks/useInteractionAnalysis";
-import { useMemo, useState, Component, type ReactNode } from "react";
+import { useEffect, useMemo, useState, Component, type ReactNode } from "react";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
+import {
+  rollUpInteractions,
+  INTERACTION_VERBS,
+  type RolledUpGroup,
+  type DisplayInteractionItem,
+} from "@/lib/interaction-rollup";
 
 const PAGE_SIZE = 20;
 
@@ -32,6 +38,7 @@ const INTERACTION_TYPE_LABELS: Record<string, string> = {
   protects: "Protects",
   recurs: "Recurs",
   reduces_cost: "Reduces Cost",
+  tutors_for: "Tutors For",
   blocks: "Blocks",
   conflicts: "Conflicts",
   loops_with: "Loops With",
@@ -44,6 +51,7 @@ const INTERACTION_TYPE_COLORS: Record<string, string> = {
   protects: "bg-cyan-600/60 text-cyan-100",
   recurs: "bg-emerald-600/60 text-emerald-100",
   reduces_cost: "bg-lime-600/60 text-lime-100",
+  tutors_for: "bg-indigo-600/60 text-indigo-100",
   blocks: "bg-red-600/60 text-red-100",
   conflicts: "bg-orange-600/60 text-orange-100",
   loops_with: "bg-fuchsia-600/60 text-fuchsia-100",
@@ -56,6 +64,7 @@ const TYPE_FILTER_COLORS: Record<string, { active: string; border: string }> = {
   protects: { active: "border-cyan-500 bg-cyan-900/30 text-cyan-300", border: "border-cyan-600/40" },
   recurs: { active: "border-emerald-500 bg-emerald-900/30 text-emerald-300", border: "border-emerald-600/40" },
   reduces_cost: { active: "border-lime-500 bg-lime-900/30 text-lime-300", border: "border-lime-600/40" },
+  tutors_for: { active: "border-indigo-500 bg-indigo-900/30 text-indigo-300", border: "border-indigo-600/40" },
   blocks: { active: "border-red-500 bg-red-900/30 text-red-300", border: "border-red-600/40" },
   conflicts: { active: "border-orange-500 bg-orange-900/30 text-orange-300", border: "border-orange-600/40" },
   loops_with: { active: "border-fuchsia-500 bg-fuchsia-900/30 text-fuchsia-300", border: "border-fuchsia-600/40" },
@@ -242,6 +251,149 @@ function InteractionItem({
       <p className="text-xs text-slate-400 leading-relaxed">
         {interaction.mechanical}
       </p>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Rolled-up interaction group with expandable sub-list
+// ═══════════════════════════════════════════════════════════════
+
+function RolledUpInteractionItem({
+  group,
+  index,
+  type,
+}: {
+  group: RolledUpGroup;
+  index: number;
+  type: string;
+}) {
+  const [open, setOpen] = useState(false);
+  // Stable ID using anchor card + type (avoids index-based collisions across group modes)
+  const contentId = `rollup-content-${group.anchorCard.replace(/\s+/g, "-")}-${group.type}-${index}`;
+  const badgeColors =
+    INTERACTION_TYPE_COLORS[group.type] ?? "bg-slate-600/60 text-slate-100";
+  const verb =
+    group.anchorRole === "source"
+      ? INTERACTION_VERBS[group.type]?.sourceVerb ?? group.type
+      : INTERACTION_VERBS[group.type]?.targetVerb ?? group.type;
+
+  return (
+    <div
+      data-testid={`interaction-${type}-${index}`}
+      className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 transition-colors duration-150"
+    >
+      {/* Header row: type badge + strength */}
+      <div className="flex items-center justify-between mb-2">
+        <span
+          data-testid="interaction-type"
+          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badgeColors}`}
+        >
+          {INTERACTION_TYPE_LABELS[group.type] ?? group.type}
+        </span>
+        <StrengthBar strength={group.maxStrength} />
+      </div>
+
+      {/* Summary line: anchor card + verb + count + noun */}
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <CardPill name={group.anchorCard} highlight />
+        <span className="text-xs text-slate-300">
+          {verb}{" "}
+          <span className="font-semibold text-slate-200 tabular-nums">
+            {group.interactions.length}
+          </span>{" "}
+          {group.targetNoun}
+        </span>
+      </div>
+
+      {/* Expandable toggle */}
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={contentId}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && open) {
+            e.stopPropagation();
+            setOpen(false);
+          }
+        }}
+        className="group flex items-center gap-1 text-xs text-slate-500 hover:text-sky-300 transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-sky-400 rounded"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className={`h-3 w-3 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${
+            open ? "rotate-90" : ""
+          }`}
+        >
+          <path
+            fillRule="evenodd"
+            d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+            clipRule="evenodd"
+          />
+        </svg>
+        <span className="underline-offset-2 group-hover:underline">
+          {open ? "Hide" : "Show"} {group.interactions.length} {group.targetNoun}
+        </span>
+      </button>
+
+      {/* Expandable sub-list — grid trick for smooth height animation */}
+      <div
+        className={`grid transition-[grid-template-rows] duration-200 motion-reduce:transition-none ease-out ${
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+        aria-hidden={!open}
+      >
+        <div className="overflow-hidden">
+          <div
+            id={contentId}
+            className="mt-2 rounded-md border border-slate-700/60 bg-slate-900/40 py-1 divide-y divide-slate-700/30"
+          >
+            {group.interactions.map((inter, i) => {
+              const targetCard =
+                group.anchorRole === "source"
+                  ? inter.cards[1]
+                  : inter.cards[0];
+              return (
+                <RolledUpSubRow
+                  key={`${targetCard}-${i}`}
+                  targetCard={targetCard}
+                  mechanical={inter.mechanical}
+                  strength={inter.strength}
+                />
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RolledUpSubRow({
+  targetCard,
+  mechanical,
+  strength,
+}: {
+  targetCard: string;
+  mechanical: string;
+  strength: number;
+}) {
+  const pct = strengthPercent(strength);
+  return (
+    <div className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-700/20 transition-colors duration-100">
+      <CardPill name={targetCard} />
+      <span
+        className="text-[11px] text-slate-400 truncate min-w-0 flex-1"
+        title={mechanical}
+      >
+        {mechanical}
+      </span>
+      <span className="text-[10px] tabular-nums text-slate-500 shrink-0 w-7 text-right">
+        {pct}%
+      </span>
     </div>
   );
 }
@@ -959,57 +1111,112 @@ interface DisplayGroup {
   id: string;
   label: string;
   accentColor: string;
+  /** Raw interactions for counting and backward compatibility */
   interactions: Interaction[];
+  /** Rolled-up display items (rollup groups + individual entries) */
+  displayItems: DisplayInteractionItem[];
 }
 
-function buildGroups(interactions: Interaction[], mode: GroupMode): DisplayGroup[] {
+/** Helper: get the interaction type from a display item */
+function getItemType(item: DisplayInteractionItem): InteractionType {
+  return item.kind === "rollup" ? item.type : item.interaction.type;
+}
+
+/** Helper: get the max strength from a display item */
+function getItemStrength(item: DisplayInteractionItem): number {
+  return item.kind === "rollup" ? item.maxStrength : item.interaction.strength;
+}
+
+/** Helper: get all card names from a display item */
+function getItemCards(item: DisplayInteractionItem): string[] {
+  if (item.kind === "rollup") {
+    return [item.anchorCard, ...item.targetCards];
+  }
+  return [...item.interaction.cards];
+}
+
+function buildGroups(
+  displayItems: DisplayInteractionItem[],
+  rawInteractions: Interaction[],
+  mode: GroupMode
+): DisplayGroup[] {
   if (mode === "type") {
-    const groups: Record<string, Interaction[]> = {};
-    for (const i of interactions) {
-      if (!groups[i.type]) groups[i.type] = [];
-      groups[i.type].push(i);
+    const groups: Record<string, DisplayInteractionItem[]> = {};
+    const rawGroups: Record<string, Interaction[]> = {};
+    for (const item of displayItems) {
+      const type = getItemType(item);
+      if (!groups[type]) groups[type] = [];
+      groups[type].push(item);
+    }
+    for (const i of rawInteractions) {
+      if (!rawGroups[i.type]) rawGroups[i.type] = [];
+      rawGroups[i.type].push(i);
     }
     return Object.entries(groups)
-      .sort(([, a], [, b]) => b.length - a.length)
+      .sort(([a], [b]) => (rawGroups[b]?.length ?? 0) - (rawGroups[a]?.length ?? 0))
       .map(([type, items]) => ({
         id: type,
         label: INTERACTION_TYPE_LABELS[type] ?? type,
         accentColor: INTERACTION_GROUP_COLORS[type] ?? "text-slate-400",
-        interactions: [...items].sort((a, b) => b.strength - a.strength),
+        interactions: rawGroups[type] ?? [],
+        displayItems: [...items].sort((a, b) => getItemStrength(b) - getItemStrength(a)),
       }));
   }
 
   if (mode === "card") {
-    const cardGroups: Record<string, Interaction[]> = {};
-    for (const i of interactions) {
+    // Use Sets for O(1) dedup (avoids O(n^2) from .includes())
+    const cardGroupSets = new Map<string, Set<DisplayInteractionItem>>();
+    const rawCardGroups: Record<string, Interaction[]> = {};
+    for (const item of displayItems) {
+      const cards = getItemCards(item);
+      for (const card of cards) {
+        if (!cardGroupSets.has(card)) cardGroupSets.set(card, new Set());
+        cardGroupSets.get(card)!.add(item);
+      }
+    }
+    const cardGroups: Record<string, DisplayInteractionItem[]> = {};
+    for (const [card, set] of cardGroupSets) {
+      cardGroups[card] = [...set];
+    }
+    for (const i of rawInteractions) {
       for (const card of i.cards) {
-        if (!cardGroups[card]) cardGroups[card] = [];
-        cardGroups[card].push(i);
+        if (!rawCardGroups[card]) rawCardGroups[card] = [];
+        rawCardGroups[card].push(i);
       }
     }
     return Object.entries(cardGroups)
-      .sort(([, a], [, b]) => b.length - a.length)
+      .sort(([a], [b]) => (rawCardGroups[b]?.length ?? 0) - (rawCardGroups[a]?.length ?? 0))
       .map(([card, items]) => ({
         id: card,
         label: card,
         accentColor: "text-purple-400",
-        interactions: [...items].sort((a, b) => b.strength - a.strength),
+        interactions: rawCardGroups[card] ?? [],
+        displayItems: [...items].sort((a, b) => getItemStrength(b) - getItemStrength(a)),
       }));
   }
 
   // strength mode
-  const high: Interaction[] = [];
-  const mid: Interaction[] = [];
-  const low: Interaction[] = [];
-  for (const i of interactions) {
-    if (i.strength >= 0.75) high.push(i);
-    else if (i.strength >= 0.5) mid.push(i);
-    else low.push(i);
+  const high: DisplayInteractionItem[] = [];
+  const mid: DisplayInteractionItem[] = [];
+  const low: DisplayInteractionItem[] = [];
+  const rawHigh: Interaction[] = [];
+  const rawMid: Interaction[] = [];
+  const rawLow: Interaction[] = [];
+  for (const item of displayItems) {
+    const s = getItemStrength(item);
+    if (s >= 0.75) high.push(item);
+    else if (s >= 0.5) mid.push(item);
+    else low.push(item);
+  }
+  for (const i of rawInteractions) {
+    if (i.strength >= 0.75) rawHigh.push(i);
+    else if (i.strength >= 0.5) rawMid.push(i);
+    else rawLow.push(i);
   }
   const groups: DisplayGroup[] = [];
-  if (high.length > 0) groups.push({ id: "high", label: "High (75%+)", accentColor: "text-green-400", interactions: high.sort((a, b) => b.strength - a.strength) });
-  if (mid.length > 0) groups.push({ id: "mid", label: "Mid (50-75%)", accentColor: "text-amber-400", interactions: mid.sort((a, b) => b.strength - a.strength) });
-  if (low.length > 0) groups.push({ id: "low", label: "Low (< 50%)", accentColor: "text-slate-400", interactions: low.sort((a, b) => b.strength - a.strength) });
+  if (high.length > 0) groups.push({ id: "high", label: "High (75%+)", accentColor: "text-green-400", interactions: rawHigh, displayItems: high.sort((a, b) => getItemStrength(b) - getItemStrength(a)) });
+  if (mid.length > 0) groups.push({ id: "mid", label: "Mid (50-75%)", accentColor: "text-amber-400", interactions: rawMid, displayItems: mid.sort((a, b) => getItemStrength(b) - getItemStrength(a)) });
+  if (low.length > 0) groups.push({ id: "low", label: "Low (< 50%)", accentColor: "text-slate-400", interactions: rawLow, displayItems: low.sort((a, b) => getItemStrength(b) - getItemStrength(a)) });
   return groups;
 }
 
@@ -1062,10 +1269,8 @@ function InteractionSectionInner({
     });
   };
 
-  // Filtered interactions — reset pagination when filters change
+  // Filtered interactions
   const filteredInteractions = useMemo(() => {
-    // Reset group pagination on filter change
-    setGroupPages({});
     if (!analysis) return [];
     return analysis.interactions.filter((i) => {
       if (activeTypes.size > 0 && !activeTypes.has(i.type)) return false;
@@ -1082,10 +1287,21 @@ function InteractionSectionInner({
     });
   }, [analysis, activeTypes, minStrength, cardSearch]);
 
-  // Grouped interactions
+  // Reset pagination when filters change (moved out of useMemo to avoid side effects)
+  useEffect(() => {
+    setGroupPages({});
+  }, [activeTypes, minStrength, cardSearch]);
+
+  // Apply rollup to filtered interactions
+  const rolledUpItems = useMemo(
+    () => rollUpInteractions(filteredInteractions, analysis?.profiles ?? {}),
+    [filteredInteractions, analysis?.profiles]
+  );
+
+  // Grouped interactions (using rolled-up display items)
   const groups = useMemo(
-    () => buildGroups(filteredInteractions, groupMode),
-    [filteredInteractions, groupMode]
+    () => buildGroups(rolledUpItems, filteredInteractions, groupMode),
+    [rolledUpItems, filteredInteractions, groupMode]
   );
 
   const hasActiveFilters = activeTypes.size > 0 || cardSearch.trim() !== "" || minStrength > 0;
@@ -1235,7 +1451,7 @@ function InteractionSectionInner({
                 <div className="space-y-4">
                   {groups.map((group) => {
                     const limit = getGroupLimit(group.id);
-                    const visible = group.interactions.slice(0, limit);
+                    const visible = group.displayItems.slice(0, limit);
                     return (
                       <div key={group.id}>
                         <h4
@@ -1247,17 +1463,26 @@ function InteractionSectionInner({
                           </span>
                         </h4>
                         <div className="space-y-2">
-                          {visible.map((interaction, i) => (
-                            <InteractionItem
-                              key={`${interaction.cards[0]}-${interaction.cards[1]}-${interaction.type}`}
-                              interaction={interaction}
-                              index={i}
-                              type={group.id}
-                            />
-                          ))}
+                          {visible.map((item, i) =>
+                            item.kind === "rollup" ? (
+                              <RolledUpInteractionItem
+                                key={`rollup-${item.anchorCard}-${item.type}-${i}`}
+                                group={item}
+                                index={i}
+                                type={group.id}
+                              />
+                            ) : (
+                              <InteractionItem
+                                key={`${item.interaction.cards[0]}-${item.interaction.cards[1]}-${item.interaction.type}`}
+                                interaction={item.interaction}
+                                index={i}
+                                type={group.id}
+                              />
+                            )
+                          )}
                           <ShowMoreButton
                             shown={visible.length}
-                            total={group.interactions.length}
+                            total={group.displayItems.length}
                             onShowMore={() => showMoreGroup(group.id)}
                           />
                         </div>
