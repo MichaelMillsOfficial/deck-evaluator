@@ -358,23 +358,23 @@ test.describe("recurs detection", () => {
 // ═══════════════════════════════════════════════════════════════
 
 test.describe("tutors_for detection", () => {
-  test("Demonic Tutor tutors for any card", () => {
+  test("tutors_for is not emitted as pairwise interactions (handled as capability)", () => {
     const tutor = demonicTutor();
     const artist = bloodArtist();
     const analysis = findInteractions([tutor, artist]);
 
-    // Demonic Tutor searches library for any card -> Blood Artist is a card
+    // Tutoring is now handled as a capability note, not individual pairwise interactions.
+    // A card's search capability is visible in its CardProfile.
     const tutors = findDirectional(
       analysis,
       "tutors_for",
       "Demonic Tutor",
       "Blood Artist"
     );
-    expect(tutors.length).toBeGreaterThanOrEqual(1);
-    expect(tutors[0].strength).toBeGreaterThanOrEqual(0.4);
+    expect(tutors.length).toBe(0);
   });
 
-  test("Demonic Tutor tutors for multiple cards", () => {
+  test("no tutors_for interactions for multiple cards", () => {
     const tutor = demonicTutor();
     const ring = solRing();
     const altar = ashnodAltar();
@@ -392,8 +392,8 @@ test.describe("tutors_for detection", () => {
       "Demonic Tutor",
       "Ashnod's Altar"
     );
-    expect(tutorsRing.length).toBeGreaterThanOrEqual(1);
-    expect(tutorsAltar.length).toBeGreaterThanOrEqual(1);
+    expect(tutorsRing.length).toBe(0);
+    expect(tutorsAltar.length).toBe(0);
   });
 });
 

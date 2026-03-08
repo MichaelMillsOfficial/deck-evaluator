@@ -3,6 +3,12 @@
  *
  * Handles multi-word recognition, mana symbols, ability block splitting,
  * modal spells, self-references, and oracle text aliases.
+ *
+ * Performance optimizations:
+ * - Sticky (y-flag) regexes avoid substring allocation per character
+ * - Pre-lowercased text eliminates per-iteration toLowerCase calls
+ * - First-word alias lookup Map reduces multi-word alias scan from O(n) to O(k)
+ * - Card-name regex is compiled once per tokenize() call, reused across blocks
  */
 
 import type { Token, TokenType } from "./types";
@@ -145,6 +151,32 @@ const MULTI_WORD_ALIASES: AliasEntry[] = [
   { pattern: "up to one", type: "QUANTITY", normalized: "up_to_1" },
 ];
 
+// ─── First-word alias lookup Map ───
+// Instead of scanning all MULTI_WORD_ALIASES at every position, index by
+// first word so we only check aliases that could possibly match.
+const ALIAS_BY_FIRST_WORD = new Map<string, AliasEntry[]>();
+for (const alias of MULTI_WORD_ALIASES) {
+  const firstWord = alias.pattern.split(" ")[0];
+  if (!ALIAS_BY_FIRST_WORD.has(firstWord)) {
+    ALIAS_BY_FIRST_WORD.set(firstWord, []);
+  }
+  ALIAS_BY_FIRST_WORD.get(firstWord)!.push(alias);
+}
+
+// ─── Pre-compiled sticky regexes for the tokenization loop ───
+// Using the sticky (y) flag avoids creating a substring slice on every
+// character position. Instead we set lastIndex and exec directly.
+const MANA_RE = /\{[WUBRGCXSTQEP0-9/]+\}/y;
+const STAT_RE = /[+-][0-9X]+\/[+-][0-9X]+/y;
+const WORD_RE = /[a-zA-Z_']+/y;
+const NUM_RE = /[0-9]+/y;
+const WS_RE = /\s/y;
+const AFTER_EXILE_RE = /\s+([a-zA-Z]+)/y;
+const STRIKE_RE = /\s+(strike)/yi;
+
+// Word-boundary character test for multi-word alias matching
+const WORD_BOUNDARY_RE = /[\s,;.:•)—\-]/;
+
 // ─── Single-word token maps ───
 
 const TRIGGER_WORDS = new Set(["when", "whenever", "at"]);
@@ -223,6 +255,18 @@ const QUANTITY_WORDS: Record<string, string> = {
 
 const CONJUNCTIONS = new Set(["and", "or", "then", "also", "but"]);
 
+// Set of words that indicate "exile" is being used as a verb
+const EXILE_VERB_CONTEXT = new Set([
+  "it", "them", "that", "target", "a", "an", "all", "each",
+]);
+
+// ═══════════════════════════════════════════════════════════════════
+// SELF-REFERENCE REGEX (static — compiled once)
+// ═══════════════════════════════════════════════════════════════════
+
+const SELF_REFERENCE_RE =
+  /\bthis\s+(creature|permanent|artifact|enchantment|planeswalker|land|spell)\b/gi;
+
 // ═══════════════════════════════════════════════════════════════════
 // LEXER
 // ═══════════════════════════════════════════════════════════════════
@@ -270,48 +314,66 @@ export function splitModalModes(abilityText: string): {
 /**
  * Replace self-references (CARDNAME, "this creature", "it") with a
  * canonical SELF token. The cardName parameter is the actual card name.
+ *
+ * When cardNameRegex is provided (pre-compiled), it is used instead of
+ * building a new RegExp from cardName. This avoids re-compiling the same
+ * regex for every ability block on the same card.
  */
 export function normalizeSelfReferences(
   text: string,
-  cardName: string
+  cardName: string,
+  cardNameRegex?: RegExp
 ): string {
   // Replace exact card name with ~
-  // Use word-boundary-aware replacement (card names can contain special chars)
   let result = text;
   if (cardName.length > 0) {
-    const escapedName = cardName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    result = text.replace(new RegExp(escapedName, "gi"), "~");
+    if (cardNameRegex) {
+      result = text.replace(cardNameRegex, "~");
+    } else {
+      const escapedName = cardName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      result = text.replace(new RegExp(escapedName, "gi"), "~");
+    }
   }
 
   // "this creature", "this permanent", "this artifact", etc.
-  result = result.replace(
-    /\bthis\s+(creature|permanent|artifact|enchantment|planeswalker|land|spell)\b/gi,
-    "~"
-  );
+  SELF_REFERENCE_RE.lastIndex = 0;
+  result = result.replace(SELF_REFERENCE_RE, "~");
 
   return result;
 }
 
 /**
  * Tokenize a single ability block into Token[].
+ *
+ * @param cardNameRegex - Optional pre-compiled regex for card name replacement,
+ *   avoiding redundant regex compilation when processing multiple blocks.
  */
 export function tokenizeAbility(
   abilityText: string,
-  cardName: string = ""
+  cardName: string = "",
+  cardNameRegex?: RegExp
 ): Token[] {
   const tokens: Token[] = [];
-  let normalized = normalizeSelfReferences(abilityText, cardName);
+  const normalized = normalizeSelfReferences(abilityText, cardName, cardNameRegex);
+
+  // Pre-lowercase the entire text once, used for multi-word alias matching
+  // and single-word classification. This avoids calling toLowerCase()
+  // inside the loop on every character or word.
+  const normalizedLower = normalized.toLowerCase();
+
   let pos = 0;
 
   while (pos < normalized.length) {
-    // Skip whitespace
-    if (/\s/.test(normalized[pos])) {
+    // Skip whitespace — use sticky regex instead of per-char test
+    WS_RE.lastIndex = pos;
+    if (WS_RE.test(normalized)) {
       pos++;
       continue;
     }
 
     // ─── Mana symbols: {W}, {T}, {2/W}, etc. ───
-    const manaMatch = normalized.slice(pos).match(/^\{[WUBRGCXSTQEP0-9/]+\}/);
+    MANA_RE.lastIndex = pos;
+    const manaMatch = MANA_RE.exec(normalized);
     if (manaMatch) {
       tokens.push({
         type: "MANA_SYMBOL",
@@ -324,7 +386,8 @@ export function tokenizeAbility(
     }
 
     // ─── Stat modifications: +1/+1, -2/-2, +X/+X ───
-    const statMatch = normalized.slice(pos).match(/^[+-][0-9X]+\/[+-][0-9X]+/);
+    STAT_RE.lastIndex = pos;
+    const statMatch = STAT_RE.exec(normalized);
     if (statMatch) {
       tokens.push({
         type: "STAT_MOD",
@@ -348,10 +411,10 @@ export function tokenizeAbility(
     }
 
     // ─── Modal bullet ───
-    if (normalized[pos] === "•") {
+    if (normalized[pos] === "\u2022") {
       tokens.push({
         type: "MODAL",
-        value: "•",
+        value: "\u2022",
         position: pos,
         normalized: "bullet",
       });
@@ -372,9 +435,9 @@ export function tokenizeAbility(
     }
 
     // ─── Punctuation ───
-    if (",;.—-".includes(normalized[pos])) {
+    if (",;.\u2014-".includes(normalized[pos])) {
       // em-dash and en-dash
-      if (normalized[pos] === "—" || (normalized[pos] === "-" && normalized[pos + 1] === " ")) {
+      if (normalized[pos] === "\u2014" || (normalized[pos] === "-" && normalized[pos + 1] === " ")) {
         tokens.push({
           type: "PUNCTUATION",
           value: normalized[pos],
@@ -409,36 +472,52 @@ export function tokenizeAbility(
     }
 
     // ─── Try multi-word alias matches ───
-    const remaining = normalized.slice(pos).toLowerCase();
+    // Extract the current word from pre-lowercased text to look up candidates.
+    // Only aliases sharing the same first word are checked.
     let multiMatched = false;
 
-    for (const alias of MULTI_WORD_ALIASES) {
-      if (remaining.startsWith(alias.pattern)) {
-        // Verify word boundary after the match
-        const afterIdx = pos + alias.pattern.length;
-        if (
-          afterIdx >= normalized.length ||
-          /[\s,;.:•)—\-]/.test(normalized[afterIdx])
-        ) {
-          tokens.push({
-            type: alias.type,
-            value: normalized.slice(pos, afterIdx),
-            position: pos,
-            normalized: alias.normalized,
-          });
-          pos = afterIdx;
-          multiMatched = true;
-          break;
+    // Use sticky regex on the lowercased text to extract the first word at pos
+    WORD_RE.lastIndex = pos;
+    const firstWordMatch = WORD_RE.exec(normalizedLower);
+    if (firstWordMatch) {
+      const firstWord = firstWordMatch[0];
+      const candidates = ALIAS_BY_FIRST_WORD.get(firstWord);
+      if (candidates) {
+        for (const alias of candidates) {
+          // Check if the lowercased text starting at pos matches the alias pattern
+          if (
+            normalizedLower.length - pos >= alias.pattern.length &&
+            normalizedLower.startsWith(alias.pattern, pos)
+          ) {
+            // Verify word boundary after the match
+            const afterIdx = pos + alias.pattern.length;
+            if (
+              afterIdx >= normalized.length ||
+              WORD_BOUNDARY_RE.test(normalized[afterIdx])
+            ) {
+              tokens.push({
+                type: alias.type,
+                value: normalized.slice(pos, afterIdx),
+                position: pos,
+                normalized: alias.normalized,
+              });
+              pos = afterIdx;
+              multiMatched = true;
+              break;
+            }
+          }
         }
       }
     }
     if (multiMatched) continue;
 
     // ─── Extract next word ───
-    const wordMatch = normalized.slice(pos).match(/^[a-zA-Z_']+/);
+    WORD_RE.lastIndex = pos;
+    const wordMatch = WORD_RE.exec(normalized);
     if (!wordMatch) {
       // Number
-      const numMatch = normalized.slice(pos).match(/^[0-9]+/);
+      NUM_RE.lastIndex = pos;
+      const numMatch = NUM_RE.exec(normalized);
       if (numMatch) {
         tokens.push({
           type: "NUMBER",
@@ -454,7 +533,8 @@ export function tokenizeAbility(
     }
 
     const word = wordMatch[0];
-    const wordLower = word.toLowerCase();
+    // Use pre-lowercased text to get the lowercase word without allocation
+    const wordLower = normalizedLower.slice(pos, pos + word.length);
     const wordEnd = pos + word.length;
 
     // ─── Classify single word ───
@@ -479,12 +559,10 @@ export function tokenizeAbility(
       // and "exile all" are already handled above by MULTI_WORD_ALIASES;
       // this catches remaining verb-context cases for standalone "exile".
       if (wordLower === "exile") {
-        const afterExile = normalized.slice(wordEnd).match(/^\s+([a-zA-Z]+)/);
+        AFTER_EXILE_RE.lastIndex = wordEnd;
+        const afterExile = AFTER_EXILE_RE.exec(normalized);
         const nextWordLower = afterExile ? afterExile[1].toLowerCase() : "";
-        const verbContextWords = new Set([
-          "it", "them", "that", "target", "a", "an", "all", "each",
-        ]);
-        if (verbContextWords.has(nextWordLower)) {
+        if (EXILE_VERB_CONTEXT.has(nextWordLower)) {
           tokens.push({ type: "EFFECT_VERB", value: word, position: pos, normalized: wordLower });
           pos = wordEnd;
           continue;
@@ -496,7 +574,8 @@ export function tokenizeAbility(
     } else if (KEYWORDS_SET.has(wordLower)) {
       // Handle "first strike" and "double strike" as compound keywords
       if (wordLower === "first" || wordLower === "double") {
-        const nextWord = normalized.slice(wordEnd).match(/^\s+(strike)/i);
+        STRIKE_RE.lastIndex = wordEnd;
+        const nextWord = STRIKE_RE.exec(normalized);
         if (nextWord) {
           tokens.push({
             type: "KEYWORD",
@@ -538,14 +617,24 @@ export function tokenizeAbility(
 /**
  * Tokenize complete oracle text (potentially multiple abilities).
  * Returns an array of ability blocks, each containing Token[].
+ *
+ * Compiles the card-name regex once and reuses it across all ability blocks,
+ * avoiding redundant regex compilation per block.
  */
 export function tokenize(
   oracleText: string,
   cardName: string = ""
 ): { blocks: Token[][]; raw: string } {
+  // Compile card-name regex once, reuse across all ability blocks
+  let cardNameRegex: RegExp | undefined;
+  if (cardName.length > 0) {
+    const escapedName = cardName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    cardNameRegex = new RegExp(escapedName, "gi");
+  }
+
   const abilityBlocks = splitAbilityBlocks(oracleText);
   const blocks = abilityBlocks.map((block) =>
-    tokenizeAbility(block, cardName)
+    tokenizeAbility(block, cardName, cardNameRegex)
   );
 
   return { blocks, raw: oracleText };

@@ -1929,13 +1929,16 @@ export const KEYWORD_DATABASE: KeywordEntry[] = [
 // LOOKUP FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════
 
+/** Pre-built Map for O(1) keyword lookup by lowercased name. */
+const KEYWORD_MAP = new Map<string, KeywordEntry>(
+  KEYWORD_DATABASE.map((entry) => [entry.keyword.toLowerCase(), entry])
+);
+
 /**
  * Look up a keyword by name (case-insensitive).
  */
 export function lookupKeyword(keyword: string): KeywordEntry | undefined {
-  return KEYWORD_DATABASE.find(
-    (entry) => entry.keyword.toLowerCase() === keyword.toLowerCase()
-  );
+  return KEYWORD_MAP.get(keyword.toLowerCase());
 }
 
 /**

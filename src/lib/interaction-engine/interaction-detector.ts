@@ -31,8 +31,11 @@ import type {
   CostSubstitutionEffect,
   Effect,
   CardType,
+  Subtype,
+  Supertype,
+  SacrificeCost,
 } from "./types";
-import { PERMANENT_TYPES } from "./game-model";
+import { PERMANENT_TYPES, matchesCompositeType } from "./game-model";
 
 // ═══════════════════════════════════════════════════════════════
 // PUBLIC API
@@ -118,10 +121,17 @@ function eventsMatch(caused: GameEvent, trigger: GameEvent): boolean {
   }
 
   if (caused.kind === "state_change" && trigger.kind === "state_change") {
-    return caused.property === trigger.property;
+    if (caused.property !== trigger.property) return false;
+    // If both specify objects, their types must be compatible
+    if (caused.object && trigger.object) {
+      return objectTypesMatch(caused.object, trigger.object);
+    }
+    return true;
   }
 
   if (caused.kind === "damage" && trigger.kind === "damage") {
+    // If trigger specifically requires combat damage, caused must be combat
+    if (trigger.isCombatDamage && !caused.isCombatDamage) return false;
     return true;
   }
 
@@ -146,7 +156,13 @@ function eventsMatch(caused: GameEvent, trigger: GameEvent): boolean {
  * into the actual CardType values they represent. The upstream parser
  * sometimes places these composite identifiers into GameObjectRef.types.
  */
-function expandCompositeTypes(types: string[]): string[] {
+const expansionCache = new Map<string, readonly string[]>();
+
+function expandCompositeTypes(types: string[]): readonly string[] {
+  const key = types.join(",");
+  const cached = expansionCache.get(key);
+  if (cached) return cached;
+
   const expanded: string[] = [];
   for (const t of types) {
     const lower = t.toLowerCase();
@@ -179,7 +195,9 @@ function expandCompositeTypes(types: string[]): string[] {
       expanded.push(t);
     }
   }
-  return expanded;
+  const frozen = Object.freeze(expanded);
+  expansionCache.set(key, frozen);
+  return frozen;
 }
 
 /**
@@ -192,10 +210,17 @@ function objectTypesMatch(
   b: GameObjectRef | undefined
 ): boolean {
   if (!a || !b) return true;
-  if (a.types.length === 0 || b.types.length === 0) return true;
-  const expandedA = expandCompositeTypes(a.types);
-  const expandedB = expandCompositeTypes(b.types);
-  return expandedA.some((t) => expandedB.includes(t));
+  // Type check
+  if (a.types.length > 0 && b.types.length > 0) {
+    const expandedA = expandCompositeTypes(a.types);
+    const expandedB = expandCompositeTypes(b.types);
+    if (!expandedA.some((t) => expandedB.includes(t))) return false;
+  }
+  // Subtype check - if one side specifies subtypes and the other does too, they must overlap
+  if (a.subtypes && a.subtypes.length > 0 && b.subtypes && b.subtypes.length > 0) {
+    if (!a.subtypes.some((st) => b.subtypes!.includes(st))) return false;
+  }
+  return true;
 }
 
 /**
@@ -205,11 +230,41 @@ function objectTypesMatch(
  */
 function cardMatchesRef(
   cardTypes: CardType[],
-  ref: GameObjectRef
+  ref: GameObjectRef,
+  cardSubtypes?: Subtype[],
+  cardSupertypes?: Supertype[]
 ): boolean {
-  if (ref.types.length === 0) return true;
-  const expandedRefTypes = expandCompositeTypes(ref.types);
-  return expandedRefTypes.some((t) => cardTypes.includes(t as CardType));
+  // Type check (handle empty types differently)
+  if (ref.types.length > 0) {
+    const expandedRefTypes = expandCompositeTypes(ref.types);
+    if (!expandedRefTypes.some((t) => cardTypes.includes(t as CardType))) {
+      return false;
+    }
+  }
+  // Subtype check - if ref requires specific subtypes, card must have at least one
+  if (ref.subtypes && ref.subtypes.length > 0) {
+    if (!cardSubtypes || !ref.subtypes.some((st) => cardSubtypes.includes(st))) {
+      return false;
+    }
+  }
+  // Supertype check - if ref requires specific supertypes, card must have at least one
+  if (ref.supertypes && ref.supertypes.length > 0) {
+    if (!cardSupertypes || !ref.supertypes.some((st) => cardSupertypes.includes(st))) {
+      return false;
+    }
+  }
+  // Composite type check - use matchesCompositeType from game-model
+  if (ref.compositeTypes && ref.compositeTypes.length > 0) {
+    const matchesAny = ref.compositeTypes.some((ct) =>
+      matchesCompositeType(ct, {
+        types: cardTypes,
+        supertypes: cardSupertypes || [],
+        subtypes: cardSubtypes || [],
+      })
+    );
+    if (!matchesAny) return false;
+  }
+  return true;
 }
 
 /**
@@ -263,10 +318,14 @@ function resourceMatchesCost(
  */
 function cardSatisfiesSacrificeCost(
   cardTypes: CardType[],
-  cost: { object: GameObjectRef }
+  cost: SacrificeCost,
+  cardSubtypes?: Subtype[],
+  cardSupertypes?: Supertype[]
 ): boolean {
-  if (cost.object.types.length === 0) return isPermanentCard(cardTypes);
-  return cardMatchesRef(cardTypes, cost.object);
+  if (cost.object.types.length === 0 && (!cost.object.subtypes || cost.object.subtypes.length === 0)) {
+    return isPermanentCard(cardTypes);
+  }
+  return cardMatchesRef(cardTypes, cost.object, cardSubtypes, cardSupertypes);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -321,7 +380,7 @@ function detectEnables(a: CardProfile, b: CardProfile): Interaction[] {
   if (isPermanentCard(a.cardTypes)) {
     for (const cost of b.consumes) {
       if (cost.costType === "sacrifice") {
-        if (cardSatisfiesSacrificeCost(a.cardTypes, cost)) {
+        if (cardSatisfiesSacrificeCost(a.cardTypes, cost, a.subtypes, a.supertypes)) {
           // Check if we already found this via token production
           const dedupKey = `enables:sacrifice:${a.cardName}:${b.cardName}`;
           if (!seen.has(dedupKey)) {
@@ -516,7 +575,7 @@ function detectProtects(a: CardProfile, b: CardProfile): Interaction[] {
     if (!isProtective) continue;
 
     // Check if B's types match the grant target
-    if (cardMatchesRef(b.cardTypes, grant.to)) {
+    if (cardMatchesRef(b.cardTypes, grant.to, b.subtypes, b.supertypes)) {
       // Also check controller — "you control" means B must be yours
       // For analysis purposes, we assume all cards are controlled by "you"
       const controllerOk =
@@ -667,6 +726,8 @@ function detectRecursFromEffectTargets(
   for (const ability of a.abilities) {
     const effects = getAbilityEffects(ability);
     for (const effect of effects) {
+      // Skip exile effects — they remove from graveyard, not recur
+      if (effect.type === "exile" || effect.type === "exile_from_graveyard") continue;
       // Check for "put onto the battlefield" type effects with graveyard targets
       if (effect.target?.zone === "graveyard") {
         if (
@@ -699,60 +760,10 @@ function detectRecursFromEffectTargets(
  * A tutors_for B if A has effects that search the library,
  * and B matches the search target types.
  */
-function detectTutorsFor(a: CardProfile, b: CardProfile): Interaction[] {
-  const results: Interaction[] = [];
-
-  for (const ability of a.abilities) {
-    const effects = getAbilityEffects(ability);
-    for (const effect of effects) {
-      if (isSearchEffect(effect)) {
-        // Determine what types the search targets
-        const searchTarget = getSearchTarget(effect);
-
-        // Check if B matches the search target
-        if (
-          !searchTarget ||
-          searchTarget.types.length === 0 ||
-          cardMatchesRef(b.cardTypes, searchTarget)
-        ) {
-          const targetDesc =
-            searchTarget && searchTarget.types.length > 0
-              ? searchTarget.types.join("/")
-              : "any card";
-
-          results.push({
-            cards: [a.cardName, b.cardName],
-            type: "tutors_for",
-            strength: searchTarget?.types.length ? 0.6 : 0.4,
-            mechanical: `${a.cardName} can search for ${b.cardName} (${targetDesc})`,
-            events: [],
-          });
-          return results; // One tutors interaction per pair is enough
-        }
-      }
-    }
-  }
-
-  // Also check causesEvents for search_library player actions
-  for (const event of a.causesEvents) {
-    if (event.kind === "player_action") {
-      if (event.action === "search_library") {
-        const alreadyFound = results.length > 0;
-        if (!alreadyFound) {
-          results.push({
-            cards: [a.cardName, b.cardName],
-            type: "tutors_for",
-            strength: 0.4,
-            mechanical: `${a.cardName} searches the library and can find ${b.cardName}`,
-            events: [event],
-          });
-          return results;
-        }
-      }
-    }
-  }
-
-  return results;
+function detectTutorsFor(_a: CardProfile, _b: CardProfile): Interaction[] {
+  // Tutoring is handled as a capability note, not individual pairwise interactions.
+  // A card's search capability is visible in its CardProfile.
+  return [];
 }
 
 /**
@@ -832,7 +843,7 @@ function detectReducesCost(a: CardProfile, b: CardProfile): Interaction[] {
       const affectedObjects = staticEffect.affectedObjects;
       if (
         !affectedObjects ||
-        cardMatchesRef(b.cardTypes, affectedObjects)
+        cardMatchesRef(b.cardTypes, affectedObjects, b.subtypes, b.supertypes)
       ) {
         results.push({
           cards: [a.cardName, b.cardName],
@@ -862,7 +873,7 @@ function costSubstitutionAppliesTo(
     const symbol = sub.replacesSymbol.toLowerCase();
     if (manaCost.includes(`{${symbol}}`)) {
       // Check if the substitution's appliesTo matches B's types
-      if (cardMatchesRef(b.cardTypes, sub.appliesTo)) {
+      if (cardMatchesRef(b.cardTypes, sub.appliesTo, b.subtypes, b.supertypes)) {
         return true;
       }
     }
@@ -874,7 +885,7 @@ function costSubstitutionAppliesTo(
       const manaCost = cost.mana.toLowerCase();
       const symbol = sub.replacesSymbol.toLowerCase();
       if (manaCost.includes(`{${symbol}}`)) {
-        if (cardMatchesRef(b.cardTypes, sub.appliesTo)) {
+        if (cardMatchesRef(b.cardTypes, sub.appliesTo, b.subtypes, b.supertypes)) {
           return true;
         }
       }
@@ -1836,7 +1847,7 @@ function detectEnablers(
   const interactionCount = new Map<string, Interaction[]>();
   const positiveTypes = new Set<string>([
     "enables", "triggers", "amplifies", "protects",
-    "recurs", "reduces_cost", "tutors_for",
+    "recurs", "reduces_cost",
   ]);
 
   for (const inter of interactions) {

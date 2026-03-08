@@ -7,14 +7,18 @@ import type {
   InteractionLoop,
   InteractionBlocker,
   InteractionEnabler,
+  InteractionType,
 } from "@/lib/interaction-engine";
-import { useMemo } from "react";
+import type { AnalysisStep } from "@/hooks/useInteractionAnalysis";
+import { useMemo, useState } from "react";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 
 interface InteractionSectionProps {
   analysis: InteractionAnalysis | null;
   loading: boolean;
   error: string | null;
+  steps: AnalysisStep[];
+  progress: number;
   expandedSections: Set<string>;
   onToggleSection: (id: string) => void;
 }
@@ -24,7 +28,6 @@ const INTERACTION_TYPE_LABELS: Record<string, string> = {
   triggers: "Triggers",
   amplifies: "Amplifies",
   protects: "Protects",
-  tutors_for: "Tutors For",
   recurs: "Recurs",
   reduces_cost: "Reduces Cost",
   blocks: "Blocks",
@@ -32,13 +35,11 @@ const INTERACTION_TYPE_LABELS: Record<string, string> = {
   loops_with: "Loops With",
 };
 
-// Per-type color schemes for the interaction type badge
 const INTERACTION_TYPE_COLORS: Record<string, string> = {
   enables: "bg-green-600/60 text-green-100",
   triggers: "bg-blue-600/60 text-blue-100",
   amplifies: "bg-amber-600/60 text-amber-100",
   protects: "bg-cyan-600/60 text-cyan-100",
-  tutors_for: "bg-violet-600/60 text-violet-100",
   recurs: "bg-emerald-600/60 text-emerald-100",
   reduces_cost: "bg-lime-600/60 text-lime-100",
   blocks: "bg-red-600/60 text-red-100",
@@ -46,13 +47,23 @@ const INTERACTION_TYPE_COLORS: Record<string, string> = {
   loops_with: "bg-fuchsia-600/60 text-fuchsia-100",
 };
 
-// Per-type group heading accent colors
+const TYPE_FILTER_COLORS: Record<string, { active: string; border: string }> = {
+  enables: { active: "border-green-500 bg-green-900/30 text-green-300", border: "border-green-600/40" },
+  triggers: { active: "border-blue-500 bg-blue-900/30 text-blue-300", border: "border-blue-600/40" },
+  amplifies: { active: "border-amber-500 bg-amber-900/30 text-amber-300", border: "border-amber-600/40" },
+  protects: { active: "border-cyan-500 bg-cyan-900/30 text-cyan-300", border: "border-cyan-600/40" },
+  recurs: { active: "border-emerald-500 bg-emerald-900/30 text-emerald-300", border: "border-emerald-600/40" },
+  reduces_cost: { active: "border-lime-500 bg-lime-900/30 text-lime-300", border: "border-lime-600/40" },
+  blocks: { active: "border-red-500 bg-red-900/30 text-red-300", border: "border-red-600/40" },
+  conflicts: { active: "border-orange-500 bg-orange-900/30 text-orange-300", border: "border-orange-600/40" },
+  loops_with: { active: "border-fuchsia-500 bg-fuchsia-900/30 text-fuchsia-300", border: "border-fuchsia-600/40" },
+};
+
 const INTERACTION_GROUP_COLORS: Record<string, string> = {
   enables: "text-green-400",
   triggers: "text-blue-400",
   amplifies: "text-amber-400",
   protects: "text-cyan-400",
-  tutors_for: "text-violet-400",
   recurs: "text-emerald-400",
   reduces_cost: "text-lime-400",
   blocks: "text-red-400",
@@ -60,14 +71,18 @@ const INTERACTION_GROUP_COLORS: Record<string, string> = {
   loops_with: "text-fuchsia-400",
 };
 
+type GroupMode = "type" | "card" | "strength";
+
 function strengthPercent(strength: number): number {
   return Math.round(strength * 100);
 }
 
-// Inline strength bar — compact, sits right-aligned in the row
+// ═══════════════════════════════════════════════════════════════
+// Sub-components
+// ═══════════════════════════════════════════════════════════════
+
 function StrengthBar({ strength }: { strength: number }) {
   const pct = strengthPercent(strength);
-  // Choose bar color based on strength level
   const barColor =
     pct >= 75
       ? "bg-purple-500"
@@ -78,8 +93,11 @@ function StrengthBar({ strength }: { strength: number }) {
       : "bg-slate-600";
 
   return (
-    <span className="ml-auto flex items-center gap-1.5 shrink-0">
-      <span className="w-12 h-1.5 rounded-full bg-slate-700 overflow-hidden">
+    <span
+      className="ml-auto flex items-center gap-1.5 shrink-0"
+      aria-label={`Interaction strength: ${pct}%`}
+    >
+      <span className="w-14 h-1.5 rounded-full bg-slate-700 overflow-hidden">
         <span
           className={`block h-full rounded-full ${barColor} transition-all duration-300`}
           style={{ width: `${pct}%` }}
@@ -92,20 +110,22 @@ function StrengthBar({ strength }: { strength: number }) {
   );
 }
 
-// Styled card name pill consistent with the app's card reference style
-function CardPill({ name }: { name: string }) {
+function CardPill({ name, highlight }: { name: string; highlight?: boolean }) {
   return (
-    <span className="rounded bg-slate-700/80 border border-slate-600/50 px-2 py-0.5 text-xs font-medium text-slate-200 leading-none">
+    <span
+      className={`rounded px-2 py-0.5 text-xs font-medium leading-none ${
+        highlight
+          ? "bg-purple-900/30 border border-purple-600/50 text-purple-200"
+          : "bg-slate-700/80 border border-slate-600/50 text-slate-200"
+      }`}
+    >
       {name}
     </span>
   );
 }
 
-// Empty state consistent with other tabs
 function EmptyState({ message }: { message: string }) {
-  return (
-    <p className="text-xs text-slate-500 italic py-1">{message}</p>
-  );
+  return <p className="text-xs text-slate-500 italic py-1">{message}</p>;
 }
 
 function InteractionItem({
@@ -123,14 +143,9 @@ function InteractionItem({
   return (
     <div
       data-testid={`interaction-${type}-${index}`}
-      className="rounded-md border border-slate-700 bg-slate-800/30 p-3 hover:bg-slate-700/30 hover:border-slate-600 transition-colors duration-150"
+      className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 hover:bg-slate-700/30 hover:border-slate-600 transition-colors duration-150"
     >
-      <div className="flex flex-wrap items-center gap-2 mb-1.5">
-        <CardPill name={interaction.cards[0]} />
-        <span className="text-slate-500 text-xs" aria-hidden="true">
-          &rarr;
-        </span>
-        <CardPill name={interaction.cards[1]} />
+      <div className="flex items-center justify-between mb-2">
         <span
           data-testid="interaction-type"
           className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badgeColors}`}
@@ -138,6 +153,13 @@ function InteractionItem({
           {INTERACTION_TYPE_LABELS[interaction.type] ?? interaction.type}
         </span>
         <StrengthBar strength={interaction.strength} />
+      </div>
+      <div className="flex items-center gap-2 mb-2">
+        <CardPill name={interaction.cards[0]} />
+        <span className="text-slate-500 text-sm" aria-hidden="true">
+          &rarr;
+        </span>
+        <CardPill name={interaction.cards[1]} />
       </div>
       <p className="text-xs text-slate-400 leading-relaxed">
         {interaction.mechanical}
@@ -150,7 +172,7 @@ function ChainItem({ chain, index }: { chain: InteractionChain; index: number })
   return (
     <div
       data-testid={`chain-${index}`}
-      className="rounded-md border border-slate-700 bg-slate-800/30 p-3 hover:bg-slate-700/30 hover:border-slate-600 transition-colors duration-150"
+      className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 hover:bg-slate-700/30 hover:border-slate-600 transition-colors duration-150"
     >
       <div className="flex flex-wrap items-center gap-1.5 mb-2">
         {chain.cards.map((card, i) => (
@@ -173,52 +195,75 @@ function LoopItem({ loop, index }: { loop: InteractionLoop; index: number }) {
   return (
     <div
       data-testid={`loop-${index}`}
-      className="rounded-md border border-slate-700 bg-slate-800/30 p-3 hover:bg-slate-700/30 hover:border-slate-600 transition-colors duration-150"
+      className="rounded-lg border border-fuchsia-700/30 bg-fuchsia-900/5 p-3 hover:bg-fuchsia-900/10 hover:border-fuchsia-700/50 transition-colors duration-150"
     >
-      <div className="flex flex-wrap items-center gap-2 mb-2">
-        {loop.cards.map((card) => (
-          <CardPill key={card} name={card} />
-        ))}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-semibold text-fuchsia-300">
+          {loop.isInfinite ? "Infinite Loop" : "Loop"}
+        </span>
         {loop.isInfinite && (
-          <span className="rounded-full bg-fuchsia-600/80 border border-fuchsia-500/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fuchsia-100">
-            Infinite
+          <span className="rounded-full bg-fuchsia-600/80 border border-fuchsia-500/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fuchsia-100 flex items-center gap-1">
+            <span aria-hidden="true">&infin;</span> Infinite
           </span>
         )}
       </div>
+      {/* Loop cycle visualization */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+        {loop.cards.map((card, i) => (
+          <span key={card} className="flex items-center gap-1.5">
+            {i > 0 && (
+              <span className="text-fuchsia-500/60 text-xs" aria-hidden="true">
+                &rarr;
+              </span>
+            )}
+            <CardPill name={card} />
+          </span>
+        ))}
+        <span
+          className="text-fuchsia-400 text-sm font-bold"
+          title={`Loops back to ${loop.cards[0]}`}
+          aria-label={`Loops back to ${loop.cards[0]}`}
+        >
+          &#8634;
+        </span>
+      </div>
       <p className="text-xs text-slate-400 leading-relaxed">{loop.description}</p>
       {loop.netEffect.resources.length > 0 && (
-        <p className="mt-1.5 text-[10px] text-slate-500 leading-relaxed">
-          Net per cycle:{" "}
-          {loop.netEffect.resources
-            .map((r) => {
+        <div className="mt-2 rounded-md border border-slate-600/50 bg-slate-900/50 px-3 py-2">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+            Net per cycle
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {loop.netEffect.resources.map((r, i) => {
               const colorStr = r.category === "mana" ? ` ${r.color}` : "";
-              return `${r.category}${colorStr} x${r.quantity}`;
-            })
-            .join(", ")}
-        </p>
+              return (
+                <span
+                  key={`${r.category}-${i}`}
+                  className="rounded bg-slate-700/60 border border-slate-600/40 px-2 py-0.5 text-xs text-slate-300"
+                >
+                  {r.category}{colorStr} &times;{r.quantity}
+                </span>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-function BlockerItem({
-  blocker,
-  index,
-}: {
-  blocker: InteractionBlocker;
-  index: number;
-}) {
+function BlockerItem({ blocker, index }: { blocker: InteractionBlocker; index: number }) {
   return (
     <div
       data-testid={`blocker-${index}`}
-      className="rounded-md border border-amber-700/40 bg-amber-900/10 p-3 hover:bg-amber-900/20 hover:border-amber-700/60 transition-colors duration-150"
+      className="rounded-lg border border-slate-600/50 bg-slate-800/30 p-3 hover:bg-slate-700/30 hover:border-slate-500/50 transition-colors duration-150"
     >
       <div className="flex flex-wrap items-center gap-2 mb-1.5">
-        <span className="rounded bg-amber-700/60 border border-amber-600/40 px-2 py-0.5 text-xs font-medium text-amber-100 leading-none">
+        <span className="rounded bg-slate-600/80 border border-slate-500/50 px-2 py-0.5 text-xs font-medium text-slate-200 leading-none">
           {blocker.blocker}
         </span>
-        <span className="text-xs text-amber-400/80">
-          blocks {blocker.blockedInteractions.length} interaction
+        <span className="rounded-full bg-slate-700/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+          Blocks {blocker.blockedInteractions.length} interaction
           {blocker.blockedInteractions.length !== 1 ? "s" : ""}
         </span>
       </div>
@@ -227,22 +272,21 @@ function BlockerItem({
   );
 }
 
-function EnablerItem({
-  enabler,
-  index,
-}: {
-  enabler: InteractionEnabler;
-  index: number;
-}) {
+function EnablerItem({ enabler, index }: { enabler: InteractionEnabler; index: number }) {
   return (
     <div
       data-testid={`enabler-${index}`}
-      className="rounded-md border border-green-700/40 bg-green-900/10 p-3 hover:bg-green-900/20 hover:border-green-700/60 transition-colors duration-150"
+      className="rounded-lg border border-green-700/30 bg-green-900/5 p-3 hover:bg-green-900/10 hover:border-green-700/50 transition-colors duration-150"
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded bg-green-700/60 border border-green-600/40 px-2 py-0.5 text-xs font-medium text-green-100 leading-none">
           {enabler.enabler}
         </span>
+        {enabler.isRequired && (
+          <span className="rounded-full bg-green-700/60 border border-green-600/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-100">
+            Key Enabler
+          </span>
+        )}
         <span className="text-xs text-green-400/80">
           enables {enabler.enabledInteractions.length} interaction
           {enabler.enabledInteractions.length !== 1 ? "s" : ""}
@@ -252,24 +296,399 @@ function EnablerItem({
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Loading state with step progress
+// ═══════════════════════════════════════════════════════════════
+
+function LoadingState({ steps, progress }: { steps: AnalysisStep[]; progress: number }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label="Analyzing interactions"
+      className="py-10 px-4 flex flex-col items-center gap-5"
+    >
+      <span className="text-sm font-semibold text-slate-300">
+        Analyzing card interactions
+      </span>
+
+      {/* Progress bar */}
+      <div className="w-full max-w-xs">
+        <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-purple-500 transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Step list */}
+      <div className="w-full max-w-xs space-y-1.5">
+        {steps.map((step) => (
+          <div key={step.id} className="flex items-center gap-2 text-xs">
+            {step.status === "done" && (
+              <svg className="h-3.5 w-3.5 text-green-400 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            )}
+            {step.status === "active" && (
+              <svg className="h-3.5 w-3.5 animate-spin text-purple-400 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+            {step.status === "pending" && (
+              <span className="h-3.5 w-3.5 shrink-0 flex items-center justify-center">
+                <span className="block h-1.5 w-1.5 rounded-full bg-slate-600" />
+              </span>
+            )}
+            <span
+              className={
+                step.status === "done"
+                  ? "text-slate-500"
+                  : step.status === "active"
+                  ? "text-slate-200 font-medium"
+                  : "text-slate-600"
+              }
+            >
+              {step.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Summary Dashboard
+// ═══════════════════════════════════════════════════════════════
+
+function SummaryDashboard({ analysis }: { analysis: InteractionAnalysis }) {
+  const totalInteractions = analysis.interactions.length;
+  const totalLoops = analysis.loops.length;
+  const infiniteLoops = analysis.loops.filter((l) => l.isInfinite).length;
+  const totalEnablers = analysis.enablers.length;
+  const topEnabler = analysis.enablers[0]?.enabler;
+
+  return (
+    <div className="mb-5">
+      {/* Primary stats - 3 large cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+        <div className="rounded-lg border border-purple-700/50 bg-purple-900/10 px-4 py-4">
+          <div className="text-2xl font-bold tabular-nums text-purple-300">{totalInteractions}</div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Interactions</div>
+          <div className="mt-1 text-xs text-slate-500">detected</div>
+        </div>
+        <div className="rounded-lg border border-fuchsia-700/40 bg-fuchsia-900/10 px-4 py-4">
+          <div className="text-2xl font-bold tabular-nums text-fuchsia-300">{totalLoops}</div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Loops Found</div>
+          {infiniteLoops > 0 && (
+            <div className="mt-1 text-xs text-fuchsia-400">{infiniteLoops} infinite</div>
+          )}
+        </div>
+        <div className="rounded-lg border border-green-700/40 bg-green-900/10 px-4 py-4">
+          <div className="text-2xl font-bold tabular-nums text-green-300">{totalEnablers}</div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Key Enablers</div>
+          {topEnabler && (
+            <div className="mt-1 text-xs text-slate-500 truncate">Top: {topEnabler}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Secondary stats */}
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded-full bg-slate-800 border border-slate-700 px-3 py-1 text-xs text-slate-400 tabular-nums">
+          Chains: {analysis.chains.length}
+        </span>
+        <span className="rounded-full bg-slate-800 border border-slate-700 px-3 py-1 text-xs text-slate-400 tabular-nums">
+          Blockers: {analysis.blockers.length}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Filter Controls
+// ═══════════════════════════════════════════════════════════════
+
+function FilterControls({
+  interactions,
+  activeTypes,
+  onToggleType,
+  cardSearch,
+  onCardSearch,
+  minStrength,
+  onMinStrength,
+  groupMode,
+  onGroupMode,
+}: {
+  interactions: Interaction[];
+  activeTypes: Set<InteractionType>;
+  onToggleType: (type: InteractionType) => void;
+  cardSearch: string;
+  onCardSearch: (s: string) => void;
+  minStrength: number;
+  onMinStrength: (s: number) => void;
+  groupMode: GroupMode;
+  onGroupMode: (m: GroupMode) => void;
+}) {
+  // Count by type for badges
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const i of interactions) {
+      counts[i.type] = (counts[i.type] || 0) + 1;
+    }
+    return counts;
+  }, [interactions]);
+
+  const typesPresent = Object.keys(typeCounts).sort(
+    (a, b) => (typeCounts[b] || 0) - (typeCounts[a] || 0)
+  );
+
+  return (
+    <div className="mb-4 space-y-3">
+      {/* Card search */}
+      <div className="relative">
+        <svg
+          className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            fillRule="evenodd"
+            d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
+            clipRule="evenodd"
+          />
+        </svg>
+        <input
+          type="text"
+          value={cardSearch}
+          onChange={(e) => onCardSearch(e.target.value)}
+          className="w-full rounded-lg border border-slate-700 bg-slate-800/80 pl-8 pr-8 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 transition-colors"
+          placeholder="Filter by card name..."
+          aria-label="Filter interactions by card name"
+        />
+        {cardSearch && (
+          <button
+            type="button"
+            onClick={() => onCardSearch("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1"
+            aria-label="Clear search"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Type filter pills + strength + grouping in one row */}
+      <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+        {/* Type pills */}
+        <div className="flex gap-1.5 overflow-x-auto pb-1 -mb-1 flex-1">
+          <button
+            type="button"
+            onClick={() => {
+              // Clear all active types
+              for (const t of activeTypes) onToggleType(t as InteractionType);
+            }}
+            className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer shrink-0 ${
+              activeTypes.size === 0
+                ? "border-purple-500 bg-purple-900/30 text-purple-300"
+                : "border-slate-600 bg-slate-800 text-slate-400 hover:border-slate-400"
+            }`}
+            aria-pressed={activeTypes.size === 0}
+          >
+            All {interactions.length}
+          </button>
+          {typesPresent.map((type) => {
+            const isActive = activeTypes.has(type as InteractionType);
+            const colors = TYPE_FILTER_COLORS[type];
+            return (
+              <button
+                key={type}
+                type="button"
+                role="switch"
+                aria-checked={isActive}
+                onClick={() => onToggleType(type as InteractionType)}
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer shrink-0 ${
+                  isActive
+                    ? colors?.active ?? "border-slate-400 bg-slate-700 text-slate-200"
+                    : "border-slate-600 bg-slate-800 text-slate-400 hover:border-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {INTERACTION_TYPE_LABELS[type] ?? type} {typeCounts[type]}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Strength threshold */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-xs text-slate-500">Min:</span>
+          {[
+            { label: "All", value: 0 },
+            { label: "25%+", value: 0.25 },
+            { label: "50%+", value: 0.5 },
+            { label: "75%+", value: 0.75 },
+          ].map(({ label, value }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => onMinStrength(value)}
+              className={`rounded-full border px-2 py-0.5 text-xs transition-colors cursor-pointer ${
+                minStrength === value
+                  ? "border-purple-500 bg-purple-900/30 text-purple-300"
+                  : "border-slate-600 bg-slate-800 text-slate-400 hover:border-slate-400"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Grouping toggle */}
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-slate-500">Group by:</span>
+        {(["type", "card", "strength"] as GroupMode[]).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => onGroupMode(mode)}
+            className={`rounded-md border px-2.5 py-1 text-xs transition-colors cursor-pointer ${
+              groupMode === mode
+                ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
+                : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
+            }`}
+          >
+            {mode === "type" ? "Type" : mode === "card" ? "Card" : "Strength"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Grouped Interaction List
+// ═══════════════════════════════════════════════════════════════
+
+interface DisplayGroup {
+  id: string;
+  label: string;
+  accentColor: string;
+  interactions: Interaction[];
+}
+
+function buildGroups(interactions: Interaction[], mode: GroupMode): DisplayGroup[] {
+  if (mode === "type") {
+    const groups: Record<string, Interaction[]> = {};
+    for (const i of interactions) {
+      if (!groups[i.type]) groups[i.type] = [];
+      groups[i.type].push(i);
+    }
+    return Object.entries(groups)
+      .sort(([, a], [, b]) => b.length - a.length)
+      .map(([type, items]) => ({
+        id: type,
+        label: INTERACTION_TYPE_LABELS[type] ?? type,
+        accentColor: INTERACTION_GROUP_COLORS[type] ?? "text-slate-400",
+        interactions: [...items].sort((a, b) => b.strength - a.strength),
+      }));
+  }
+
+  if (mode === "card") {
+    const cardGroups: Record<string, Interaction[]> = {};
+    for (const i of interactions) {
+      for (const card of i.cards) {
+        if (!cardGroups[card]) cardGroups[card] = [];
+        cardGroups[card].push(i);
+      }
+    }
+    return Object.entries(cardGroups)
+      .sort(([, a], [, b]) => b.length - a.length)
+      .map(([card, items]) => ({
+        id: card,
+        label: card,
+        accentColor: "text-purple-400",
+        interactions: [...items].sort((a, b) => b.strength - a.strength),
+      }));
+  }
+
+  // strength mode
+  const high: Interaction[] = [];
+  const mid: Interaction[] = [];
+  const low: Interaction[] = [];
+  for (const i of interactions) {
+    if (i.strength >= 0.75) high.push(i);
+    else if (i.strength >= 0.5) mid.push(i);
+    else low.push(i);
+  }
+  const groups: DisplayGroup[] = [];
+  if (high.length > 0) groups.push({ id: "high", label: "High (75%+)", accentColor: "text-green-400", interactions: high.sort((a, b) => b.strength - a.strength) });
+  if (mid.length > 0) groups.push({ id: "mid", label: "Mid (50-75%)", accentColor: "text-amber-400", interactions: mid.sort((a, b) => b.strength - a.strength) });
+  if (low.length > 0) groups.push({ id: "low", label: "Low (< 50%)", accentColor: "text-slate-400", interactions: low.sort((a, b) => b.strength - a.strength) });
+  return groups;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Main Component
+// ═══════════════════════════════════════════════════════════════
+
 export default function InteractionSection({
   analysis,
   loading,
   error,
+  steps,
+  progress,
   expandedSections,
   onToggleSection,
 }: InteractionSectionProps) {
-  // Group interactions by type for display (memoized)
-  const groupedInteractions = useMemo(
-    () => (analysis ? groupByType(analysis.interactions) : {}),
-    [analysis]
+  // Filter state
+  const [activeTypes, setActiveTypes] = useState<Set<InteractionType>>(new Set());
+  const [cardSearch, setCardSearch] = useState("");
+  const [minStrength, setMinStrength] = useState(0);
+  const [groupMode, setGroupMode] = useState<GroupMode>("type");
+
+  const toggleType = (type: InteractionType) => {
+    setActiveTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  };
+
+  // Filtered interactions
+  const filteredInteractions = useMemo(() => {
+    if (!analysis) return [];
+    return analysis.interactions.filter((i) => {
+      if (activeTypes.size > 0 && !activeTypes.has(i.type)) return false;
+      if (i.strength < minStrength) return false;
+      if (cardSearch.trim()) {
+        const term = cardSearch.toLowerCase().trim();
+        if (
+          !i.cards[0].toLowerCase().includes(term) &&
+          !i.cards[1].toLowerCase().includes(term)
+        )
+          return false;
+      }
+      return true;
+    });
+  }, [analysis, activeTypes, minStrength, cardSearch]);
+
+  // Grouped interactions
+  const groups = useMemo(
+    () => buildGroups(filteredInteractions, groupMode),
+    [filteredInteractions, groupMode]
   );
 
-  const totalInteractions = analysis?.interactions.length ?? 0;
-  const totalChains = analysis?.chains.length ?? 0;
-  const totalLoops = analysis?.loops.length ?? 0;
-  const totalBlockers = analysis?.blockers.length ?? 0;
-  const totalEnablers = analysis?.enablers.length ?? 0;
+  const hasActiveFilters = activeTypes.size > 0 || cardSearch.trim() !== "" || minStrength > 0;
+  const totalCount = analysis?.interactions.length ?? 0;
 
   return (
     <div>
@@ -297,34 +716,8 @@ export default function InteractionSection({
         </p>
       </div>
 
-      {/* Loading state */}
-      {loading && (
-        <div role="status" aria-live="polite" className="flex items-center gap-3 py-10 justify-center">
-          <svg
-            className="h-5 w-5 animate-spin text-purple-400"
-            viewBox="0 0 24 24"
-            fill="none"
-            aria-hidden="true"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            />
-          </svg>
-          <span className="text-sm text-slate-400">
-            Analyzing card interactions...
-          </span>
-        </div>
-      )}
+      {/* Loading state with progress steps */}
+      {loading && <LoadingState steps={steps} progress={progress} />}
 
       {/* Error state */}
       {error && (
@@ -338,186 +731,177 @@ export default function InteractionSection({
       {/* Results */}
       {analysis && !loading && (
         <div data-testid="interactions-content">
-          {/* Summary stats */}
-          <div
-            data-testid="interaction-stats"
-            className="mb-4 grid grid-cols-2 sm:grid-cols-5 gap-3"
-          >
-            <StatCard label="Interactions" value={totalInteractions} accent />
-            <StatCard label="Chains" value={totalChains} />
-            <StatCard label="Loops" value={totalLoops} />
-            <StatCard label="Blockers" value={totalBlockers} />
-            <StatCard label="Enablers" value={totalEnablers} />
+          {/* Summary dashboard */}
+          <div data-testid="interaction-stats">
+            <SummaryDashboard analysis={analysis} />
           </div>
 
-          {/* Interactions section */}
+          {/* Filter controls */}
+          <FilterControls
+            interactions={analysis.interactions}
+            activeTypes={activeTypes}
+            onToggleType={toggleType}
+            cardSearch={cardSearch}
+            onCardSearch={setCardSearch}
+            minStrength={minStrength}
+            onMinStrength={setMinStrength}
+            groupMode={groupMode}
+            onGroupMode={setGroupMode}
+          />
+
+          {/* Filter active summary */}
+          {hasActiveFilters && (
+            <div className="text-xs text-slate-500 flex items-center gap-2 mb-3">
+              <span>
+                Showing {filteredInteractions.length} of {totalCount} interactions
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTypes(new Set());
+                  setCardSearch("");
+                  setMinStrength(0);
+                }}
+                className="text-purple-400 hover:text-purple-300 underline"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
+
+          {/* Sections */}
           <div className="space-y-3">
-            <CollapsiblePanel
-              id="ie-interactions"
-              title="Interactions"
-              summary={`${totalInteractions} detected`}
-              expanded={expandedSections.has("ie-interactions")}
-              onToggle={() => onToggleSection("ie-interactions")}
-            >
-              {totalInteractions === 0 ? (
-                <EmptyState message="No mechanical interactions detected." />
-              ) : (
-                <div className="space-y-4">
-                  {Object.entries(groupedInteractions).map(
-                    ([type, interactions]) => {
-                      const groupAccent =
-                        INTERACTION_GROUP_COLORS[type] ?? "text-slate-400";
-                      return (
-                        <div key={type}>
-                          <h4
-                            className={`mb-2 text-[10px] font-bold uppercase tracking-widest ${groupAccent}`}
-                          >
-                            {INTERACTION_TYPE_LABELS[type] ?? type}{" "}
-                            <span className="text-slate-500 font-normal">
-                              ({interactions.length})
-                            </span>
-                          </h4>
-                          <div className="space-y-2">
-                            {[...interactions]
-                              .sort((a, b) => b.strength - a.strength)
-                              .map((interaction, i) => (
-                                <InteractionItem
-                                  key={`${interaction.cards[0]}-${interaction.cards[1]}-${type}`}
-                                  interaction={interaction}
-                                  index={i}
-                                  type={type}
-                                />
-                              ))}
-                          </div>
-                        </div>
-                      );
-                    }
-                  )}
-                </div>
-              )}
-            </CollapsiblePanel>
-
-            {/* Chains section */}
-            <CollapsiblePanel
-              id="ie-chains"
-              title="Chains"
-              summary={`${totalChains} detected`}
-              expanded={expandedSections.has("ie-chains")}
-              onToggle={() => onToggleSection("ie-chains")}
-            >
-              {totalChains === 0 ? (
-                <EmptyState message="No multi-card chains detected." />
-              ) : (
-                <div className="space-y-2">
-                  {analysis.chains.map((chain, i) => (
-                    <ChainItem key={chain.cards.join("-")} chain={chain} index={i} />
-                  ))}
-                </div>
-              )}
-            </CollapsiblePanel>
-
-            {/* Loops section */}
-            <CollapsiblePanel
-              id="ie-loops"
-              title="Loops"
-              summary={`${totalLoops} detected`}
-              expanded={expandedSections.has("ie-loops")}
-              onToggle={() => onToggleSection("ie-loops")}
-            >
-              {totalLoops === 0 ? (
-                <EmptyState message="No loops detected." />
-              ) : (
+            {/* Loops first if any exist */}
+            {analysis.loops.length > 0 && (
+              <CollapsiblePanel
+                id="ie-loops"
+                title="Loops"
+                summary={`${analysis.loops.length} detected${analysis.loops.filter((l) => l.isInfinite).length > 0 ? ` (${analysis.loops.filter((l) => l.isInfinite).length} infinite)` : ""}`}
+                expanded={expandedSections.has("ie-loops")}
+                onToggle={() => onToggleSection("ie-loops")}
+              >
                 <div className="space-y-2">
                   {analysis.loops.map((loop, i) => (
                     <LoopItem key={loop.cards.join("-")} loop={loop} index={i} />
                   ))}
                 </div>
-              )}
-            </CollapsiblePanel>
+              </CollapsiblePanel>
+            )}
 
-            {/* Blockers section */}
-            <CollapsiblePanel
-              id="ie-blockers"
-              title="Blockers"
-              summary={`${totalBlockers} detected`}
-              expanded={expandedSections.has("ie-blockers")}
-              onToggle={() => onToggleSection("ie-blockers")}
-            >
-              {totalBlockers === 0 ? (
-                <EmptyState message="No interaction blockers detected." />
-              ) : (
-                <div className="space-y-2">
-                  {analysis.blockers.map((blocker, i) => (
-                    <BlockerItem key={blocker.blocker} blocker={blocker} index={i} />
-                  ))}
-                </div>
-              )}
-            </CollapsiblePanel>
-
-            {/* Enablers section */}
-            <CollapsiblePanel
-              id="ie-enablers"
-              title="Enablers"
-              summary={`${totalEnablers} detected`}
-              expanded={expandedSections.has("ie-enablers")}
-              onToggle={() => onToggleSection("ie-enablers")}
-            >
-              {totalEnablers === 0 ? (
-                <EmptyState message="No key enablers detected." />
-              ) : (
+            {/* Enablers */}
+            {analysis.enablers.length > 0 && (
+              <CollapsiblePanel
+                id="ie-enablers"
+                title="Key Enablers"
+                summary={`${analysis.enablers.length} cards`}
+                expanded={expandedSections.has("ie-enablers")}
+                onToggle={() => onToggleSection("ie-enablers")}
+              >
                 <div className="space-y-2">
                   {analysis.enablers.map((enabler, i) => (
                     <EnablerItem key={enabler.enabler} enabler={enabler} index={i} />
                   ))}
                 </div>
+              </CollapsiblePanel>
+            )}
+
+            {/* Interactions (filtered + grouped) */}
+            <CollapsiblePanel
+              id="ie-interactions"
+              title="Interactions"
+              summary={
+                hasActiveFilters
+                  ? `${filteredInteractions.length} of ${totalCount}`
+                  : `${totalCount} detected`
+              }
+              expanded={expandedSections.has("ie-interactions")}
+              onToggle={() => onToggleSection("ie-interactions")}
+            >
+              {filteredInteractions.length === 0 ? (
+                <EmptyState
+                  message={
+                    hasActiveFilters
+                      ? "No interactions match the current filters."
+                      : "No mechanical interactions detected."
+                  }
+                />
+              ) : (
+                <div className="space-y-4">
+                  {groups.map((group) => (
+                    <div key={group.id}>
+                      <h4
+                        className={`mb-2 text-[10px] font-bold uppercase tracking-widest ${group.accentColor}`}
+                      >
+                        {group.label}{" "}
+                        <span className="text-slate-500 font-normal">
+                          ({group.interactions.length})
+                        </span>
+                      </h4>
+                      <div className="space-y-2">
+                        {group.interactions.map((interaction, i) => (
+                          <InteractionItem
+                            key={`${interaction.cards[0]}-${interaction.cards[1]}-${interaction.type}`}
+                            interaction={interaction}
+                            index={i}
+                            type={group.id}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </CollapsiblePanel>
+
+            {/* Chains */}
+            {analysis.chains.length > 0 && (
+              <CollapsiblePanel
+                id="ie-chains"
+                title="Chains"
+                summary={`${analysis.chains.length} detected`}
+                expanded={expandedSections.has("ie-chains")}
+                onToggle={() => onToggleSection("ie-chains")}
+              >
+                <div className="space-y-2">
+                  {analysis.chains.map((chain, i) => (
+                    <ChainItem key={chain.cards.join("-")} chain={chain} index={i} />
+                  ))}
+                </div>
+              </CollapsiblePanel>
+            )}
+
+            {/* Blockers */}
+            {analysis.blockers.length > 0 && (
+              <CollapsiblePanel
+                id="ie-blockers"
+                title="Blockers"
+                summary={`${analysis.blockers.length} detected`}
+                expanded={expandedSections.has("ie-blockers")}
+                onToggle={() => onToggleSection("ie-blockers")}
+              >
+                <div className="space-y-2">
+                  {analysis.blockers.map((blocker, i) => (
+                    <BlockerItem key={blocker.blocker} blocker={blocker} index={i} />
+                  ))}
+                </div>
+              </CollapsiblePanel>
+            )}
+
+            {/* Loops empty state (shown as panel only when none exist) */}
+            {analysis.loops.length === 0 && (
+              <CollapsiblePanel
+                id="ie-loops"
+                title="Loops"
+                summary="0 detected"
+                expanded={expandedSections.has("ie-loops")}
+                onToggle={() => onToggleSection("ie-loops")}
+              >
+                <EmptyState message="No loops detected." />
+              </CollapsiblePanel>
+            )}
           </div>
         </div>
       )}
     </div>
   );
-}
-
-function StatCard({
-  label,
-  value,
-  accent = false,
-}: {
-  label: string;
-  value: number;
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-lg border bg-slate-800/50 px-3 py-3 text-center transition-colors ${
-        accent
-          ? "border-purple-700/50 bg-purple-900/10"
-          : "border-slate-700"
-      }`}
-    >
-      <div
-        className={`text-xl font-bold tabular-nums ${
-          accent ? "text-purple-300" : "text-white"
-        }`}
-      >
-        {value}
-      </div>
-      <div className="mt-0.5 text-[10px] uppercase tracking-wide text-slate-400">
-        {label}
-      </div>
-    </div>
-  );
-}
-
-function groupByType(
-  interactions: Interaction[]
-): Record<string, Interaction[]> {
-  const groups: Record<string, Interaction[]> = {};
-  for (const interaction of interactions) {
-    const type = interaction.type;
-    if (!groups[type]) groups[type] = [];
-    groups[type].push(interaction);
-  }
-  return groups;
 }

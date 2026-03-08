@@ -55,6 +55,8 @@ export default function DeckViewTabs({
     analysis: interactionAnalysis,
     loading: interactionLoading,
     error: interactionError,
+    steps: interactionSteps,
+    progress: interactionProgress,
   } = useInteractionAnalysis(cardMap, activeTab === "interactions");
 
   // --- Candidate state (persists across tab switches) ---
@@ -340,6 +342,8 @@ export default function DeckViewTabs({
               analysis={interactionAnalysis}
               loading={interactionLoading}
               error={interactionError}
+              steps={interactionSteps}
+              progress={interactionProgress}
               expandedSections={
                 expandedSections.interactions ?? new Set<string>()
               }
