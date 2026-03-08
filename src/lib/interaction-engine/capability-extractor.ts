@@ -389,7 +389,11 @@ const DEFAULT_OBJECT_REF: GameObjectRef = {
   modifiers: [],
 };
 
-function extractCausesEvents(abilities: AbilityNode[]): GameEvent[] {
+function extractCausesEvents(
+  abilities: AbilityNode[],
+  cardTypes: CardType[],
+  subtypes: Subtype[]
+): GameEvent[] {
   const causesEvents: GameEvent[] = [];
 
   for (const ability of abilities) {
@@ -521,12 +525,25 @@ function extractCausesEvents(abilities: AbilityNode[]): GameEvent[] {
     const costs = getCosts(ability);
     for (const cost of costs) {
       if (cost.costType === "sacrifice") {
+        // When a card sacrifices itself (self: true), the parser produces
+        // an empty-typed object ({ self: true, types: [] }). Enrich it
+        // with the card's actual types and subtypes so type matching
+        // works correctly — e.g., a land sacrificing itself should NOT
+        // match a "whenever a Sliver dies" trigger.
+        let sacObject = cost.object;
+        if (sacObject.self && sacObject.types.length === 0) {
+          sacObject = {
+            ...sacObject,
+            types: [...cardTypes],
+            subtypes: subtypes.length > 0 ? [...subtypes] : sacObject.subtypes,
+          };
+        }
         causesEvents.push({
           kind: "zone_transition",
           from: "battlefield",
           to: "graveyard",
           cause: "sacrifice",
-          object: cost.object,
+          object: sacObject,
         } as ZoneTransition);
       }
     }
@@ -1074,7 +1091,7 @@ export function profileCard(card: EnrichedCard): CardProfile {
   const produces = extractProduces(allAbilities);
   const consumes = extractConsumes(allAbilities);
   const triggersOn = extractTriggersOn(allAbilities);
-  const causesEvents = extractCausesEvents(allAbilities);
+  const causesEvents = extractCausesEvents(allAbilities, cardTypes, subtypes);
   const grants = extractGrants(allAbilities, oracleText);
   const replacements = extractReplacements(allAbilities);
   const speeds = extractSpeeds(allAbilities);

@@ -57,6 +57,8 @@ function detectPairInteractions(a: CardProfile, b: CardProfile): Interaction[] {
   results.push(...detectTriggers(b, a));
   results.push(...detectProtects(a, b));
   results.push(...detectProtects(b, a));
+  results.push(...detectAmplifies(a, b));
+  results.push(...detectAmplifies(b, a));
   results.push(...detectRecurs(a, b));
   results.push(...detectRecurs(b, a));
   results.push(...detectTutorsFor(a, b));
@@ -228,6 +230,19 @@ function eventsMatch(caused: GameEvent, trigger: GameEvent): boolean {
   if (caused.kind === "damage" && trigger.kind === "damage") {
     // If trigger specifically requires combat damage, caused must be combat
     if (trigger.isCombatDamage && !caused.isCombatDamage) return false;
+    // Check source type compatibility when the caused event has type info.
+    // When the caused source has no type info (generic "deals damage"),
+    // pass through — detectTriggers will verify the card matches.
+    const causedSource = caused.source;
+    const triggerSource = trigger.source;
+    if (causedSource && triggerSource) {
+      const causedHasTypeInfo =
+        causedSource.types.length > 0 ||
+        (causedSource.subtypes?.length ?? 0) > 0;
+      if (causedHasTypeInfo) {
+        if (!objectTypesMatch(causedSource, triggerSource)) return false;
+      }
+    }
     return true;
   }
 
@@ -297,13 +312,15 @@ function expandCompositeTypes(types: string[]): readonly string[] {
 }
 
 /**
- * Check if a filter/target ref (a) matches a card's ref (b).
+ * Check if two object refs are compatible (e.g., caused event vs trigger).
  * Empty types = matches anything (wildcard).
  * Handles composite types like "permanent" by expanding them.
  *
- * Subtype handling: if the filter (a) requires subtypes, the card (b)
- * must have at least one matching subtype. This prevents "search for a
- * Sliver" from matching non-Sliver cards.
+ * Subtype handling is BIDIRECTIONAL: if either side requires subtypes,
+ * the other side must have at least one matching subtype. This prevents
+ * "whenever a Sliver dies" from matching a non-Sliver dying, and vice versa.
+ * Comparisons are case-insensitive since the parser normalises to lowercase
+ * while the capability extractor preserves original casing.
  */
 function objectTypesMatch(
   a: GameObjectRef | undefined,
@@ -316,12 +333,26 @@ function objectTypesMatch(
     const expandedB = expandCompositeTypes(b.types);
     if (!expandedA.some((t) => expandedB.includes(t))) return false;
   }
-  // Subtype check — if the filter (a) requires subtypes, the card (b) must have them
-  if (a.subtypes && a.subtypes.length > 0) {
-    if (!b.subtypes || !a.subtypes.some((st) => b.subtypes!.includes(st))) {
+  // Bidirectional subtype check (case-insensitive)
+  const aSubtypes = a.subtypes?.map((s) => s.toLowerCase()) ?? [];
+  const bSubtypes = b.subtypes?.map((s) => s.toLowerCase()) ?? [];
+  // If a requires subtypes, b must have at least one match
+  if (aSubtypes.length > 0) {
+    if (bSubtypes.length === 0 || !aSubtypes.some((st) => bSubtypes.includes(st))) {
       return false;
     }
   }
+  // If b requires subtypes, a must have at least one match
+  if (bSubtypes.length > 0) {
+    if (aSubtypes.length === 0 || !bSubtypes.some((st) => aSubtypes.includes(st))) {
+      return false;
+    }
+  }
+  // Modifier compatibility: nontoken vs token
+  const aModifiers = a.modifiers ?? [];
+  const bModifiers = b.modifiers ?? [];
+  if (aModifiers.includes("nontoken") && bModifiers.includes("token")) return false;
+  if (aModifiers.includes("token") && bModifiers.includes("nontoken")) return false;
   return true;
 }
 
@@ -344,8 +375,11 @@ function cardMatchesRef(
     }
   }
   // Subtype check - if ref requires specific subtypes, card must have at least one
+  // Case-insensitive: parser normalises to lowercase, card profiles keep original case
   if (ref.subtypes && ref.subtypes.length > 0) {
-    if (!cardSubtypes || !ref.subtypes.some((st) => cardSubtypes.includes(st))) {
+    if (!cardSubtypes) return false;
+    const cardSubsLower = cardSubtypes.map((s) => s.toLowerCase());
+    if (!ref.subtypes.some((st) => cardSubsLower.includes(st.toLowerCase()))) {
       return false;
     }
   }
@@ -579,6 +613,29 @@ function detectTriggers(a: CardProfile, b: CardProfile): Interaction[] {
   for (const caused of a.causesEvents) {
     for (const trigger of b.triggersOn) {
       if (eventsMatch(caused, trigger)) {
+        // For damage events where the trigger requires specific source types
+        // (e.g., "Whenever a Sliver deals damage"), verify the card itself
+        // matches the source filter — the event data may lack source type info.
+        if (caused.kind === "damage" && trigger.kind === "damage") {
+          const triggerSource = trigger.source;
+          if (
+            triggerSource &&
+            ((triggerSource.subtypes?.length ?? 0) > 0 ||
+              triggerSource.types.length > 0)
+          ) {
+            if (
+              !cardMatchesRef(
+                a.cardTypes,
+                triggerSource,
+                a.subtypes,
+                a.supertypes
+              )
+            ) {
+              continue;
+            }
+          }
+        }
+
         // Dedup: keep the best (highest strength) interaction per card pair + event kind
         const dedupKey = `triggers:${a.cardName}:${b.cardName}:${caused.kind}:${trigger.kind}`;
         if (seen.has(dedupKey)) {
@@ -753,6 +810,85 @@ function detectProtects(a: CardProfile, b: CardProfile): Interaction[] {
           type: "protects",
           strength: 0.8,
           mechanical: `${a.cardName} grants ${keywordName} to ${b.cardName}`,
+          events: [],
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DETECTOR: AMPLIFIES
+// ═══════════════════════════════════════════════════════════════
+
+/** Non-protective keywords that enhance a card's power */
+const AMPLIFY_KEYWORDS = new Set([
+  "flying", "haste", "lifelink", "deathtouch", "trample",
+  "menace", "vigilance", "reach", "first", "double", "strike",
+  "fear", "intimidate", "shadow", "prowess", "infect", "wither",
+  "undying", "persist", "flanking", "bushido", "exalted",
+  "annihilator", "cascade",
+]);
+
+/**
+ * A amplifies B if A grants stat modifications or enhancement keywords
+ * to objects that match B's types (e.g., "All Sliver creatures get +1/+1").
+ */
+function detectAmplifies(a: CardProfile, b: CardProfile): Interaction[] {
+  const results: Interaction[] = [];
+
+  for (const grant of a.grants) {
+    let isAmplifying = false;
+    let description = "";
+
+    if (typeof grant.ability === "string") {
+      isAmplifying = AMPLIFY_KEYWORDS.has(grant.ability.toLowerCase());
+      description = `grants ${grant.ability}`;
+    } else if (grant.ability.category === "stat_mod") {
+      isAmplifying = true;
+      const sm = grant.ability;
+      const pSign = typeof sm.power === "number" && sm.power >= 0 ? "+" : "";
+      const tSign = typeof sm.toughness === "number" && sm.toughness >= 0 ? "+" : "";
+      description = `grants ${pSign}${sm.power}/${tSign}${sm.toughness}`;
+    } else if (grant.ability.category === "keyword_grant") {
+      const kw = grant.ability.keyword.toLowerCase();
+      // Skip protection keywords — those are handled by detectProtects
+      if (PROTECTION_KEYWORDS.has(kw) || kw.startsWith("protection")) continue;
+      isAmplifying = AMPLIFY_KEYWORDS.has(kw);
+      if (!isAmplifying) {
+        // Accept any non-protective keyword as amplifying
+        isAmplifying = true;
+      }
+      description = `grants ${grant.ability.keyword}`;
+    }
+
+    if (!isAmplifying) continue;
+
+    // Check if B's types match the grant target
+    if (cardMatchesRef(b.cardTypes, grant.to, b.subtypes, b.supertypes)) {
+      const controllerOk =
+        !grant.to.controller ||
+        grant.to.controller === "you" ||
+        grant.to.controller === "any" ||
+        grant.to.controller === "each";
+
+      if (controllerOk) {
+        // Don't let a card "amplify" itself if grant says "other"
+        if (grant.to.modifiers?.includes("other") && a.cardName === b.cardName) {
+          continue;
+        }
+
+        // Strength: subtype-specific grants are stronger than generic ones
+        const hasSubtypeMatch = grant.to.subtypes && grant.to.subtypes.length > 0;
+        const strength = hasSubtypeMatch ? 0.8 : 0.7;
+
+        results.push({
+          cards: [a.cardName, b.cardName],
+          type: "amplifies",
+          strength,
+          mechanical: `${a.cardName} ${description} to ${b.cardName}`,
           events: [],
         });
       }

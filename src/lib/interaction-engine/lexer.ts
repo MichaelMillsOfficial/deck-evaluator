@@ -199,17 +199,24 @@ const SUPERTYPES = new Set(["legendary", "basic", "snow", "world", "ongoing"]);
 
 // Common subtypes recognized in oracle text
 const SUBTYPES = new Set([
-  // Creature types commonly referenced in oracle text
-  "elf", "goblin", "human", "zombie", "vampire", "angel", "demon",
-  "dragon", "wizard", "cleric", "warrior", "rogue", "knight",
-  "elemental", "spirit", "beast", "bird", "cat", "dog", "dinosaur",
-  "merfolk", "pirate", "soldier", "shaman", "druid", "monk",
-  "horror", "nightmare", "skeleton", "phyrexian", "sliver",
+  // Creature types commonly referenced in oracle text (singular + plural)
+  "elf", "elves", "goblin", "goblins", "human", "humans",
+  "zombie", "zombies", "vampire", "vampires", "angel", "angels",
+  "demon", "demons", "dragon", "dragons", "wizard", "wizards",
+  "cleric", "clerics", "warrior", "warriors", "rogue", "rogues",
+  "knight", "knights", "elemental", "elementals", "spirit", "spirits",
+  "beast", "beasts", "bird", "birds", "cat", "cats", "dog", "dogs",
+  "dinosaur", "dinosaurs", "merfolk", "pirate", "pirates",
+  "soldier", "soldiers", "shaman", "shamans", "druid", "druids",
+  "monk", "monks", "horror", "horrors", "nightmare", "nightmares",
+  "skeleton", "skeletons", "phyrexian", "phyrexians",
+  "sliver", "slivers",
   // Artifact subtypes
-  "equipment", "vehicle", "treasure", "food", "clue", "blood",
-  "map", "powerstone",
+  "equipment", "vehicle", "vehicles", "treasure", "treasures",
+  "food", "foods", "clue", "clues", "blood", "map", "powerstone",
   // Enchantment subtypes
-  "aura", "saga", "shrine", "curse", "cartouche", "case", "class", "room",
+  "aura", "auras", "saga", "sagas", "shrine", "shrines",
+  "curse", "curses", "cartouche", "case", "class", "room",
   // Land subtypes
   "plains", "island", "swamp", "mountain", "forest",
   "desert", "gate", "lair", "locus", "cave",

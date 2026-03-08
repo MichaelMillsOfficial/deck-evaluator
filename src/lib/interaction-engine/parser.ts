@@ -230,6 +230,11 @@ function isStaticAbility(tokens: Token[]): boolean {
     return true;
   }
 
+  // "All Slivers have indestructible" / "Sliver creatures get +1/+1"
+  if (hasType(tokens, "SUBTYPE") && (hasType(tokens, "KEYWORD") || hasType(tokens, "STAT_MOD"))) {
+    return true;
+  }
+
   // Also match when controller is present: "[X] you control have [keyword]"
   if (hasType(tokens, "CONTROLLER") && hasType(tokens, "KEYWORD")) {
     return true;
@@ -1191,7 +1196,13 @@ function parseObjectRefFrom(tokens: Token[], startIndex: number): ObjectRefResul
       ref.types.push(normalized as CardType);
     } else if (token.type === "SUBTYPE") {
       if (!ref.subtypes) ref.subtypes = [];
-      ref.subtypes.push(token.normalized || token.value);
+      // Normalize plural subtypes to singular (e.g., "slivers" → "sliver")
+      let subtype = token.normalized || token.value;
+      if (subtype.endsWith("s") && subtype !== "plains") {
+        if (subtype === "elves") subtype = "elf";
+        else subtype = subtype.replace(/s$/, "");
+      }
+      ref.subtypes.push(subtype);
     } else if (token.type === "MODIFIER" && token.normalized === "target") {
       ref.modifiers.push("target" as RefModifier);
     } else if (token.type === "MODIFIER" && token.normalized === "other") {
@@ -1243,7 +1254,14 @@ function buildObjectRefFromTokens(tokens: Token[]): GameObjectRef {
     }
     if (token.type === "SUBTYPE") {
       if (!ref.subtypes) ref.subtypes = [];
-      ref.subtypes.push(token.normalized || token.value);
+      // Normalize plural subtypes to singular (e.g., "slivers" → "sliver")
+      let subtype = token.normalized || token.value;
+      if (subtype.endsWith("s") && subtype !== "plains") {
+        // Special cases: "elves" → "elf", but most just drop the trailing "s"
+        if (subtype === "elves") subtype = "elf";
+        else subtype = subtype.replace(/s$/, "");
+      }
+      ref.subtypes.push(subtype);
     }
     if (token.type === "CONTROLLER") {
       ref.controller = parseController(token.normalized || "");
@@ -1253,6 +1271,12 @@ function buildObjectRefFromTokens(tokens: Token[]): GameObjectRef {
     }
     if (token.type === "MODIFIER" && token.normalized === "other") {
       ref.modifiers.push("other");
+    }
+    if (token.type === "MODIFIER" && token.normalized === "nontoken") {
+      ref.modifiers.push("nontoken");
+    }
+    if (token.type === "MODIFIER" && token.normalized === "token") {
+      ref.modifiers.push("token");
     }
   }
 
@@ -1536,7 +1560,10 @@ function parseStaticAbility(tokens: Token[]): StaticAbility {
     abilityType: "static",
     effects,
     affectedObjects:
-      affectedObjects.types.length > 0 ? affectedObjects : undefined,
+      affectedObjects.types.length > 0 ||
+      (affectedObjects.subtypes && affectedObjects.subtypes.length > 0)
+        ? affectedObjects
+        : undefined,
   };
 }
 

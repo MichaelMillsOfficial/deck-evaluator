@@ -317,3 +317,31 @@ test.describe("summary text format", () => {
     );
   });
 });
+
+test.describe("tribal rollup noun classification", () => {
+  test("protects interactions with Slivers roll up as 'Slivers'", () => {
+    const interactions = [
+      makeInteraction("Sliver Hivelord", "Sinew Sliver", "protects" as InteractionType),
+      makeInteraction("Sliver Hivelord", "Venom Sliver", "protects" as InteractionType),
+      makeInteraction("Sliver Hivelord", "Basal Sliver", "protects" as InteractionType),
+      makeInteraction("Sliver Hivelord", "Essence Sliver", "protects" as InteractionType),
+      makeInteraction("Sliver Hivelord", "Lazotep Sliver", "protects" as InteractionType),
+    ];
+    const profiles: Record<string, CardProfile> = {
+      "Sinew Sliver": makeProfile("Sinew Sliver", ["creature"], ["Sliver"]),
+      "Venom Sliver": makeProfile("Venom Sliver", ["creature"], ["Sliver"]),
+      "Basal Sliver": makeProfile("Basal Sliver", ["creature"], ["Sliver"]),
+      "Essence Sliver": makeProfile("Essence Sliver", ["creature"], ["Sliver"]),
+      "Lazotep Sliver": makeProfile("Lazotep Sliver", ["creature"], ["Sliver"]),
+    };
+    const result = rollUpInteractions(interactions, profiles);
+    const rollup = result.find((r) => r.kind === "rollup") as RolledUpGroup;
+
+    expect(rollup).toBeDefined();
+    expect(rollup.anchorCard).toBe("Sliver Hivelord");
+    expect(rollup.type).toBe("protects");
+    expect(rollup.targetNoun).toBe("Slivers");
+    expect(rollup.interactions.length).toBe(5);
+    expect(rollup.summaryText).toContain("5 Slivers");
+  });
+});

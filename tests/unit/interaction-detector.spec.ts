@@ -1533,3 +1533,249 @@ test.describe("lexer pattern coverage — passive damage and zone qualifiers", (
     expect(triggers.length).toBeGreaterThan(0);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// FALSE POSITIVE REGRESSION: SELF-SACRIFICE WILDCARD MATCHING
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("false positive: self-sacrifice should not wildcard-match typed triggers", () => {
+  function lazotepSliver(): CardProfile {
+    return profile({
+      name: "Lazotep Sliver",
+      typeLine: "Creature — Sliver",
+      oracleText:
+        "Sliver creatures you control have afflict 2.\nWhenever a nontoken Sliver you control dies, amass Slivers 2.",
+      manaCost: "{4}{B}",
+    });
+  }
+
+  test("Arid Mesa self-sacrifice does NOT trigger Lazotep Sliver (land ≠ Sliver)", () => {
+    const aridMesa = profile({
+      name: "Arid Mesa",
+      typeLine: "Land",
+      oracleText:
+        "{T}, Pay 1 life, Sacrifice Arid Mesa: Search your library for a Mountain or Plains card, put it onto the battlefield, then shuffle.",
+    });
+    const analysis = findInteractions([aridMesa, lazotepSliver()]);
+    const triggers = findByType(analysis, "triggers", "Arid Mesa", "Lazotep Sliver");
+    expect(triggers.length).toBe(0);
+  });
+
+  test("Basal Sliver self-sacrifice DOES trigger Lazotep Sliver (Sliver creature dying)", () => {
+    const basalSliver = profile({
+      name: "Basal Sliver",
+      typeLine: "Creature — Sliver",
+      oracleText: "All Slivers have \"Sacrifice this permanent: Add {B}{B}.\"",
+      manaCost: "{2}{B}",
+    });
+    const analysis = findInteractions([basalSliver, lazotepSliver()]);
+    // Basal Sliver dying (it's a Sliver creature) should trigger Lazotep's death trigger
+    const triggers = findByType(analysis, "triggers", "Basal Sliver", "Lazotep Sliver");
+    expect(triggers.length).toBeGreaterThan(0);
+  });
+
+  test("Commander's Sphere self-sacrifice does NOT trigger Lazotep Sliver (artifact ≠ Sliver)", () => {
+    const sphere = profile({
+      name: "Commander's Sphere",
+      typeLine: "Artifact",
+      oracleText:
+        "{T}: Add one mana of any color in your commander's color identity.\nSacrifice Commander's Sphere: Draw a card.",
+      manaCost: "{3}",
+    });
+    const analysis = findInteractions([sphere, lazotepSliver()]);
+    const triggers = findByType(analysis, "triggers", "Commander's Sphere", "Lazotep Sliver");
+    expect(triggers.length).toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// FALSE POSITIVE REGRESSION: DAMAGE TRIGGER SOURCE TYPE LOSS
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("false positive: non-Sliver damage should not trigger Sliver damage triggers", () => {
+  function essenceSliver(): CardProfile {
+    return profile({
+      name: "Essence Sliver",
+      typeLine: "Creature — Sliver",
+      oracleText: "Whenever a Sliver deals damage, its controller gains that much life.",
+      manaCost: "{3}{W}",
+    });
+  }
+
+  test("City of Brass damage does NOT trigger Essence Sliver (land ≠ Sliver)", () => {
+    const cityOfBrass = profile({
+      name: "City of Brass",
+      typeLine: "Land",
+      oracleText:
+        "Whenever City of Brass becomes tapped, it deals 1 damage to you.\n{T}: Add one mana of any color.",
+    });
+    const analysis = findInteractions([cityOfBrass, essenceSliver()]);
+    const triggers = findByType(analysis, "triggers", "City of Brass", "Essence Sliver");
+    expect(triggers.length).toBe(0);
+  });
+
+  test("Caves of Koilos damage does NOT trigger Essence Sliver (land ≠ Sliver)", () => {
+    const caves = profile({
+      name: "Caves of Koilos",
+      typeLine: "Land",
+      oracleText:
+        "{T}: Add {C}.\n{T}: Add {W} or {B}. Caves of Koilos deals 1 damage to you.",
+    });
+    const analysis = findInteractions([caves, essenceSliver()]);
+    const triggers = findByType(analysis, "triggers", "Caves of Koilos", "Essence Sliver");
+    expect(triggers.length).toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// AMPLIFIES: STAT-MOD GRANTS
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("amplifies — stat-mod grants to matching creatures", () => {
+  test("Sinew Sliver amplifies another Sliver but not a non-Sliver", () => {
+    const sinewSliver = profile({
+      name: "Sinew Sliver",
+      typeLine: "Creature — Sliver",
+      oracleText: "All Sliver creatures get +1/+1.",
+      manaCost: "{1}{W}",
+    });
+    const targetSliver = profile({
+      name: "Venom Sliver",
+      typeLine: "Creature — Sliver",
+      oracleText: "All Sliver creatures have deathtouch.",
+      manaCost: "{1}{G}",
+    });
+    const nonSliver = profile({
+      name: "Blood Artist",
+      typeLine: "Creature — Vampire",
+      oracleText:
+        "Whenever Blood Artist or another creature dies, target opponent loses 1 life and you gain 1 life.",
+      manaCost: "{1}{B}",
+    });
+
+    const analysis = findInteractions([sinewSliver, targetSliver, nonSliver]);
+
+    // Sinew Sliver should amplify Venom Sliver (both are Slivers)
+    const sliverAmplifies = findByType(analysis, "amplifies", "Sinew Sliver", "Venom Sliver");
+    expect(sliverAmplifies.length).toBeGreaterThan(0);
+
+    // Sinew Sliver should NOT amplify Blood Artist (not a Sliver)
+    const nonSliverAmplifies = findByType(analysis, "amplifies", "Sinew Sliver", "Blood Artist");
+    expect(nonSliverAmplifies.length).toBe(0);
+  });
+
+  test("Sinew Sliver does NOT amplify itself when grant says 'other'", () => {
+    // Note: "All Sliver creatures get +1/+1" includes itself in MTG rules,
+    // but "Other Sliver creatures you control get +1/+1" would exclude self.
+    // Sinew Sliver says "All" so it DOES include itself.
+    // Test with a card that says "other" explicitly:
+    const otherAnthem = profile({
+      name: "Test Lord",
+      typeLine: "Creature — Sliver",
+      oracleText: "Other Sliver creatures you control get +1/+1.",
+      manaCost: "{2}{W}",
+    });
+    const targetSliver = profile({
+      name: "Venom Sliver",
+      typeLine: "Creature — Sliver",
+      oracleText: "All Sliver creatures have deathtouch.",
+      manaCost: "{1}{G}",
+    });
+
+    const analysis = findInteractions([otherAnthem, targetSliver]);
+
+    // "Other" grant should amplify Venom Sliver
+    const amplifies = findByType(analysis, "amplifies", "Test Lord", "Venom Sliver");
+    expect(amplifies.length).toBeGreaterThan(0);
+
+    // "Other" grant should NOT amplify itself
+    const selfAmplifies = findByType(analysis, "amplifies", "Test Lord", "Test Lord");
+    expect(selfAmplifies.length).toBe(0);
+  });
+
+  test("Glorious Anthem amplifies any creature", () => {
+    const anthem = profile({
+      name: "Glorious Anthem",
+      typeLine: "Enchantment",
+      oracleText: "Creatures you control get +1/+1.",
+      manaCost: "{1}{W}{W}",
+    });
+    const creature = profile({
+      name: "Blood Artist",
+      typeLine: "Creature — Vampire",
+      oracleText:
+        "Whenever Blood Artist or another creature dies, target opponent loses 1 life and you gain 1 life.",
+      manaCost: "{1}{B}",
+    });
+
+    const analysis = findInteractions([anthem, creature]);
+    const amplifies = findByType(analysis, "amplifies", "Glorious Anthem", "Blood Artist");
+    expect(amplifies.length).toBeGreaterThan(0);
+  });
+
+  test("amplifies interaction describes the stat mod", () => {
+    const sinewSliver = profile({
+      name: "Sinew Sliver",
+      typeLine: "Creature — Sliver",
+      oracleText: "All Sliver creatures get +1/+1.",
+      manaCost: "{1}{W}",
+    });
+    const targetSliver = profile({
+      name: "Venom Sliver",
+      typeLine: "Creature — Sliver",
+      oracleText: "All Sliver creatures have deathtouch.",
+      manaCost: "{1}{G}",
+    });
+
+    const analysis = findInteractions([sinewSliver, targetSliver]);
+    const amplifies = findByType(analysis, "amplifies", "Sinew Sliver", "Venom Sliver");
+    expect(amplifies.length).toBeGreaterThan(0);
+    // The mechanical text should mention the stat modification
+    expect(amplifies[0].mechanical).toContain("+1/+1");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TRIBAL PROTECTS: SLIVER HIVELORD
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("tribal protects — Sliver Hivelord grants indestructible to Slivers", () => {
+  test("Sliver Hivelord protects Slivers but not non-Slivers", () => {
+    const hivelord = profile({
+      name: "Sliver Hivelord",
+      typeLine: "Legendary Creature — Sliver",
+      oracleText: "All Slivers have indestructible.",
+      manaCost: "{W}{U}{B}{R}{G}",
+    });
+    const sliver1 = profile({
+      name: "Sinew Sliver",
+      typeLine: "Creature — Sliver",
+      oracleText: "All Sliver creatures get +1/+1.",
+      manaCost: "{1}{W}",
+    });
+    const sliver2 = profile({
+      name: "Venom Sliver",
+      typeLine: "Creature — Sliver",
+      oracleText: "All Sliver creatures have deathtouch.",
+      manaCost: "{1}{G}",
+    });
+    const nonSliver = profile({
+      name: "Sol Ring",
+      typeLine: "Artifact",
+      oracleText: "{T}: Add {C}{C}.",
+      manaCost: "{1}",
+    });
+
+    const analysis = findInteractions([hivelord, sliver1, sliver2, nonSliver]);
+
+    // Hivelord should protect both Slivers
+    const protects1 = findByType(analysis, "protects", "Sliver Hivelord", "Sinew Sliver");
+    const protects2 = findByType(analysis, "protects", "Sliver Hivelord", "Venom Sliver");
+    expect(protects1.length).toBeGreaterThan(0);
+    expect(protects2.length).toBeGreaterThan(0);
+
+    // Hivelord should NOT protect Sol Ring (not a Sliver)
+    const protectsNon = findByType(analysis, "protects", "Sliver Hivelord", "Sol Ring");
+    expect(protectsNon.length).toBe(0);
+  });
+});
