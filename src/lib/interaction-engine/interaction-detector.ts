@@ -71,11 +71,26 @@ function detectPairInteractions(a: CardProfile, b: CardProfile): Interaction[] {
 /**
  * Build the final analysis result from pairwise interactions.
  */
+function deduplicateInteractions(interactions: Interaction[]): Interaction[] {
+  const seen = new Map<string, Interaction>();
+  for (const inter of interactions) {
+    const key = `${inter.type}:${inter.cards[0]}:${inter.cards[1]}`;
+    const existing = seen.get(key);
+    if (!existing || inter.strength > existing.strength) {
+      seen.set(key, inter);
+    }
+  }
+  return Array.from(seen.values());
+}
+
 function buildAnalysisResult(
   profileMap: Record<string, CardProfile>,
   interactions: Interaction[],
   profiles: CardProfile[]
 ): InteractionAnalysis {
+  // Global dedup: keep highest-strength interaction per (type, cardA, cardB) triple
+  interactions = deduplicateInteractions(interactions);
+
   // Derive conflicts from blocks (bidirectional view of blocking)
   interactions.push(...deriveConflicts(interactions));
 
@@ -461,25 +476,39 @@ function detectEnables(a: CardProfile, b: CardProfile): Interaction[] {
           // producers, not a conversion chain. A card like The World Tree
           // has both a tap-for-mana ability AND a separate sacrifice ability;
           // the sacrifice is on a different ability, so it's not a converter.
+          const manaDedupKey = `enables:mana:${a.cardName}:${b.cardName}`;
+          if (seen.has(manaDedupKey)) {
+            continue;
+          }
+          let converterCostType = "";
           const isManaConverter = a.abilities.some((ability) => {
             if (ability.abilityType !== "activated") return false;
             const costs = ability.costs || [];
             const effects = ability.effects || [];
-            const hasNonTrivialCost = costs.some(
+            const nonTrivialCost = costs.find(
               (c: Cost) => c.costType === "sacrifice" || c.costType === "pay_life" ||
                 c.costType === "exile" || c.costType === "discard"
             );
             const producesMana = effects.some(
               (e: Effect) => e.type === "add_mana"
             );
-            return hasNonTrivialCost && producesMana;
+            if (nonTrivialCost && producesMana) {
+              converterCostType = nonTrivialCost.costType;
+              return true;
+            }
+            return false;
           });
           if (!isManaConverter) {
             continue;
           }
           strength = 0.6;
-          mechanical = `${a.cardName} produces mana that ${b.cardName} can use`;
-          seen.add(`enables:mana:${a.cardName}:${b.cardName}`);
+          const costVerb = converterCostType === "sacrifice" ? "sacrificing permanents"
+            : converterCostType === "pay_life" ? "paying life"
+            : converterCostType === "exile" ? "exiling cards"
+            : converterCostType === "discard" ? "discarding cards"
+            : "converting resources";
+          mechanical = `${a.cardName} converts ${costVerb} into mana, fueling ${b.cardName}'s abilities`;
+          seen.add(manaDedupKey);
         } else {
           mechanical = `${a.cardName} produces resources consumed by ${b.cardName}`;
         }
@@ -539,10 +568,18 @@ function detectEnables(a: CardProfile, b: CardProfile): Interaction[] {
  */
 function detectTriggers(a: CardProfile, b: CardProfile): Interaction[] {
   const results: Interaction[] = [];
+  const seen = new Set<string>();
 
   for (const caused of a.causesEvents) {
     for (const trigger of b.triggersOn) {
       if (eventsMatch(caused, trigger)) {
+        // Dedup: keep the best (highest strength) interaction per card pair + event kind
+        const dedupKey = `triggers:${a.cardName}:${b.cardName}:${caused.kind}:${trigger.kind}`;
+        if (seen.has(dedupKey)) {
+          continue;
+        }
+        seen.add(dedupKey);
+
         const strength = computeTriggerStrength(caused, trigger);
         const mechanical = describeTriggerInteraction(a, b, caused, trigger);
 
