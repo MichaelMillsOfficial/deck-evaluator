@@ -444,6 +444,30 @@ function detectEnables(a: CardProfile, b: CardProfile): Interaction[] {
           mechanical = `${a.cardName} creates tokens that ${b.cardName} can sacrifice`;
           seen.add(`enables:sacrifice:${a.cardName}:${b.cardName}`);
         } else if (resource.category === "mana" && cost.costType === "mana") {
+          // Only create mana-enables-mana if A is a resource converter that
+          // transforms non-mana resources into mana on the SAME ability.
+          // e.g. Ashnod's Altar: "Sacrifice a creature: Add {C}{C}" — the
+          // sacrifice cost and mana output are on the same activated ability.
+          // Pure mana producers (lands, mana dorks) just tap — they're parallel
+          // producers, not a conversion chain. A card like The World Tree
+          // has both a tap-for-mana ability AND a separate sacrifice ability;
+          // the sacrifice is on a different ability, so it's not a converter.
+          const isManaConverter = a.abilities.some((ability) => {
+            if (ability.abilityType !== "activated") return false;
+            const costs = ability.costs || [];
+            const effects = ability.effects || [];
+            const hasNonTrivialCost = costs.some(
+              (c: Cost) => c.costType === "sacrifice" || c.costType === "pay_life" ||
+                c.costType === "exile" || c.costType === "discard"
+            );
+            const producesMana = effects.some(
+              (e: Effect) => e.type === "add_mana"
+            );
+            return hasNonTrivialCost && producesMana;
+          });
+          if (!isManaConverter) {
+            continue;
+          }
           strength = 0.6;
           mechanical = `${a.cardName} produces mana that ${b.cardName} can use`;
           seen.add(`enables:mana:${a.cardName}:${b.cardName}`);

@@ -1253,4 +1253,27 @@ test.describe("type matching — Sliver/fetchland regression", () => {
     );
     expect(enables.length).toBe(0);
   });
+
+  test("two lands tapping for mana do NOT form a loop (parallel producers, not a chain)", () => {
+    const worldTree = profile({
+      name: "The World Tree",
+      typeLine: "Land",
+      oracleText: "The World Tree enters the battlefield tapped.\n{T}: Add {G}.\nAs long as you control six or more lands, lands you control have \"{T}: Add one mana of any color.\"\n{W}{W}{U}{U}{B}{B}{R}{R}{G}{G}, {T}, Sacrifice The World Tree: Search your library for any number of God cards, put them onto the battlefield, then shuffle.",
+    });
+    const sliverHive = profile({
+      name: "Sliver Hive",
+      typeLine: "Land",
+      oracleText: "{T}: Add {C}.\n{T}: Add one mana of any color. Spend this mana only to cast a Sliver spell.\n{5}, {T}: Create a 1/1 colorless Sliver creature token. Activate only if you control a Sliver.",
+    });
+    const analysis = findInteractions([worldTree, sliverHive]);
+
+    // Two lands that tap for mana are parallel producers — no loop
+    expect(analysis.loops.length).toBe(0);
+
+    // Should NOT have mana-enables-mana interactions between pure mana sources
+    const manaEnables = analysis.interactions.filter(
+      (i) => i.type === "enables" && i.mechanical.includes("produces mana")
+    );
+    expect(manaEnables.length).toBe(0);
+  });
 });
