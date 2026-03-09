@@ -109,7 +109,7 @@ export class DeckPage {
   }
 
   /** Click a deck view tab */
-  async selectDeckViewTab(tab: "Deck List" | "Analysis" | "Synergy" | "Hands" | "Additions") {
+  async selectDeckViewTab(tab: "Deck List" | "Analysis" | "Synergy" | "Hands" | "Additions" | "Interactions") {
     await this.page
       .getByTestId("deck-header")
       .getByRole("tab", { name: tab })
@@ -227,6 +227,23 @@ export class DeckPage {
   /** Locator for the additions panel */
   get additionsPanel() {
     return this.page.locator("#tabpanel-deck-additions");
+  }
+
+  /** Locator for the interactions panel */
+  get interactionsPanel() {
+    return this.page.locator("#tabpanel-deck-interactions");
+  }
+
+  /** Wait for the interactions panel to display content */
+  async waitForInteractionsPanel() {
+    await this.page
+      .getByTestId("interactions-content")
+      .waitFor({ timeout: 15_000 });
+  }
+
+  /** Expand a collapsible section in the Interactions tab by its ID */
+  async expandInteractionsSection(id: string) {
+    return this.expandAnalysisSection(id);
   }
 
   /** Locator for the commander input field */

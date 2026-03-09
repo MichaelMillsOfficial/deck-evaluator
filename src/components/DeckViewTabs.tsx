@@ -12,6 +12,8 @@ import DeckAnalysis from "@/components/DeckAnalysis";
 import SynergySection from "@/components/SynergySection";
 import HandSimulator from "@/components/HandSimulator";
 import AdditionsPanel from "@/components/AdditionsPanel";
+import InteractionSection from "@/components/InteractionSection";
+import { useInteractionAnalysis } from "@/hooks/useInteractionAnalysis";
 
 interface DeckViewTabsProps {
   deck: DeckData;
@@ -43,9 +45,19 @@ export default function DeckViewTabs({
     analysis: new Set<string>(),
     synergy: new Set<string>(),
     hands: new Set<string>(),
+    interactions: new Set<string>(),
   });
 
   const synergyAnalysis = analysisResults?.synergyAnalysis ?? null;
+
+  // --- Interaction engine (lazy: only runs when tab is active) ---
+  const {
+    analysis: interactionAnalysis,
+    loading: interactionLoading,
+    error: interactionError,
+    steps: interactionSteps,
+    progress: interactionProgress,
+  } = useInteractionAnalysis(cardMap, activeTab === "interactions");
 
   // --- Candidate state (persists across tab switches) ---
   const [candidates, setCandidates] = useState<string[]>([]);
@@ -306,6 +318,40 @@ export default function DeckViewTabs({
             onRetryCard={handleRetryCandidate}
             deckCardNames={deckCardNames}
           />
+        )}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="tabpanel-deck-interactions"
+        aria-labelledby="tab-deck-interactions"
+        hidden={activeTab !== "interactions"}
+      >
+        {activeTab === "interactions" && cardMap && !enrichLoading && (
+          <section aria-labelledby="interactions-heading">
+            <h3
+              id="interactions-heading"
+              className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
+            >
+              Card Interactions
+            </h3>
+            <p className="mb-4 text-xs text-slate-400">
+              Mechanical interaction analysis powered by oracle text compilation
+            </p>
+            <InteractionSection
+              analysis={interactionAnalysis}
+              loading={interactionLoading}
+              error={interactionError}
+              steps={interactionSteps}
+              progress={interactionProgress}
+              expandedSections={
+                expandedSections.interactions ?? new Set<string>()
+              }
+              onToggleSection={(id) =>
+                handleToggleSection("interactions", id)
+              }
+            />
+          </section>
         )}
       </div>
     </div>

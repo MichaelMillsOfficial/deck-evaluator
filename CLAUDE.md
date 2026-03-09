@@ -188,12 +188,14 @@ These provide Magic: The Gathering expertise for card analysis and deck evaluati
 | `mtg-card-expert` | Card lookup via Scryfall, oracle text interpretation, play pattern analysis, card interaction reasoning | `/mtg-card-expert` |
 | `evaluate-detection` | Audit tag/synergy regex accuracy against real cards, find false positives/negatives | `/evaluate-detection` |
 | `review-deck-analysis` | Holistic deck evaluation tying together all analysis modules | `/review-deck-analysis` |
+| `l3-judge` | L3 Judge-level rules review for type system, mechanics modeling, and interaction accuracy | `/l3-judge` |
 
 ### When to Use Which Skill
 
 - Adding a new feature? Start with `/write-plan`, then use the appropriate `add-*` skill for each piece
 - Need to understand a card's mechanics? Use `/mtg-card-expert`
 - Suspect tags or synergy detection is wrong for certain cards? Use `/evaluate-detection`
+- Need to validate rules accuracy of type definitions or game mechanics? Use `/l3-judge`
 - Want to validate that the analysis pipeline produces sensible results for a deck? Use `/review-deck-analysis`
 - Adding a new combo to the registry? Use `/add-known-combo`
 

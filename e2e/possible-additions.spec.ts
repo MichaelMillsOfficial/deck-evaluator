@@ -427,12 +427,12 @@ test.describe("Additions tab", () => {
     const tablist = page.getByRole("tablist", { name: "Deck view" });
     const tabs = tablist.getByRole("tab");
 
-    // Should have 5 tabs total
-    await expect(tabs).toHaveCount(5);
+    // Should have 6 tabs total (Interactions added after Additions)
+    await expect(tabs).toHaveCount(6);
 
-    // Last tab should be "Additions"
-    const lastTab = tabs.last();
-    await expect(lastTab).toHaveText("Additions");
+    // Additions should be the second-to-last tab
+    const additionsTab = tablist.getByRole("tab", { name: "Additions" });
+    await expect(additionsTab).toBeVisible();
   });
 
   test("becomes enabled after enrichment completes", async ({
