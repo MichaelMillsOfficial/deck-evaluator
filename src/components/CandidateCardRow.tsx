@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, memo } from "react";
 import type { EnrichedCard } from "@/lib/types";
 import type { CandidateAnalysis } from "@/lib/candidate-analysis";
 import ManaCost from "@/components/ManaCost";
@@ -13,7 +13,7 @@ interface CandidateCardRowProps {
   onRemove: () => void;
 }
 
-export default function CandidateCardRow({
+export default memo(function CandidateCardRow({
   card,
   analysis,
   onRemove,
@@ -318,4 +318,4 @@ export default function CandidateCardRow({
       )}
     </div>
   );
-}
+});

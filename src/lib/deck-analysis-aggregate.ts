@@ -40,6 +40,7 @@ import {
   runSimulation,
   computePipWeights,
 } from "./opening-hand";
+import { buildTagCache } from "./card-tags";
 
 export interface DeckAnalysisResults {
   manaCurve: ManaCurveBucket[];
@@ -80,6 +81,9 @@ export function computeAllAnalyses(
 ): DeckAnalysisResults {
   const { deck, cardMap, spellbookCombos } = input;
 
+  // Pre-compute tag cache once for all analysis modules
+  const tagCache = buildTagCache(cardMap);
+
   // Phase 1: No dependencies
   const colorDistribution = computeColorDistribution(deck, cardMap);
   const manaBaseMetrics = computeManaBaseMetrics(deck, cardMap);
@@ -90,10 +94,10 @@ export function computeAllAnalyses(
 
   // Phase 3: Land analysis
   const landEfficiency = computeLandBaseEfficiency(deck, cardMap);
-  const manaRecommendations = computeManaBaseRecommendations(deck, cardMap);
+  const manaRecommendations = computeManaBaseRecommendations(deck, cardMap, tagCache);
 
   // Phase 4: Power level
-  const powerLevel = computePowerLevel(deck, cardMap);
+  const powerLevel = computePowerLevel(deck, cardMap, tagCache);
 
   // Phase 5: Bracket (depends on powerLevel)
   const bracketResult = computeBracketEstimate(
@@ -101,18 +105,20 @@ export function computeAllAnalyses(
     cardMap,
     powerLevel,
     STATIC_CEDH_STAPLES,
-    spellbookCombos?.exactCombos ?? null
+    spellbookCombos?.exactCombos ?? null,
+    tagCache
   );
 
   // Phase 6: Budget & Synergy
-  const budgetAnalysis = computeBudgetAnalysis(deck, cardMap);
-  const synergyAnalysis = analyzeDeckSynergy(deck, cardMap);
+  const budgetAnalysis = computeBudgetAnalysis(deck, cardMap, tagCache);
+  const synergyAnalysis = analyzeDeckSynergy(deck, cardMap, tagCache);
 
   // Phase 7: Composition
   const compositionScorecard = computeCompositionScorecard(
     deck,
     cardMap,
-    TEMPLATE_COMMAND_ZONE
+    TEMPLATE_COMMAND_ZONE,
+    tagCache
   );
 
   // Phase 8: Creature types & supertypes

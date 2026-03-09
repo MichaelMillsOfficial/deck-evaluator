@@ -1,5 +1,5 @@
 import type { DeckData, EnrichedCard } from "./types";
-import { generateTags } from "./card-tags";
+import { getTagsCached } from "./card-tags";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -176,12 +176,13 @@ export function getDeckSize(deck: DeckData): number {
 export function countCardsByTag(
   deck: DeckData,
   cardMap: Record<string, EnrichedCard>,
-  tag: string
+  tag: string,
+  tagCache?: Map<string, string[]>
 ): number {
   return getLibraryCards(deck).reduce((sum, card) => {
     const enriched = cardMap[card.name];
     if (!enriched) return sum;
-    const tags = generateTags(enriched);
+    const tags = getTagsCached(enriched, tagCache);
     return tags.includes(tag) ? sum + card.quantity : sum;
   }, 0);
 }

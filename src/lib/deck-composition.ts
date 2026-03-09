@@ -1,5 +1,5 @@
 import type { DeckData, EnrichedCard } from "./types";
-import { generateTags } from "./card-tags";
+import { getTagsCached } from "./card-tags";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -271,8 +271,8 @@ function getAllCards(deck: DeckData): { name: string; quantity: number }[] {
  * Determine the effective tags for a card, mapping "Card Advantage" -> "Card Draw"
  * and deduplicating. Used to bucket cards into categories.
  */
-function effectiveTags(enriched: EnrichedCard): string[] {
-  const rawTags = generateTags(enriched);
+function effectiveTags(enriched: EnrichedCard, tagCache?: Map<string, string[]>): string[] {
+  const rawTags = getTagsCached(enriched, tagCache);
   const result = new Set<string>(rawTags);
   // Card Advantage tagged cards also contribute to Card Draw
   if (rawTags.includes("Card Advantage")) {
@@ -339,7 +339,8 @@ function computeHealthSummary(
  */
 export function countCategoryCards(
   deck: DeckData,
-  cardMap: Record<string, EnrichedCard>
+  cardMap: Record<string, EnrichedCard>,
+  tagCache?: Map<string, string[]>
 ): {
   tagMap: Map<string, { name: string; quantity: number }[]>;
   landCards: { name: string; quantity: number }[];
@@ -360,7 +361,7 @@ export function countCategoryCards(
       continue;
     }
 
-    const tags = effectiveTags(enriched);
+    const tags = effectiveTags(enriched, tagCache);
 
     if (tags.length === 0) {
       untaggedCards.push({ name: card.name, quantity: card.quantity });
@@ -390,9 +391,10 @@ export function countCategoryCards(
 export function computeCompositionScorecard(
   deck: DeckData,
   cardMap: Record<string, EnrichedCard>,
-  template: CompositionTemplate
+  template: CompositionTemplate,
+  tagCache?: Map<string, string[]>
 ): CompositionScorecardResult {
-  const { tagMap, landCards, untaggedCards } = countCategoryCards(deck, cardMap);
+  const { tagMap, landCards, untaggedCards } = countCategoryCards(deck, cardMap, tagCache);
 
   // Count total land quantity
   const landCount = landCards.reduce((sum, c) => sum + c.quantity, 0);

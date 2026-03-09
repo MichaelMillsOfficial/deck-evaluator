@@ -2,7 +2,7 @@ import type { DeckData, EnrichedCard } from "./types";
 import type { PowerLevelResult } from "./power-level";
 import type { SpellbookCombo } from "./commander-spellbook";
 import { findCombosInDeck, type KnownCombo } from "./known-combos";
-import { generateTags } from "./card-tags";
+import { getTagsCached } from "./card-tags";
 import { computeStapleOverlap } from "./cedh-staples";
 
 // ---------------------------------------------------------------------------
@@ -125,7 +125,8 @@ export function mergeRestrictedCombos(
 function countCardsWithTag(
   deck: DeckData,
   cardMap: Record<string, EnrichedCard>,
-  tag: string
+  tag: string,
+  tagCache?: Map<string, string[]>
 ): { count: number; cards: string[] } {
   const allCards = [
     ...deck.commanders,
@@ -139,7 +140,7 @@ function countCardsWithTag(
   for (const card of allCards) {
     const enriched = cardMap[card.name];
     if (!enriched) continue;
-    const tags = generateTags(enriched);
+    const tags = getTagsCached(enriched, tagCache);
     if (tags.includes(tag)) {
       count += card.quantity;
       cards.push(card.name);
@@ -208,20 +209,21 @@ export function computeBracketEstimate(
   cardMap: Record<string, EnrichedCard>,
   powerLevel: PowerLevelResult,
   cedhStaples: Set<string>,
-  spellbookCombos: SpellbookCombo[] | null
+  spellbookCombos: SpellbookCombo[] | null,
+  tagCache?: Map<string, string[]>
 ): BracketResult {
   const constraints: BracketConstraint[] = [];
 
   // --- Count constraint violations ---
 
   // Game Changers
-  const gameChangers = countCardsWithTag(deck, cardMap, "Game Changer");
+  const gameChangers = countCardsWithTag(deck, cardMap, "Game Changer", tagCache);
 
   // Extra Turns
-  const extraTurns = countCardsWithTag(deck, cardMap, "Extra Turn");
+  const extraTurns = countCardsWithTag(deck, cardMap, "Extra Turn", tagCache);
 
   // Mass Land Denial
-  const mld = countCardsWithTag(deck, cardMap, "Mass Land Denial");
+  const mld = countCardsWithTag(deck, cardMap, "Mass Land Denial", tagCache);
 
   // 2-card combos
   const allCardNames = [

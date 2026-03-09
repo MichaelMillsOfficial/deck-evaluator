@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useReducer, useRef, useEffect, useCallback, useMemo } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { SpellbookCombo } from "@/lib/commander-spellbook";
 import { validateCommanderLegality } from "@/lib/commander-validation";
@@ -14,29 +14,139 @@ import DeckViewTabs from "@/components/DeckViewTabs";
 import DeckHeader, { type ViewTab } from "@/components/DeckHeader";
 import DiscordExportModal from "@/components/DiscordExportModal";
 
+// ---------------------------------------------------------------------------
+// State & Actions
+// ---------------------------------------------------------------------------
+
+interface DeckImportState {
+  deckData: DeckData | null;
+  loading: boolean;
+  error: string | null;
+  cardMap: Record<string, EnrichedCard> | null;
+  enrichLoading: boolean;
+  enrichError: string | null;
+  notFoundCount: number;
+  spellbookCombos: { exactCombos: SpellbookCombo[]; nearCombos: SpellbookCombo[] } | null;
+  spellbookLoading: boolean;
+  parseWarnings: string[];
+  commanderWarning: string | null;
+  activeTab: ViewTab;
+  discordModalOpen: boolean;
+  shareUrl: string | null;
+}
+
+type DeckImportAction =
+  | { type: "IMPORT_START" }
+  | { type: "IMPORT_SUCCESS"; deck: DeckData; warnings: string[] }
+  | { type: "IMPORT_ERROR"; error: string }
+  | { type: "ENRICH_START" }
+  | { type: "ENRICH_SUCCESS"; cardMap: Record<string, EnrichedCard>; notFoundCount: number }
+  | { type: "ENRICH_ERROR"; error: string }
+  | { type: "SPELLBOOK_START" }
+  | { type: "SPELLBOOK_SUCCESS"; combos: { exactCombos: SpellbookCombo[]; nearCombos: SpellbookCombo[] } }
+  | { type: "SPELLBOOK_ERROR" }
+  | { type: "SET_COMMANDER_WARNING"; warning: string | null }
+  | { type: "SET_TAB"; tab: ViewTab }
+  | { type: "SET_SHARE_URL"; url: string | null }
+  | { type: "TOGGLE_DISCORD_MODAL"; open: boolean }
+  | { type: "DISMISS_PARSE_WARNINGS" }
+  | { type: "DISMISS_NOT_FOUND" }
+  | { type: "DISMISS_ENRICH_ERROR" };
+
+const initialState: DeckImportState = {
+  deckData: null,
+  loading: false,
+  error: null,
+  cardMap: null,
+  enrichLoading: false,
+  enrichError: null,
+  notFoundCount: 0,
+  spellbookCombos: null,
+  spellbookLoading: false,
+  parseWarnings: [],
+  commanderWarning: null,
+  activeTab: "list",
+  discordModalOpen: false,
+  shareUrl: null,
+};
+
+function reducer(state: DeckImportState, action: DeckImportAction): DeckImportState {
+  switch (action.type) {
+    case "IMPORT_START":
+      return {
+        ...initialState,
+        loading: true,
+      };
+    case "IMPORT_SUCCESS":
+      return {
+        ...state,
+        loading: false,
+        deckData: action.deck,
+        parseWarnings: action.warnings,
+      };
+    case "IMPORT_ERROR":
+      return { ...state, loading: false, error: action.error };
+    case "ENRICH_START":
+      return {
+        ...state,
+        enrichLoading: true,
+        enrichError: null,
+        cardMap: null,
+        notFoundCount: 0,
+      };
+    case "ENRICH_SUCCESS":
+      return {
+        ...state,
+        enrichLoading: false,
+        cardMap: action.cardMap,
+        notFoundCount: action.notFoundCount,
+      };
+    case "ENRICH_ERROR":
+      return { ...state, enrichLoading: false, enrichError: action.error };
+    case "SPELLBOOK_START":
+      return { ...state, spellbookLoading: true, spellbookCombos: null };
+    case "SPELLBOOK_SUCCESS":
+      return { ...state, spellbookLoading: false, spellbookCombos: action.combos };
+    case "SPELLBOOK_ERROR":
+      return {
+        ...state,
+        spellbookLoading: false,
+        spellbookCombos: { exactCombos: [], nearCombos: [] },
+      };
+    case "SET_COMMANDER_WARNING":
+      return { ...state, commanderWarning: action.warning };
+    case "SET_TAB":
+      return { ...state, activeTab: action.tab };
+    case "SET_SHARE_URL":
+      return { ...state, shareUrl: action.url };
+    case "TOGGLE_DISCORD_MODAL":
+      return { ...state, discordModalOpen: action.open };
+    case "DISMISS_PARSE_WARNINGS":
+      return { ...state, parseWarnings: [] };
+    case "DISMISS_NOT_FOUND":
+      return { ...state, notFoundCount: 0 };
+    case "DISMISS_ENRICH_ERROR":
+      return { ...state, enrichError: null };
+    default:
+      return state;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export default function DeckImportSection() {
-  const [deckData, setDeckData] = useState<DeckData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [cardMap, setCardMap] = useState<Record<string, EnrichedCard> | null>(
-    null
-  );
-  const [enrichLoading, setEnrichLoading] = useState(false);
-  const [enrichError, setEnrichError] = useState<string | null>(null);
-  const [notFoundCount, setNotFoundCount] = useState<number>(0);
-  const [spellbookCombos, setSpellbookCombos] = useState<{
-    exactCombos: SpellbookCombo[];
-    nearCombos: SpellbookCombo[];
-  } | null>(null);
-  const [spellbookLoading, setSpellbookLoading] = useState(false);
-  const [parseWarnings, setParseWarnings] = useState<string[]>([]);
-  const [commanderWarning, setCommanderWarning] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ViewTab>("list");
-  const [discordModalOpen, setDiscordModalOpen] = useState(false);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [state, dispatch] = useReducer(reducer, initialState);
   const deckResultRef = useRef<HTMLDivElement>(null);
   const enrichAbortRef = useRef<AbortController | null>(null);
   const spellbookAbortRef = useRef<AbortController | null>(null);
+
+  const {
+    deckData, loading, error, cardMap, enrichLoading, enrichError,
+    notFoundCount, spellbookCombos, spellbookLoading, parseWarnings,
+    commanderWarning, activeTab, discordModalOpen, shareUrl,
+  } = state;
 
   useEffect(() => {
     if (deckData && deckResultRef.current) {
@@ -47,7 +157,7 @@ export default function DeckImportSection() {
   // Post-enrichment commander legality check
   useEffect(() => {
     if (!deckData || !cardMap || enrichLoading) {
-      setCommanderWarning(null);
+      dispatch({ type: "SET_COMMANDER_WARNING", warning: null });
       return;
     }
     if (deckData.commanders.length === 0) return;
@@ -56,7 +166,10 @@ export default function DeckImportSection() {
       deckData.commanders.map((c) => c.name),
       cardMap
     );
-    setCommanderWarning(warnings.length > 0 ? warnings.join(" ") : null);
+    dispatch({
+      type: "SET_COMMANDER_WARNING",
+      warning: warnings.length > 0 ? warnings.join(" ") : null,
+    });
   }, [deckData, cardMap, enrichLoading]);
 
   // Compute analysis results when cardMap is available
@@ -83,10 +196,7 @@ export default function DeckImportSection() {
     const controller = new AbortController();
     enrichAbortRef.current = controller;
 
-    setEnrichLoading(true);
-    setEnrichError(null);
-    setCardMap(null);
-    setNotFoundCount(0);
+    dispatch({ type: "ENRICH_START" });
 
     try {
       const res = await fetch("/api/deck-enrich", {
@@ -100,27 +210,30 @@ export default function DeckImportSection() {
       });
 
       if (!res.ok) {
-        if (res.status === 502) {
-          setEnrichError("Card data service temporarily unavailable");
-        } else {
-          setEnrichError("Could not load card details");
-        }
+        dispatch({
+          type: "ENRICH_ERROR",
+          error: res.status === 502
+            ? "Card data service temporarily unavailable"
+            : "Could not load card details",
+        });
         return;
       }
 
       const json = await res.json();
-      setCardMap(json.cards as Record<string, EnrichedCard>);
-      setNotFoundCount(json.notFound?.length ?? 0);
+      dispatch({
+        type: "ENRICH_SUCCESS",
+        cardMap: json.cards as Record<string, EnrichedCard>,
+        notFoundCount: json.notFound?.length ?? 0,
+      });
     } catch (err) {
       // Don't update state for aborted requests
       if (err instanceof DOMException && err.name === "AbortError") return;
-      if (err instanceof TypeError) {
-        setEnrichError("Network error — could not reach card data service");
-      } else {
-        setEnrichError("Could not load card details");
-      }
-    } finally {
-      setEnrichLoading(false);
+      dispatch({
+        type: "ENRICH_ERROR",
+        error: err instanceof TypeError
+          ? "Network error — could not reach card data service"
+          : "Could not load card details",
+      });
     }
   }, []);
 
@@ -138,8 +251,7 @@ export default function DeckImportSection() {
     const controller = new AbortController();
     spellbookAbortRef.current = controller;
 
-    setSpellbookLoading(true);
-    setSpellbookCombos(null);
+    dispatch({ type: "SPELLBOOK_START" });
 
     try {
       const res = await fetch("/api/deck-combos", {
@@ -156,59 +268,51 @@ export default function DeckImportSection() {
       });
 
       if (!res.ok) {
-        setSpellbookCombos({ exactCombos: [], nearCombos: [] });
+        dispatch({ type: "SPELLBOOK_ERROR" });
         return;
       }
 
       const json = await res.json();
-      setSpellbookCombos({
-        exactCombos: json.exactCombos ?? [],
-        nearCombos: json.nearCombos ?? [],
+      dispatch({
+        type: "SPELLBOOK_SUCCESS",
+        combos: {
+          exactCombos: json.exactCombos ?? [],
+          nearCombos: json.nearCombos ?? [],
+        },
       });
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
-      setSpellbookCombos({ exactCombos: [], nearCombos: [] });
-    } finally {
-      setSpellbookLoading(false);
+      dispatch({ type: "SPELLBOOK_ERROR" });
     }
   }, []);
 
   const handleImport = async (fetcher: () => Promise<Response>) => {
-    setLoading(true);
-    setError(null);
-    setDeckData(null);
-    setCardMap(null);
-    setEnrichError(null);
-    setParseWarnings([]);
-    setCommanderWarning(null);
-    setSpellbookCombos(null);
-    setNotFoundCount(0);
-    setShareUrl(null);
-    setActiveTab("list");
+    dispatch({ type: "IMPORT_START" });
 
     try {
       const res = await fetcher();
       const json = await res.json();
 
       if (!res.ok) {
-        setError(json.error ?? `Request failed with status ${res.status}`);
+        dispatch({
+          type: "IMPORT_ERROR",
+          error: json.error ?? `Request failed with status ${res.status}`,
+        });
         return;
       }
 
       const { warnings: w, ...deckFields } = json as DeckData & { warnings?: string[] };
       const deck = deckFields as DeckData;
-      setDeckData(deck);
-      setParseWarnings(w ?? []);
+      dispatch({ type: "IMPORT_SUCCESS", deck, warnings: w ?? [] });
       enrichDeck(deck);
       fetchCombos(deck);
     } catch (err) {
-      setError(
-        err instanceof Error
+      dispatch({
+        type: "IMPORT_ERROR",
+        error: err instanceof Error
           ? err.message
-          : "An unexpected error occurred. Please try again."
-      );
-    } finally {
-      setLoading(false);
+          : "An unexpected error occurred. Please try again.",
+      });
     }
   };
 
@@ -227,7 +331,7 @@ export default function DeckImportSection() {
   // Compute share URL after enrichment completes (v2 compact codec)
   useEffect(() => {
     if (!deckData || !cardMap) {
-      setShareUrl(null);
+      dispatch({ type: "SET_SHARE_URL", url: null });
       return;
     }
     let cancelled = false;
@@ -235,7 +339,7 @@ export default function DeckImportSection() {
       try {
         const encoded = await encodeCompactDeckPayload(deckData, cardMap);
         if (!cancelled) {
-          setShareUrl(`${window.location.origin}/shared?d=${encoded}`);
+          dispatch({ type: "SET_SHARE_URL", url: `${window.location.origin}/shared?d=${encoded}` });
         }
       } catch {
         // Encoding error — leave shareUrl null
@@ -314,7 +418,7 @@ export default function DeckImportSection() {
           </div>
           <button
             type="button"
-            onClick={() => setParseWarnings([])}
+            onClick={() => dispatch({ type: "DISMISS_PARSE_WARNINGS" })}
             className="ml-4 shrink-0 text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
             aria-label="Dismiss parse warnings"
           >
@@ -344,9 +448,9 @@ export default function DeckImportSection() {
             enrichError={enrichError}
             notFoundCount={notFoundCount}
             activeTab={activeTab}
-            onTabChange={setActiveTab}
+            onTabChange={(tab) => dispatch({ type: "SET_TAB", tab })}
             analysisResults={analysisResults}
-            onOpenDiscordModal={() => setDiscordModalOpen(true)}
+            onOpenDiscordModal={() => dispatch({ type: "TOGGLE_DISCORD_MODAL", open: true })}
             onCopyShareLink={handleCopyShareLink}
           />
 
@@ -359,7 +463,7 @@ export default function DeckImportSection() {
                 spellbookCombos={spellbookCombos}
                 spellbookLoading={spellbookLoading}
                 activeTab={activeTab}
-                onTabChange={setActiveTab}
+                onTabChange={(tab) => dispatch({ type: "SET_TAB", tab })}
                 analysisResults={analysisResults}
               />
             </div>
@@ -386,7 +490,7 @@ export default function DeckImportSection() {
                 <button
                   type="button"
                   onClick={() => {
-                    setEnrichError(null);
+                    dispatch({ type: "DISMISS_ENRICH_ERROR" });
                     deckResultRef.current?.focus();
                   }}
                   className="text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
@@ -417,7 +521,7 @@ export default function DeckImportSection() {
               </span>
               <button
                 type="button"
-                onClick={() => setNotFoundCount(0)}
+                onClick={() => dispatch({ type: "DISMISS_NOT_FOUND" })}
                 className="ml-4 shrink-0 text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
                 aria-label="Dismiss warning"
               >
@@ -442,7 +546,7 @@ export default function DeckImportSection() {
               <button
                 type="button"
                 onClick={() => {
-                  setCommanderWarning(null);
+                  dispatch({ type: "SET_COMMANDER_WARNING", warning: null });
                   deckResultRef.current?.focus();
                 }}
                 className="ml-4 shrink-0 text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
@@ -470,7 +574,7 @@ export default function DeckImportSection() {
       {deckData && analysisResults && (
         <DiscordExportModal
           open={discordModalOpen}
-          onClose={() => setDiscordModalOpen(false)}
+          onClose={() => dispatch({ type: "TOGGLE_DISCORD_MODAL", open: false })}
           analysisResults={analysisResults}
           deck={deckData}
           shareUrl={shareUrl ?? undefined}
