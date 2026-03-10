@@ -184,41 +184,44 @@ export async function fetchCardCollectionByIds(
 // TODO: add server-side LRU cache for card data
 const MAX_RETRIES = 2;
 
-async function fetchBatchWithRetry(
-  identifiers: ScryfallIdentifier[],
-  signal?: AbortSignal
-): Promise<CollectionResponse> {
+/**
+ * Generic fetch-with-retry for Scryfall API calls.
+ * Handles 429 rate limits (respects Retry-After header) and 5xx server errors.
+ * Returns the raw Response on success; throws on exhausted retries or non-retryable errors.
+ */
+export async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  maxRetries: number = MAX_RETRIES
+): Promise<Response> {
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const res = await fetch(`${SCRYFALL_API_BASE}/cards/collection`, {
-      method: "POST",
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, {
+      ...options,
       headers: {
-        "Content-Type": "application/json",
         Accept: "application/json",
+        ...options.headers,
       },
-      body: JSON.stringify({ identifiers }),
-      signal: signal ?? AbortSignal.timeout(10_000),
+      signal: options.signal ?? AbortSignal.timeout(10_000),
     });
 
-    if (res.ok) {
-      return res.json() as Promise<CollectionResponse>;
-    }
+    if (res.ok) return res;
 
     if (res.status === 429) {
       const retryAfter = parseInt(res.headers.get("Retry-After") ?? "1", 10);
       const waitMs = Math.min(retryAfter * 1000, 10_000);
       console.warn(
-        `[scryfall] rate limited (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying after ${waitMs}ms`
+        `[scryfall] rate limited (attempt ${attempt + 1}/${maxRetries + 1}), retrying after ${waitMs}ms`
       );
       await delay(waitMs);
       lastError = new Error(`Scryfall API rate limited: ${res.status}`);
       continue;
     }
 
-    if (res.status >= 500 && attempt < MAX_RETRIES) {
+    if (res.status >= 500 && attempt < maxRetries) {
       console.warn(
-        `[scryfall] server error ${res.status} (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying`
+        `[scryfall] server error ${res.status} (attempt ${attempt + 1}/${maxRetries + 1}), retrying`
       );
       await delay(1000);
       lastError = new Error(`Scryfall API server error: ${res.status}`);
@@ -229,6 +232,22 @@ async function fetchBatchWithRetry(
   }
 
   throw lastError ?? new Error("Scryfall API error: retries exhausted");
+}
+
+async function fetchBatchWithRetry(
+  identifiers: ScryfallIdentifier[],
+  signal?: AbortSignal
+): Promise<CollectionResponse> {
+  const res = await fetchWithRetry(
+    `${SCRYFALL_API_BASE}/cards/collection`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifiers }),
+      signal,
+    }
+  );
+  return res.json() as Promise<CollectionResponse>;
 }
 
 function parsePrice(val: string | null | undefined): number | null {
