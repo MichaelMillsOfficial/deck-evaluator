@@ -173,8 +173,16 @@ function mapLayout(scryfallLayout: string): CardLayout {
 // ═══════════════════════════════════════════════════════════════════
 
 function buildCastingCost(card: EnrichedCard): CastingCost | undefined {
-  if (!card.manaCost && card.cmc === 0) {
-    // Lands have no casting cost
+  // Distinguish between cards with NO mana cost (lands, suspend-only,
+  // tokens) and cards with a zero mana cost like Ornithopter ("{0}").
+  //
+  // - No mana cost: manaCost is "" or undefined → return undefined
+  // - Zero mana cost: manaCost is "{0}" → return CastingCost with manaValue 0
+  //
+  // Previously this used `!card.manaCost && card.cmc === 0` which works
+  // because "{0}" is truthy, but we make the intent explicit here.
+  const hasManaCost = card.manaCost !== undefined && card.manaCost !== "";
+  if (!hasManaCost) {
     return undefined;
   }
   return {

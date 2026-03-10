@@ -10,8 +10,9 @@ import {
   computeAllAnalyses,
   type DeckAnalysisResults,
 } from "@/lib/deck-analysis-aggregate";
-import DeckHeader, { type ViewTab } from "@/components/DeckHeader";
+import { DeckSidebar } from "@/components/DeckSidebar";
 import DeckViewTabs from "@/components/DeckViewTabs";
+import type { ViewTab } from "@/lib/view-tabs";
 
 function SharedDeckContent() {
   const searchParams = useSearchParams();
@@ -197,11 +198,11 @@ function SharedDeckContent() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <div className="px-4 py-8">
       {/* Shared deck banner */}
       <div
         data-testid="shared-banner"
-        className="mb-6 rounded-lg border border-purple-500/20 bg-purple-500/10 px-4 py-3 text-sm text-purple-300 flex items-center justify-between"
+        className="mb-6 rounded-lg border border-purple-500/20 bg-purple-500/10 px-4 py-3 text-sm text-purple-300 flex items-center justify-between max-w-3xl mx-auto"
       >
         <span>Shared deck</span>
         <a
@@ -212,29 +213,30 @@ function SharedDeckContent() {
         </a>
       </div>
 
-      <DeckHeader
-        deck={deckData}
-        cardMap={cardMap}
-        enrichLoading={enrichLoading}
-        enrichError={enrichError}
-        notFoundCount={0}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        analysisResults={analysisResults}
-      />
+      <div className="flex min-h-0">
+        <DeckSidebar
+          deck={deckData}
+          cardMap={cardMap}
+          enrichLoading={enrichLoading}
+          enrichError={enrichError}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          analysisResults={analysisResults}
+        />
 
-      <div className="rounded-xl rounded-t-none border border-t-0 border-slate-700 bg-slate-800/50 overflow-hidden">
-        <div className="p-6">
-          <DeckViewTabs
-            deck={deckData}
-            cardMap={cardMap}
-            enrichLoading={enrichLoading}
-            spellbookCombos={spellbookCombos}
-            spellbookLoading={spellbookLoading}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            analysisResults={analysisResults}
-          />
+        <div className="flex-1 min-w-0 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden md:rounded-l-none md:border-l-0">
+          <div className="p-6">
+            <DeckViewTabs
+              deck={deckData}
+              cardMap={cardMap}
+              enrichLoading={enrichLoading}
+              spellbookCombos={spellbookCombos}
+              spellbookLoading={spellbookLoading}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              analysisResults={analysisResults}
+            />
+          </div>
         </div>
       </div>
     </div>

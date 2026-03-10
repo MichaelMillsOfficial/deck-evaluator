@@ -12,6 +12,7 @@ const features = [
 export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center px-4 py-16">
+      {/* Hero + import form — centered at readable width */}
       <div className="w-full max-w-4xl">
         <div className="mb-10 text-center">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-tight">
@@ -23,13 +24,16 @@ export default function HomePage() {
             and test it under various scenarios
           </p>
         </div>
+      </div>
 
+      {/* Deck import + results — wider to accommodate sidebar + content */}
+      <div className="w-full max-w-7xl">
         <DeckImportSection />
 
         {/* Features section */}
         <section
           aria-labelledby="features-heading"
-          className="mt-12 rounded-xl border border-slate-700 bg-slate-800/50 p-6"
+          className="mx-auto mt-12 max-w-4xl rounded-xl border border-slate-700 bg-slate-800/50 p-6"
         >
           <h2
             id="features-heading"

@@ -6,7 +6,7 @@ import type { SpellbookCombo } from "@/lib/commander-spellbook";
 import type { CandidateAnalysis } from "@/lib/candidate-analysis";
 import { analyzeCandidateCard } from "@/lib/candidate-analysis";
 import type { DeckAnalysisResults } from "@/lib/deck-analysis-aggregate";
-import type { ViewTab } from "@/components/DeckHeader";
+import type { ViewTab } from "@/lib/view-tabs";
 import DeckList from "@/components/DeckList";
 import DeckAnalysis from "@/components/DeckAnalysis";
 import SynergySection from "@/components/SynergySection";

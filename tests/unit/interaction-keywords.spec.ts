@@ -170,6 +170,30 @@ test.describe("expandKeyword — parameterized keywords", () => {
     const activated = abilities![0] as { speed: string };
     expect(activated.speed).toBe("sorcery");
   });
+
+  test("crew 3 is instant speed (CR 702.122 — no timing restriction)", () => {
+    const abilities = expandKeyword("crew", "3");
+    expect(abilities).toBeDefined();
+    expect(abilities![0].abilityType).toBe("activated");
+    const activated = abilities![0] as { speed: string };
+    expect(activated.speed).toBe("instant");
+  });
+
+  test("saddle 2 is sorcery speed (CR 702.171a — activate only as a sorcery)", () => {
+    const abilities = expandKeyword("saddle", "2");
+    expect(abilities).toBeDefined();
+    expect(abilities![0].abilityType).toBe("activated");
+    const activated = abilities![0] as { speed: string };
+    expect(activated.speed).toBe("sorcery");
+  });
+
+  test("adapt 3 is instant speed (CR 702.139 — no timing restriction)", () => {
+    const abilities = expandKeyword("adapt", "3");
+    expect(abilities).toBeDefined();
+    expect(abilities![0].abilityType).toBe("activated");
+    const activated = abilities![0] as { speed: string };
+    expect(activated.speed).toBe("instant");
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -225,6 +249,38 @@ test.describe("expandKeyword — complex keywords", () => {
       effects: { details: { castCopy: boolean } }[];
     };
     expect(static_.effects[0].details.castCopy).toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// expandKeyword — Undying/Persist trigger cause
+// ═══════════════════════════════════════════════════════════════════
+
+test.describe("expandKeyword — undying/persist triggers", () => {
+  test("undying trigger has no cause (triggers on any battlefield→graveyard)", () => {
+    const abilities = expandKeyword("undying");
+    expect(abilities).toBeDefined();
+    expect(abilities![0].abilityType).toBe("triggered");
+    const triggered = abilities![0] as {
+      trigger: { kind: string; from: string; to: string; cause?: string };
+    };
+    expect(triggered.trigger.kind).toBe("zone_transition");
+    expect(triggered.trigger.from).toBe("battlefield");
+    expect(triggered.trigger.to).toBe("graveyard");
+    expect(triggered.trigger.cause).toBeUndefined();
+  });
+
+  test("persist trigger has no cause (triggers on any battlefield→graveyard)", () => {
+    const abilities = expandKeyword("persist");
+    expect(abilities).toBeDefined();
+    expect(abilities![0].abilityType).toBe("triggered");
+    const triggered = abilities![0] as {
+      trigger: { kind: string; from: string; to: string; cause?: string };
+    };
+    expect(triggered.trigger.kind).toBe("zone_transition");
+    expect(triggered.trigger.from).toBe("battlefield");
+    expect(triggered.trigger.to).toBe("graveyard");
+    expect(triggered.trigger.cause).toBeUndefined();
   });
 });
 
