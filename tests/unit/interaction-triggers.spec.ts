@@ -85,7 +85,7 @@ test.describe("landfall chains — fetchlands trigger double landfall", () => {
     });
   }
 
-  test.fixme("Polluted Delta triggers Omnath's landfall (fetchland puts land onto battlefield)", () => {
+  test("Polluted Delta triggers Omnath's landfall (fetchland puts land onto battlefield)", () => {
     const delta = pollutedDelta();
     const omnath = omnathLocusOfCreation();
     const analysis = findInteractions([delta, omnath]);
@@ -101,7 +101,7 @@ test.describe("landfall chains — fetchlands trigger double landfall", () => {
     expect(triggers[0].strength).toBeGreaterThanOrEqual(0.5);
   });
 
-  test.fixme("Omnath's landfall trigger description references land entering", () => {
+  test("Omnath's landfall trigger description references land entering", () => {
     const delta = pollutedDelta();
     const omnath = omnathLocusOfCreation();
     const analysis = findInteractions([delta, omnath]);
@@ -172,7 +172,7 @@ test.describe("cast triggers vs ETB triggers — Panharmonicon doubles ETB but n
     });
   }
 
-  test.fixme("Panharmonicon has synergy with Mulldrifter (ETB trigger)", () => {
+  test("Panharmonicon has synergy with Mulldrifter (ETB trigger)", () => {
     const panhar = panharmonicon();
     const mull = mulldrifter();
     const analysis = findInteractions([panhar, mull]);
@@ -253,7 +253,7 @@ test.describe("life gain trigger chains — Soul Warden + Archangel of Thune", (
     });
   }
 
-  test.fixme("Soul Warden triggers Archangel of Thune (life gain -> +1/+1 counters)", () => {
+  test("Soul Warden triggers Archangel of Thune (life gain -> +1/+1 counters)", () => {
     const warden = soulWarden();
     const archangel = archangelOfThune();
     const analysis = findInteractions([warden, archangel]);
@@ -521,7 +521,7 @@ test.describe("spell cast triggers — Talrand, Sky Summoner", () => {
     });
   }
 
-  test.fixme("Counterspell triggers Talrand (instant spell cast)", () => {
+  test("Counterspell triggers Talrand (instant spell cast)", () => {
     const tal = talrand();
     const counter = counterspell();
     const analysis = findInteractions([tal, counter]);
@@ -536,7 +536,7 @@ test.describe("spell cast triggers — Talrand, Sky Summoner", () => {
     expect(triggers.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Lightning Bolt triggers Talrand (instant spell cast)", () => {
+  test("Lightning Bolt triggers Talrand (instant spell cast)", () => {
     const tal = talrand();
     const bolt = lightningBolt();
     const analysis = findInteractions([tal, bolt]);
@@ -652,7 +652,7 @@ test.describe("draw triggers — Niv-Mizzet, Parun + Curiosity infinite loop", (
     expect(nivTriggersCuriosity.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Curiosity triggers Niv-Mizzet (draw -> damage)", () => {
+  test("Curiosity triggers Niv-Mizzet (draw -> damage)", () => {
     const niv = nivMizzetParun();
     const cur = curiosity();
     const analysis = findInteractions([niv, cur]);
@@ -750,7 +750,7 @@ test.describe("constellation — enchantment ETB and cast triggers", () => {
     expect(etbTriggers.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("casting an enchantment creature triggers both Sigil and Eidolon", () => {
+  test("casting an enchantment creature triggers both Sigil and Eidolon", () => {
     const eidolon = eidolonOfBlossoms();
     const sigil = sigilOfTheEmptyThrone();
     const courser = courserOfKruphix();
@@ -780,7 +780,7 @@ test.describe("constellation — enchantment ETB and cast triggers", () => {
     expect(castTriggers.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Sigil and Eidolon synergize when enchantments are played", () => {
+  test("Sigil and Eidolon synergize when enchantments are played", () => {
     const eidolon = eidolonOfBlossoms();
     const sigil = sigilOfTheEmptyThrone();
     const analysis = findInteractions([eidolon, sigil]);
@@ -922,7 +922,7 @@ test.describe("attack triggers — Aurelia, the Warleader", () => {
     }
   });
 
-  test.fixme("Najeela triggers on Warrior attack — a Warrior creature should trigger her", () => {
+  test("Najeela triggers on Warrior attack — a Warrior creature should trigger her", () => {
     const najeela = najeelaBladeBlossom();
     const warrior = profile({
       name: "Brighthearth Banneret",

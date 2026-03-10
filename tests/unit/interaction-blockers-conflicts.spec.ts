@@ -339,7 +339,7 @@ function demonicTutor(): CardProfile {
 // ═══════════════════════════════════════════════════════════════
 
 test.describe("Torpor Orb blocks ETB triggers", () => {
-  test.fixme("Torpor Orb blocks Avenger of Zendikar ETB (create Plant tokens)", () => {
+  test("Torpor Orb blocks Avenger of Zendikar ETB (create Plant tokens)", () => {
     const torpor = torporOrb();
     const avenger = avengerOfZendikar();
     const analysis = findInteractions([torpor, avenger]);
@@ -355,7 +355,7 @@ test.describe("Torpor Orb blocks ETB triggers", () => {
     expect(blocks.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Torpor Orb blocks Soul Warden creature-ETB trigger", () => {
+  test("Torpor Orb blocks Soul Warden creature-ETB trigger", () => {
     const torpor = torporOrb();
     const warden = soulWarden();
     const analysis = findInteractions([torpor, warden]);
@@ -371,7 +371,7 @@ test.describe("Torpor Orb blocks ETB triggers", () => {
     expect(blocks.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Torpor Orb generates conflict interactions with ETB creatures", () => {
+  test("Torpor Orb generates conflict interactions with ETB creatures", () => {
     const torpor = torporOrb();
     const avenger = avengerOfZendikar();
     const analysis = findInteractions([torpor, avenger]);
@@ -388,7 +388,7 @@ test.describe("Torpor Orb blocks ETB triggers", () => {
 });
 
 test.describe("Cursed Totem blocks creature activated abilities", () => {
-  test.fixme("Cursed Totem blocks Viscera Seer sacrifice ability", () => {
+  test("Cursed Totem blocks Viscera Seer sacrifice ability", () => {
     const totem = cursedTotem();
     const seer = visceraSeer();
     const analysis = findInteractions([totem, seer]);
@@ -404,7 +404,7 @@ test.describe("Cursed Totem blocks creature activated abilities", () => {
     expect(blocks.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Cursed Totem blocks Reassembling Skeleton self-return ability", () => {
+  test("Cursed Totem blocks Reassembling Skeleton self-return ability", () => {
     const totem = cursedTotem();
     const skeleton = reassemblingSkeleton();
     const analysis = findInteractions([totem, skeleton]);
@@ -437,7 +437,7 @@ test.describe("Cursed Totem blocks creature activated abilities", () => {
     expect(blocks).toHaveLength(0);
   });
 
-  test.fixme("Cursed Totem generates conflict with blocked creatures", () => {
+  test("Cursed Totem generates conflict with blocked creatures", () => {
     const totem = cursedTotem();
     const seer = visceraSeer();
     const analysis = findInteractions([totem, seer]);
@@ -453,7 +453,7 @@ test.describe("Cursed Totem blocks creature activated abilities", () => {
 });
 
 test.describe("Null Rod blocks artifact activated abilities", () => {
-  test.fixme("Null Rod blocks Sol Ring mana ability", () => {
+  test("Null Rod blocks Sol Ring mana ability", () => {
     const rod = nullRod();
     const ring = solRing();
     const analysis = findInteractions([rod, ring]);
@@ -464,7 +464,7 @@ test.describe("Null Rod blocks artifact activated abilities", () => {
     expect(blocks.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Null Rod blocks Isochron Scepter imprint ability", () => {
+  test("Null Rod blocks Isochron Scepter imprint ability", () => {
     const rod = nullRod();
     const scepter = isochornScepter();
     const analysis = findInteractions([rod, scepter]);
@@ -480,7 +480,7 @@ test.describe("Null Rod blocks artifact activated abilities", () => {
     expect(blocks.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Null Rod blocks Sensei's Divining Top", () => {
+  test("Null Rod blocks Sensei's Divining Top", () => {
     const rod = nullRod();
     const top = senseisDiviningTop();
     const analysis = findInteractions([rod, top]);
@@ -512,7 +512,7 @@ test.describe("Null Rod blocks artifact activated abilities", () => {
     expect(blocks).toHaveLength(0);
   });
 
-  test.fixme("Null Rod generates conflict with blocked artifacts", () => {
+  test("Null Rod generates conflict with blocked artifacts", () => {
     const rod = nullRod();
     const ring = solRing();
     const analysis = findInteractions([rod, ring]);
@@ -610,7 +610,7 @@ test.describe("Linvala, Keeper of Silence — opponent-only restriction", () => 
 });
 
 test.describe("Stony Silence + Treasure tokens", () => {
-  test.fixme("Stony Silence blocks Sol Ring (artifact activated ability)", () => {
+  test("Stony Silence blocks Sol Ring (artifact activated ability)", () => {
     const stony = stonySilence();
     const ring = solRing();
     const analysis = findInteractions([stony, ring]);
@@ -655,7 +655,7 @@ test.describe("Stony Silence + Treasure tokens", () => {
     }
   });
 
-  test.fixme("Stony Silence generates conflict with Sol Ring", () => {
+  test("Stony Silence generates conflict with Sol Ring", () => {
     const stony = stonySilence();
     const ring = solRing();
     const analysis = findInteractions([stony, ring]);
@@ -712,7 +712,7 @@ test.describe("Notion Thief + Consecrated Sphinx", () => {
 });
 
 test.describe("Blood Moon vs nonbasic lands", () => {
-  test.fixme("Blood Moon blocks/conflicts with Maze of Ith (utility land)", () => {
+  test("Blood Moon blocks/conflicts with Maze of Ith (utility land)", () => {
     const moon = bloodMoon();
     const maze = mazeOfIth();
     const analysis = findInteractions([moon, maze]);
@@ -812,7 +812,7 @@ test.describe("cross-cutting blocker scenarios", () => {
     expect(reverseBlocks).toHaveLength(0);
   });
 
-  test.fixme("multiple stax pieces stack: Null Rod + Stony Silence both block Sol Ring", () => {
+  test("multiple stax pieces stack: Null Rod + Stony Silence both block Sol Ring", () => {
     const rod = nullRod();
     const stony = stonySilence();
     const ring = solRing();

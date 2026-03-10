@@ -305,7 +305,7 @@ function helmOfAwakening(): CardProfile {
 // ═══════════════════════════════════════════════════════════════
 
 test.describe("amplifies — Doubling Season + token/counter creators", () => {
-  test.fixme("Doubling Season amplifies Avenger of Zendikar's token creation", () => {
+  test("Doubling Season amplifies Avenger of Zendikar's token creation", () => {
     const ds = doublingSeason();
     const avenger = avengerOfZendikar();
     const analysis = findInteractions([ds, avenger]);
@@ -323,7 +323,7 @@ test.describe("amplifies — Doubling Season + token/counter creators", () => {
     expect(amplifies[0].mechanical).toBeTruthy();
   });
 
-  test.fixme("Doubling Season amplifies Avenger of Zendikar's +1/+1 counter placement", () => {
+  test("Doubling Season amplifies Avenger of Zendikar's +1/+1 counter placement", () => {
     const ds = doublingSeason();
     const avenger = avengerOfZendikar();
     const analysis = findInteractions([ds, avenger]);
@@ -352,7 +352,7 @@ test.describe("amplifies — Doubling Season + token/counter creators", () => {
 });
 
 test.describe("amplifies — Panharmonicon + ETB creatures", () => {
-  test.fixme("Panharmonicon amplifies Mulldrifter's ETB draw trigger", () => {
+  test("Panharmonicon amplifies Mulldrifter's ETB draw trigger", () => {
     const pan = panharmonicon();
     const mull = mulldrifter();
     const analysis = findInteractions([pan, mull]);
@@ -370,7 +370,7 @@ test.describe("amplifies — Panharmonicon + ETB creatures", () => {
     expect(amplifies[0].strength).toBeGreaterThanOrEqual(0.6);
   });
 
-  test.fixme("Panharmonicon amplifies Avenger of Zendikar's ETB token creation", () => {
+  test("Panharmonicon amplifies Avenger of Zendikar's ETB token creation", () => {
     const pan = panharmonicon();
     const avenger = avengerOfZendikar();
     const analysis = findInteractions([pan, avenger]);
@@ -388,7 +388,7 @@ test.describe("amplifies — Panharmonicon + ETB creatures", () => {
 });
 
 test.describe("amplifies — Torbran + red damage sources", () => {
-  test.fixme("Torbran amplifies Lightning Bolt's damage", () => {
+  test("Torbran amplifies Lightning Bolt's damage", () => {
     const torb = torbranThaneOfRedFell();
     const bolt = lightningBolt();
     const analysis = findInteractions([torb, bolt]);
@@ -405,7 +405,7 @@ test.describe("amplifies — Torbran + red damage sources", () => {
     expect(amplifies[0].strength).toBeGreaterThanOrEqual(0.6);
   });
 
-  test.fixme("Torbran amplifies Purphoros's ETB damage", () => {
+  test("Torbran amplifies Purphoros's ETB damage", () => {
     const torb = torbranThaneOfRedFell();
     const purph = purphorosGodOfTheForge();
     const analysis = findInteractions([torb, purph]);
@@ -509,7 +509,7 @@ test.describe("protects — Lightning Greaves protects creatures", () => {
 });
 
 test.describe("protects — Heroic Intervention protects the board", () => {
-  test.fixme("Heroic Intervention protects creatures", () => {
+  test("Heroic Intervention protects creatures", () => {
     const heroic = heroicIntervention();
     const creature = bloodArtist();
     const analysis = findInteractions([heroic, creature]);
@@ -526,7 +526,7 @@ test.describe("protects — Heroic Intervention protects the board", () => {
     expect(protects[0].strength).toBeGreaterThanOrEqual(0.6);
   });
 
-  test.fixme("Heroic Intervention protects artifacts", () => {
+  test("Heroic Intervention protects artifacts", () => {
     const heroic = heroicIntervention();
     const ring = solRing();
     const analysis = findInteractions([heroic, ring]);
@@ -541,7 +541,7 @@ test.describe("protects — Heroic Intervention protects the board", () => {
     expect(protects.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Heroic Intervention protects enchantments", () => {
+  test("Heroic Intervention protects enchantments", () => {
     const heroic = heroicIntervention();
     const ds = doublingSeason();
     const analysis = findInteractions([heroic, ds]);
@@ -558,7 +558,7 @@ test.describe("protects — Heroic Intervention protects the board", () => {
 });
 
 test.describe("protects — Mother of Runes protects creatures", () => {
-  test.fixme("Mother of Runes protects a creature with targeted protection", () => {
+  test("Mother of Runes protects a creature with targeted protection", () => {
     const mom = motherOfRunes();
     const creature = bloodArtist();
     const analysis = findInteractions([mom, creature]);
@@ -670,7 +670,7 @@ test.describe("recurs — Meren of Clan Nel Toth recurs creatures only", () => {
     expect(recurs[0].strength).toBeGreaterThanOrEqual(0.6);
   });
 
-  test.fixme("Meren does NOT recur Lightning Bolt (an instant, not a creature card)", () => {
+  test("Meren does NOT recur Lightning Bolt (an instant, not a creature card)", () => {
     const meren = merenOfClanNelToth();
     const bolt = lightningBolt();
     const analysis = findInteractions([meren, bolt]);
@@ -685,7 +685,7 @@ test.describe("recurs — Meren of Clan Nel Toth recurs creatures only", () => {
     expect(recurs.length).toBe(0);
   });
 
-  test.fixme("Meren does NOT recur Sol Ring (an artifact, not a creature card)", () => {
+  test("Meren does NOT recur Sol Ring (an artifact, not a creature card)", () => {
     const meren = merenOfClanNelToth();
     const ring = solRing();
     const analysis = findInteractions([meren, ring]);
@@ -702,7 +702,7 @@ test.describe("recurs — Meren of Clan Nel Toth recurs creatures only", () => {
 });
 
 test.describe("recurs — Lurrus of the Dream-Den recurs low-cost permanents", () => {
-  test.fixme("Lurrus recurs Sol Ring (permanent, MV 1)", () => {
+  test("Lurrus recurs Sol Ring (permanent, MV 1)", () => {
     const lurrus = lurrusOfTheDreamDen();
     const ring = solRing();
     const analysis = findInteractions([lurrus, ring]);
@@ -719,7 +719,7 @@ test.describe("recurs — Lurrus of the Dream-Den recurs low-cost permanents", (
     expect(recurs[0].strength).toBeGreaterThanOrEqual(0.6);
   });
 
-  test.fixme("Lurrus recurs Blood Artist (permanent, MV 2)", () => {
+  test("Lurrus recurs Blood Artist (permanent, MV 2)", () => {
     const lurrus = lurrusOfTheDreamDen();
     const artist = bloodArtist();
     const analysis = findInteractions([lurrus, artist]);
@@ -789,7 +789,7 @@ test.describe("reduces_cost — Urza's Incubator with creature type", () => {
     expect(hasReductionCapability).toBe(true);
   });
 
-  test.fixme("Urza's Incubator reduces cost for creature spells", () => {
+  test("Urza's Incubator reduces cost for creature spells", () => {
     const incubator = urzasIncubator();
     const creature = bloodArtist();
     const analysis = findInteractions([incubator, creature]);
@@ -808,7 +808,7 @@ test.describe("reduces_cost — Urza's Incubator with creature type", () => {
 });
 
 test.describe("reduces_cost — Goblin Warchief reduces Goblin costs", () => {
-  test.fixme("Goblin Warchief reduces cost for Krenko, Mob Boss", () => {
+  test("Goblin Warchief reduces cost for Krenko, Mob Boss", () => {
     const warchief = goblinWarchief();
     const krenko = krenkoMobBoss();
     const analysis = findInteractions([warchief, krenko]);
@@ -857,7 +857,7 @@ test.describe("reduces_cost — Goblin Warchief reduces Goblin costs", () => {
 });
 
 test.describe("reduces_cost — Helm of Awakening universal reduction", () => {
-  test.fixme("Helm of Awakening reduces cost for creatures", () => {
+  test("Helm of Awakening reduces cost for creatures", () => {
     const helm = helmOfAwakening();
     const creature = bloodArtist();
     const analysis = findInteractions([helm, creature]);
@@ -873,7 +873,7 @@ test.describe("reduces_cost — Helm of Awakening universal reduction", () => {
     expect(reduces[0].strength).toBeGreaterThanOrEqual(0.5);
   });
 
-  test.fixme("Helm of Awakening reduces cost for instants", () => {
+  test("Helm of Awakening reduces cost for instants", () => {
     const helm = helmOfAwakening();
     const cs = counterspell();
     const analysis = findInteractions([helm, cs]);
@@ -887,7 +887,7 @@ test.describe("reduces_cost — Helm of Awakening universal reduction", () => {
     expect(reduces.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Helm of Awakening reduces cost for sorceries", () => {
+  test("Helm of Awakening reduces cost for sorceries", () => {
     const helm = helmOfAwakening();
     const tutor = profile({
       name: "Demonic Tutor",
@@ -908,7 +908,7 @@ test.describe("reduces_cost — Helm of Awakening universal reduction", () => {
     expect(reduces.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Helm of Awakening reduces cost for artifacts", () => {
+  test("Helm of Awakening reduces cost for artifacts", () => {
     const helm = helmOfAwakening();
     const ring = solRing();
     const analysis = findInteractions([helm, ring]);

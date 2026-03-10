@@ -355,7 +355,7 @@ test.describe("L3 Judge: Enablers", () => {
 // ═══════════════════════════════════════════════════════════════
 
 test.describe("L3 Judge: Triggers", () => {
-  test.fixme("Soul Warden + Archangel of Thune: life gain triggers counter placement", () => {
+  test("Soul Warden + Archangel of Thune: life gain triggers counter placement", () => {
     const warden = profile({
       name: "Soul Warden",
       typeLine: "Creature — Human Cleric",
@@ -413,7 +413,7 @@ test.describe("L3 Judge: Triggers", () => {
     expect(triggers.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Talrand triggers on instant/sorcery cast — Lightning Bolt is an instant", () => {
+  test("Talrand triggers on instant/sorcery cast — Lightning Bolt is an instant", () => {
     const talrand = profile({
       name: "Talrand, Sky Summoner",
       typeLine: "Legendary Creature — Merfolk Wizard",
@@ -467,7 +467,7 @@ test.describe("L3 Judge: Triggers", () => {
     expect(triggers.length).toBe(0);
   });
 
-  test.fixme("Eidolon of Blossoms triggers on enchantment ETB", () => {
+  test("Eidolon of Blossoms triggers on enchantment ETB", () => {
     const eidolon = profile({
       name: "Eidolon of Blossoms",
       typeLine: "Enchantment Creature — Spirit",
@@ -505,7 +505,7 @@ test.describe("L3 Judge: Triggers", () => {
     expect(anyInteraction.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Niv-Mizzet, Parun has multiple triggers — cast trigger and draw trigger", () => {
+  test("Niv-Mizzet, Parun has multiple triggers — cast trigger and draw trigger", () => {
     const niv = profile({
       name: "Niv-Mizzet, Parun",
       typeLine: "Legendary Creature — Dragon Wizard",
@@ -825,7 +825,7 @@ test.describe("L3 Judge: Loops & Chains", () => {
 // ═══════════════════════════════════════════════════════════════
 
 test.describe("L3 Judge: Blockers & Conflicts", () => {
-  test.fixme("Torpor Orb blocks creature ETB triggers (Avenger of Zendikar)", () => {
+  test("Torpor Orb blocks creature ETB triggers (Avenger of Zendikar)", () => {
     const torpor = profile({
       name: "Torpor Orb",
       typeLine: "Artifact",
@@ -847,7 +847,7 @@ test.describe("L3 Judge: Blockers & Conflicts", () => {
     expect(blocks.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Torpor Orb blocks Soul Warden's ETB trigger", () => {
+  test("Torpor Orb blocks Soul Warden's ETB trigger", () => {
     const torpor = profile({
       name: "Torpor Orb",
       typeLine: "Artifact",
@@ -877,7 +877,7 @@ test.describe("L3 Judge: Blockers & Conflicts", () => {
     expect(blocks.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Cursed Totem blocks creature activated abilities but NOT artifact abilities", () => {
+  test("Cursed Totem blocks creature activated abilities but NOT artifact abilities", () => {
     const totem = profile({
       name: "Cursed Totem",
       typeLine: "Artifact",
@@ -908,7 +908,7 @@ test.describe("L3 Judge: Blockers & Conflicts", () => {
     expect(blocksAltar.length).toBe(0);
   });
 
-  test.fixme("Null Rod blocks artifact activated abilities but NOT creature abilities", () => {
+  test("Null Rod blocks artifact activated abilities but NOT creature abilities", () => {
     const nullRod = profile({
       name: "Null Rod",
       typeLine: "Artifact",
@@ -1067,7 +1067,7 @@ test.describe("L3 Judge: Blockers & Conflicts", () => {
     expect(blocks.length).toBe(0);
   });
 
-  test.fixme("Stony Silence blocks artifact activated abilities — affects Treasure tokens", () => {
+  test("Stony Silence blocks artifact activated abilities — affects Treasure tokens", () => {
     const stony = profile({
       name: "Stony Silence",
       typeLine: "Enchantment",
@@ -1094,7 +1094,7 @@ test.describe("L3 Judge: Blockers & Conflicts", () => {
 // ═══════════════════════════════════════════════════════════════
 
 test.describe("L3 Judge: Amplifies", () => {
-  test.fixme("Doubling Season amplifies Avenger of Zendikar token creation", () => {
+  test("Doubling Season amplifies Avenger of Zendikar token creation", () => {
     const doubling = profile({
       name: "Doubling Season",
       typeLine: "Enchantment",
@@ -1116,7 +1116,7 @@ test.describe("L3 Judge: Amplifies", () => {
     expect(amplifies.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Panharmonicon amplifies ETB triggers (Mulldrifter)", () => {
+  test("Panharmonicon amplifies ETB triggers (Mulldrifter)", () => {
     const panharmonicon = profile({
       name: "Panharmonicon",
       typeLine: "Artifact",
@@ -1148,7 +1148,7 @@ test.describe("L3 Judge: Amplifies", () => {
     expect(amplifies.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Torbran amplifies red damage sources", () => {
+  test("Torbran amplifies red damage sources", () => {
     const torbran = profile({
       name: "Torbran, Thane of Red Fell",
       typeLine: "Legendary Creature — Dwarf Noble",
@@ -1206,7 +1206,7 @@ test.describe("L3 Judge: Protects", () => {
     expect(protects.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Mother of Runes protects creatures with color protection", () => {
+  test("Mother of Runes protects creatures with color protection", () => {
     const mom = profile({
       name: "Mother of Runes",
       typeLine: "Creature — Human Cleric",
@@ -1285,7 +1285,7 @@ test.describe("L3 Judge: Recurs", () => {
     expect(recurs.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Sun Titan recurs low-MV permanents but not high-MV ones", () => {
+  test("Sun Titan recurs low-MV permanents but not high-MV ones", () => {
     const titan = profile({
       name: "Sun Titan",
       typeLine: "Creature — Giant",
@@ -1327,7 +1327,7 @@ test.describe("L3 Judge: Recurs", () => {
     expect(recursPanharmonicon.length).toBe(0);
   });
 
-  test.fixme("Meren recurs creatures — not instants or sorceries", () => {
+  test("Meren recurs creatures — not instants or sorceries", () => {
     const meren = profile({
       name: "Meren of Clan Nel Toth",
       typeLine: "Legendary Creature — Human Shaman",
@@ -1408,7 +1408,7 @@ test.describe("L3 Judge: Reduces Cost", () => {
     expect(anyInteraction.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Helm of Awakening reduces all spell costs", () => {
+  test("Helm of Awakening reduces all spell costs", () => {
     const helm = profile({
       name: "Helm of Awakening",
       typeLine: "Artifact",
