@@ -966,6 +966,54 @@ test.describe("additional extraction edge cases", () => {
     expect(profile.supertypes).toContain("basic");
     expect(profile.subtypes).toContain("Swamp");
   });
+
+  test("Ornithopter ({0} mana cost): castingCost is defined with manaValue 0", () => {
+    const card = makeCard({
+      name: "Ornithopter",
+      typeLine: "Artifact Creature — Thopter",
+      oracleText: "Flying",
+      manaCost: "{0}",
+      cmc: 0,
+      power: "0",
+      toughness: "2",
+      keywords: ["Flying"],
+    });
+    const profile = profileCard(card);
+
+    expect(profile.castingCost).toBeDefined();
+    expect(profile.castingCost!.manaCost).toBe("{0}");
+    expect(profile.castingCost!.manaValue).toBe(0);
+  });
+
+  test("land with no mana cost: castingCost is undefined", () => {
+    const card = makeCard({
+      name: "Swamp",
+      typeLine: "Basic Land — Swamp",
+      oracleText: "({T}: Add {B}.)",
+      manaCost: "",
+      cmc: 0,
+    });
+    const profile = profileCard(card);
+
+    expect(profile.castingCost).toBeUndefined();
+  });
+
+  test("Memnite ({0} mana cost): castingCost is defined", () => {
+    const card = makeCard({
+      name: "Memnite",
+      typeLine: "Artifact Creature — Construct",
+      oracleText: "",
+      manaCost: "{0}",
+      cmc: 0,
+      power: "1",
+      toughness: "1",
+    });
+    const profile = profileCard(card);
+
+    expect(profile.castingCost).toBeDefined();
+    expect(profile.castingCost!.manaCost).toBe("{0}");
+    expect(profile.castingCost!.manaValue).toBe(0);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════

@@ -11,8 +11,10 @@ import {
 import { encodeCompactDeckPayload } from "@/lib/deck-codec";
 import DeckInput from "@/components/DeckInput";
 import DeckViewTabs from "@/components/DeckViewTabs";
-import DeckHeader, { type ViewTab } from "@/components/DeckHeader";
+import { DeckSidebar, DeckDrawer } from "@/components/DeckSidebar";
+import DeckMobileTopBar from "@/components/DeckMobileTopBar";
 import DiscordExportModal from "@/components/DiscordExportModal";
+import type { ViewTab } from "@/lib/view-tabs";
 
 // ---------------------------------------------------------------------------
 // State & Actions
@@ -33,6 +35,7 @@ interface DeckImportState {
   activeTab: ViewTab;
   discordModalOpen: boolean;
   shareUrl: string | null;
+  drawerOpen: boolean;
 }
 
 type DeckImportAction =
@@ -51,7 +54,8 @@ type DeckImportAction =
   | { type: "TOGGLE_DISCORD_MODAL"; open: boolean }
   | { type: "DISMISS_PARSE_WARNINGS" }
   | { type: "DISMISS_NOT_FOUND" }
-  | { type: "DISMISS_ENRICH_ERROR" };
+  | { type: "DISMISS_ENRICH_ERROR" }
+  | { type: "TOGGLE_DRAWER"; open: boolean };
 
 const initialState: DeckImportState = {
   deckData: null,
@@ -68,6 +72,7 @@ const initialState: DeckImportState = {
   activeTab: "list",
   discordModalOpen: false,
   shareUrl: null,
+  drawerOpen: false,
 };
 
 function reducer(state: DeckImportState, action: DeckImportAction): DeckImportState {
@@ -127,6 +132,8 @@ function reducer(state: DeckImportState, action: DeckImportAction): DeckImportSt
       return { ...state, notFoundCount: 0 };
     case "DISMISS_ENRICH_ERROR":
       return { ...state, enrichError: null };
+    case "TOGGLE_DRAWER":
+      return { ...state, drawerOpen: action.open };
     default:
       return state;
   }
@@ -145,7 +152,7 @@ export default function DeckImportSection() {
   const {
     deckData, loading, error, cardMap, enrichLoading, enrichError,
     notFoundCount, spellbookCombos, spellbookLoading, parseWarnings,
-    commanderWarning, activeTab, discordModalOpen, shareUrl,
+    commanderWarning, activeTab, discordModalOpen, shareUrl, drawerOpen,
   } = state;
 
   useEffect(() => {
@@ -441,31 +448,64 @@ export default function DeckImportSection() {
           className="mt-10 focus:outline-none"
           aria-label="Deck import results"
         >
-          <DeckHeader
+          {/* Mobile top bar (only visible below md) */}
+          <DeckMobileTopBar
+            deckName={deckData.name}
+            enrichLoading={enrichLoading}
+            cardMap={cardMap}
+            enrichError={enrichError}
+            hasAnalysis={!!analysisResults}
+            onOpenDrawer={() => dispatch({ type: "TOGGLE_DRAWER", open: true })}
+            onShare={handleCopyShareLink}
+          />
+
+          {/* Mobile drawer */}
+          <DeckDrawer
+            open={drawerOpen}
+            onClose={() => dispatch({ type: "TOGGLE_DRAWER", open: false })}
             deck={deckData}
             cardMap={cardMap}
             enrichLoading={enrichLoading}
             enrichError={enrichError}
-            notFoundCount={notFoundCount}
             activeTab={activeTab}
-            onTabChange={(tab) => dispatch({ type: "SET_TAB", tab })}
+            onTabChange={(tab) => {
+              dispatch({ type: "SET_TAB", tab });
+              dispatch({ type: "TOGGLE_DRAWER", open: false });
+            }}
             analysisResults={analysisResults}
             onOpenDiscordModal={() => dispatch({ type: "TOGGLE_DISCORD_MODAL", open: true })}
             onCopyShareLink={handleCopyShareLink}
           />
 
-          <div className="rounded-xl rounded-t-none border border-t-0 border-slate-700 bg-slate-800/50 overflow-hidden">
-            <div className="p-6">
-              <DeckViewTabs
-                deck={deckData}
-                cardMap={cardMap}
-                enrichLoading={enrichLoading}
-                spellbookCombos={spellbookCombos}
-                spellbookLoading={spellbookLoading}
-                activeTab={activeTab}
-                onTabChange={(tab) => dispatch({ type: "SET_TAB", tab })}
-                analysisResults={analysisResults}
-              />
+          {/* Desktop layout: sidebar + content */}
+          <div className="flex min-h-0">
+            {/* Desktop sidebar */}
+            <DeckSidebar
+              deck={deckData}
+              cardMap={cardMap}
+              enrichLoading={enrichLoading}
+              enrichError={enrichError}
+              activeTab={activeTab}
+              onTabChange={(tab) => dispatch({ type: "SET_TAB", tab })}
+              analysisResults={analysisResults}
+              onOpenDiscordModal={() => dispatch({ type: "TOGGLE_DISCORD_MODAL", open: true })}
+              onCopyShareLink={handleCopyShareLink}
+            />
+
+            {/* Content area */}
+            <div className="flex-1 min-w-0 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden md:rounded-l-none md:border-l-0">
+              <div className="p-6">
+                <DeckViewTabs
+                  deck={deckData}
+                  cardMap={cardMap}
+                  enrichLoading={enrichLoading}
+                  spellbookCombos={spellbookCombos}
+                  spellbookLoading={spellbookLoading}
+                  activeTab={activeTab}
+                  onTabChange={(tab) => dispatch({ type: "SET_TAB", tab })}
+                  analysisResults={analysisResults}
+                />
+              </div>
             </div>
           </div>
 

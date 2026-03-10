@@ -796,7 +796,7 @@ export const KEYWORD_DATABASE: KeywordEntry[] = [
             },
           ],
           condition: undefined,
-          speed: "sorcery" as Speed,
+          speed: "instant" as Speed,
         } as ActivatedAbility,
       ];
     },
@@ -1270,7 +1270,7 @@ export const KEYWORD_DATABASE: KeywordEntry[] = [
             type: "if",
             predicate: "this creature has no +1/+1 counters on it",
           },
-          speed: "sorcery" as Speed,
+          speed: "instant" as Speed,
         } as ActivatedAbility,
       ];
     },
@@ -1320,7 +1320,6 @@ export const KEYWORD_DATABASE: KeywordEntry[] = [
           from: "battlefield",
           to: "graveyard",
           object: { types: [], quantity: "one", modifiers: [], self: true },
-          cause: "dies",
         } as ZoneTransition,
         effects: [
           {
@@ -1362,7 +1361,6 @@ export const KEYWORD_DATABASE: KeywordEntry[] = [
           from: "battlefield",
           to: "graveyard",
           object: { types: [], quantity: "one", modifiers: [], self: true },
-          cause: "dies",
         } as ZoneTransition,
         effects: [
           {
