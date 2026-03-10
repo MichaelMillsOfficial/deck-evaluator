@@ -366,6 +366,7 @@ export default function DeckImportSection() {
 
   return (
     <>
+      <div className="mx-auto max-w-4xl">
       <DeckInput
         onSubmitUrl={handleFetchDeck}
         onSubmitText={handleParseDeck}
@@ -440,6 +441,8 @@ export default function DeckImportSection() {
           </button>
         </div>
       )}
+
+      </div>{/* end max-w-4xl wrapper for import form */}
 
       {deckData && !loading && (
         <div
