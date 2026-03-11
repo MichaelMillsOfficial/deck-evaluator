@@ -181,47 +181,88 @@ export async function fetchCardCollectionByIds(
   return { data: allCards, not_found: allNotFound };
 }
 
+/**
+ * Fetches cards from Scryfall's Search API using a query string.
+ * Returns an empty array on 404 (no results).
+ * Retries once on 429 (rate limited) honoring Retry-After header.
+ * Throws on 5xx or network errors.
+ */
+export async function fetchScryfallSearch(
+  query: string,
+  options?: { limit?: number }
+): Promise<ScryfallCard[]> {
+  const limit = options?.limit ?? 10;
+  const url = `${SCRYFALL_API_BASE}/cards/search?q=${encodeURIComponent(query)}&order=edhrec&page=1`;
+
+  for (let attempt = 0; attempt <= 1; attempt++) {
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (res.status === 404) return [];
+
+    if (res.status === 429) {
+      if (attempt < 1) {
+        const retryAfter = parseInt(res.headers.get("Retry-After") ?? "1", 10);
+        const waitMs = Math.min(retryAfter * 1000, 10_000);
+        console.warn(`[scryfall-search] rate limited, retrying after ${waitMs}ms`);
+        await delay(waitMs);
+        continue;
+      }
+      return []; // Skip this category after retry exhaustion
+    }
+
+    if (!res.ok) {
+      throw new Error(`Scryfall Search API error: ${res.status}`);
+    }
+
+    const json = (await res.json()) as { data: ScryfallCard[] };
+    return json.data.slice(0, limit);
+  }
+
+  return [];
+}
+
 // TODO: add server-side LRU cache for card data
 const MAX_RETRIES = 2;
 
-/**
- * Generic fetch-with-retry for Scryfall API calls.
- * Handles 429 rate limits (respects Retry-After header) and 5xx server errors.
- * Returns the raw Response on success; throws on exhausted retries or non-retryable errors.
- */
-export async function fetchWithRetry(
-  url: string,
-  options: RequestInit = {},
-  maxRetries: number = MAX_RETRIES
-): Promise<Response> {
+async function fetchBatchWithRetry(
+  identifiers: ScryfallIdentifier[],
+  signal?: AbortSignal
+): Promise<CollectionResponse> {
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const res = await fetch(url, {
-      ...options,
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(`${SCRYFALL_API_BASE}/cards/collection`, {
+      method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Accept: "application/json",
-        ...options.headers,
       },
-      signal: options.signal ?? AbortSignal.timeout(10_000),
+      body: JSON.stringify({ identifiers }),
+      signal: signal ?? AbortSignal.timeout(10_000),
     });
 
-    if (res.ok) return res;
+    if (res.ok) {
+      return res.json() as Promise<CollectionResponse>;
+    }
 
     if (res.status === 429) {
       const retryAfter = parseInt(res.headers.get("Retry-After") ?? "1", 10);
       const waitMs = Math.min(retryAfter * 1000, 10_000);
       console.warn(
-        `[scryfall] rate limited (attempt ${attempt + 1}/${maxRetries + 1}), retrying after ${waitMs}ms`
+        `[scryfall] rate limited (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying after ${waitMs}ms`
       );
       await delay(waitMs);
       lastError = new Error(`Scryfall API rate limited: ${res.status}`);
       continue;
     }
 
-    if (res.status >= 500 && attempt < maxRetries) {
+    if (res.status >= 500 && attempt < MAX_RETRIES) {
       console.warn(
-        `[scryfall] server error ${res.status} (attempt ${attempt + 1}/${maxRetries + 1}), retrying`
+        `[scryfall] server error ${res.status} (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying`
       );
       await delay(1000);
       lastError = new Error(`Scryfall API server error: ${res.status}`);
@@ -232,22 +273,6 @@ export async function fetchWithRetry(
   }
 
   throw lastError ?? new Error("Scryfall API error: retries exhausted");
-}
-
-async function fetchBatchWithRetry(
-  identifiers: ScryfallIdentifier[],
-  signal?: AbortSignal
-): Promise<CollectionResponse> {
-  const res = await fetchWithRetry(
-    `${SCRYFALL_API_BASE}/cards/collection`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identifiers }),
-      signal,
-    }
-  );
-  return res.json() as Promise<CollectionResponse>;
 }
 
 function parsePrice(val: string | null | undefined): number | null {
