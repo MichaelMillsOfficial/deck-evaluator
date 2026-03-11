@@ -88,15 +88,38 @@ The chain solver needs a finite vocabulary of abstract resource tokens with **qu
 Each resource token carries a **quantity** (default 1). The solver performs multiset matching:
 
 ```typescript
+interface ObjectFilter {
+  self?: boolean;          // true = "this creature", false = "another creature"
+  types?: string[];        // ["creature"], ["artifact", "creature"]
+  subtypes?: string[];     // ["Zombie"], ["Human"]
+  supertypeExcludes?: string[];  // non-Human → excludes: ["Human"]
+  isToken?: boolean;       // true = token only, false = nontoken only
+}
+
 interface ResourceRequirement {
   token: string;
-  quantity: number;  // how many needed
+  quantity: number;        // how many needed
+  filter?: ObjectFilter;   // constraints on which object satisfies this
 }
 interface ResourceProduction {
   token: string;
-  quantity: number;  // how many produced
+  quantity: number;        // how many produced
+  filter?: ObjectFilter;   // constraints on the object produced/affected
 }
 ```
+
+**Object filter matching rules:**
+- A `requires` with `filter.self: false` ("another creature") cannot be satisfied by a `produces` from the same card — the solver must check that the producing step's `card` differs from the consuming step's `card`
+- A `requires` with `filter.isToken: false` ("nontoken creature") cannot be satisfied by a `produces` with `filter.isToken: true` (a token being created)
+- A `requires` with `filter.supertypeExcludes: ["Human"]` cannot be satisfied by a `produces` whose source card has subtype Human
+- Filters are **advisory** in v1 — the solver logs a warning when it can't verify a filter (e.g., subtype data missing from `CardProfile`) but still allows the match. This prevents false negatives while surfacing extraction gaps. Future versions can tighten to strict enforcement.
+
+**Why this matters — real failure modes:**
+- **Yawgmoth, Thran Physician**: "Sacrifice *another* creature" — Yawgmoth can't sacrifice itself. Without `self: false`, the solver might think Yawgmoth alone closes a loop.
+- **Nim Deathmantle**: "Whenever a *nontoken* creature dies" — tokens dying don't trigger it. Without `isToken: false`, the solver would accept token-only sacrifice loops.
+- **Mikaeus, the Unhallowed**: "other *non-Human* creatures you control have undying" — Mikaeus doesn't grant undying to Humans. Without `supertypeExcludes: ["Human"]`, the solver would pair Mikaeus with Human creatures.
+- **Pitiless Plunderer**: "Whenever *another* creature you control dies" — Plunderer's own death doesn't trigger itself. Same `self: false` constraint.
+- **Blood Artist**: "Whenever Blood Artist *or another* creature dies" — includes self. This is `self: undefined` (no filter), meaning any creature death works.
 
 **Mana substitution rules:**
 - `mana_any(1)` satisfies exactly one of: `mana_W(1)`, `mana_U(1)`, `mana_B(1)`, `mana_R(1)`, `mana_G(1)`, `mana_C(1)`, or `mana_generic(1)`
@@ -116,6 +139,8 @@ A critical innovation: some step outputs are **blocking** — if not consumed by
 ```typescript
 interface LoopStep {
   card: string;
+  cardTypes?: string[];            // ["Creature"], ["Artifact"] — for filter validation
+  cardSubtypes?: string[];         // ["Zombie", "Warrior"] — for subtype filter validation
   action: string;
   requires: ResourceRequirement[];
   produces: ResourceProduction[];
@@ -139,8 +164,13 @@ The solver rule: **a chain is valid only if every step's `blocking` outputs are 
    a. Compute total production and total requirements (quantity-aware)
    b. Apply mana substitution rules to match `mana_any` against specific requirements
    c. Verify every `requires` is covered by some `produces` (multiset containment)
-   d. Verify every `blocking` output is covered by some `requires` (blocking constraint)
-   e. Verify at least one circular dependency exists (not just linear)
+   d. **Validate object filters**: For each requires↔produces match, check `ObjectFilter` constraints:
+      - `self: false` → producing step's `card` must differ from consuming step's `card`
+      - `isToken: false` → producing step must not be a token-creation step
+      - `supertypeExcludes` → producing step's `cardSubtypes` must not include excluded types
+      - Log warnings for unverifiable filters (missing type data) but allow the match in v1
+   e. Verify every `blocking` output is covered by some `requires` (blocking constraint)
+   f. Verify at least one circular dependency exists (not just linear)
 5. **Emit `InteractionLoop`**: Convert valid chains into `InteractionLoop` with steps, netEffect, and isInfinite
 
 Complexity is bounded: max 5 cards, each generating 1-3 steps, so ≤15 steps total. Subset enumeration over steps is feasible at this scale.
@@ -160,6 +190,8 @@ The loop detector is a **heuristic** for combo potential, not a full game-state 
 2. **Timing is not validated.** The solver doesn't check if abilities are instant-speed vs sorcery-speed, or whether trigger ordering matters.
 3. **Zone tracking is simplified.** A creature "dying" and "returning to battlefield" is modeled without tracking zone state between steps.
 
+4. **Object filters are advisory in v1.** When the solver can't verify a filter (e.g., card subtype data missing from the profile), it logs a warning and allows the match. This prevents false negatives. The `self: false` and `isToken: false` filters are always enforceable (they depend on card identity, not type data) and are enforced strictly.
+
 These are documented so future improvements can tighten the model without redesigning the architecture.
 
 ## Implementation Tasks
@@ -170,47 +202,60 @@ Before building the chain solver, verify that the capability extractor produces 
 
 - [ ] 0.1 Create `tests/unit/loop-profile-diagnostics.spec.ts` — diagnostic tests for 17 cards
 
-  **Core combo cards (7):**
-  - Viscera Seer: `consumes` includes `SacrificeCost` with creature type, no mana cost
-  - Pitiless Plunderer: `triggersOn` includes death event for another creature; `produces` includes `create_token` (Treasure)
-  - Reassembling Skeleton: `consumes` includes `ManaCostUnit({1}{B})`; has graveyard return ability
-  - Ashnod's Altar: `consumes` includes `SacrificeCost` with creature type; `produces` includes `mana` with quantity 2
-  - Mikaeus, the Unhallowed: `grants` includes undying keyword to non-Human creatures; `grants` includes +1/+1 stat modification
-  - Triskelion: `consumes` includes `RemoveCounterCost(+1/+1)`; `causesEvents` includes damage event
+  **Core combo cards (8) — with filter assertions:**
+  - Viscera Seer: `consumes` includes `SacrificeCost` with creature type, no mana cost. Filter: `self: false` NOT required (can sac itself or others — "Sacrifice a creature" with no "another" qualifier)
+  - Pitiless Plunderer: `triggersOn` includes death event for **another** creature (`quantity: "another"` or `self: false` on the trigger's object ref); `produces` includes `create_token` (Treasure). **Filter test: trigger must carry `self: false`**
+  - Reassembling Skeleton: `consumes` includes `ManaCostUnit({1}{B})`; has graveyard return ability. `self: true` on the return target.
+  - Ashnod's Altar: `consumes` includes `SacrificeCost` with creature type; `produces` includes `mana` with quantity 2. No self/other filter (any creature).
+  - Mikaeus, the Unhallowed: `grants` includes undying keyword to non-Human creatures — **must carry `supertypeExcludes: ["Human"]` on the grant target**; `grants` includes +1/+1 stat modification with same filter
+  - Triskelion: `consumes` includes `RemoveCounterCost(+1/+1)` with `self: true`; `causesEvents` includes damage event
   - Kitchen Finks: has persist keyword; `causesEvents` includes ETB life gain
   - Vizier of Remedies: `replacements` includes -1/-1 counter prevention with `mode: "modify"` or `"prevent"`
 
-  **Stress-test cards (10) — mechanically complex cards that exercise edge cases:**
-  - Murderous Redcap: ETB damage trigger + persist keyword (dual-trigger card). Must extract both `triggersOn: [ETB]` and persist as separate profile entries. Tests that damage output and self-recurrence coexist.
-  - Altar of Dementia: Free sac outlet with zero mana cost. `consumes: [SacrificeCost(creature)]`, no mana. Tests that variable-magnitude mill is extracted as a `causesEvents` entry without confusing it for resource production.
-  - Karmic Guide: ETB reanimation trigger + echo keyword. Must extract `causesEvents: [ReturnFromGraveyardToBattlefield(creature)]` AND echo as a delayed conditional self-sacrifice. Tests multi-mechanic extraction on a single card.
-  - Reveillark: Leaves-the-battlefield trigger (NOT just dies). Must extract `triggersOn: [LTB(self)]` distinct from death triggers. `causesEvents` returns up to 2 creatures with power ≤ 2 constraint. Tests LTB vs dies distinction.
-  - Gravecrawler: Static graveyard-cast permission, NOT a triggered ability. Must extract `zoneCastPermissions` with zone=graveyard and condition=controlZombie. Tests recursion that is cast-based, not return-based.
-  - Phyrexian Altar: Sac outlet producing colored mana. `consumes: [SacrificeCost(creature)]`, `produces: [Mana(1, any)]`. Tests colored mana production vs Ashnod's Altar's colorless. Critical for mana economics validation.
-  - Blood Artist: Global death trigger including self. `triggersOn: [Dies(anyCreature)]` — must trigger on ANY creature, not just self. Tests payoff card extraction (life drain) that converts loops into win conditions.
-  - Nim Deathmantle: Equipment grants (stat buffs, types, keywords) + optional-payment death trigger reanimation. Must extract BOTH the `grants` array (to equipped creature) AND `triggersOn: [Dies(nontokenCreature)]` with optional {4} mana payment. Tests dual-role card extraction.
-  - Yawgmoth, Thran Physician: Two distinct activated abilities with different cost structures. Ability 1: `consumes: [PayLife(1), Sacrifice(creature)]`, `causesEvents: [PlaceCounter(-1/-1), DrawCard]`. Ability 2: `consumes: [Mana({B}{B}), Discard]`, `causesEvents: [Proliferate]`. Tests multi-ability extraction where only one ability is combo-relevant.
-  - Solemnity: Pure static replacement effect with NO triggers/activations. `replacements: [PreventCounterPlacement(on: permanents and players)]`. Tests that counter-prevention replacement is extracted from a purely static card. Functionally equivalent to Vizier of Remedies but broader scope — loop detector should recognize it serves the same role in persist/undying combos.
+  **Stress-test cards (10) — mechanically complex cards that exercise edge cases, including filter validation:**
+  - Murderous Redcap: ETB damage trigger + persist keyword (dual-trigger card). Must extract both `triggersOn: [ETB]` and persist as separate profile entries. Tests that damage output and self-recurrence coexist. **No filter complexity** — damage targets "any target", persist is self-referential.
+  - Altar of Dementia: Free sac outlet with zero mana cost. `consumes: [SacrificeCost(creature)]`, no mana. **No self/other filter** — "Sacrifice a creature" (no "another"). Tests that variable-magnitude mill is extracted as `causesEvents` without confusing it for resource production.
+  - Karmic Guide: ETB reanimation trigger + echo keyword. Must extract `causesEvents: [ReturnFromGraveyardToBattlefield(creature)]` AND echo as a delayed conditional self-sacrifice. Tests multi-mechanic extraction on a single card. Return target is "target creature card" — **no self filter** (can return any creature from graveyard).
+  - Reveillark: Leaves-the-battlefield trigger (NOT just dies). Must extract `triggersOn: [LTB(self)]` distinct from death triggers. `causesEvents` returns up to 2 creatures with **power ≤ 2 constraint** (modeled as `manaValue` or custom filter on the target ref). Tests LTB vs dies distinction. **Filter test: the power constraint gates which combos are legal** — Karmic Guide (2/2) passes, Grave Titan (6/6) fails.
+  - Gravecrawler: Static graveyard-cast permission, NOT a triggered ability. Must extract `zoneCastPermissions` with zone=graveyard and **condition: control a Zombie** (subtype filter on controller's battlefield). Tests recursion that is cast-based, not return-based. **Filter test: Zombie condition means the loop requires a Zombie on the battlefield.**
+  - Phyrexian Altar: Sac outlet producing colored mana. `consumes: [SacrificeCost(creature)]`, `produces: [Mana(1, any)]`. **No self/other filter** — "Sacrifice a creature" (generic). Tests colored mana production vs Ashnod's Altar's colorless.
+  - Blood Artist: Global death trigger **including self**. `triggersOn: [Dies(anyCreature)]` — "Blood Artist or another creature" means no `self: false` filter, the trigger fires on ALL creatures including itself. **Filter test: verify absence of `self: false`**, unlike Pitiless Plunderer which has "another".
+  - Nim Deathmantle: Equipment grants + death trigger reanimation. **Filter test: `triggersOn` must carry `isToken: false`** — "Whenever a nontoken creature dies" excludes tokens. The {4} payment is optional. Must extract both `grants` (to equipped creature) and the filtered death trigger.
+  - Yawgmoth, Thran Physician: Two activated abilities. **Filter test: Ability 1 sac cost must carry `self: false`** — "Sacrifice *another* creature" means Yawgmoth cannot sacrifice itself. Ability 2 is `consumes: [Mana({B}{B}), Discard]`, `causesEvents: [Proliferate]`. Tests multi-ability extraction where filter on the sac cost matters for combo validation.
+  - Solemnity: Pure static replacement effect. `replacements: [PreventCounterPlacement(on: permanents and players)]`. **No object filters** — applies globally to all permanents. Tests broadest possible replacement effect scope.
 
 - [ ] 0.2 Run diagnostic tests to identify extraction gaps
   - For each card where structured extraction fails, document which oracle text fallback pattern `extractLoopSteps` will need
 
 ### Phase 1: Define Types
 
-- [ ] 1.1 Add `LoopStep` interface to `src/lib/interaction-engine/types.ts`
+- [ ] 1.1 Add `ObjectFilter`, `ResourceRequirement`, `ResourceProduction`, and `LoopStep` interfaces to `src/lib/interaction-engine/types.ts`
   ```typescript
+  /** Constrains which game object can satisfy a resource requirement or is produced */
+  export interface ObjectFilter {
+    self?: boolean;              // true = "this creature", false = "another creature"
+    types?: string[];            // ["creature"], ["artifact", "creature"]
+    subtypes?: string[];         // ["Zombie"], ["Human"]
+    supertypeExcludes?: string[];  // non-Human → excludes: ["Human"]
+    isToken?: boolean;           // true = token only, false = nontoken only
+  }
+
   export interface ResourceRequirement {
     token: string;
     quantity: number;
+    filter?: ObjectFilter;       // constraints on which object satisfies this
   }
 
   export interface ResourceProduction {
     token: string;
     quantity: number;
+    filter?: ObjectFilter;       // constraints on the object produced/affected
   }
 
   export interface LoopStep {
     card: string;
+    cardTypes?: string[];        // ["Creature"], ["Artifact"] — for filter validation
+    cardSubtypes?: string[];     // ["Zombie", "Warrior"] — for subtype filter validation
     action: string;
     requires: ResourceRequirement[];
     produces: ResourceProduction[];
@@ -252,6 +297,17 @@ Before building the chain solver, verify that the capability extractor produces 
   - Test: `mana_C(1)` does NOT satisfy `mana_B(1)` requirement
   - Test: `mana_any(1)` + `mana_C(2)` satisfies `mana_generic(1)` + `mana_B(1)` (optimal allocation)
 
+  **Object filter tests:**
+  - Test: `extractLoopSteps` for Pitiless Plunderer death trigger step has `requires` with `filter: { self: false }` on `creature_death` token
+  - Test: `extractLoopSteps` for Yawgmoth sac step has `requires` with `filter: { self: false }` on `creature_on_bf` token ("another creature")
+  - Test: `extractLoopSteps` for Nim Deathmantle death trigger step has `requires` with `filter: { isToken: false }` on `creature_death` token ("nontoken creature")
+  - Test: `extractLoopSteps` for Mikaeus grant step carries `filter: { supertypeExcludes: ["Human"] }` on `undying_grant` token
+  - Test: `extractLoopSteps` for Blood Artist death trigger step has NO `self: false` filter (triggers on self AND others)
+  - Test: `extractLoopSteps` for Viscera Seer sac step has NO `self: false` filter ("Sacrifice a creature" — can sac self)
+  - Test: `solveChain` rejects a loop where the only sacrifice fodder is the card with `self: false` on its sac cost (e.g., Yawgmoth can't sac itself)
+  - Test: `solveChain` rejects Nim Deathmantle loop where the only dying creature is a token (`isToken: false` filter blocks)
+  - Test: `solveChain` rejects Mikaeus granting undying to a Human creature (`supertypeExcludes: ["Human"]` filter blocks)
+
 - [ ] 2.2 Fix the 3 loop tests in `tests/unit/interaction-loops-chains.spec.ts`
   - Change Pitiless Plunderer test to use Ashnod's Altar instead of Viscera Seer (mana math fix)
   - `test.fixme` → `test` for "Pitiless Plunderer + Ashnod's Altar + Reassembling Skeleton detects a loop"
@@ -262,27 +318,44 @@ Before building the chain solver, verify that the capability extractor produces 
 
 - [ ] 3.1 Create `src/lib/interaction-engine/loop-chain-solver.ts`
   - Function signature: `export function extractLoopSteps(card: CardProfile): LoopStep[]`
-  - Extract from structured `CardProfile` fields:
-    - `consumes` with `costType: "sacrifice"` where `object.types` includes `"creature"` → sac outlet step
+  - Extract from structured `CardProfile` fields, **propagating `ObjectFilter` from `GameObjectRef`**:
+    - `consumes` with `costType: "sacrifice"` where `object.types` includes `"creature"` → sac outlet step.
+      **Filter propagation**: read `object.quantity` and `object.self` from the `GameObjectRef`:
+      - `quantity: "another"` or `self: false` → add `filter: { self: false }` to the `creature_on_bf` requirement
+      - `modifiers` includes `"nontoken"` → add `filter: { isToken: false }`
+      - No qualifier → no filter (can sac any creature, including self)
     - `produces` with `category: "mana"` → check `quantity` and `color` fields for accurate mana amounts
-    - `triggersOn` with `kind: "zone_transition"` and `to: "graveyard"` → death trigger step
+    - `triggersOn` with `kind: "zone_transition"` and `to: "graveyard"` → death trigger step.
+      **Filter propagation**: read `object` ref from the trigger event:
+      - `quantity: "another"` or `self: false` → add `filter: { self: false }` to the `creature_death` requirement (e.g., Pitiless Plunderer)
+      - `modifiers` includes `"nontoken"` → add `filter: { isToken: false }` (e.g., Nim Deathmantle)
+      - No qualifier → no filter (e.g., Blood Artist triggers on any creature including self)
     - `produces` with `category: "create_token"` and treasure/food/etc. → treasure production step
-    - `grants` containing undying/persist keywords → keyword grant step
+    - `grants` containing undying/persist keywords → keyword grant step.
+      **Filter propagation**: read the grant's target ref:
+      - `subtypes` with excludes → add `filter: { supertypeExcludes: [...] }` (e.g., Mikaeus's "non-Human")
+      - `modifiers` includes `"nontoken"` → add `filter: { isToken: false }`
     - `replacements` with `mode: "prevent"` or `"modify"` on -1/-1 counters → counter prevention step
     - Keywords array: "Persist" → persist return step with `blocking: [minus_counter(1)]`
     - Keywords array: "Undying" → undying return step with `blocking: [plus_counter(1)]`
-    - `consumes` with `costType: "remove_counter"` → counter removal step
-    - `zoneCastPermissions` with graveyard zone → graveyard cast step (parse mana cost from `castingCost`)
-  - Oracle text fallback patterns (for cards where structured extraction misses):
-    - `"Sacrifice a creature:"` → sac outlet step
+    - `consumes` with `costType: "remove_counter"` → counter removal step. Typically `self: true` (remove from self).
+    - `zoneCastPermissions` with graveyard zone → graveyard cast step (parse mana cost from `castingCost`). May carry condition filters (e.g., Gravecrawler's "control a Zombie").
+  - Oracle text fallback patterns (for cards where structured extraction misses).
+    **Filter extraction from oracle text**: parse "another", "nontoken", "non-Human" qualifiers:
+    - `"Sacrifice a creature:"` → sac outlet step (no filter)
+    - `"Sacrifice another creature:"` → sac outlet step with `filter: { self: false }` (e.g., Yawgmoth)
     - `"Sacrifice a creature: Add {C}{C}"` → mana-producing sac outlet, parse mana from effect
     - `"Sacrifice a creature: Add one mana of any color"` → colored-mana sac outlet
+    - `"Whenever another creature .+ dies"` → death trigger with `filter: { self: false }` (e.g., Plunderer)
+    - `"Whenever a nontoken creature dies"` → death trigger with `filter: { isToken: false }` (e.g., Nim Deathmantle)
+    - `"Whenever .+ or another creature dies"` → death trigger with NO self filter (e.g., Blood Artist)
     - `"Whenever .+ creature .+ dies, create a Treasure"` → death trigger + treasure production
     - `"{cost}: Return .+ from your graveyard to the battlefield"` → graveyard return step, parse mana from cost
-    - `"have undying"` / `"have persist"` → keyword grant step
+    - `"other non-Human creatures .+ have undying"` → keyword grant with `filter: { self: false, supertypeExcludes: ["Human"] }`
+    - `"have undying"` / `"have persist"` → keyword grant step (check for "other"/"non-X" qualifiers)
     - `"counters would be put .+ minus one"` / `"can't be placed"` → counter prevention step
     - `"enters the battlefield with .+ +1/+1 counter"` + `"Remove a +1/+1 counter:"` → counter removal step
-    - `"may cast .+ from your graveyard"` → graveyard cast permission step
+    - `"may cast .+ from your graveyard"` → graveyard cast permission step (check for conditions like "as long as you control a Zombie")
 
 - [ ] 3.2 Add implicit resource production rules
   - Treasure tokens implicitly produce mana: for each step producing `treasure_token(N)`, add a synthetic step `{ card: "(Treasure)", action: "sacrifice for mana", requires: [treasure_token(1)], produces: [mana_any(1)] }` (repeated N times conceptually — solver handles quantity)
