@@ -671,7 +671,7 @@ test.describe("Stony Silence + Treasure tokens", () => {
 });
 
 test.describe("Notion Thief + Consecrated Sphinx", () => {
-  test.fixme("Notion Thief and Consecrated Sphinx produce a positive interaction (enables or triggers)", () => {
+  test("Notion Thief and Consecrated Sphinx produce a positive interaction (enables or triggers)", () => {
     const thief = notionThief();
     const sphinx = consecratedSphinx();
     const analysis = findInteractions([thief, sphinx]);

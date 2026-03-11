@@ -745,6 +745,21 @@ function detectTriggersFromOraclePatterns(
     }
   }
 
+  // A is a creature → B triggers on creature ETB ("whenever another creature enters")
+  if (a.cardTypes.includes("creature") && cardTriggersOnCreatureETB(b, bOracle)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:creature_etb`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${a.cardName} entering the battlefield triggers ${b.cardName}`,
+        events: [],
+      });
+    }
+  }
+
   // A puts a land onto the battlefield → B has landfall
   if (cardCausesLandETB(a, aOracle) && cardTriggersOnLandfall(b, bOracle)) {
     const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:land`;
@@ -770,6 +785,126 @@ function detectTriggersFromOraclePatterns(
         type: "triggers",
         strength: 0.8,
         mechanical: `${a.cardName} attacking triggers ${b.cardName}`,
+        events: [],
+      });
+    }
+  }
+
+  // A is a permanent → B triggers on permanent ETB ("whenever another permanent enters")
+  if (isPermanentCard(a.cardTypes) && cardTriggersOnPermanentETB(b, bOracle)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:permanent_etb`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${a.cardName} entering triggers ${b.cardName}'s permanent ETB ability`,
+        events: [],
+      });
+    }
+  }
+
+  // A has equipment death trigger + B creates tokens (Skullclamp + token makers)
+  if (cardHasEquipmentDeathTrigger(a, aOracle) && cardCreatesTokens(b)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:equipment_death:token_creation`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${b.cardName} creates tokens that ${a.cardName} can equip and trigger on death`,
+        events: [],
+      });
+    }
+  }
+
+  // A has draw replacement for opponents + B triggers on opponent draws (Notion Thief + Consecrated Sphinx)
+  if (cardReplacesOpponentDraws(a, aOracle) && cardTriggersOnOpponentDraws(b, bOracle)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:draw_replacement:draw_trigger`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${a.cardName} redirects opponent draws while ${b.cardName} triggers on them, creating synergy`,
+        events: [],
+      });
+    }
+  }
+
+  // Both A and B grant extra combat phases → synergy
+  if (cardGrantsExtraCombat(a, aOracle) && cardGrantsExtraCombat(b, bOracle)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:extra_combat:extra_combat`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.7,
+        mechanical: `${a.cardName} and ${b.cardName} both create extra combat phases, amplifying attack triggers`,
+        events: [],
+      });
+    }
+  }
+
+  // A copies/imprints instants + B is an instant that untaps (Isochron Scepter + Dramatic Reversal)
+  if (cardCopiesImprinted(a, aOracle) && b.cardTypes.includes("instant")) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:imprint:instant`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "enables",
+        strength: 0.8,
+        mechanical: `${a.cardName} can copy ${b.cardName} (imprinted instant)`,
+        events: [],
+      });
+    }
+  }
+
+  // B untaps nonland permanents + A is an artifact with activated abilities
+  if (cardUntapsNonlands(b, bOracle) && a.cardTypes.includes("artifact") && cardHasActivatedAbilities(a)) {
+    const dedupKey = `triggers:${b.cardName}:${a.cardName}:untap:artifact`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [b.cardName, a.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${b.cardName} untaps ${a.cardName}, enabling repeated activation`,
+        events: [],
+      });
+    }
+  }
+
+  // A grants undying/persist to creatures → enables B (creature)
+  if (b.cardTypes.includes("creature") && cardGrantsUndyingOrPersist(a, aOracle, b)) {
+    const dedupKey = `enables:${a.cardName}:${b.cardName}:keyword_grant`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "enables",
+        strength: 0.8,
+        mechanical: `${a.cardName} grants undying/persist to ${b.cardName}, enabling recursion`,
+        events: [],
+      });
+    }
+  }
+
+  // A prevents -1/-1 counters + B has persist (Vizier of Remedies + Kitchen Finks)
+  if (cardPreventsMinusCounters(a, aOracle) && cardHasPersist(b, bOracle)) {
+    const dedupKey = `enables:${a.cardName}:${b.cardName}:counter_prevention:persist`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "enables",
+        strength: 0.9,
+        mechanical: `${a.cardName} prevents persist counters on ${b.cardName}, enabling infinite recurrence`,
         events: [],
       });
     }
@@ -885,6 +1020,76 @@ function cardTriggersOnSubtypeAttack(card: CardProfile, oracle: string, attacker
     if (regex.test(oracle)) return true;
   }
   return false;
+}
+
+function cardTriggersOnCreatureETB(_card: CardProfile, oracle: string): boolean {
+  return /whenever (?:a(?:nother)? )?creature enters the battlefield/i.test(oracle);
+}
+
+function cardTriggersOnPermanentETB(_card: CardProfile, oracle: string): boolean {
+  return /whenever another permanent enters the battlefield/i.test(oracle);
+}
+
+function cardHasEquipmentDeathTrigger(card: CardProfile, oracle: string): boolean {
+  if (card.cardTypes.includes("artifact") && /whenever equipped creature dies/i.test(oracle)) return true;
+  return false;
+}
+
+function cardReplacesOpponentDraws(_card: CardProfile, oracle: string): boolean {
+  return /if an opponent would draw/i.test(oracle);
+}
+
+function cardTriggersOnOpponentDraws(_card: CardProfile, oracle: string): boolean {
+  return /whenever an opponent draws/i.test(oracle);
+}
+
+function cardGrantsExtraCombat(_card: CardProfile, oracle: string): boolean {
+  return /additional combat (?:phase|step)/i.test(oracle) ||
+    /untap (?:all|each) .+ (?:and|that) (?:attack|attacks)/i.test(oracle);
+}
+
+function cardCopiesImprinted(_card: CardProfile, oracle: string): boolean {
+  return /copy the (?:exiled|imprinted) card/i.test(oracle) ||
+    /you may copy the (?:exiled|imprinted)/i.test(oracle);
+}
+
+function cardUntapsNonlands(_card: CardProfile, oracle: string): boolean {
+  return /untap all nonland permanents/i.test(oracle) ||
+    /untap each nonland permanent/i.test(oracle);
+}
+
+function cardGrantsUndyingOrPersist(granter: CardProfile, oracle: string, target: CardProfile): boolean {
+  // Match "have undying" anywhere in a sentence about "creatures you control"
+  // e.g., "Other non-Human creatures you control get +1/+1 and have undying."
+  const undyingMatch = oracle.match(/(?:other )?(.+?)creatures? you control .+?(?:have|gain) undying/i)
+    || oracle.match(/(?:other )?(.+?)creatures? you control (?:have|get|gain) undying/i);
+  if (undyingMatch) {
+    const qualifier = (undyingMatch[1] || "").trim().toLowerCase();
+    // "non-Human" check
+    if (qualifier.includes("non-human")) {
+      // Target must not be a Human
+      const isHuman = target.subtypes?.some((s) => s.toLowerCase() === "human");
+      return !isHuman;
+    }
+    return true; // No type restriction
+  }
+  // Check for persist grants too
+  if (/(?:other )?creatures? you control .+?(?:have|gain) persist/i.test(oracle) ||
+      /(?:other )?creatures? you control (?:have|get|gain) persist/i.test(oracle)) {
+    return true;
+  }
+  return false;
+}
+
+function cardPreventsMinusCounters(_card: CardProfile, oracle: string): boolean {
+  return /if one or more -1\/-1 counters would be (?:placed|put)/i.test(oracle) ||
+    /that many -1\/-1 counters minus one/i.test(oracle) ||
+    /enters? (?:the battlefield )?with one fewer -1\/-1 counter/i.test(oracle);
+}
+
+function cardHasPersist(card: CardProfile, oracle: string): boolean {
+  if (card.abilities.some((a) => a.abilityType === "keyword" && (a as { keyword: string }).keyword.toLowerCase() === "persist")) return true;
+  return /persist/i.test(oracle);
 }
 
 /**
@@ -2857,7 +3062,7 @@ function detectLoops(
   if (profiles.length < 2) return [];
 
   // Build adjacency from causal interactions
-  const causalTypes = new Set<string>(["enables", "triggers"]);
+  const causalTypes = new Set<string>(["enables", "triggers", "recurs"]);
   const adjacency = new Map<string, Map<string, Interaction[]>>();
 
   for (const inter of interactions) {

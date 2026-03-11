@@ -398,7 +398,7 @@ test.describe("loop & chain detection — Pitiless Plunderer combo", () => {
 });
 
 test.describe("loop & chain detection — Dramatic Scepter", () => {
-  test.fixme("Isochron Scepter + Dramatic Reversal detected as interacting pair", () => {
+  test("Isochron Scepter + Dramatic Reversal detected as interacting pair", () => {
     const scepter = isochornScepter();
     const reversal = dramaticReversal();
     const analysis = findInteractions([scepter, reversal]);
@@ -414,7 +414,7 @@ test.describe("loop & chain detection — Dramatic Scepter", () => {
     expect(allInteractions.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Dramatic Scepter forms a loop (Scepter casts Reversal, Reversal untaps Scepter)", () => {
+  test("Dramatic Scepter forms a loop (Scepter casts Reversal, Reversal untaps Scepter)", () => {
     const scepter = isochornScepter();
     const reversal = dramaticReversal();
     const analysis = findInteractions([scepter, reversal]);
@@ -463,7 +463,7 @@ test.describe("loop & chain detection — Mikaeus + Triskelion", () => {
     expect(loop).toBeDefined();
   });
 
-  test.fixme("Mikaeus grants undying — detected as enables interaction", () => {
+  test("Mikaeus grants undying — detected as enables interaction", () => {
     const mikaeus = mikaeusTheUnhallowed();
     const trisk = triskelion();
     const analysis = findInteractions([mikaeus, trisk]);
@@ -530,7 +530,7 @@ test.describe("chain detection — Skullclamp + Young Pyromancer (value chain, n
     expect(infiniteLoop).toBeUndefined();
   });
 
-  test.fixme("Skullclamp triggers on equipped creature death — triggers interaction", () => {
+  test("Skullclamp triggers on equipped creature death — triggers interaction", () => {
     const clamp = skullclamp();
     const pyro = youngPyromancer();
     const analysis = findInteractions([clamp, pyro]);
@@ -631,7 +631,7 @@ test.describe("chain detection — Kodama of the East Tree four-card chain", () 
     expect(toggoInteractions.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Kodama triggers on permanent ETB — detected as triggers interaction", () => {
+  test("Kodama triggers on permanent ETB — detected as triggers interaction", () => {
     const kodama = kodamaOfTheEastTree();
     const bounceLand = grulTurf();
     const analysis = findInteractions([kodama, bounceLand]);

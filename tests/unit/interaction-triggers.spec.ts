@@ -269,7 +269,7 @@ test.describe("life gain trigger chains — Soul Warden + Archangel of Thune", (
     expect(triggers[0].strength).toBeGreaterThanOrEqual(0.5);
   });
 
-  test.fixme("Archangel of Thune's lifelink also triggers itself (self-referential)", () => {
+  test("Archangel of Thune's lifelink also triggers itself (self-referential)", () => {
     const archangel = archangelOfThune();
     const analysis = findInteractions([archangel]);
 
@@ -289,7 +289,7 @@ test.describe("life gain trigger chains — Soul Warden + Archangel of Thune", (
     expect(causesGainLife || triggersOnGainLife).toBe(true);
   });
 
-  test.fixme("creature ETB triggers Soul Warden which chains into Archangel", () => {
+  test("creature ETB triggers Soul Warden which chains into Archangel", () => {
     const warden = soulWarden();
     const archangel = archangelOfThune();
 
@@ -628,7 +628,7 @@ test.describe("draw triggers — Niv-Mizzet, Parun + Curiosity infinite loop", (
     expect(damageTriggers.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Curiosity causes draw events", () => {
+  test("Curiosity causes draw events", () => {
     const cur = curiosity();
 
     const drawEvents = cur.causesEvents.filter(
@@ -667,7 +667,7 @@ test.describe("draw triggers — Niv-Mizzet, Parun + Curiosity infinite loop", (
     expect(curiosityTriggersNiv.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Niv-Mizzet + Curiosity form a loop", () => {
+  test("Niv-Mizzet + Curiosity form a loop", () => {
     const niv = nivMizzetParun();
     const cur = curiosity();
     const analysis = findInteractions([niv, cur]);
@@ -682,7 +682,7 @@ test.describe("draw triggers — Niv-Mizzet, Parun + Curiosity infinite loop", (
     expect(loop!.steps.length).toBeGreaterThanOrEqual(2);
   });
 
-  test.fixme("Niv-Mizzet + Curiosity loop is infinite", () => {
+  test("Niv-Mizzet + Curiosity loop is infinite", () => {
     const niv = nivMizzetParun();
     const cur = curiosity();
     const analysis = findInteractions([niv, cur]);
@@ -740,7 +740,7 @@ test.describe("constellation — enchantment ETB and cast triggers", () => {
     });
   }
 
-  test.fixme("Eidolon of Blossoms triggers on enchantment ETB", () => {
+  test("Eidolon of Blossoms triggers on enchantment ETB", () => {
     const eidolon = eidolonOfBlossoms();
 
     // Eidolon should trigger on enchantment entering the battlefield
@@ -770,7 +770,7 @@ test.describe("constellation — enchantment ETB and cast triggers", () => {
     expect(eidolonTriggered.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Sigil of the Empty Throne triggers on enchantment cast (not ETB)", () => {
+  test("Sigil of the Empty Throne triggers on enchantment cast (not ETB)", () => {
     const sigil = sigilOfTheEmptyThrone();
 
     // Sigil triggers on CASTING enchantment spells
@@ -875,7 +875,7 @@ test.describe("attack triggers — Aurelia, the Warleader", () => {
     expect(hasExtraPhaseInProfile).toBe(true);
   });
 
-  test.fixme("Aurelia synergizes with another combat-focused creature", () => {
+  test("Aurelia synergizes with another combat-focused creature", () => {
     const aur = aurelia();
     const celebrant = combatCelebrant();
     const analysis = findInteractions([aur, celebrant]);

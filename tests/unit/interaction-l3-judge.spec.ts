@@ -172,7 +172,7 @@ test.describe("L3 Judge: Enablers", () => {
     expect(enables.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Dockside Extortionist creates conditional Treasure tokens — still detected as token producer", () => {
+  test("Dockside Extortionist creates conditional Treasure tokens — still detected as token producer", () => {
     const dockside = profile({
       name: "Dockside Extortionist",
       typeLine: "Creature — Goblin Pirate",
@@ -287,7 +287,7 @@ test.describe("L3 Judge: Enablers", () => {
     expect(enables.length).toBeGreaterThanOrEqual(1);
   });
 
-  test.fixme("Bolas's Citadel has zone_cast_permission from library top", () => {
+  test("Bolas's Citadel has zone_cast_permission from library top", () => {
     const citadel = profile({
       name: "Bolas's Citadel",
       typeLine: "Legendary Artifact",
