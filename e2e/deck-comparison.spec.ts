@@ -276,10 +276,10 @@ test.describe("Deck Comparison page", () => {
   test("slot A shows 'Your deck' label and slot B shows 'Comparison deck' label", async ({ page }) => {
     await page.goto("/compare");
     await expect(
-      page.getByTestId("compare-slot-a").getByText("Your deck")
+      page.getByTestId("compare-slot-a").getByRole("heading", { name: "Your deck" })
     ).toBeVisible();
     await expect(
-      page.getByTestId("compare-slot-b").getByText("Comparison deck")
+      page.getByTestId("compare-slot-b").getByRole("heading", { name: "Comparison deck" })
     ).toBeVisible();
   });
 
@@ -440,7 +440,7 @@ test.describe("Deck Comparison page", () => {
 
   test("nav bar Compare Decks link navigates to /compare", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("link", { name: "Compare Decks" }).click();
+    await page.getByLabel("Main navigation").getByRole("link", { name: "Compare Decks" }).click();
     await expect(page).toHaveURL(/\/compare/);
     await expect(page.getByTestId("compare-page")).toBeVisible();
   });

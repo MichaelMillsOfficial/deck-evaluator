@@ -338,7 +338,14 @@ test.describe("Centrality Ranking panel", () => {
     const { page } = deckPage;
 
     // Expand the centrality + removal impact collapsible section
-    await deckPage.expandInteractionsSection("ie-centrality");
+    // Expand centrality panel (uses custom testId, not panel-${id} pattern)
+    {
+      const panel = deckPage.page.getByTestId("centrality-panel");
+      await panel.waitFor({ timeout: 10_000 });
+      const btn = panel.locator("button").first();
+      const expanded = await btn.getAttribute("aria-expanded");
+      if (expanded !== "true") await btn.click();
+    }
 
     const rankingTable = page.getByTestId("centrality-ranking");
     await expect(rankingTable).toBeVisible({ timeout: 5_000 });
@@ -348,7 +355,14 @@ test.describe("Centrality Ranking panel", () => {
     await setupInteractionsTab(deckPage);
     const { page } = deckPage;
 
-    await deckPage.expandInteractionsSection("ie-centrality");
+    // Expand centrality panel (uses custom testId, not panel-${id} pattern)
+    {
+      const panel = deckPage.page.getByTestId("centrality-panel");
+      await panel.waitFor({ timeout: 10_000 });
+      const btn = panel.locator("button").first();
+      const expanded = await btn.getAttribute("aria-expanded");
+      if (expanded !== "true") await btn.click();
+    }
 
     const rankingTable = page.getByTestId("centrality-ranking");
     await expect(rankingTable).toBeVisible({ timeout: 5_000 });
@@ -366,7 +380,14 @@ test.describe("Centrality Ranking panel", () => {
     await setupInteractionsTab(deckPage);
     const { page } = deckPage;
 
-    await deckPage.expandInteractionsSection("ie-centrality");
+    // Expand centrality panel (uses custom testId, not panel-${id} pattern)
+    {
+      const panel = deckPage.page.getByTestId("centrality-panel");
+      await panel.waitFor({ timeout: 10_000 });
+      const btn = panel.locator("button").first();
+      const expanded = await btn.getAttribute("aria-expanded");
+      if (expanded !== "true") await btn.click();
+    }
 
     const rankingTable = page.getByTestId("centrality-ranking");
     await expect(rankingTable).toBeVisible({ timeout: 5_000 });
@@ -392,7 +413,14 @@ test.describe("Centrality Ranking panel", () => {
     await setupInteractionsTab(deckPage);
     const { page } = deckPage;
 
-    await deckPage.expandInteractionsSection("ie-centrality");
+    // Expand centrality panel (uses custom testId, not panel-${id} pattern)
+    {
+      const panel = deckPage.page.getByTestId("centrality-panel");
+      await panel.waitFor({ timeout: 10_000 });
+      const btn = panel.locator("button").first();
+      const expanded = await btn.getAttribute("aria-expanded");
+      if (expanded !== "true") await btn.click();
+    }
 
     const rankingTable = page.getByTestId("centrality-ranking");
     await expect(rankingTable).toBeVisible({ timeout: 5_000 });
@@ -423,7 +451,14 @@ test.describe("Removal Impact Inspector", () => {
     await setupInteractionsTab(deckPage);
     const { page } = deckPage;
 
-    await deckPage.expandInteractionsSection("ie-centrality");
+    // Expand centrality panel (uses custom testId, not panel-${id} pattern)
+    {
+      const panel = deckPage.page.getByTestId("centrality-panel");
+      await panel.waitFor({ timeout: 10_000 });
+      const btn = panel.locator("button").first();
+      const expanded = await btn.getAttribute("aria-expanded");
+      if (expanded !== "true") await btn.click();
+    }
 
     // Inspector renders in placeholder state when no card is selected
     const inspector = page.getByTestId("removal-impact-inspector");
@@ -436,7 +471,14 @@ test.describe("Removal Impact Inspector", () => {
     await setupInteractionsTab(deckPage);
     const { page } = deckPage;
 
-    await deckPage.expandInteractionsSection("ie-centrality");
+    // Expand centrality panel (uses custom testId, not panel-${id} pattern)
+    {
+      const panel = deckPage.page.getByTestId("centrality-panel");
+      await panel.waitFor({ timeout: 10_000 });
+      const btn = panel.locator("button").first();
+      const expanded = await btn.getAttribute("aria-expanded");
+      if (expanded !== "true") await btn.click();
+    }
 
     const rankingTable = page.getByTestId("centrality-ranking");
     await expect(rankingTable).toBeVisible({ timeout: 5_000 });
@@ -458,7 +500,14 @@ test.describe("Removal Impact Inspector", () => {
     await setupInteractionsTab(deckPage);
     const { page } = deckPage;
 
-    await deckPage.expandInteractionsSection("ie-centrality");
+    // Expand centrality panel (uses custom testId, not panel-${id} pattern)
+    {
+      const panel = deckPage.page.getByTestId("centrality-panel");
+      await panel.waitFor({ timeout: 10_000 });
+      const btn = panel.locator("button").first();
+      const expanded = await btn.getAttribute("aria-expanded");
+      if (expanded !== "true") await btn.click();
+    }
 
     const rankingTable = page.getByTestId("centrality-ranking");
     await expect(rankingTable).toBeVisible({ timeout: 5_000 });
@@ -482,7 +531,14 @@ test.describe("Removal Impact Inspector", () => {
     await setupInteractionsTab(deckPage);
     const { page } = deckPage;
 
-    await deckPage.expandInteractionsSection("ie-centrality");
+    // Expand centrality panel (uses custom testId, not panel-${id} pattern)
+    {
+      const panel = deckPage.page.getByTestId("centrality-panel");
+      await panel.waitFor({ timeout: 10_000 });
+      const btn = panel.locator("button").first();
+      const expanded = await btn.getAttribute("aria-expanded");
+      if (expanded !== "true") await btn.click();
+    }
 
     const rankingTable = page.getByTestId("centrality-ranking");
     await expect(rankingTable).toBeVisible({ timeout: 5_000 });
