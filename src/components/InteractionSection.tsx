@@ -8,16 +8,23 @@ import type {
   InteractionBlocker,
   InteractionEnabler,
   InteractionType,
+  RemovalImpact,
 } from "@/lib/interaction-engine";
 import type { AnalysisStep } from "@/hooks/useInteractionAnalysis";
 import { useEffect, useMemo, useState, Component, type ReactNode } from "react";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
+import CentralityRanking from "@/components/CentralityRanking";
+import RemovalImpactInspector from "@/components/RemovalImpactInspector";
+import { CitationList } from "@/components/InteractionCitation";
 import {
   rollUpInteractions,
   INTERACTION_VERBS,
   type RolledUpGroup,
   type DisplayInteractionItem,
 } from "@/lib/interaction-rollup";
+import { computeCentrality } from "@/lib/interaction-centrality";
+import { computeAllRemovalImpacts } from "@/lib/interaction-removal-impact";
+import { extractCitations } from "@/lib/interaction-citations";
 
 const PAGE_SIZE = 20;
 
@@ -31,7 +38,7 @@ interface InteractionSectionProps {
   onToggleSection: (id: string) => void;
 }
 
-const INTERACTION_TYPE_LABELS: Record<string, string> = {
+const INTERACTION_TYPE_LABELS: Record<InteractionType, string> = {
   enables: "Enables",
   triggers: "Triggers",
   amplifies: "Amplifies",
@@ -44,7 +51,7 @@ const INTERACTION_TYPE_LABELS: Record<string, string> = {
   loops_with: "Loops With",
 };
 
-const INTERACTION_TYPE_COLORS: Record<string, string> = {
+const INTERACTION_TYPE_COLORS: Record<InteractionType, string> = {
   enables: "bg-green-600/60 text-green-100",
   triggers: "bg-blue-600/60 text-blue-100",
   amplifies: "bg-amber-600/60 text-amber-100",
@@ -57,7 +64,7 @@ const INTERACTION_TYPE_COLORS: Record<string, string> = {
   loops_with: "bg-fuchsia-600/60 text-fuchsia-100",
 };
 
-const TYPE_FILTER_COLORS: Record<string, { active: string; border: string }> = {
+const TYPE_FILTER_COLORS: Record<InteractionType, { active: string; border: string }> = {
   enables: { active: "border-green-500 bg-green-900/30 text-green-300", border: "border-green-600/40" },
   triggers: { active: "border-blue-500 bg-blue-900/30 text-blue-300", border: "border-blue-600/40" },
   amplifies: { active: "border-amber-500 bg-amber-900/30 text-amber-300", border: "border-amber-600/40" },
@@ -70,13 +77,14 @@ const TYPE_FILTER_COLORS: Record<string, { active: string; border: string }> = {
   loops_with: { active: "border-fuchsia-500 bg-fuchsia-900/30 text-fuchsia-300", border: "border-fuchsia-600/40" },
 };
 
-const INTERACTION_GROUP_COLORS: Record<string, string> = {
+const INTERACTION_GROUP_COLORS: Record<InteractionType, string> = {
   enables: "text-green-400",
   triggers: "text-blue-400",
   amplifies: "text-amber-400",
   protects: "text-cyan-400",
   recurs: "text-emerald-400",
   reduces_cost: "text-lime-400",
+  tutors_for: "text-indigo-400",
   blocks: "text-red-400",
   conflicts: "text-orange-400",
   loops_with: "text-fuchsia-400",
@@ -219,11 +227,22 @@ function InteractionItem({
   interaction,
   index,
   type,
+  profiles,
 }: {
   interaction: Interaction;
   index: number;
   type: string;
+  profiles?: InteractionAnalysis["profiles"];
 }) {
+  const [showCitations, setShowCitations] = useState(false);
+  const citationsId = `citations-${interaction.cards[0].replace(/\s+/g, "-")}-${interaction.cards[1].replace(/\s+/g, "-")}-${index}`;
+
+  // Lazy-compute citations only when toggle is opened
+  const citations = useMemo(() => {
+    if (!showCitations || !profiles) return [];
+    return extractCitations(interaction, profiles);
+  }, [showCitations, interaction, profiles]);
+
   const badgeColors =
     INTERACTION_TYPE_COLORS[interaction.type] ?? "bg-slate-600/60 text-slate-100";
 
@@ -248,9 +267,56 @@ function InteractionItem({
         </span>
         <CardPill name={interaction.cards[1]} />
       </div>
-      <p className="text-xs text-slate-400 leading-relaxed">
+      <p className="text-xs text-slate-400 leading-relaxed mb-2">
         {interaction.mechanical}
       </p>
+
+      {/* Citation toggle */}
+      {profiles && (
+        <>
+          <button
+            type="button"
+            data-testid="show-citations-toggle"
+            aria-expanded={showCitations}
+            aria-controls={citationsId}
+            onClick={() => setShowCitations((v) => !v)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && showCitations) setShowCitations(false);
+            }}
+            className="group flex items-center gap-1 text-[11px] text-slate-500 hover:text-purple-300 transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-400 rounded min-h-[44px] py-2"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className={`h-3 w-3 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${
+                showCitations ? "rotate-90" : ""
+              }`}
+            >
+              <path
+                fillRule="evenodd"
+                d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span className="underline-offset-2 group-hover:underline">
+              {showCitations ? "Hide" : "Show"} rules text
+            </span>
+          </button>
+
+          <div
+            id={citationsId}
+            className={`grid transition-[grid-template-rows] duration-200 motion-reduce:transition-none ease-out ${
+              showCitations ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`}
+            aria-hidden={!showCitations}
+          >
+            <div className="overflow-hidden">
+              <CitationList citations={citations} />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -421,7 +487,7 @@ function ChainItem({ chain, index }: { chain: InteractionChain; index: number })
       {/* Card flow header */}
       <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
         {chain.cards.map((card, i) => (
-          <span key={card} className="flex items-center gap-1.5">
+          <span key={`${card}-${i}`} className="flex items-center gap-1.5">
             {i > 0 && (
               <span className="text-slate-500 text-xs" aria-hidden="true">
                 &rarr;
@@ -673,7 +739,8 @@ function LoopHowItWorks({ loop, id }: { loop: InteractionLoop; id: string }) {
                     } else if (r.category === "cards") {
                       label = `+${r.quantity} card${r.quantity !== 1 ? "s" : ""}`;
                     } else {
-                      label = `resource \u00d7${(r as { quantity?: unknown }).quantity ?? "?"}`;
+                      const _exhaustive: never = r;
+                      label = `resource`;
                     }
                     return (
                       <span
@@ -757,7 +824,7 @@ function LoopItem({ loop, index }: { loop: InteractionLoop; index: number }) {
       {/* Loop cycle visualization */}
       <div className="flex flex-wrap items-center gap-1.5 mb-2">
         {loop.cards.map((card, i) => (
-          <span key={card} className="flex items-center gap-1.5">
+          <span key={`${card}-${i}`} className="flex items-center gap-1.5">
             {i > 0 && (
               <span className="text-fuchsia-500/60 text-xs" aria-hidden="true">
                 &rarr;
@@ -1036,7 +1103,7 @@ function FilterControls({
           </button>
           {typesPresent.map((type) => {
             const isActive = activeTypes.has(type as InteractionType);
-            const colors = TYPE_FILTER_COLORS[type];
+            const colors = TYPE_FILTER_COLORS[type as InteractionType];
             return (
               <button
                 key={type}
@@ -1050,7 +1117,7 @@ function FilterControls({
                     : "border-slate-600 bg-slate-800 text-slate-400 hover:border-slate-400 hover:text-slate-200"
                 }`}
               >
-                {INTERACTION_TYPE_LABELS[type] ?? type} {typeCounts[type]}
+                {INTERACTION_TYPE_LABELS[type as InteractionType] ?? type} {typeCounts[type]}
               </button>
             );
           })}
@@ -1156,8 +1223,8 @@ function buildGroups(
       .sort(([a], [b]) => (rawGroups[b]?.length ?? 0) - (rawGroups[a]?.length ?? 0))
       .map(([type, items]) => ({
         id: type,
-        label: INTERACTION_TYPE_LABELS[type] ?? type,
-        accentColor: INTERACTION_GROUP_COLORS[type] ?? "text-slate-400",
+        label: INTERACTION_TYPE_LABELS[type as InteractionType] ?? type,
+        accentColor: INTERACTION_GROUP_COLORS[type as InteractionType] ?? "text-slate-400",
         interactions: rawGroups[type] ?? [],
         displayItems: [...items].sort((a, b) => getItemStrength(b) - getItemStrength(a)),
       }));
@@ -1247,6 +1314,9 @@ function InteractionSectionInner({
   const [minStrength, setMinStrength] = useState(0);
   const [groupMode, setGroupMode] = useState<GroupMode>("type");
 
+  // Centrality + removal impact state
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
+
   // Pagination state — per-group limits for interactions, plus section-level for others
   const [groupPages, setGroupPages] = useState<Record<string, number>>({});
   const [chainPage, setChainPage] = useState(PAGE_SIZE);
@@ -1303,6 +1373,24 @@ function InteractionSectionInner({
     () => buildGroups(rolledUpItems, filteredInteractions, groupMode),
     [rolledUpItems, filteredInteractions, groupMode]
   );
+
+  // Centrality scores — computed from full analysis (not filtered)
+  const centralityResult = useMemo(() => {
+    if (!analysis) return null;
+    return computeCentrality(analysis);
+  }, [analysis]);
+
+  // Removal impact index — all cards, pre-built for O(1) lookup
+  const removalImpacts = useMemo(() => {
+    if (!analysis) return null;
+    return computeAllRemovalImpacts(analysis);
+  }, [analysis]);
+
+  // Selected card's removal impact
+  const selectedImpact: RemovalImpact | null = useMemo(() => {
+    if (!selectedCard || !removalImpacts) return null;
+    return removalImpacts.get(selectedCard) ?? null;
+  }, [selectedCard, removalImpacts]);
 
   const hasActiveFilters = activeTypes.size > 0 || cardSearch.trim() !== "" || minStrength > 0;
   const totalCount = analysis?.interactions.length ?? 0;
@@ -1388,6 +1476,27 @@ function InteractionSectionInner({
 
           {/* Sections */}
           <div className="space-y-3">
+            {/* Card Centrality & Removal Impact */}
+            {centralityResult && centralityResult.scores.length > 0 && (
+              <CollapsiblePanel
+                id="ie-centrality"
+                title="Card Centrality & Removal Impact"
+                summary={`${centralityResult.scores.length} cards ranked`}
+                expanded={expandedSections.has("ie-centrality")}
+                onToggle={() => onToggleSection("ie-centrality")}
+                testId="centrality-panel"
+              >
+                <div className="space-y-4">
+                  <CentralityRanking
+                    scores={centralityResult.scores}
+                    selectedCard={selectedCard}
+                    onSelectCard={setSelectedCard}
+                  />
+                  <RemovalImpactInspector impact={selectedImpact} />
+                </div>
+              </CollapsiblePanel>
+            )}
+
             {/* Loops first if any exist */}
             {analysis.loops.length > 0 && (
               <CollapsiblePanel
@@ -1477,6 +1586,7 @@ function InteractionSectionInner({
                                 interaction={item.interaction}
                                 index={i}
                                 type={group.id}
+                                profiles={analysis?.profiles}
                               />
                             )
                           )}
