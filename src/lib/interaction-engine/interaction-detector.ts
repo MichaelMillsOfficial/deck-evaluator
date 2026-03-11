@@ -687,7 +687,7 @@ function detectTriggersFromOraclePatterns(
 
   // A causes life gain → B triggers on life gain
   if (cardCausesLifeGain(a, aOracle) && cardTriggersOnLifeGain(b, bOracle)) {
-    const dedupKey = `triggers:${a.cardName}:${b.cardName}:player_action:player_action`;
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:player_action:player_action:life_gain`;
     if (!seen.has(dedupKey)) {
       seen.add(dedupKey);
       results.push({
@@ -702,7 +702,7 @@ function detectTriggersFromOraclePatterns(
 
   // A is an instant/sorcery → B triggers on instant/sorcery cast
   if (cardIsSpellType(a, ["instant", "sorcery"]) && cardTriggersOnSpellCast(b, bOracle, ["instant", "sorcery"])) {
-    const dedupKey = `triggers:${a.cardName}:${b.cardName}:player_action:player_action`;
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:player_action:player_action:spell_cast`;
     if (!seen.has(dedupKey)) {
       seen.add(dedupKey);
       results.push({
@@ -951,7 +951,7 @@ function cardTriggersOnSpellCast(card: CardProfile, oracle: string, spellTypes: 
     }
   }
   // Oracle text fallback
-  const typePattern = spellTypes.join("|");
+  const typePattern = spellTypes.map(escapeRegExp).join("|");
   const regex = new RegExp(`whenever (?:you|a player) cast[s]? (?:an? )?(?:${typePattern})`, "i");
   if (regex.test(oracle)) return true;
   // Also match "whenever you cast an instant or sorcery spell"
@@ -996,8 +996,9 @@ function cardCausesLandETB(card: CardProfile, oracle: string): boolean {
   }
   // Oracle fallback: "search your library for a land card, put it onto the battlefield"
   if (/(?:search|put)\s+(?:a |one |up to \S+ )?(?:\S+ )?land\s+(?:card\s+)?(?:onto|into|on) the battlefield/i.test(oracle)) return true;
-  // Fetchlands: "Search your library for an [type] or [type] card, put it onto the battlefield"
-  if (/search your library for (?:a|an)\s+.+card,?\s+put it onto the battlefield/i.test(oracle)) return true;
+  // Fetchlands: "Search your library for a Forest or Plains card, put it onto the battlefield"
+  // Match land type names (basic land types and common dual-land references)
+  if (/search your library for (?:a|an)\s+(?:basic )?(?:Plains|Island|Swamp|Mountain|Forest|Desert|Gate|land)(?:\s+or\s+(?:Plains|Island|Swamp|Mountain|Forest|Desert|Gate|land))*\s+card,?\s+put it onto the battlefield/i.test(oracle)) return true;
   return false;
 }
 
@@ -1012,11 +1013,15 @@ function cardTriggersOnLandfall(card: CardProfile, oracle: string): boolean {
   return false;
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function cardTriggersOnSubtypeAttack(card: CardProfile, oracle: string, attackerSubtypes: Subtype[]): boolean {
   if (!attackerSubtypes || attackerSubtypes.length === 0) return false;
   // Check for oracle text pattern "whenever a [subtype] attacks"
   for (const subtype of attackerSubtypes) {
-    const regex = new RegExp(`whenever (?:a |an )?${subtype} (?:you control )?attacks`, "i");
+    const regex = new RegExp(`whenever (?:a |an )?${escapeRegExp(subtype)} (?:you control )?attacks`, "i");
     if (regex.test(oracle)) return true;
   }
   return false;
@@ -1545,10 +1550,12 @@ function cardDealsDamage(card: CardProfile): boolean {
 
 /**
  * Check if card is red (has red in mana cost or color identity).
+ * Handles pure {R} and hybrid symbols like {R/W}, {R/G}, {R/P}.
  */
 function cardIsRed(card: CardProfile): boolean {
-  if (card.castingCost?.manaCost && /\{R\}/i.test(card.castingCost.manaCost)) return true;
-  if (card.rawOracleText && /\{R\}/i.test(card.rawOracleText)) return true;
+  const redPattern = /\{R(?:\/[WUBGP2])?\}|\{[WUBG2]\/R\}/i;
+  if (card.castingCost?.manaCost && redPattern.test(card.castingCost.manaCost)) return true;
+  if (card.rawOracleText && redPattern.test(card.rawOracleText)) return true;
   return false;
 }
 
@@ -1681,18 +1688,20 @@ function oracleRecursionTypeMatches(oracle: string, b: CardProfile): boolean {
   // Patterns can be:
   //   "return target creature card from your graveyard" (return...type...graveyard)
   //   "target creature card in your graveyard...return it" (type...graveyard...return)
-  const typePatterns = [
-    { pattern: /creature card (?:from|in) (?:your |a )?graveyard/i, type: "creature" as CardType },
-    { pattern: /(?:return|put).*?creature card/i, type: "creature" as CardType },
-    { pattern: /artifact card (?:from|in) (?:your |a )?graveyard/i, type: "artifact" as CardType },
-    { pattern: /(?:return|put).*?artifact card/i, type: "artifact" as CardType },
-    { pattern: /enchantment card (?:from|in) (?:your |a )?graveyard/i, type: "enchantment" as CardType },
-    { pattern: /(?:return|put).*?enchantment card/i, type: "enchantment" as CardType },
-    { pattern: /instant (?:or sorcery )?card (?:from|in) (?:your |a )?graveyard/i, type: "instant" as CardType },
-    { pattern: /(?:return|put).*?instant (?:or sorcery )?card/i, type: "instant" as CardType },
-    { pattern: /permanent card (?:from|in) (?:your |a )?graveyard/i, type: "permanent" as unknown as CardType },
-    { pattern: /(?:return|put).*?permanent card/i, type: "permanent" as unknown as CardType },
-    { pattern: /permanent spell with mana value/i, type: "permanent" as unknown as CardType },
+  // Type strings here intentionally include "permanent" which is not a CardType,
+  // so we use plain strings and handle "permanent" via isPermanentCard().
+  const typePatterns: { pattern: RegExp; type: string }[] = [
+    { pattern: /creature card (?:from|in) (?:your |a )?graveyard/i, type: "creature" },
+    { pattern: /(?:return|put).*?creature card/i, type: "creature" },
+    { pattern: /artifact card (?:from|in) (?:your |a )?graveyard/i, type: "artifact" },
+    { pattern: /(?:return|put).*?artifact card/i, type: "artifact" },
+    { pattern: /enchantment card (?:from|in) (?:your |a )?graveyard/i, type: "enchantment" },
+    { pattern: /(?:return|put).*?enchantment card/i, type: "enchantment" },
+    { pattern: /instant (?:or sorcery )?card (?:from|in) (?:your |a )?graveyard/i, type: "instant" },
+    { pattern: /(?:return|put).*?instant (?:or sorcery )?card/i, type: "instant" },
+    { pattern: /permanent card (?:from|in) (?:your |a )?graveyard/i, type: "permanent" },
+    { pattern: /(?:return|put).*?permanent card/i, type: "permanent" },
+    { pattern: /permanent spell with mana value/i, type: "permanent" },
   ];
 
   // Only check patterns that are in a graveyard recursion context
@@ -1712,7 +1721,7 @@ function oracleRecursionTypeMatches(oracle: string, b: CardProfile): boolean {
 
   // Check if B matches any of the matched types
   for (const type of matchedTypes) {
-    if (type === ("permanent" as unknown as CardType)) {
+    if (type === "permanent") {
       if (isPermanentCard(b.cardTypes)) return true;
     } else if (b.cardTypes.includes(type as CardType)) {
       return true;
@@ -1957,9 +1966,6 @@ function detectReducesCost(a: CardProfile, b: CardProfile): Interaction[] {
   return results;
 }
 
-/**
- * Oracle text fallback for cost reduction detection.
- */
 /**
  * Oracle text cross-check for cost reduction targets.
  * When the structured parser gives a wildcard target, verify that
