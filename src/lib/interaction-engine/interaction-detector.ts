@@ -36,6 +36,7 @@ import type {
   SacrificeCost,
 } from "./types";
 import { PERMANENT_TYPES, matchesCompositeType } from "./game-model";
+import { detectLoopsFromChains } from "./loop-chain-solver";
 
 // ═══════════════════════════════════════════════════════════════
 // PUBLIC API
@@ -3088,6 +3089,17 @@ function detectLoops(
   for (const startCard of adjacency.keys()) {
     if (loops.length >= MAX_LOOPS) break;
     findCycles(startCard, [startCard], adjacency, loops, seen, profiles);
+  }
+
+  // Second pass: action-chain solver catches loops the graph-cycle approach misses
+  // (e.g., intermediary resources, self-loops via granted keywords, replacement effects)
+  const chainLoops = detectLoopsFromChains(profiles);
+  for (const cl of chainLoops) {
+    const key = [...cl.cards].sort().join("+");
+    if (!seen.has(key)) {
+      seen.add(key);
+      loops.push(cl);
+    }
   }
 
   return loops;

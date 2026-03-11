@@ -351,19 +351,20 @@ test.describe("loop & chain detection — classic aristocrats loop", () => {
 });
 
 test.describe("loop & chain detection — Pitiless Plunderer combo", () => {
-  test.fixme("Pitiless Plunderer + Viscera Seer + Reassembling Skeleton detects a loop", () => {
+  test("Pitiless Plunderer + Ashnod's Altar + Reassembling Skeleton detects a loop", () => {
     const plunderer = pitilessPlunderer();
-    const seer = visceraSeer();
+    const altar = ashnodAltar();
     const skeleton = reassemblingSkeleton();
-    const analysis = findInteractions([plunderer, seer, skeleton]);
+    const analysis = findInteractions([plunderer, altar, skeleton]);
 
-    // Sac Skeleton to Seer → Plunderer triggers making Treasure →
-    // use Treasure(s) to pay {1}{B} → return Skeleton → repeat
+    // Sac Skeleton to Altar for {C}{C} → Plunderer triggers making Treasure →
+    // Treasure gives {B} → pay {1}{B} to return Skeleton → repeat
+    // Net: mana-positive ({C}{C} + {B} = 3 mana, cost = {1}{B} = 2 mana)
     expect(analysis.loops.length).toBeGreaterThanOrEqual(1);
 
     const loop = analysis.loops.find(
       (l) =>
-        l.cards.includes("Viscera Seer") &&
+        l.cards.includes("Ashnod's Altar") &&
         l.cards.includes("Reassembling Skeleton")
     );
     expect(loop).toBeDefined();
@@ -445,7 +446,7 @@ test.describe("loop & chain detection — Dramatic Scepter", () => {
 });
 
 test.describe("loop & chain detection — Mikaeus + Triskelion", () => {
-  test.fixme("Mikaeus + Triskelion detects a loop", () => {
+  test("Mikaeus + Triskelion detects a loop", () => {
     const mikaeus = mikaeusTheUnhallowed();
     const trisk = triskelion();
     const analysis = findInteractions([mikaeus, trisk]);
@@ -546,7 +547,7 @@ test.describe("chain detection — Skullclamp + Young Pyromancer (value chain, n
 });
 
 test.describe("loop & chain detection — Persist combo (Kitchen Finks + Viscera Seer + Vizier of Remedies)", () => {
-  test.fixme("Kitchen Finks + Viscera Seer + Vizier of Remedies detects a loop", () => {
+  test("Kitchen Finks + Viscera Seer + Vizier of Remedies detects a loop", () => {
     const finks = kitchenFinks();
     const seer = visceraSeer();
     const vizier = vizierOfRemedies();
