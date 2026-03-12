@@ -429,6 +429,23 @@ test.describe("Artifacts axis", () => {
     expect(axis.detect(card)).toBeGreaterThan(0);
   });
 
+  test("detects artifact type line", () => {
+    const axis = getAxisById("artifacts")!;
+    const card = mockCard({
+      typeLine: "Artifact",
+      oracleText: "{T}: Add one mana of any color in your commander's color identity.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("detects non-artifact protection text", () => {
+    const axis = getAxisById("artifacts")!;
+    const card = mockCard({
+      oracleText: "Destroy all non-artifact creatures.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
   test("returns 0 for irrelevant card", () => {
     const axis = getAxisById("artifacts")!;
     const card = mockCard({ oracleText: "Destroy target creature." });

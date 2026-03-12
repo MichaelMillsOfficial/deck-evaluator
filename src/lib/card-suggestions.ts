@@ -115,7 +115,7 @@ export interface SuggestionsApiResponse {
 
 export const TAG_TO_SCRYFALL_QUERY: Record<string, string> = {
   // Ramp: mana rocks + land search + mana dorks + land auras + extra land drops
-  Ramp: '(o:"add {" or o:"search your library for" o:"land" or o:"additional land" or o:"tap for mana")',
+  Ramp: '(o:"add {" or o:"search your library for" o:"land" or o:"additional land" or o:"tap for mana") -t:land',
 
   // Card Draw: explicit draw effects
   "Card Draw": '(o:"draw" o:"card")',
