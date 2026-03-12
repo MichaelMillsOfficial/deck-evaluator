@@ -14,7 +14,7 @@ import type { AnalysisStep } from "@/hooks/useInteractionAnalysis";
 import { useEffect, useMemo, useState, Component, type ReactNode } from "react";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import CentralityRanking from "@/components/CentralityRanking";
-import RemovalImpactInspector from "@/components/RemovalImpactInspector";
+import RemovalImpactFloatingPanel from "@/components/RemovalImpactFloatingPanel";
 import { CitationList } from "@/components/InteractionCitation";
 import {
   rollUpInteractions,
@@ -1085,7 +1085,7 @@ function FilterControls({
       {/* Type filter pills + strength + grouping in one row */}
       <div className="flex flex-col sm:flex-row sm:items-start gap-3">
         {/* Type pills */}
-        <div className="flex gap-1.5 overflow-x-auto pb-1 -mb-1 flex-1">
+        <div className="flex flex-wrap gap-1.5 flex-1">
           <button
             type="button"
             onClick={() => {
@@ -1486,16 +1486,24 @@ function InteractionSectionInner({
                 onToggle={() => onToggleSection("ie-centrality")}
                 testId="centrality-panel"
               >
-                <div className="space-y-4">
+                <div>
+                  <p className="text-[11px] text-slate-500 italic mb-2">
+                    Click a card to see what breaks if you remove it.
+                  </p>
                   <CentralityRanking
                     scores={centralityResult.scores}
                     selectedCard={selectedCard}
                     onSelectCard={setSelectedCard}
                   />
-                  <RemovalImpactInspector impact={selectedImpact} />
                 </div>
               </CollapsiblePanel>
             )}
+
+            {/* Floating removal impact panel — lives outside CollapsiblePanel so it overlays all content */}
+            <RemovalImpactFloatingPanel
+              impact={selectedImpact}
+              onClose={() => setSelectedCard(null)}
+            />
 
             {/* Loops first if any exist */}
             {analysis.loops.length > 0 && (
