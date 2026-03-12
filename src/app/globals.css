@@ -18,3 +18,18 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   min-height: 100vh;
 }
+
+@keyframes slide-in-from-right {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+.removal-panel-enter {
+  animation: slide-in-from-right 0.18s ease-out forwards;
+}

@@ -127,12 +127,29 @@ export default function CentralityRanking({
 
                 {/* Category badge */}
                 <td className="py-2">
-                  <span
-                    aria-label={`Category: ${config.label}`}
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${config.classes}`}
-                  >
-                    {config.label}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      aria-label={`Category: ${config.label}`}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${config.classes}`}
+                    >
+                      {config.label}
+                    </span>
+                    {/* Panel-open indicator */}
+                    {isSelected && (
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="h-3 w-3 shrink-0 text-purple-400"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    )}
+                  </div>
                 </td>
               </tr>
             );
