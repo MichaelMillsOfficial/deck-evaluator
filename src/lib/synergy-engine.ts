@@ -20,6 +20,12 @@ import {
   identifySupertypeAnchors,
   isHistoric,
 } from "./supertypes";
+import type { SynergyAnalysisOptions, CardIntentSummary } from "./reasoning-engine/types";
+import {
+  buildDeckIntentSummaries,
+  analyzeDeckContext,
+  applyDeckContext,
+} from "./reasoning-engine";
 
 const BASE_SCORE = 50;
 const AXIS_WEIGHT = 3;
@@ -96,7 +102,8 @@ const axisMap = buildAxisMap();
 /** Generate heuristic synergy pairs between cards sharing axes */
 function generateSynergyPairs(
   cardNames: string[],
-  axisScores: Map<string, CardAxisScore[]>
+  axisScores: Map<string, CardAxisScore[]>,
+  intentSummaries?: Record<string, CardIntentSummary>
 ): SynergyPair[] {
   // Group cards by axis for O(axis × cards_per_axis²) instead of O(cards²)
   const cardsByAxis = new Map<string, { name: string; relevance: number }[]>();
@@ -130,6 +137,12 @@ function generateSynergyPairs(
         if (seen.has(key)) continue;
         seen.add(key);
 
+        // Reasoning engine filter: skip pairs where either card's contribution
+        // to this axis is purely opponent-directed
+        if (intentSummaries && shouldFilterPair(a.name, b.name, axisId, intentSummaries)) {
+          continue;
+        }
+
         const strength = Math.min(1, (a.relevance + b.relevance) / 2);
 
         pairs.push({
@@ -144,6 +157,72 @@ function generateSynergyPairs(
   }
 
   return pairs;
+}
+
+/**
+ * Determine if a synergy pair should be filtered out based on intent analysis.
+ * Returns true if the pair is a false positive (e.g., removal paired with own creature).
+ */
+function shouldFilterPair(
+  cardA: string,
+  cardB: string,
+  axisId: string,
+  intentSummaries: Record<string, CardIntentSummary>
+): boolean {
+  const summaryA = intentSummaries[cardA];
+  const summaryB = intentSummaries[cardB];
+
+  if (!summaryA || !summaryB) return false;
+
+  // Check if either card's effects relevant to this axis are purely opponent-directed
+  const intentA = getCardAxisIntent(summaryA, axisId);
+  const intentB = getCardAxisIntent(summaryB, axisId);
+
+  // If card A's contribution is opponent-only, it shouldn't synergize
+  // with card B on this axis (e.g., Breya's -4/-4 shouldn't pair with creatures)
+  if (intentA === "opponent" && intentB !== "opponent") return true;
+  if (intentB === "opponent" && intentA !== "opponent") return true;
+
+  return false;
+}
+
+/**
+ * Get a card's dominant intent for a specific synergy axis.
+ * Checks both the pre-computed axisIntent map and falls back to
+ * examining individual effects.
+ */
+function getCardAxisIntent(
+  summary: CardIntentSummary,
+  axisId: string
+): string | undefined {
+  // Check pre-computed axis intent
+  if (summary.axisIntent[axisId]) {
+    return summary.axisIntent[axisId];
+  }
+
+  // Check if card has any opponent-directed harmful effects
+  // that could create false positives
+  const hasOpponentHarmful = summary.effects.some(
+    (e) =>
+      e.targetIntent === "opponent" &&
+      e.polarity === "harmful" &&
+      e.confidence >= 0.7
+  );
+
+  if (hasOpponentHarmful) {
+    // Check if card also has self-beneficial effects
+    const hasSelfBeneficial = summary.effects.some(
+      (e) =>
+        e.targetIntent === "self" &&
+        e.polarity === "beneficial" &&
+        e.confidence >= 0.5
+    );
+
+    if (hasSelfBeneficial) return "either";
+    return "opponent";
+  }
+
+  return undefined;
 }
 
 /** Generate anti-synergy pairs between cards on conflicting axes */
@@ -593,7 +672,8 @@ function identifyDeckThemes(
 export function analyzeDeckSynergy(
   deck: DeckData,
   cardMap: Record<string, EnrichedCard>,
-  tagCache?: Map<string, string[]>
+  tagCache?: Map<string, string[]>,
+  options?: SynergyAnalysisOptions
 ): DeckSynergyAnalysis {
   const cardNames = getAllCardNames(deck);
 
@@ -609,14 +689,22 @@ export function analyzeDeckSynergy(
   // Step 1d: Boost keyword scores for cards with keywords anchored by payoff cards
   const keywordAnchors = boostKeywordScores(deck, cardNames, cardMap, axisScores);
 
+  // Step 1e: Build reasoning engine intent summaries (opt-in)
+  let intentSummaries: Record<string, CardIntentSummary> | undefined;
+  if (options?.reasoning) {
+    intentSummaries = buildDeckIntentSummaries(cardMap);
+    const deckContext = analyzeDeckContext(cardMap, axisScores);
+    applyDeckContext(intentSummaries, deckContext);
+  }
+
   // Step 2: Compute deck-level axis strengths
   const deckAxisStrengths = computeDeckAxisStrengths(axisScores);
 
   // Step 3: Detect known combos
   const comboPairs = combosToPairs(cardNames);
 
-  // Step 4: Generate heuristic synergy pairs
-  const synergyPairs = generateSynergyPairs(cardNames, axisScores);
+  // Step 4: Generate heuristic synergy pairs (with optional intent filtering)
+  const synergyPairs = generateSynergyPairs(cardNames, axisScores, intentSummaries);
 
   // Step 5: Generate anti-synergy pairs
   const antiSynergyPairs = generateAntiSynergyPairs(cardNames, axisScores, cardMap, tagCache);
