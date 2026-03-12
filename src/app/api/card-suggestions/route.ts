@@ -163,7 +163,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         });
       } catch (err) {
         console.error(
-          `[card-suggestions] category fill fetch failed for tag "${gap.tag}":`,
+          "[card-suggestions] category fill fetch failed for tag:",
+          gap.tag,
           err instanceof Error ? err.message : err
         );
         // Continue with empty suggestions for this category
@@ -216,7 +217,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         });
       } catch (err) {
         console.error(
-          `[card-suggestions] upgrade fetch failed for "${candidate.cardName}":`,
+          "[card-suggestions] upgrade fetch failed for:",
+          candidate.cardName,
           err instanceof Error ? err.message : err
         );
       }

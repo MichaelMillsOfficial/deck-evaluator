@@ -380,7 +380,7 @@ export function deriveGapsFromScorecard(
 ): GapDescriptor[] {
   return scorecard.categories
     .filter(
-      (cat: CategoryResult) =>
+      (cat: CategoryResult): cat is CategoryResult & { status: "low" | "critical" } =>
         isLowOrCritical(cat) && cat.tag !== "Lands"
     )
     .map((cat) => ({
