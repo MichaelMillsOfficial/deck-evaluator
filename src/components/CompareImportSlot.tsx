@@ -9,10 +9,14 @@ interface CompareImportSlotProps {
   label: string;
   /** Descriptive subtitle shown below the heading */
   subtitle: string;
+  /** Default name for the deck name field */
+  defaultName: string;
   /** Called with the imported deck and enriched card map once both are ready */
   onDeckReady: (deck: DeckData, cardMap: Record<string, EnrichedCard>) => void;
   /** Called when the user clears this slot */
   onDeckCleared: () => void;
+  /** Called whenever the deck name changes */
+  onNameChange: (name: string) => void;
   /** data-testid value for the slot root element */
   testId?: string;
 }
@@ -20,10 +24,13 @@ interface CompareImportSlotProps {
 export default function CompareImportSlot({
   label,
   subtitle,
+  defaultName,
   onDeckReady,
   onDeckCleared,
+  onNameChange,
   testId,
 }: CompareImportSlotProps) {
+  const [deckName, setDeckName] = useState(defaultName);
   const [deckData, setDeckData] = useState<DeckData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,11 +40,22 @@ export default function CompareImportSlot({
 
   const enrichAbortRef = useRef<AbortController | null>(null);
 
-  // Stable ref to avoid stale closure — onDeckReady is an inline arrow in parent
+  // Stable refs to avoid stale closures — callbacks are inline arrows in parent
   const onDeckReadyRef = useRef(onDeckReady);
   useEffect(() => {
     onDeckReadyRef.current = onDeckReady;
   }, [onDeckReady]);
+
+  const onNameChangeRef = useRef(onNameChange);
+  useEffect(() => {
+    onNameChangeRef.current = onNameChange;
+  }, [onNameChange]);
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setDeckName(value);
+    onNameChangeRef.current(value);
+  };
 
   const enrichDeck = useCallback(async (deck: DeckData) => {
     const allCards = [...deck.commanders, ...deck.mainboard, ...deck.sideboard];
@@ -137,6 +155,8 @@ export default function CompareImportSlot({
     setError(null);
     setEnrichLoading(false);
     setEnrichError(null);
+    setDeckName(defaultName);
+    onNameChangeRef.current(defaultName);
     onDeckCleared();
   };
 
@@ -165,6 +185,24 @@ export default function CompareImportSlot({
           {label}
         </h2>
         <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>
+        {/* Editable deck name */}
+        <div className="mt-3">
+          <label
+            htmlFor={`${testId ?? label}-deck-name`}
+            className="mb-1 block text-xs font-medium text-slate-400"
+          >
+            Deck name
+          </label>
+          <input
+            id={`${testId ?? label}-deck-name`}
+            type="text"
+            value={deckName}
+            onChange={handleNameChange}
+            placeholder="Enter a name for this deck"
+            data-testid={`${testId ?? label}-name-input`}
+            className="w-full rounded-lg border border-slate-600 bg-slate-900/50 px-3 py-2 text-sm text-white placeholder-slate-500 transition-colors focus:border-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 motion-reduce:transition-none"
+          />
+        </div>
       </div>
 
       {/* Import form — shown when no deck loaded yet */}
@@ -205,10 +243,7 @@ export default function CompareImportSlot({
           <div className="rounded-lg border border-slate-600 bg-slate-900/50 px-4 py-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate font-medium text-white" title={deckData.name}>
-                  {deckData.name}
-                </p>
-                <p className="mt-0.5 text-sm text-slate-400">
+                <p className="text-sm text-slate-400">
                   {totalCards} {totalCards === 1 ? "card" : "cards"}
                   {deckData.commanders.length > 0 && (
                     <span className="ml-2 text-slate-500">

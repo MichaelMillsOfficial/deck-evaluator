@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import { computeDeckComparison, type DeckComparisonResult } from "@/lib/deck-comparison";
 import CompareImportSlot from "@/components/CompareImportSlot";
@@ -14,12 +15,17 @@ interface DeckSlot {
   cardMap: Record<string, EnrichedCard>;
 }
 
+const DEFAULT_NAME_A = "Deck 1";
+const DEFAULT_NAME_B = "Deck 2";
+
 export default function ComparePageClient() {
   const [slotA, setSlotA] = useState<DeckSlot | null>(null);
   const [slotB, setSlotB] = useState<DeckSlot | null>(null);
+  const [nameA, setNameA] = useState(DEFAULT_NAME_A);
+  const [nameB, setNameB] = useState(DEFAULT_NAME_B);
 
-  const labelA = slotA?.deck.name && slotA.deck.name !== "Unknown Deck" ? slotA.deck.name : "Deck A";
-  const labelB = slotB?.deck.name && slotB.deck.name !== "Unknown Deck" ? slotB.deck.name : "Deck B";
+  const labelA = nameA.trim() || DEFAULT_NAME_A;
+  const labelB = nameB.trim() || DEFAULT_NAME_B;
 
   // Compute comparison only when both decks are enriched
   const comparisonResult = useMemo<{
@@ -61,6 +67,29 @@ export default function ComparePageClient() {
   return (
     <div data-testid="compare-page" className="min-h-screen px-4 py-10">
       <div className="mx-auto max-w-7xl">
+        {/* Back navigation */}
+        <div className="mb-6">
+          <Link
+            href="/"
+            data-testid="compare-back-link"
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 motion-reduce:transition-none"
+          >
+            <svg
+              className="h-4 w-4 shrink-0"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                fillRule="evenodd"
+                d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Back to Deck Evaluator
+          </Link>
+        </div>
+
         {/* Page header */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-white sm:text-4xl">Compare Decks</h1>
@@ -75,16 +104,20 @@ export default function ComparePageClient() {
           <CompareImportSlot
             label="Your deck"
             subtitle="Import your deck"
+            defaultName={DEFAULT_NAME_A}
             testId="compare-slot-a"
             onDeckReady={(deck, cardMap) => setSlotA({ deck, cardMap })}
             onDeckCleared={() => setSlotA(null)}
+            onNameChange={setNameA}
           />
           <CompareImportSlot
             label="Comparison deck"
             subtitle="Import the deck to compare against"
+            defaultName={DEFAULT_NAME_B}
             testId="compare-slot-b"
             onDeckReady={(deck, cardMap) => setSlotB({ deck, cardMap })}
             onDeckCleared={() => setSlotB(null)}
+            onNameChange={setNameB}
           />
         </div>
 
