@@ -1362,6 +1362,13 @@ function InteractionSectionInner({
     setGroupPages({});
   }, [activeTypes, minStrength, cardSearch]);
 
+  // Close the floating panel when the Card Centrality section is collapsed
+  useEffect(() => {
+    if (!expandedSections.has("ie-centrality")) {
+      setSelectedCard(null);
+    }
+  }, [expandedSections]);
+
   // Apply rollup to filtered interactions
   const rolledUpItems = useMemo(
     () => rollUpInteractions(filteredInteractions, analysis?.profiles ?? {}),
