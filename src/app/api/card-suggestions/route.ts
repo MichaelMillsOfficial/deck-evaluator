@@ -112,6 +112,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     .filter((n): n is string => typeof n === "string" && n.length > 0)
     .slice(0, MAX_DECK_CARD_NAMES);
 
+  // Set for O(1) post-fetch filtering (Scryfall query exclusions are capped
+  // at 20, so cards beyond that limit can still appear in results)
+  const deckCardNameSet = new Set(deckCardNames.map((n) => n.toLowerCase()));
+
   const upgradeCandidates: UpgradeCandidate[] = req.upgradeCandidates
     .filter(
       (c) =>
@@ -155,12 +159,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       let suggestions: CardSuggestion[] = [];
       try {
         const scryfallCards = await fetchScryfallSearch(query, {
-          limit: RESULTS_PER_CATEGORY,
+          limit: RESULTS_PER_CATEGORY * 3,
         });
-        suggestions = scryfallCards.map((rawCard) => {
-          const enriched = normalizeToEnrichedCard(rawCard);
-          return toCardSuggestion(enriched, gap.label);
-        });
+        suggestions = scryfallCards
+          .map((rawCard) => normalizeToEnrichedCard(rawCard))
+          .filter((card) => !deckCardNameSet.has(card.name.toLowerCase()))
+          .slice(0, RESULTS_PER_CATEGORY)
+          .map((enriched) => toCardSuggestion(enriched, gap.label));
       } catch (err) {
         console.error(
           "[card-suggestions] category fill fetch failed for tag:",
@@ -209,12 +214,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       let upgradeCards: CardSuggestion[] = [];
       try {
         const scryfallCards = await fetchScryfallSearch(upgQuery, {
-          limit: RESULTS_PER_UPGRADE,
+          limit: RESULTS_PER_UPGRADE * 3,
         });
-        upgradeCards = scryfallCards.map((rawCard) => {
-          const enriched = normalizeToEnrichedCard(rawCard);
-          return toCardSuggestion(enriched, primaryTag);
-        });
+        upgradeCards = scryfallCards
+          .map((rawCard) => normalizeToEnrichedCard(rawCard))
+          .filter((card) => !deckCardNameSet.has(card.name.toLowerCase()))
+          .slice(0, RESULTS_PER_UPGRADE)
+          .map((enriched) => toCardSuggestion(enriched, primaryTag));
       } catch (err) {
         console.error(
           "[card-suggestions] upgrade fetch failed for:",
