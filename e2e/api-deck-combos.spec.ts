@@ -19,8 +19,11 @@ test.beforeAll(async ({ request }) => {
       timeout: 20_000,
     });
     if (!res.ok()) {
+      spellbookReachable = false;
+    } else {
+      // The route uses graceful degradation: returns 200 with an error field
+      // when Commander Spellbook is unreachable.
       const body = await res.json();
-      // If the route returned an error field, spellbook might be unreachable
       if (body.error) {
         spellbookReachable = false;
       }

@@ -1,5 +1,30 @@
 import { test, expect, SAMPLE_DECKLIST } from "./fixtures";
 
+/**
+ * Probe Scryfall reachability so we can skip enrichment-dependent tests
+ * when the API is unreachable (sandboxed CI, offline dev).
+ */
+let scryfallReachable = true;
+
+test.beforeAll(async ({ request }) => {
+  try {
+    const res = await request.post("/api/deck-enrich", {
+      data: { cardNames: ["Sol Ring"] },
+      timeout: 15_000,
+    });
+    if (res.status() === 502) {
+      scryfallReachable = false;
+    } else if (res.ok()) {
+      const body = await res.json();
+      if (!body.cards?.["Sol Ring"]) {
+        scryfallReachable = false;
+      }
+    }
+  } catch {
+    scryfallReachable = false;
+  }
+});
+
 test.describe("Deck Header", () => {
   test("header is visible after deck import", async ({ deckPage }) => {
     await deckPage.goto();
@@ -43,6 +68,7 @@ test.describe("Deck Header", () => {
   });
 
   test("clicking tabs switches panel content", async ({ deckPage }) => {
+    test.skip(!scryfallReachable, "Scryfall API is unreachable");
     await deckPage.goto();
     await deckPage.fillDecklist(SAMPLE_DECKLIST);
     await deckPage.submitImport();
@@ -120,6 +146,7 @@ test.describe("Deck Header", () => {
   test("bracket/power badge appears after enrichment completes", async ({
     deckPage,
   }) => {
+    test.skip(!scryfallReachable, "Scryfall API is unreachable");
     await deckPage.goto();
     await deckPage.fillDecklist(SAMPLE_DECKLIST);
     await deckPage.submitImport();
@@ -144,6 +171,7 @@ test.describe("Deck Header", () => {
   test("theme pills render when deck has detected themes", async ({
     deckPage,
   }) => {
+    test.skip(!scryfallReachable, "Scryfall API is unreachable");
     await deckPage.goto();
     await deckPage.fillDecklist(SAMPLE_DECKLIST);
     await deckPage.submitImport();
@@ -175,6 +203,7 @@ test.describe("Deck Header", () => {
   test("hand stats visible after enrichment completes", async ({
     deckPage,
   }) => {
+    test.skip(!scryfallReachable, "Scryfall API is unreachable");
     await deckPage.goto();
     await deckPage.fillDecklist(SAMPLE_DECKLIST);
     await deckPage.submitImport();
