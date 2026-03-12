@@ -22,6 +22,7 @@ APP_PATHS=(
   "vercel.json"
   "Dockerfile"
   "docker-compose.yml"
+  "scripts/"
 )
 
 # Use Vercel-provided previous SHA, fall back to merge base with master
