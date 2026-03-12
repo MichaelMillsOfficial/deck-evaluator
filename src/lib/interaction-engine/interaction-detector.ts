@@ -505,7 +505,10 @@ function detectEnables(a: CardProfile, b: CardProfile): Interaction[] {
           resource.category === "create_token" &&
           cost.costType === "sacrifice"
         ) {
-          strength = 0.8;
+          // Permanents with sacrifice costs are repeatable engine pieces (0.8).
+          // Sorceries/instants with sacrifice costs are one-shot effects — the
+          // sacrifice only happens once per cast (CR 304-305), so reduce strength.
+          strength = isPermanentCard(b.cardTypes) ? 0.8 : 0.5;
           mechanical = `${a.cardName} creates tokens that ${b.cardName} can sacrifice`;
           seen.add(`enables:sacrifice:${a.cardName}:${b.cardName}`);
         } else if (resource.category === "mana" && cost.costType === "mana") {
@@ -644,8 +647,14 @@ function detectTriggers(a: CardProfile, b: CardProfile): Interaction[] {
         }
         seen.add(dedupKey);
 
-        const strength = computeTriggerStrength(caused, trigger);
+        let strength = computeTriggerStrength(caused, trigger);
         const mechanical = describeTriggerInteraction(a, b, caused, trigger);
+
+        // Sorceries/instants cause events only once per cast — not a repeatable
+        // engine. Reduce trigger strength for non-permanent sources (CR 304-305).
+        if (!isPermanentCard(a.cardTypes)) {
+          strength *= 0.6;
+        }
 
         results.push({
           cards: [a.cardName, b.cardName],
@@ -2900,6 +2909,10 @@ function detectChains(
 ): InteractionChain[] {
   if (profiles.length < 3) return [];
 
+  // Build profile lookup for card type checks (sorcery/instant penalty)
+  const profileMap = new Map<string, CardProfile>();
+  for (const p of profiles) profileMap.set(p.cardName, p);
+
   // Build adjacency list from causal interactions (directional)
   // Only include meaningful-strength edges — a chain is only as strong
   // as its weakest link, so weak edges produce weak chains.
@@ -2953,7 +2966,7 @@ function detectChains(
           const key = newPath.join(" → ");
           if (!seen.has(key)) {
             seen.add(key);
-            const chain = buildChain(newPath, newInteractions);
+            const chain = buildChain(newPath, newInteractions, profileMap);
             // Only keep chains where every edge is meaningful
             if (chain.strength >= MIN_CHAIN_AVG_STRENGTH) {
               candidates.push(chain);
@@ -3017,7 +3030,8 @@ function generateChainReasoning(
 
 function buildChain(
   path: string[],
-  interactions: Interaction[]
+  interactions: Interaction[],
+  profileMap: Map<string, CardProfile>
 ): InteractionChain {
   const steps: InteractionChain["steps"] = [];
   for (let i = 0; i < interactions.length; i++) {
@@ -3036,9 +3050,28 @@ function buildChain(
   }
 
   // Chain strength = minimum edge strength (weakest link)
-  const strength = interactions.length > 0
+  let strength = interactions.length > 0
     ? Math.min(...interactions.map((i) => i.strength))
     : 0;
+
+  // Penalize chains containing sorceries/instants — they are one-shot effects,
+  // not repeatable engine pieces. A chain implies sustained synergy, but
+  // sorceries/instants can only fire once per cast (CR 111, CR 304-305).
+  // Interior positions (not first or last) get the heaviest penalty because
+  // the chain narrative implies the card is a repeatable conduit.
+  for (let i = 0; i < path.length; i++) {
+    const p = profileMap.get(path[i]);
+    if (!p) continue;
+    if (!isPermanentCard(p.cardTypes)) {
+      // Interior position: sorcery/instant acting as conduit — heavy penalty
+      if (i > 0 && i < path.length - 1) {
+        strength *= 0.5;
+      } else {
+        // Start or end position: minor penalty (one-shot initiator/payoff)
+        strength *= 0.75;
+      }
+    }
+  }
 
   const reasoning = generateChainReasoning(path, interactions);
 

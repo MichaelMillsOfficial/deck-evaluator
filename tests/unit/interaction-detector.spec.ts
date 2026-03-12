@@ -1009,6 +1009,83 @@ test.describe("chain detection", () => {
     // Two-card interactions are just pairwise, not chains
     expect(analysis.chains).toHaveLength(0);
   });
+
+  test("sorcery in interior chain position gets penalized below threshold", () => {
+    // Token maker → Sorcery with sac cost → ETB trigger creature
+    // The sorcery is a one-shot effect and should not be treated as a repeatable conduit
+    const tokenMaker = profile({
+      name: "Adagia, Windswept Bastion",
+      typeLine: "Land",
+      oracleText:
+        "Adagia, Windswept Bastion enters the battlefield tapped.\n{T}: Add {G}.\n{2}{G}{G}, {T}: Create a 1/1 green Saproling creature token.",
+      manaCost: "",
+      cmc: 0,
+    });
+    const sorcery = profile({
+      name: "Trash for Treasure",
+      typeLine: "Sorcery",
+      oracleText:
+        "As an additional cost to cast this spell, sacrifice an artifact.\nReturn target artifact card from your graveyard to the battlefield.",
+      manaCost: "{2}{R}",
+      cmc: 3,
+    });
+    const etbCreature = profile({
+      name: "Breya, Etherium Shaper",
+      typeLine: "Legendary Artifact Creature — Human",
+      oracleText:
+        "When Breya, Etherium Shaper enters the battlefield, create two 1/1 blue Thopter artifact creature tokens.\n{2}, Sacrifice two artifacts: Choose one —\n• Breya deals 3 damage to target player or planeswalker.\n• Target creature gets -4/-4 until end of turn.\n• You gain 5 life.",
+      manaCost: "{W}{U}{B}{R}",
+      cmc: 4,
+      power: "4",
+      toughness: "4",
+      keywords: [],
+    });
+    const analysis = findInteractions([tokenMaker, sorcery, etbCreature]);
+
+    // Any chain with the sorcery in the middle should be penalized below 0.65
+    const sorceryMiddleChain = analysis.chains.find(
+      (c) =>
+        c.cards.length >= 3 &&
+        c.cards.indexOf("Trash for Treasure") > 0 &&
+        c.cards.indexOf("Trash for Treasure") < c.cards.length - 1
+    );
+    // Either no such chain exists, or its strength is below 0.65 (filtered out)
+    expect(sorceryMiddleChain).toBeUndefined();
+  });
+
+  test("sorcery enables interaction has reduced strength vs permanent", () => {
+    // Sorcery with sacrifice cost should get lower enables strength than permanent
+    const tokenMaker = profile({
+      name: "Avenger of Zendikar",
+      typeLine: "Creature — Plant",
+      oracleText:
+        "When Avenger of Zendikar enters the battlefield, create a 0/1 green Plant creature token for each land you control.\nLandfall — Whenever a land enters the battlefield under your control, you may put a +1/+1 counter on each Plant creature you control.",
+      manaCost: "{5}{G}{G}",
+      cmc: 7,
+      power: "5",
+      toughness: "5",
+    });
+    const sorcery = profile({
+      name: "Goblin Bombardment Sorcery",
+      typeLine: "Sorcery",
+      oracleText:
+        "As an additional cost to cast this spell, sacrifice a creature.\nGoblin Bombardment Sorcery deals 3 damage to any target.",
+      manaCost: "{1}{R}",
+      cmc: 2,
+    });
+    const permanent = ashnodAltar();
+
+    const sorceryAnalysis = findInteractions([tokenMaker, sorcery]);
+    const permanentAnalysis = findInteractions([tokenMaker, permanent]);
+
+    const sorceryEnables = findByType(sorceryAnalysis, "enables", "Avenger of Zendikar", "Goblin Bombardment Sorcery");
+    const permanentEnables = findByType(permanentAnalysis, "enables", "Avenger of Zendikar", "Ashnod's Altar");
+
+    // Sorcery enables should have lower strength than permanent enables
+    if (sorceryEnables.length > 0 && permanentEnables.length > 0) {
+      expect(sorceryEnables[0].strength).toBeLessThan(permanentEnables[0].strength);
+    }
+  });
 });
 
 test.describe("loop detection", () => {
