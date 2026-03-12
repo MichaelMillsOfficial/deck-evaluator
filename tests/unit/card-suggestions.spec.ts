@@ -4,6 +4,7 @@ import {
   buildScryfallSearchQuery,
   selectUpgradeCandidates,
   deriveGapsFromScorecard,
+  identifyLandSwapCandidates,
   WEAK_CARD_THRESHOLD,
   MAX_WEAK_CARDS,
   UPGRADE_SCORE_MIN,
@@ -409,7 +410,7 @@ test.describe("selectUpgradeCandidates", () => {
       }),
     };
     const deckThemes: DeckTheme[] = [
-      { axisId: "artifacts", axisName: "Artifacts", strength: 80 },
+      { axisId: "artifacts", axisName: "Artifacts", strength: 80, cardCount: 20 },
     ];
 
     const result = selectUpgradeCandidates(deck, cardMap, cardScores, {
@@ -435,7 +436,7 @@ test.describe("selectUpgradeCandidates", () => {
       }),
     };
     const deckThemes: DeckTheme[] = [
-      { axisId: "artifacts", axisName: "Artifacts", strength: 80 },
+      { axisId: "artifacts", axisName: "Artifacts", strength: 80, cardCount: 20 },
     ];
 
     const result = selectUpgradeCandidates(deck, cardMap, cardScores, {
@@ -462,7 +463,7 @@ test.describe("selectUpgradeCandidates", () => {
     };
     // Theme strength below threshold — card should still be a candidate
     const deckThemes: DeckTheme[] = [
-      { axisId: "artifacts", axisName: "Artifacts", strength: 25 },
+      { axisId: "artifacts", axisName: "Artifacts", strength: 25, cardCount: 5 },
     ];
 
     const result = selectUpgradeCandidates(deck, cardMap, cardScores, {
@@ -538,6 +539,203 @@ test.describe("deriveGapsFromScorecard", () => {
 
     const gaps = deriveGapsFromScorecard(scorecard);
     expect(gaps).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// identifyLandSwapCandidates tests
+// ---------------------------------------------------------------------------
+
+test.describe("identifyLandSwapCandidates", () => {
+  test("returns candidates when Lands category is low", () => {
+    const names = ["Weak Creature", "Another Weak Card"];
+    const deck = makeDeckWithCards(names);
+    const cardMap: Record<string, EnrichedCard> = {
+      "Weak Creature": makeEnrichedCard("Weak Creature", {
+        typeLine: "Creature",
+        oracleText: "",
+      }),
+      "Another Weak Card": makeEnrichedCard("Another Weak Card", {
+        typeLine: "Creature",
+        oracleText: "",
+      }),
+    };
+    const cardScores: Record<string, CardSynergyScore> = {
+      "Weak Creature": makeScore("Weak Creature", 15),
+      "Another Weak Card": makeScore("Another Weak Card", 20),
+    };
+    const scorecard = makeScorecard([
+      makeCategoryResult("Lands", "low", 32, 35, 38),
+      makeCategoryResult("Ramp", "good"),
+    ]);
+
+    const result = identifyLandSwapCandidates(deck, cardMap, cardScores, scorecard);
+    expect(result).not.toBeNull();
+    expect(result!.gap).toBe(3); // 35 - 32
+    expect(result!.candidates.length).toBeGreaterThan(0);
+    expect(result!.candidates.length).toBeLessThanOrEqual(3); // capped at gap
+  });
+
+  test("returns null when Lands category is good", () => {
+    const deck = makeDeckWithCards(["Some Card"]);
+    const cardMap: Record<string, EnrichedCard> = {
+      "Some Card": makeEnrichedCard("Some Card", {
+        typeLine: "Creature",
+        oracleText: "",
+      }),
+    };
+    const cardScores: Record<string, CardSynergyScore> = {
+      "Some Card": makeScore("Some Card", 15),
+    };
+    const scorecard = makeScorecard([
+      makeCategoryResult("Lands", "good", 36, 35, 38),
+    ]);
+
+    const result = identifyLandSwapCandidates(deck, cardMap, cardScores, scorecard);
+    expect(result).toBeNull();
+  });
+
+  test("returns null when no Lands category exists", () => {
+    const deck = makeDeckWithCards(["Some Card"]);
+    const cardMap: Record<string, EnrichedCard> = {
+      "Some Card": makeEnrichedCard("Some Card", {
+        typeLine: "Creature",
+        oracleText: "",
+      }),
+    };
+    const cardScores: Record<string, CardSynergyScore> = {
+      "Some Card": makeScore("Some Card", 15),
+    };
+    const scorecard = makeScorecard([
+      makeCategoryResult("Ramp", "good"),
+    ]);
+
+    const result = identifyLandSwapCandidates(deck, cardMap, cardScores, scorecard);
+    expect(result).toBeNull();
+  });
+
+  test("excludes commanders and lands from candidates", () => {
+    const cmdName = "Test Commander";
+    const landName = "Forest";
+    const weakCard = "Weak Creature";
+    const deck = makeDeckWithCards([landName, weakCard], [cmdName]);
+    const cardMap: Record<string, EnrichedCard> = {
+      [cmdName]: makeEnrichedCard(cmdName, {
+        typeLine: "Legendary Creature",
+        supertypes: ["Legendary"],
+        oracleText: "Draw a card.",
+      }),
+      [landName]: makeEnrichedCard(landName, {
+        typeLine: "Basic Land — Forest",
+        oracleText: "{T}: Add {G}.",
+      }),
+      [weakCard]: makeEnrichedCard(weakCard, {
+        typeLine: "Creature",
+        oracleText: "",
+      }),
+    };
+    const cardScores: Record<string, CardSynergyScore> = {
+      [cmdName]: makeScore(cmdName, 5),
+      [landName]: makeScore(landName, 0),
+      [weakCard]: makeScore(weakCard, 10),
+    };
+    const scorecard = makeScorecard([
+      makeCategoryResult("Lands", "critical", 30, 35, 38),
+    ]);
+
+    const result = identifyLandSwapCandidates(deck, cardMap, cardScores, scorecard);
+    expect(result).not.toBeNull();
+    const candidateNames = result!.candidates.map((c) => c.cardName);
+    expect(candidateNames).not.toContain(cmdName);
+    expect(candidateNames).not.toContain(landName);
+    expect(candidateNames).toContain(weakCard);
+  });
+
+  test("caps candidates at the land gap count", () => {
+    // Gap of 2 but 5 possible candidates
+    const names = Array.from({ length: 5 }, (_, i) => `Weak ${i}`);
+    const deck = makeDeckWithCards(names);
+    const cardMap: Record<string, EnrichedCard> = {};
+    const cardScores: Record<string, CardSynergyScore> = {};
+
+    names.forEach((name, i) => {
+      cardMap[name] = makeEnrichedCard(name, {
+        typeLine: "Creature",
+        oracleText: "",
+      });
+      cardScores[name] = makeScore(name, i * 5);
+    });
+
+    const scorecard = makeScorecard([
+      makeCategoryResult("Lands", "low", 33, 35, 38),
+    ]);
+
+    const result = identifyLandSwapCandidates(deck, cardMap, cardScores, scorecard);
+    expect(result).not.toBeNull();
+    expect(result!.gap).toBe(2);
+    expect(result!.candidates).toHaveLength(2);
+  });
+
+  test("sorted by score ascending (weakest first)", () => {
+    const names = ["Medium Card", "Weak Card", "Weakest Card"];
+    const deck = makeDeckWithCards(names);
+    const cardMap: Record<string, EnrichedCard> = {};
+    const cardScores: Record<string, CardSynergyScore> = {};
+
+    const scores = [30, 15, 5];
+    names.forEach((name, i) => {
+      cardMap[name] = makeEnrichedCard(name, {
+        typeLine: "Creature",
+        oracleText: "",
+      });
+      cardScores[name] = makeScore(name, scores[i]);
+    });
+
+    const scorecard = makeScorecard([
+      makeCategoryResult("Lands", "low", 32, 35, 38),
+    ]);
+
+    const result = identifyLandSwapCandidates(deck, cardMap, cardScores, scorecard);
+    expect(result).not.toBeNull();
+    expect(result!.candidates[0].cardName).toBe("Weakest Card");
+    expect(result!.candidates[1].cardName).toBe("Weak Card");
+    expect(result!.candidates[2].cardName).toBe("Medium Card");
+  });
+
+  test("protects combo pieces from land swap", () => {
+    const comboPiece = "Thassa's Oracle";
+    const comboPartner = "Demonic Consultation";
+    const weakCard = "Weak Creature";
+    const deck = makeDeckWithCards([comboPiece, comboPartner, weakCard]);
+    const cardMap: Record<string, EnrichedCard> = {
+      [comboPiece]: makeEnrichedCard(comboPiece, {
+        typeLine: "Creature — Merfolk Wizard",
+        oracleText: "When Thassa's Oracle enters the battlefield, look at the top X cards of your library...",
+      }),
+      [comboPartner]: makeEnrichedCard(comboPartner, {
+        typeLine: "Instant",
+        oracleText: "Name a card, then exile cards from the top of your library until you exile a card with that name.",
+      }),
+      [weakCard]: makeEnrichedCard(weakCard, {
+        typeLine: "Creature",
+        oracleText: "",
+      }),
+    };
+    const cardScores: Record<string, CardSynergyScore> = {
+      [comboPiece]: makeScore(comboPiece, 5),
+      [comboPartner]: makeScore(comboPartner, 5),
+      [weakCard]: makeScore(weakCard, 10),
+    };
+    const scorecard = makeScorecard([
+      makeCategoryResult("Lands", "critical", 30, 35, 38),
+    ]);
+
+    const result = identifyLandSwapCandidates(deck, cardMap, cardScores, scorecard);
+    expect(result).not.toBeNull();
+    const candidateNames = result!.candidates.map((c) => c.cardName);
+    expect(candidateNames).not.toContain(comboPiece);
+    expect(candidateNames).not.toContain(comboPartner);
+    expect(candidateNames).toContain(weakCard);
   });
 });
 

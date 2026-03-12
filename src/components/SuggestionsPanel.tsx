@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CategoryFillList from "@/components/CategoryFillList";
 import WeakCardList from "@/components/WeakCardList";
 import UpgradeList from "@/components/UpgradeList";
+import LandSwapList from "@/components/LandSwapList";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import {
   identifyWeakCards,
   selectUpgradeCandidates,
   deriveGapsFromScorecard,
+  identifyLandSwapCandidates,
 } from "@/lib/card-suggestions";
 import type {
   WeakCard,
@@ -60,6 +62,11 @@ export default function SuggestionsPanel({
   // -------------------------------------------------------------------------
   const gaps = useMemo(() => deriveGapsFromScorecard(scorecard), [scorecard]);
 
+  const landSwap = useMemo(
+    () => identifyLandSwapCandidates(deck, cardMap, synergyAnalysis.cardScores, scorecard),
+    [deck, cardMap, synergyAnalysis, scorecard]
+  );
+
   const upgradeCandidates = useMemo(
     () => selectUpgradeCandidates(deck, cardMap, synergyAnalysis.cardScores, {
       deckThemes: synergyAnalysis.deckThemes,
@@ -106,6 +113,7 @@ export default function SuggestionsPanel({
     fills: true,
     weak: true,
     upgrades: true,
+    landSwap: true,
   });
 
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -355,7 +363,27 @@ export default function SuggestionsPanel({
         </CollapsiblePanel>
 
         {/* ----------------------------------------------------------------- */}
-        {/* Section 3: Better Alternatives (Upgrades)                         */}
+        {/* Section 3: Replace with Lands                                     */}
+        {/* ----------------------------------------------------------------- */}
+        <CollapsiblePanel
+          id="suggestions-land-swap"
+          title="Replace with Lands"
+          expanded={expandedSections.landSwap}
+          onToggle={() => toggleSection("landSwap")}
+          testId="suggestions-land-swap-panel"
+          summary={
+            landSwap ? (
+              <span className="text-xs text-slate-400">
+                {landSwap.gap} land{landSwap.gap !== 1 ? "s" : ""} short
+              </span>
+            ) : undefined
+          }
+        >
+          <LandSwapList recommendation={landSwap} />
+        </CollapsiblePanel>
+
+        {/* ----------------------------------------------------------------- */}
+        {/* Section 4: Better Alternatives (Upgrades)                         */}
         {/* ----------------------------------------------------------------- */}
         <CollapsiblePanel
           id="suggestions-upgrades"

@@ -100,6 +100,20 @@ export interface UpgradeContext {
   deckThemes: DeckTheme[];
 }
 
+export interface LandSwapCandidate {
+  cardName: string;
+  synergyScore: number;
+  tags: string[];
+}
+
+export interface LandSwapRecommendation {
+  currentCount: number;
+  targetMin: number;
+  gap: number;
+  status: "low" | "critical";
+  candidates: LandSwapCandidate[];
+}
+
 export interface SuggestionsApiResponse {
   categoryFills: CategoryFillRecommendation[];
   upgrades: UpgradeSuggestion[];
@@ -419,4 +433,75 @@ export function deriveGapsFromScorecard(
       targetMin: cat.min,
       gap: cat.min - cat.count,
     }));
+}
+
+// ---------------------------------------------------------------------------
+// identifyLandSwapCandidates
+// ---------------------------------------------------------------------------
+
+/**
+ * When the deck is short on lands (Lands category is "low" or "critical"),
+ * identifies the weakest non-land, non-commander cards that could be cut
+ * to make room for more lands. Returns null if lands are adequate.
+ *
+ * Candidates are sorted by synergy score ascending (weakest first) and
+ * capped at the land gap count (targetMin - currentCount).
+ */
+export function identifyLandSwapCandidates(
+  deck: DeckData,
+  cardMap: Record<string, EnrichedCard>,
+  cardScores: Record<string, CardSynergyScore>,
+  scorecard: CompositionScorecardResult
+): LandSwapRecommendation | null {
+  // Find the Lands category
+  const landsCategory = scorecard.categories.find(
+    (cat) => cat.tag === "Lands"
+  );
+  if (!landsCategory) return null;
+  if (!isLowOrCritical(landsCategory)) return null;
+
+  const gap = landsCategory.min - landsCategory.count;
+  if (gap <= 0) return null;
+
+  const commanderNames = getCommanderNames(deck);
+  const allCardNames = getAllDeckCardNames(deck);
+  const comboCardNames = new Set(
+    findCombosInDeck(allCardNames).flatMap((c) => c.cards)
+  );
+
+  const candidates: LandSwapCandidate[] = [];
+
+  for (const section of [deck.mainboard, deck.sideboard]) {
+    for (const deckCard of section) {
+      const { name } = deckCard;
+
+      const enriched = cardMap[name];
+      if (!enriched) continue;
+
+      const scoreData = cardScores[name];
+      if (!scoreData) continue;
+
+      // Skip lands, commanders, combo pieces
+      if (isLand(enriched.typeLine)) continue;
+      if (commanderNames.has(name)) continue;
+      if (comboCardNames.has(name)) continue;
+
+      candidates.push({
+        cardName: name,
+        synergyScore: scoreData.score,
+        tags: generateTags(enriched),
+      });
+    }
+  }
+
+  // Sort weakest first, cap at the gap
+  candidates.sort((a, b) => a.synergyScore - b.synergyScore);
+
+  return {
+    currentCount: landsCategory.count,
+    targetMin: landsCategory.min,
+    gap,
+    status: landsCategory.status,
+    candidates: candidates.slice(0, gap),
+  };
 }
