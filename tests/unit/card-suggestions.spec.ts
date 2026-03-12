@@ -10,8 +10,10 @@ import {
   UPGRADE_SCORE_MAX,
   MAX_UPGRADE_CANDIDATES,
   MAX_QUERY_EXCLUSIONS,
+  THEME_STRENGTH_THRESHOLD,
+  AXIS_RELEVANCE_THRESHOLD,
 } from "../../src/lib/card-suggestions";
-import type { DeckData, EnrichedCard, CardSynergyScore } from "../../src/lib/types";
+import type { DeckData, EnrichedCard, CardSynergyScore, DeckTheme } from "../../src/lib/types";
 import type { CompositionScorecardResult, CategoryResult } from "../../src/lib/deck-composition";
 import { makeCard, makeDeck } from "../helpers";
 
@@ -388,6 +390,107 @@ test.describe("selectUpgradeCandidates", () => {
     const deck = makeDeckWithCards([]);
     const result = selectUpgradeCandidates(deck, {}, {});
     expect(result).toHaveLength(0);
+  });
+
+  test("excludes card with high axis relevance to a strong deck theme", () => {
+    const cardName = "Organic Extinction";
+    const deck = makeDeckWithCards([cardName]);
+    const cardMap: Record<string, EnrichedCard> = {
+      [cardName]: makeEnrichedCard(cardName, {
+        typeLine: "Sorcery",
+        oracleText: "Destroy all non-artifact creatures.",
+        cmc: 5,
+        manaCost: "{3}{B}{B}",
+      }),
+    };
+    const cardScores: Record<string, CardSynergyScore> = {
+      [cardName]: makeScore(cardName, 45, {
+        axes: [{ axisId: "artifacts", axisName: "Artifacts", relevance: 0.8 }],
+      }),
+    };
+    const deckThemes: DeckTheme[] = [
+      { axisId: "artifacts", axisName: "Artifacts", strength: 80 },
+    ];
+
+    const result = selectUpgradeCandidates(deck, cardMap, cardScores, {
+      deckThemes,
+    });
+    expect(result.some((c) => c.cardName === cardName)).toBe(false);
+  });
+
+  test("includes card with low relevance to all themes", () => {
+    const cardName = "Divination";
+    const deck = makeDeckWithCards([cardName]);
+    const cardMap: Record<string, EnrichedCard> = {
+      [cardName]: makeEnrichedCard(cardName, {
+        typeLine: "Sorcery",
+        oracleText: "Draw two cards.",
+        cmc: 3,
+        manaCost: "{2}{U}",
+      }),
+    };
+    const cardScores: Record<string, CardSynergyScore> = {
+      [cardName]: makeScore(cardName, 45, {
+        axes: [{ axisId: "artifacts", axisName: "Artifacts", relevance: 0.1 }],
+      }),
+    };
+    const deckThemes: DeckTheme[] = [
+      { axisId: "artifacts", axisName: "Artifacts", strength: 80 },
+    ];
+
+    const result = selectUpgradeCandidates(deck, cardMap, cardScores, {
+      deckThemes,
+    });
+    expect(result.some((c) => c.cardName === cardName)).toBe(true);
+  });
+
+  test("includes card relevant to a weak/marginal theme", () => {
+    const cardName = "Organic Extinction";
+    const deck = makeDeckWithCards([cardName]);
+    const cardMap: Record<string, EnrichedCard> = {
+      [cardName]: makeEnrichedCard(cardName, {
+        typeLine: "Sorcery",
+        oracleText: "Destroy all non-artifact creatures.",
+        cmc: 5,
+        manaCost: "{3}{B}{B}",
+      }),
+    };
+    const cardScores: Record<string, CardSynergyScore> = {
+      [cardName]: makeScore(cardName, 45, {
+        axes: [{ axisId: "artifacts", axisName: "Artifacts", relevance: 0.8 }],
+      }),
+    };
+    // Theme strength below threshold — card should still be a candidate
+    const deckThemes: DeckTheme[] = [
+      { axisId: "artifacts", axisName: "Artifacts", strength: 25 },
+    ];
+
+    const result = selectUpgradeCandidates(deck, cardMap, cardScores, {
+      deckThemes,
+    });
+    expect(result.some((c) => c.cardName === cardName)).toBe(true);
+  });
+
+  test("backwards compatible when context is omitted", () => {
+    const cardName = "Divination";
+    const deck = makeDeckWithCards([cardName]);
+    const cardMap: Record<string, EnrichedCard> = {
+      [cardName]: makeEnrichedCard(cardName, {
+        typeLine: "Sorcery",
+        oracleText: "Draw two cards.",
+        cmc: 3,
+        manaCost: "{2}{U}",
+      }),
+    };
+    const cardScores: Record<string, CardSynergyScore> = {
+      [cardName]: makeScore(cardName, 42, {
+        axes: [{ axisId: "artifacts", axisName: "Artifacts", relevance: 0.9 }],
+      }),
+    };
+
+    // Calling without context parameter should work as before (no filtering)
+    const result = selectUpgradeCandidates(deck, cardMap, cardScores);
+    expect(result.some((c) => c.cardName === cardName)).toBe(true);
   });
 });
 

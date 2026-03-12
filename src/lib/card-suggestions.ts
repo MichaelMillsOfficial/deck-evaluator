@@ -7,7 +7,7 @@
  * Pattern: (deck, cardMap, ...) => Result
  */
 
-import type { DeckData, EnrichedCard, CardSynergyScore } from "./types";
+import type { DeckData, EnrichedCard, CardSynergyScore, DeckTheme } from "./types";
 import type { CompositionScorecardResult, CategoryResult } from "./deck-composition";
 import { generateTags } from "./card-tags";
 import { findCombosInDeck } from "./known-combos";
@@ -22,6 +22,8 @@ export const UPGRADE_SCORE_MIN = 35;
 export const UPGRADE_SCORE_MAX = 55;
 export const MAX_UPGRADE_CANDIDATES = 8;
 export const MAX_QUERY_EXCLUSIONS = 20;
+export const THEME_STRENGTH_THRESHOLD = 30;
+export const AXIS_RELEVANCE_THRESHOLD = 0.5;
 export const RESULTS_PER_CATEGORY = 5;
 export const RESULTS_PER_UPGRADE = 3;
 export const SEARCH_DELAY_MS = 100;
@@ -92,6 +94,10 @@ export interface SuggestionsApiRequest {
   colorIdentity: string[];
   deckCardNames: string[];
   upgradeCandidates: UpgradeCandidate[];
+}
+
+export interface UpgradeContext {
+  deckThemes: DeckTheme[];
 }
 
 export interface SuggestionsApiResponse {
@@ -317,9 +323,21 @@ export function buildScryfallSearchQuery(
 export function selectUpgradeCandidates(
   deck: DeckData,
   cardMap: Record<string, EnrichedCard>,
-  cardScores: Record<string, CardSynergyScore>
+  cardScores: Record<string, CardSynergyScore>,
+  context?: UpgradeContext
 ): UpgradeCandidate[] {
   const commanderNames = getCommanderNames(deck);
+
+  // Build set of strong theme axis IDs for context-aware filtering
+  const strongThemeAxes = new Set<string>();
+  if (context) {
+    for (const theme of context.deckThemes) {
+      if (theme.strength >= THEME_STRENGTH_THRESHOLD) {
+        strongThemeAxes.add(theme.axisId);
+      }
+    }
+  }
+
   const candidates: UpgradeCandidate[] = [];
 
   for (const section of [deck.mainboard, deck.sideboard]) {
@@ -346,6 +364,16 @@ export function selectUpgradeCandidates(
       // Must have at least one functional tag
       const tags = generateTags(enriched);
       if (tags.length === 0) continue;
+
+      // Skip cards highly relevant to a strong deck theme
+      if (strongThemeAxes.size > 0) {
+        const isThemeRelevant = scoreData.axes.some(
+          (axis) =>
+            axis.relevance > AXIS_RELEVANCE_THRESHOLD &&
+            strongThemeAxes.has(axis.axisId)
+        );
+        if (isThemeRelevant) continue;
+      }
 
       candidates.push({
         cardName: name,

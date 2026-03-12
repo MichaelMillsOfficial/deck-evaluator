@@ -61,7 +61,9 @@ export default function SuggestionsPanel({
   const gaps = useMemo(() => deriveGapsFromScorecard(scorecard), [scorecard]);
 
   const upgradeCandidates = useMemo(
-    () => selectUpgradeCandidates(deck, cardMap, synergyAnalysis.cardScores),
+    () => selectUpgradeCandidates(deck, cardMap, synergyAnalysis.cardScores, {
+      deckThemes: synergyAnalysis.deckThemes,
+    }),
     [deck, cardMap, synergyAnalysis]
   );
 
