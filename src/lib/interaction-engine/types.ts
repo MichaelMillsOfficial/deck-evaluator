@@ -976,6 +976,46 @@ export interface InteractionLoop {
   requires?: Condition[];
 }
 
+// ─── Loop Chain Solver Types ───
+
+/** Constrains which game object can satisfy a resource requirement or is produced */
+export interface ObjectFilter {
+  /** true = "this creature", false = "another creature" */
+  self?: boolean;
+  /** Required types: ["creature"], ["artifact", "creature"] */
+  types?: string[];
+  /** Required subtypes: ["Zombie"], ["Human"] */
+  subtypes?: string[];
+  /** Excluded subtypes: non-Human → ["Human"] */
+  supertypeExcludes?: string[];
+  /** true = token only, false = nontoken only */
+  isToken?: boolean;
+}
+
+export interface ResourceRequirement {
+  token: string;
+  quantity: number;
+  filter?: ObjectFilter;
+}
+
+export interface ResourceProduction {
+  token: string;
+  quantity: number;
+  filter?: ObjectFilter;
+}
+
+export interface LoopStep {
+  card: string;
+  cardTypes?: string[];
+  cardSubtypes?: string[];
+  action: string;
+  requires: ResourceRequirement[];
+  produces: ResourceProduction[];
+  /** Outputs that MUST be consumed by another step or the loop stalls */
+  blocking: ResourceProduction[];
+  source: "structured" | "oracle";
+}
+
 // ─── Interaction Dependency Graph ───
 
 export interface InteractionBlocker {
