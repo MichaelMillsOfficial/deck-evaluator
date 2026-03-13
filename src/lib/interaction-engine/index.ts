@@ -142,6 +142,12 @@ export type {
   InteractionEnabler,
   RemovalImpact,
   InteractionAnalysis,
+
+  // Loop Chain Solver
+  ObjectFilter,
+  ResourceRequirement,
+  ResourceProduction,
+  LoopStep,
 } from "./types";
 
 // Lexer
@@ -164,6 +170,14 @@ export { profileCard } from "./capability-extractor";
 
 // Interaction detector
 export { findInteractions, findInteractionsAsync } from "./interaction-detector";
+
+// Loop chain solver
+export {
+  extractLoopSteps,
+  solveChain,
+  canSatisfyRequirements,
+  detectLoopsFromChains,
+} from "./loop-chain-solver";
 
 // Keyword database
 export {

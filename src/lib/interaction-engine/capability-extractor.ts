@@ -25,6 +25,7 @@ import type {
   ZoneTransition,
   StateChange,
   DamageEvent,
+  PlayerAction,
   PlayerResource,
   ManaResource,
   LifeResource,
@@ -930,9 +931,9 @@ function detectOracleTokenCreation(
 ): CreateTokenEffect[] {
   const tokens: CreateTokenEffect[] = [];
 
-  // Match "create a/an [description] token" or "create [N] [description] tokens"
+  // Match "create a/an [description] token" or "create [N/X/that many] [description] tokens"
   const tokenPattern =
-    /create\s+(?:a|an|\d+)\s+(.+?)\s+tokens?\b/gi;
+    /create\s+(?:a|an|\d+|[Xx]|that many)\s+(.+?)\s+tokens?\b/gi;
   let match;
 
   while ((match = tokenPattern.exec(oracleText)) !== null) {
@@ -943,6 +944,11 @@ function detectOracleTokenCreation(
     if (description.includes("creature")) types.push("creature");
     if (description.includes("artifact")) types.push("artifact");
     if (description.includes("enchantment")) types.push("enchantment");
+
+    // Named artifact token types: Treasure, Food, Clue, Blood, Map, Gold, Powerstone
+    if (types.length === 0 && /treasure|food|clue|blood|map|gold|powerstone/i.test(description)) {
+      types.push("artifact");
+    }
 
     // If no types found, default to creature (most common token type)
     if (types.length === 0) types.push("creature");
@@ -1070,6 +1076,152 @@ function detectOracleRestrictions(
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// ORACLE TEXT CAPABILITY EXTRACTION (Phase 2 — fixme test fixes)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Detect life gain events from oracle text / keywords that the parser
+ * may not capture as structured causesEvents entries.
+ * - Lifelink keyword → the card causes life gain when it deals damage
+ * - "you gain N life" patterns → explicit life gain event
+ */
+function detectOracleLifeGainEvents(
+  oracleText: string,
+  keywords: string[],
+  existingEvents: GameEvent[]
+): GameEvent[] {
+  // Skip if already has a gain_life event
+  const hasGainLife = existingEvents.some(
+    (e) => e.kind === "player_action" && (e as PlayerAction).action === "gain_life"
+  );
+  if (hasGainLife) return [];
+
+  const events: GameEvent[] = [];
+
+  // Lifelink keyword causes life gain
+  const hasLifelink = keywords.some((kw) => kw.toLowerCase() === "lifelink") ||
+    /lifelink/i.test(oracleText);
+
+  // Explicit "gain N life" patterns
+  const hasExplicitGain = /(?:you )?gain\s+(?:\d+|X)\s+life/i.test(oracleText);
+
+  if (hasLifelink || hasExplicitGain) {
+    events.push({
+      kind: "player_action",
+      action: "gain_life",
+    } as PlayerAction);
+  }
+
+  return events;
+}
+
+/**
+ * Detect draw events from oracle text that the parser may not capture.
+ * "draw a card" / "draw N cards" → player_action{draw} event
+ */
+function detectOracleDrawEvents(
+  oracleText: string,
+  existingEvents: GameEvent[]
+): GameEvent[] {
+  const hasDraw = existingEvents.some(
+    (e) => e.kind === "player_action" && (e as PlayerAction).action === "draw"
+  );
+  if (hasDraw) return [];
+
+  if (/draw (?:a|one|\d+) cards?/i.test(oracleText)) {
+    return [{
+      kind: "player_action",
+      action: "draw",
+    } as PlayerAction];
+  }
+
+  return [];
+}
+
+/**
+ * Detect enchantment-specific triggers from oracle text.
+ * - Constellation: "whenever an enchantment enters the battlefield"
+ * - Enchantment cast: "whenever you cast an enchantment spell"
+ */
+function detectOracleEnchantmentTriggers(
+  oracleText: string,
+  existingTriggersOn: GameEvent[]
+): GameEvent[] {
+  const triggers: GameEvent[] = [];
+
+  // Constellation / enchantment ETB
+  const hasEnchantmentETB = /whenever (?:an(?:other)? )?enchantment enters the battlefield/i.test(oracleText)
+    || /constellation/i.test(oracleText);
+  if (hasEnchantmentETB) {
+    const alreadyHas = existingTriggersOn.some(
+      (e) => e.kind === "zone_transition" && (e as ZoneTransition).to === "battlefield"
+        && (e as ZoneTransition).object?.types?.includes("enchantment")
+    );
+    if (!alreadyHas) {
+      triggers.push({
+        kind: "zone_transition",
+        to: "battlefield",
+        object: { types: ["enchantment"], quantity: "one" as const, modifiers: [] },
+      } as ZoneTransition);
+    }
+  }
+
+  // Enchantment cast trigger
+  const hasEnchantmentCast = /whenever you cast an? enchantment spell/i.test(oracleText);
+  if (hasEnchantmentCast) {
+    const alreadyHas = existingTriggersOn.some(
+      (e) => e.kind === "player_action" && (e as PlayerAction).action === "cast_spell"
+    );
+    if (!alreadyHas) {
+      triggers.push({
+        kind: "player_action",
+        action: "cast_spell",
+        object: { types: ["enchantment"], quantity: "one" as const, modifiers: [] },
+      } as PlayerAction);
+    }
+  }
+
+  return triggers;
+}
+
+/**
+ * Detect zone cast permissions from oracle text (Bolas's Citadel, etc.).
+ * "cast spells from the top of your library" → zone_cast_permission from library
+ */
+function detectOracleZoneCastPermissions(
+  oracleText: string,
+  existingPerms: ZoneCastPermission[]
+): ZoneCastPermission[] {
+  const perms: ZoneCastPermission[] = [];
+
+  // "cast spells from ... your library"
+  if (/(?:you may )?(?:play lands and )?cast spells from (?:the top of )?your library/i.test(oracleText)) {
+    const alreadyHas = existingPerms.some((p) => p.fromZone === "library");
+    if (!alreadyHas) {
+      perms.push({
+        category: "zone_cast_permission",
+        fromZone: "library",
+        position: /top of/i.test(oracleText) ? "top" : "any",
+      });
+    }
+  }
+
+  // "cast ... from your graveyard"
+  if (/(?:you may )?cast .+ from your graveyard/i.test(oracleText)) {
+    const alreadyHas = existingPerms.some((p) => p.fromZone === "graveyard");
+    if (!alreadyHas) {
+      perms.push({
+        category: "zone_cast_permission",
+        fromZone: "graveyard",
+      });
+    }
+  }
+
+  return perms;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
 // MAIN PROFILE FUNCTION
 // ═══════════════════════════════════════════════════════════════════
 
@@ -1137,7 +1289,25 @@ export function profileCard(card: EnrichedCard): CardProfile {
   const oracleCausedEvents = detectOracleCausedEvents(oracleText, causesEvents);
   causesEvents.push(...oracleCausedEvents);
 
-  // 11. Detect layout
+  // 11. Oracle text fallback: life gain events (lifelink, "gain N life")
+  const oracleLifeGainEvents = detectOracleLifeGainEvents(
+    oracleText, card.keywords || [], causesEvents
+  );
+  causesEvents.push(...oracleLifeGainEvents);
+
+  // 12. Oracle text fallback: draw events ("draw a card")
+  const oracleDrawEvents = detectOracleDrawEvents(oracleText, causesEvents);
+  causesEvents.push(...oracleDrawEvents);
+
+  // 13. Oracle text fallback: enchantment triggers (constellation, enchantment cast)
+  const oracleEnchantmentTriggers = detectOracleEnchantmentTriggers(oracleText, triggersOn);
+  triggersOn.push(...oracleEnchantmentTriggers);
+
+  // 14. Oracle text fallback: zone cast permissions (library/graveyard casting)
+  const oracleZoneCastPerms = detectOracleZoneCastPermissions(oracleText, zoneCastPermissions);
+  zoneCastPermissions.push(...oracleZoneCastPerms);
+
+  // 15. Detect layout
   const layout = mapLayout(card.layout);
 
   return {
