@@ -1596,6 +1596,18 @@ function detectRecurs(a: CardProfile, b: CardProfile): Interaction[] {
     return results;
   }
 
+  // Pre-check: if A's oracle text describes a blink pattern (exile then return
+  // to battlefield) but does NOT mention graveyard, it's not recursion.
+  if (a.rawOracleText) {
+    const BLINK_PATTERN = /\bexile\b.+?\breturn\b.+?\bto the battlefield\b/i;
+    if (
+      BLINK_PATTERN.test(a.rawOracleText) &&
+      !/\bgraveyard\b/i.test(a.rawOracleText)
+    ) {
+      return results;
+    }
+  }
+
   // 1. Check A's causesEvents for ZoneTransition{from: graveyard, to: battlefield|hand}
   for (const event of a.causesEvents) {
     if (event.kind !== "zone_transition") continue;
@@ -1920,6 +1932,18 @@ function getSearchTarget(effect: Effect): GameObjectRef | undefined {
 function detectReducesCost(a: CardProfile, b: CardProfile): Interaction[] {
   const results: Interaction[] = [];
 
+  // Pre-check: if A's oracle text ONLY has self-referential cost reduction
+  // ("This spell costs ... less"), it doesn't reduce costs for other cards.
+  if (a.rawOracleText && /\bthis spell costs?\b/i.test(a.rawOracleText)) {
+    // Check if there are also OTHER cost reduction patterns (affecting other spells).
+    // Strip self-referential sentences and re-check.
+    const strippedText = a.rawOracleText.replace(/[^.]*\bthis spell costs?\b[^.]*/gi, "");
+    const OTHER_COST_RE = /\bcosts?\s+\{\d+\}\s+less\b|\bcosts?\s+less\s+to\s+cast\b/i;
+    if (!OTHER_COST_RE.test(strippedText)) {
+      return results; // Only self-referential cost reduction
+    }
+  }
+
   // 1. Check A's costSubstitutions
   for (const sub of a.costSubstitutions) {
     if (costSubstitutionAppliesTo(sub, b)) {
@@ -1942,8 +1966,12 @@ function detectReducesCost(a: CardProfile, b: CardProfile): Interaction[] {
       effect.type === "reduce_cost" ||
       effect.type === "cost_modifier"
     ) {
-      // Check if the affected objects match B's types
+      // Self-only cost reduction (Affinity, Convoke, Delve, Improvise,
+      // "This spell costs less") only affects the card itself, not others.
       const affectedObjects = staticEffect.affectedObjects;
+      if (affectedObjects?.self === true) {
+        continue;
+      }
       if (
         !affectedObjects ||
         cardMatchesRef(b.cardTypes, affectedObjects, b.subtypes, b.supertypes)
