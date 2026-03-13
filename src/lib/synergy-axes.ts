@@ -101,6 +101,8 @@ const ARTIFACT_TRIGGER_RE = /whenever.+?artifact.+?enters the battlefield/i;
 const ARTIFACT_MATTERS_RE =
   /for each artifact|artifacts? you control|artifact creature/i;
 const ARTIFACT_KEYWORDS = new Set(["Affinity", "Metalcraft", "Improvise"]);
+const ARTIFACT_PROTECTION_RE = /non-?artifact/i;
+const ARTIFACT_TYPE_RE = /\bArtifact\b/;
 
 // --- Enchantments ---
 const ENCHANTMENT_TRIGGER_RE =
@@ -371,6 +373,10 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
       if (ARTIFACT_TRIGGER_RE.test(text)) score += 0.7;
       if (ARTIFACT_MATTERS_RE.test(text)) score += 0.5;
       if (card.keywords.some((kw) => ARTIFACT_KEYWORDS.has(kw))) score += 0.6;
+      // Cards that ARE artifacts get baseline relevance
+      if (ARTIFACT_TYPE_RE.test(card.typeLine)) score += 0.3;
+      // "non-artifact" text implies artifact-aware design
+      if (ARTIFACT_PROTECTION_RE.test(text)) score += 0.5;
       return Math.min(score, 1);
     },
     conflictsWith: [],

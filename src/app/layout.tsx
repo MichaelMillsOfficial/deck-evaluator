@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import Footer from "@/components/Footer";
+import NavLinks from "@/components/NavLinks";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -42,7 +43,7 @@ export default function RootLayout({
           aria-label="Main navigation"
           className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-sm"
         >
-          <div className="mx-auto flex max-w-6xl items-center px-6 py-4">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
             <Link
               href="/"
               className="flex items-center gap-2 rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
@@ -60,6 +61,8 @@ export default function RootLayout({
                 MTG Deck Evaluator
               </span>
             </Link>
+
+            <NavLinks />
           </div>
         </nav>
         <div className="flex-1">{children}</div>

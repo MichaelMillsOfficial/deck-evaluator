@@ -20,6 +20,7 @@ import {
   identifySupertypeAnchors,
   isHistoric,
 } from "./supertypes";
+import { getAllCardNames } from "./deck-analysis-aggregate";
 import type { SynergyAnalysisOptions, CardIntentSummary } from "./reasoning-engine/types";
 import {
   buildDeckIntentSummaries,
@@ -34,17 +35,6 @@ const ANTI_SYNERGY_PENALTY_WEIGHT = 5;
 const AXIS_RELEVANCE_THRESHOLD = 0.2;
 const DECK_THEME_MIN_CARDS = 2;
 const TOP_SYNERGIES_LIMIT = 15;
-
-/** Collect all unique card names from a deck */
-function getAllCardNames(deck: DeckData): string[] {
-  const names: string[] = [];
-  for (const section of [deck.commanders, deck.mainboard, deck.sideboard]) {
-    for (const card of section) {
-      names.push(card.name);
-    }
-  }
-  return names;
-}
 
 /** Score every card against every axis */
 function computeAxisScores(
