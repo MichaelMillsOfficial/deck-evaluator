@@ -39,3 +39,10 @@ export {
   generateIntentOverrides,
   applyDeckContext,
 } from "./deck-context";
+
+// Interaction filter
+export {
+  shouldFilterInteraction,
+  filterInteractions,
+  filterInteractionAnalysis,
+} from "./interaction-filter";
