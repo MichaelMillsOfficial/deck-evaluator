@@ -235,3 +235,158 @@ test.describe("Card Lookup — Manual Tab", () => {
     await expect(page.getByTestId("deck-header")).toBeHidden();
   });
 });
+
+test.describe("Card Lookup — Zone Header Guard", () => {
+  test.beforeEach(async ({ deckPage }) => {
+    await deckPage.goto();
+  });
+
+  test("inserts MAINBOARD: header when last zone is SIDEBOARD:", async ({
+    deckPage,
+    page,
+  }) => {
+    await mockAutocomplete(page, ["Sol Ring"]);
+
+    await deckPage.fillDecklist(
+      "MAINBOARD:\n1 Command Tower\n\nSIDEBOARD:\n1 Rest in Peace"
+    );
+
+    await deckPage.fillCardLookup("Sol Ring");
+
+    await expect(deckPage.decklistTextarea).toHaveValue(
+      "MAINBOARD:\n1 Command Tower\n\nSIDEBOARD:\n1 Rest in Peace\n\nMAINBOARD:\n1 Sol Ring"
+    );
+  });
+
+  test("inserts MAINBOARD: header when last zone is COMMANDER:", async ({
+    deckPage,
+    page,
+  }) => {
+    await mockAutocomplete(page, ["Sol Ring"]);
+
+    await deckPage.fillDecklist("COMMANDER:\n1 Atraxa, Praetors' Voice");
+
+    await deckPage.fillCardLookup("Sol Ring");
+
+    await expect(deckPage.decklistTextarea).toHaveValue(
+      "COMMANDER:\n1 Atraxa, Praetors' Voice\n\nMAINBOARD:\n1 Sol Ring"
+    );
+  });
+
+  test("does not insert header when last zone is MAINBOARD:", async ({
+    deckPage,
+    page,
+  }) => {
+    await mockAutocomplete(page, ["Arcane Signet"]);
+
+    await deckPage.fillDecklist("MAINBOARD:\n1 Sol Ring\n1 Command Tower");
+
+    await deckPage.fillCardLookup("Arcane Signet");
+
+    await expect(deckPage.decklistTextarea).toHaveValue(
+      "MAINBOARD:\n1 Sol Ring\n1 Command Tower\n1 Arcane Signet"
+    );
+  });
+
+  test("does not insert header when no zone headers exist", async ({
+    deckPage,
+    page,
+  }) => {
+    await mockAutocomplete(page, ["Arcane Signet"]);
+
+    await deckPage.fillDecklist("1 Sol Ring\n1 Command Tower");
+
+    await deckPage.fillCardLookup("Arcane Signet");
+
+    await expect(deckPage.decklistTextarea).toHaveValue(
+      "1 Sol Ring\n1 Command Tower\n1 Arcane Signet"
+    );
+  });
+
+  test("consolidates only within mainboard zone, not sideboard", async ({
+    deckPage,
+    page,
+  }) => {
+    await mockAutocomplete(page, ["Rest in Peace"]);
+
+    // Rest in Peace exists in SIDEBOARD — lookup should NOT consolidate it
+    await deckPage.fillDecklist(
+      "MAINBOARD:\n1 Sol Ring\n\nSIDEBOARD:\n1 Rest in Peace"
+    );
+
+    await deckPage.fillCardLookup("Rest in Peace");
+
+    // Should add a new MAINBOARD entry, not increment the sideboard copy
+    await expect(deckPage.decklistTextarea).toHaveValue(
+      "MAINBOARD:\n1 Sol Ring\n\nSIDEBOARD:\n1 Rest in Peace\n\nMAINBOARD:\n1 Rest in Peace"
+    );
+  });
+
+  test("consolidates only within mainboard zone, not commander", async ({
+    deckPage,
+    page,
+  }) => {
+    await mockAutocomplete(page, ["Atraxa, Praetors' Voice"]);
+
+    // Atraxa exists under COMMANDER — lookup should NOT consolidate it
+    await deckPage.fillDecklist(
+      "COMMANDER:\n1 Atraxa, Praetors' Voice\n\nMAINBOARD:\n1 Sol Ring"
+    );
+
+    await deckPage.fillCardLookup("Atraxa, Praetors' Voice");
+
+    // Should append to mainboard, not increment the commander copy
+    await expect(deckPage.decklistTextarea).toHaveValue(
+      "COMMANDER:\n1 Atraxa, Praetors' Voice\n\nMAINBOARD:\n1 Sol Ring\n1 Atraxa, Praetors' Voice"
+    );
+  });
+
+  test("status message reflects mainboard when header is auto-inserted", async ({
+    deckPage,
+    page,
+  }) => {
+    await mockAutocomplete(page, ["Sol Ring"]);
+
+    await deckPage.fillDecklist(
+      "MAINBOARD:\n1 Command Tower\n\nSIDEBOARD:\n1 Rest in Peace"
+    );
+
+    await deckPage.fillCardLookup("Sol Ring");
+
+    await expect(deckPage.cardLookupStatus).toHaveText(
+      "Added 1 Sol Ring (mainboard)"
+    );
+  });
+});
+
+test.describe("Card Lookup — Zone Header Help", () => {
+  test.beforeEach(async ({ deckPage }) => {
+    await deckPage.goto();
+  });
+
+  test("zone format guide is visible on manual tab", async ({
+    deckPage,
+    page,
+  }) => {
+    const guide = page.getByTestId("zone-format-guide");
+    await expect(guide).toBeVisible();
+  });
+
+  test("zone format guide lists supported zone headers", async ({
+    deckPage,
+    page,
+  }) => {
+    const guide = page.getByTestId("zone-format-guide");
+    await expect(guide).toContainText("COMMANDER:");
+    await expect(guide).toContainText("MAINBOARD:");
+    await expect(guide).toContainText("SIDEBOARD:");
+  });
+
+  test("zone format guide is not visible on Moxfield tab", async ({
+    deckPage,
+    page,
+  }) => {
+    await deckPage.selectTab("Moxfield");
+    await expect(page.getByTestId("zone-format-guide")).toBeHidden();
+  });
+});
