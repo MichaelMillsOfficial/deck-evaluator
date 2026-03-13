@@ -246,6 +246,41 @@ export class DeckPage {
     return this.expandAnalysisSection(id);
   }
 
+  // ---------------------------------------------------------------------------
+  // Card lookup (manual tab only)
+  // ---------------------------------------------------------------------------
+
+  /** Locator for the card lookup search input */
+  get cardLookupInput() {
+    return this.page.locator("#card-lookup-input");
+  }
+
+  /** Locator for the card lookup quantity spinner */
+  get cardLookupQuantity() {
+    return this.page.getByLabel("Card quantity");
+  }
+
+  /** Locator for the card lookup status live region */
+  get cardLookupStatus() {
+    return this.page.getByTestId("card-lookup-status");
+  }
+
+  /**
+   * Type a card name into the card lookup input, wait for the autocomplete
+   * dropdown to appear, and click the matching suggestion.
+   * NOTE: Callers must mock /api/card-autocomplete via page.route() first.
+   */
+  async fillCardLookup(name: string) {
+    await this.cardLookupInput.fill(name);
+    const option = this.page.getByRole("option", { name });
+    await option.waitFor({ timeout: 5_000 });
+    await option.click();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Commander input
+  // ---------------------------------------------------------------------------
+
   /** Locator for the commander input field */
   get commanderInput() {
     return this.page.locator("#commander-input");

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useRef, useCallback, type FormEvent } from "react";
 import CommanderInput from "@/components/CommanderInput";
+import CardLookupInput from "@/components/CardLookupInput";
 
 type ImportTab = "manual" | "moxfield" | "archidekt";
 
@@ -38,6 +39,23 @@ export default function DeckInput({
   const [activeTab, setActiveTab] = useState<ImportTab>("manual");
   const [textValue, setTextValue] = useState("");
   const [commanders, setCommanders] = useState<string[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleCardLookup = useCallback(
+    (name: string, quantity: number) => {
+      setTextValue((prev) => {
+        const line = `${quantity} ${name}`;
+        if (!prev) return line;
+        return prev.endsWith("\n") ? prev + line : prev + "\n" + line;
+      });
+      // Scroll textarea to bottom after React renders
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+    },
+    []
+  );
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -163,6 +181,14 @@ export default function DeckInput({
             />
           )}
 
+          {/* Card lookup (manual tab only) */}
+          {activeTab === "manual" && (
+            <CardLookupInput
+              onCardSelected={handleCardLookup}
+              disabled={loading}
+            />
+          )}
+
           {/* Decklist textarea */}
           <div>
             <label
@@ -172,6 +198,7 @@ export default function DeckInput({
               Decklist
             </label>
             <textarea
+              ref={textareaRef}
               id="decklist"
               value={textValue}
               onChange={(e) => setTextValue(e.target.value)}
