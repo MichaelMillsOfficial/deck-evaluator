@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
 interface CardLookupInputProps {
-  onCardSelected: (name: string, quantity: number) => void;
+  onCardSelected: (name: string, quantity: number) => string;
   disabled?: boolean;
 }
 
@@ -71,11 +71,11 @@ export default function CardLookupInput({
   };
 
   const selectCard = (name: string) => {
-    onCardSelected(name, quantity);
+    const status = onCardSelected(name, quantity);
 
     // Show status message
     if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
-    setStatusMessage(`Added ${quantity} ${name}`);
+    setStatusMessage(status);
     statusTimerRef.current = setTimeout(() => {
       setStatusMessage("");
     }, 2000);

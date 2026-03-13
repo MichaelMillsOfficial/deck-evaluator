@@ -42,17 +42,38 @@ export default function DeckInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleCardLookup = useCallback(
-    (name: string, quantity: number) => {
+    (name: string, quantity: number): string => {
+      const cardLineRe = /^(\d+)x?\s+(.+)$/;
+      let statusMsg = `Added ${quantity} ${name}`;
+
       setTextValue((prev) => {
-        const line = `${quantity} ${name}`;
-        if (!prev) return line;
-        return prev.endsWith("\n") ? prev + line : prev + "\n" + line;
+        if (!prev) return `${quantity} ${name}`;
+
+        const lines = prev.split("\n");
+
+        for (let i = 0; i < lines.length; i++) {
+          const match = lines[i].match(cardLineRe);
+          if (match && match[2].toLowerCase() === name.toLowerCase()) {
+            const newQty = parseInt(match[1], 10) + quantity;
+            lines[i] = `${newQty} ${name}`;
+            statusMsg = `Updated ${name} to ${newQty}`;
+            return lines.join("\n");
+          }
+        }
+
+        // Append as new line
+        return prev.endsWith("\n")
+          ? prev + `${quantity} ${name}`
+          : prev + `\n${quantity} ${name}`;
       });
+
       // Scroll textarea to bottom after React renders
       requestAnimationFrame(() => {
         const el = textareaRef.current;
         if (el) el.scrollTop = el.scrollHeight;
       });
+
+      return statusMsg;
     },
     []
   );

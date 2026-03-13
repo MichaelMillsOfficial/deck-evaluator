@@ -160,6 +160,64 @@ test.describe("Card Lookup — Manual Tab", () => {
     );
   });
 
+  test("consolidates quantity when adding a card already in textarea", async ({
+    deckPage,
+    page,
+  }) => {
+    await mockAutocomplete(page, ["Cyclonic Rift"]);
+
+    // Pre-fill textarea with an existing card
+    await deckPage.fillDecklist("1 Cyclonic Rift");
+
+    await deckPage.fillCardLookup("Cyclonic Rift");
+
+    // Should update the existing line to 2, not add a duplicate
+    await expect(deckPage.decklistTextarea).toHaveValue("2 Cyclonic Rift");
+  });
+
+  test("consolidates with custom quantity when card already exists", async ({
+    deckPage,
+    page,
+  }) => {
+    await mockAutocomplete(page, ["Lightning Bolt"]);
+
+    await deckPage.fillDecklist("2 Lightning Bolt\n1 Sol Ring");
+
+    await deckPage.cardLookupQuantity.fill("3");
+    await deckPage.fillCardLookup("Lightning Bolt");
+
+    // 2 + 3 = 5
+    await expect(deckPage.decklistTextarea).toHaveValue(
+      "5 Lightning Bolt\n1 Sol Ring"
+    );
+  });
+
+  test("consolidates case-insensitively", async ({ deckPage, page }) => {
+    await mockAutocomplete(page, ["Sol Ring"]);
+
+    await deckPage.fillDecklist("1 sol ring");
+
+    await deckPage.fillCardLookup("Sol Ring");
+
+    // Should update existing line, using the new casing from the lookup
+    await expect(deckPage.decklistTextarea).toHaveValue("2 Sol Ring");
+  });
+
+  test("status message reflects updated total when consolidating", async ({
+    deckPage,
+    page,
+  }) => {
+    await mockAutocomplete(page, ["Sol Ring"]);
+
+    await deckPage.fillDecklist("1 Sol Ring");
+
+    await deckPage.fillCardLookup("Sol Ring");
+
+    await expect(deckPage.cardLookupStatus).toHaveText(
+      "Updated Sol Ring to 2"
+    );
+  });
+
   test("Enter in search input does not submit the import form", async ({
     deckPage,
     page,
