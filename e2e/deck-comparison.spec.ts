@@ -293,9 +293,9 @@ test.describe("Deck Comparison page", () => {
     await page.goto("/compare");
     await importDeckInSlot(page, "compare-slot-a", DECK_A_TEXT);
 
-    // Wait for the deck summary to appear in slot A
+    // Wait for the deck summary to appear in slot A (card count confirms enrichment)
     await expect(
-      page.getByTestId("compare-slot-a").getByText("Control Deck")
+      page.getByTestId("compare-slot-a").getByText(/\d+ cards/)
     ).toBeVisible({ timeout: 10_000 });
 
     await expect(

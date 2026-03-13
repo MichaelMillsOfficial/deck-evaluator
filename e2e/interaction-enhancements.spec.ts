@@ -445,7 +445,7 @@ test.describe("Centrality Ranking panel", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("Removal Impact Inspector", () => {
-  test("removal impact inspector is visible in the centrality panel", async ({
+  test("removal impact inspector is visible after selecting a card in the centrality panel", async ({
     deckPage,
   }) => {
     await setupInteractionsTab(deckPage);
@@ -460,7 +460,17 @@ test.describe("Removal Impact Inspector", () => {
       if (expanded !== "true") await btn.click();
     }
 
-    // Inspector renders in placeholder state when no card is selected
+    // Floating panel should not be visible before selecting a card
+    const floatingPanel = page.getByTestId("removal-impact-floating-panel");
+    await expect(floatingPanel).not.toBeVisible();
+
+    // Click the first centrality row to open the floating panel
+    const rankingTable = page.getByTestId("centrality-ranking");
+    await expect(rankingTable).toBeVisible({ timeout: 5_000 });
+    const firstRow = rankingTable.locator("[data-testid='centrality-row']").first();
+    await firstRow.click();
+
+    // Inspector should now be visible inside the floating panel
     const inspector = page.getByTestId("removal-impact-inspector");
     await expect(inspector).toBeVisible({ timeout: 5_000 });
   });
