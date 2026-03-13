@@ -256,7 +256,7 @@ export function analyzeCandidateCard(
     mainboard: [...deck.mainboard, { name: candidate.name, quantity: 1 }],
   };
   const augmentedMap = { ...cardMap, [candidate.name]: candidate };
-  const augmentedAnalysis = analyzeDeckSynergy(augmentedDeck, augmentedMap);
+  const augmentedAnalysis = analyzeDeckSynergy(augmentedDeck, augmentedMap, undefined, { reasoning: true });
   const cardScore = augmentedAnalysis.cardScores[candidate.name];
 
   const synergyScore = cardScore?.score ?? 50;
