@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import type { EnrichedCard } from "@/lib/types";
 import type { InteractionAnalysis, CardProfile } from "@/lib/interaction-engine";
 import { profileCard, findInteractionsAsync } from "@/lib/interaction-engine";
+import { filterInteractionAnalysis } from "@/lib/reasoning-engine";
 
 export interface AnalysisStep {
   id: "profiling" | "detecting" | "finalizing";
@@ -153,20 +154,22 @@ export function useInteractionAnalysis(
         setProgress(85);
         await yield_();
 
-        // Step 3: Finalize
+        // Step 3: Finalize — apply reasoning engine to filter false positives
         if (cancelledRef.current) return;
         updateStep("finalizing", "active");
         setProgress(90);
         await yield_();
 
+        const filtered = filterInteractionAnalysis(result, cardMap);
+
         updateStep("finalizing", "done");
         setProgress(100);
 
         // Store in session cache for instant re-access
-        sessionCache.set(cacheKey, result);
+        sessionCache.set(cacheKey, filtered);
 
         computedForRef.current = cardMap;
-        setAnalysis(result);
+        setAnalysis(filtered);
         setLoading(false);
       } catch (err) {
         if (!cancelledRef.current) {
