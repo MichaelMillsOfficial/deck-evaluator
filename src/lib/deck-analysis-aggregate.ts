@@ -111,7 +111,7 @@ export function computeAllAnalyses(
 
   // Phase 6: Budget & Synergy
   const budgetAnalysis = computeBudgetAnalysis(deck, cardMap, tagCache);
-  const synergyAnalysis = analyzeDeckSynergy(deck, cardMap, tagCache);
+  const synergyAnalysis = analyzeDeckSynergy(deck, cardMap, tagCache, { reasoning: true });
 
   // Phase 7: Composition
   const compositionScorecard = computeCompositionScorecard(

@@ -1366,8 +1366,11 @@ function detectAmplifies(a: CardProfile, b: CardProfile): Interaction[] {
       isAmplifying = AMPLIFY_KEYWORDS.has(grant.ability.toLowerCase());
       description = `grants ${grant.ability}`;
     } else if (grant.ability.category === "stat_mod") {
-      isAmplifying = true;
       const sm = grant.ability;
+      // Negative stat mods (e.g. -4/-4) are removal, not amplification
+      const pNum = typeof sm.power === "number" ? sm.power : 1;   // treat "X" as positive
+      const tNum = typeof sm.toughness === "number" ? sm.toughness : 1;
+      isAmplifying = pNum > 0 || tNum > 0;
       const pSign = typeof sm.power === "number" && sm.power >= 0 ? "+" : "";
       const tSign = typeof sm.toughness === "number" && sm.toughness >= 0 ? "+" : "";
       description = `grants ${pSign}${sm.power}/${tSign}${sm.toughness}`;

@@ -1810,6 +1810,33 @@ test.describe("amplifies — stat-mod grants to matching creatures", () => {
     // The mechanical text should mention the stat modification
     expect(amplifies[0].mechanical).toContain("+1/+1");
   });
+
+  test("negative stat mods like -4/-4 are NOT amplification (Breya removal)", () => {
+    const breya = profile({
+      name: "Breya, Etherium Shaper",
+      typeLine: "Legendary Artifact Creature — Human",
+      oracleText:
+        "When Breya, Etherium Shaper enters the battlefield, create two 1/1 blue Thopter artifact creature tokens with flying.\n" +
+        "{2}, Sacrifice two artifacts: Choose one —\n" +
+        "• Target player loses 3 life.\n" +
+        "• Target creature gets -4/-4 until end of turn.\n" +
+        "• You gain 5 life.",
+      keywords: [],
+    });
+
+    const creature = profile({
+      name: "Alloy Myr",
+      typeLine: "Artifact Creature — Myr",
+      oracleText: "{T}: Add one mana of any color.",
+      keywords: [],
+    });
+
+    const analysis = findInteractions([breya, creature]);
+    const amplifies = findByType(analysis, "amplifies", "Breya, Etherium Shaper", "Alloy Myr");
+    // -4/-4 is removal for opponents, NOT amplification for our creatures
+    const debuffAmplifies = amplifies.filter((a) => a.mechanical.includes("-4/-4"));
+    expect(debuffAmplifies.length).toBe(0);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════
