@@ -1,7 +1,13 @@
 import type { DeckData, EnrichedCard } from "./types";
 import { getTagsCached, RAMP_LAND_SEARCH_RE, RITUAL_MANA_ADD_RE } from "./card-tags";
 import { classifyLandEntry } from "./land-base-efficiency";
-import { buildPool, buildCommandZone, canCastWithLands } from "./opening-hand";
+import {
+  buildPool,
+  buildCommandZone,
+  canCastWithLands,
+  evaluateHandQuality,
+} from "./opening-hand";
+import type { HandCard, Verdict } from "./opening-hand";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -73,9 +79,22 @@ export interface GoldfishTurnLog {
   commanderCast: boolean;
 }
 
+export interface GoldfishOpeningHand {
+  cards: {
+    name: string;
+    imageUri: string | null;
+    typeLine: string;
+    manaCost: string;
+  }[];
+  score: number;
+  verdict: Verdict;
+  reasoning: string[];
+}
+
 export interface GoldfishGameLog {
   turnLogs: GoldfishTurnLog[];
   commanderFirstCastTurn: number | null;
+  openingHand: GoldfishOpeningHand;
 }
 
 export interface GoldfishResult {
@@ -752,6 +771,38 @@ export function runGoldfishGame(
   config: GoldfishConfig
 ): GoldfishGameLog {
   const state = initializeGame(pool, commandZone);
+
+  // Capture opening hand before any turns execute
+  const openingHandCards = state.hand.map((c) => ({
+    name: c.name,
+    imageUri: c.enriched.imageUris?.normal ?? null,
+    typeLine: c.enriched.typeLine,
+    manaCost: c.enriched.manaCost,
+  }));
+
+  // Evaluate keepability
+  const handCards: HandCard[] = state.hand.map((c) => ({
+    name: c.name,
+    quantity: 1,
+    enriched: c.enriched,
+  }));
+  const cmdCards: HandCard[] = state.commandZone.map((c) => ({
+    name: c.name,
+    quantity: 1,
+    enriched: c.enriched,
+  }));
+  const identity = new Set(
+    state.commandZone.flatMap((c) => c.enriched.colorIdentity)
+  );
+  const quality = evaluateHandQuality(handCards, 0, identity, cmdCards);
+
+  const openingHand: GoldfishOpeningHand = {
+    cards: openingHandCards,
+    score: quality.score,
+    verdict: quality.verdict,
+    reasoning: quality.reasoning,
+  };
+
   const turnLogs: GoldfishTurnLog[] = [];
   let commanderFirstCastTurn: number | null = null;
 
@@ -764,7 +815,7 @@ export function runGoldfishGame(
     }
   }
 
-  return { turnLogs, commanderFirstCastTurn };
+  return { turnLogs, commanderFirstCastTurn, openingHand };
 }
 
 // ---------------------------------------------------------------------------
