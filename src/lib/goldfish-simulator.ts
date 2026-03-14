@@ -83,6 +83,16 @@ export interface GoldfishResult {
   stats: GoldfishAggregateStats;
 }
 
+export type RampSourceType = "rock" | "dork" | "land-search" | "ritual";
+
+export interface RampSource {
+  name: string;
+  type: RampSourceType;
+  cmc: number;
+  avgCastTurn: number | null; // average turn this card was cast (null if never cast)
+  castRate: number; // % of games where this card was cast
+}
+
 export interface GoldfishAggregateStats {
   avgManaByTurn: number[]; // index = turn number (0-based, so index 0 = turn 1)
   avgManaUsedByTurn: number[];
@@ -93,6 +103,7 @@ export interface GoldfishAggregateStats {
   avgCommanderTurn: number | null; // avg turn of first commander cast
   rampAcceleration: number; // avg extra mana from ramp vs baseline
   avgTotalSpellsCast: number;
+  rampSources: RampSource[]; // ramp cards in the deck with cast statistics
 }
 
 // ---------------------------------------------------------------------------
@@ -784,6 +795,7 @@ export function computeAggregateStats(
       avgCommanderTurn: null,
       rampAcceleration: 0,
       avgTotalSpellsCast: 0,
+      rampSources: [],
     };
   }
 
@@ -866,7 +878,118 @@ export function computeAggregateStats(
     avgCommanderTurn,
     rampAcceleration,
     avgTotalSpellsCast: Math.round(avgTotalSpellsCast * 100) / 100,
+    rampSources: [], // populated by runGoldfishSimulation after aggregation
   };
+}
+
+// ---------------------------------------------------------------------------
+// Ramp source analysis
+// ---------------------------------------------------------------------------
+
+/**
+ * Classify what kind of ramp source a card is.
+ */
+function classifyRampSourceType(card: GoldfishCard): RampSourceType | null {
+  if (!card.tags.includes("Ramp")) return null;
+
+  const e = card.enriched;
+
+  // Instant/Sorcery ramp effects
+  if (isInstantOrSorcery(e)) {
+    const effect = classifyRampEffect(card);
+    if (effect === "land-search") return "land-search";
+    if (effect === "ritual") return "ritual";
+    return "land-search"; // default for ramp-tagged instants/sorceries
+  }
+
+  // Creature with producedMana → dork
+  if (e.typeLine.includes("Creature") && e.producedMana.length > 0) {
+    return "dork";
+  }
+
+  // Non-creature permanent with producedMana or tap-for-mana → rock
+  if (e.producedMana.length > 0 || /\{T\}.*?[Aa]dd\s/.test(e.oracleText)) {
+    return "rock";
+  }
+
+  // Ramp-tagged but doesn't fit above (e.g., land search on a creature like Solemn Simulacrum)
+  if (RAMP_LAND_SEARCH_RE.test(e.oracleText)) return "land-search";
+
+  return "rock"; // fallback for ramp-tagged cards
+}
+
+/**
+ * Compute ramp source statistics from the pool and game logs.
+ */
+export function computeRampSources(
+  pool: GoldfishCard[],
+  commandZone: GoldfishCard[],
+  games: GoldfishGameLog[]
+): RampSource[] {
+  // Find all unique ramp cards in the deck
+  const allCards = [...pool, ...commandZone];
+  const rampCards = new Map<string, { card: GoldfishCard; type: RampSourceType }>();
+
+  for (const card of allCards) {
+    if (rampCards.has(card.name)) continue;
+    const sourceType = classifyRampSourceType(card);
+    if (sourceType) {
+      rampCards.set(card.name, { card, type: sourceType });
+    }
+  }
+
+  if (rampCards.size === 0) return [];
+
+  // Count cast occurrences and turns across all games
+  const castData = new Map<string, { totalTurn: number; castCount: number }>();
+
+  for (const game of games) {
+    // Track which ramp cards were cast this game (first cast only for avg turn)
+    const castThisGame = new Set<string>();
+
+    for (const turnLog of game.turnLogs) {
+      for (const spellName of turnLog.spellsCast) {
+        if (!rampCards.has(spellName)) continue;
+
+        let data = castData.get(spellName);
+        if (!data) {
+          data = { totalTurn: 0, castCount: 0 };
+          castData.set(spellName, data);
+        }
+
+        if (!castThisGame.has(spellName)) {
+          data.totalTurn += turnLog.turn;
+          data.castCount++;
+          castThisGame.add(spellName);
+        }
+      }
+    }
+  }
+
+  const n = games.length;
+
+  // Build RampSource entries
+  const sources: RampSource[] = [];
+  for (const [name, { card, type }] of rampCards) {
+    const data = castData.get(name);
+    sources.push({
+      name,
+      type,
+      cmc: card.enriched.cmc,
+      avgCastTurn: data && data.castCount > 0
+        ? Math.round((data.totalTurn / data.castCount) * 10) / 10
+        : null,
+      castRate: data ? Math.round((data.castCount / n) * 1000) / 10 : 0,
+    });
+  }
+
+  // Sort: highest cast rate first, then by CMC ascending
+  sources.sort((a, b) => {
+    if (b.castRate !== a.castRate) return b.castRate - a.castRate;
+    return a.cmc - b.cmc;
+  });
+
+  return sources;
 }
 
 // ---------------------------------------------------------------------------
@@ -890,6 +1013,7 @@ export function runGoldfishSimulation(
   }
 
   const stats = computeAggregateStats(games, config.turns);
+  stats.rampSources = computeRampSources(pool, commandZone, games);
 
   return { games, stats };
 }

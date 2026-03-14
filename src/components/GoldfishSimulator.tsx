@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
-import type { GoldfishConfig } from "@/lib/goldfish-simulator";
+import type { GoldfishConfig, RampSource } from "@/lib/goldfish-simulator";
 import { DEFAULT_GOLDFISH_CONFIG } from "@/lib/goldfish-simulator";
 import { useGoldfishSimulation } from "@/hooks/useGoldfishSimulation";
 import GoldfishManaChart from "@/components/GoldfishManaChart";
@@ -301,6 +301,59 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
               />
             </div>
           </section>
+
+          {/* Ramp sources breakdown */}
+          {stats.rampSources.length > 0 && (
+            <section aria-labelledby="goldfish-ramp-heading">
+              <h4
+                id="goldfish-ramp-heading"
+                className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300"
+              >
+                Ramp Sources ({stats.rampSources.length})
+              </h4>
+              <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700 text-xs text-slate-500">
+                      <th className="px-3 py-2 text-left font-semibold">Card</th>
+                      <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">Type</th>
+                      <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">CMC</th>
+                      <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Cast Rate</th>
+                      <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Avg Turn</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.rampSources.map((src: RampSource) => (
+                      <tr
+                        key={src.name}
+                        className="border-b border-slate-700/50 last:border-0"
+                      >
+                        <td className="px-3 py-1.5 text-slate-300">{src.name}</td>
+                        <td className="px-3 py-1.5">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            src.type === "rock"
+                              ? "bg-amber-500/20 text-amber-300"
+                              : src.type === "dork"
+                                ? "bg-green-500/20 text-green-300"
+                                : src.type === "land-search"
+                                  ? "bg-emerald-500/20 text-emerald-300"
+                                  : "bg-red-500/20 text-red-300"
+                          }`}>
+                            {src.type === "rock" ? "Rock" : src.type === "dork" ? "Dork" : src.type === "land-search" ? "Land Search" : "Ritual"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-1.5 text-right text-slate-400">{src.cmc}</td>
+                        <td className="px-3 py-1.5 text-right text-slate-300">{src.castRate}%</td>
+                        <td className="px-3 py-1.5 text-right text-slate-400">
+                          {src.avgCastTurn !== null ? `T${src.avgCastTurn}` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
           {/* Mana development chart */}
           <section aria-labelledby="goldfish-chart-heading">

@@ -8,6 +8,7 @@ import {
   buildGoldfishPoolFromDeck,
   buildGoldfishCommandZoneFromDeck,
   computeAggregateStats,
+  computeRampSources,
   DEFAULT_GOLDFISH_CONFIG,
 } from "@/lib/goldfish-simulator";
 import type { GoldfishGameLog } from "@/lib/goldfish-simulator";
@@ -160,6 +161,7 @@ export function useGoldfishSimulation(
 
         // Step 3: Compute aggregate stats
         const stats = computeAggregateStats(games, config.turns);
+        stats.rampSources = computeRampSources(pool, commandZone, games);
 
         if (cancelledRef.current) return;
 
