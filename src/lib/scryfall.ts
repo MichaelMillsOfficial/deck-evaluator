@@ -181,6 +181,50 @@ export async function fetchCardCollectionByIds(
   return { data: allCards, not_found: allNotFound };
 }
 
+/**
+ * Fetches cards from Scryfall's Search API using a query string.
+ * Returns an empty array on 404 (no results).
+ * Retries once on 429 (rate limited) honoring Retry-After header.
+ * Throws on 5xx or network errors.
+ */
+export async function fetchScryfallSearch(
+  query: string,
+  options?: { limit?: number }
+): Promise<ScryfallCard[]> {
+  const limit = options?.limit ?? 10;
+  const url = `${SCRYFALL_API_BASE}/cards/search?q=${encodeURIComponent(query)}&order=edhrec&page=1`;
+
+  for (let attempt = 0; attempt <= 1; attempt++) {
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (res.status === 404) return [];
+
+    if (res.status === 429) {
+      if (attempt < 1) {
+        const retryAfter = parseInt(res.headers.get("Retry-After") ?? "1", 10);
+        const waitMs = Math.min(retryAfter * 1000, 10_000);
+        console.warn(`[scryfall-search] rate limited, retrying after ${waitMs}ms`);
+        await delay(waitMs);
+        continue;
+      }
+      return []; // Skip this category after retry exhaustion
+    }
+
+    if (!res.ok) {
+      throw new Error(`Scryfall Search API error: ${res.status}`);
+    }
+
+    const json = (await res.json()) as { data: ScryfallCard[] };
+    return json.data.slice(0, limit);
+  }
+
+  return [];
+}
+
 // TODO: add server-side LRU cache for card data
 const MAX_RETRIES = 2;
 

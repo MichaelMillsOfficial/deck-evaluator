@@ -22,13 +22,22 @@ APP_PATHS=(
   "vercel.json"
   "Dockerfile"
   "docker-compose.yml"
+  "scripts/"
 )
 
-# Use Vercel-provided previous SHA, fall back to HEAD^
+# Use Vercel-provided previous SHA, fall back to merge base with master
 PREVIOUS_SHA="${VERCEL_GIT_PREVIOUS_SHA:-}"
 if [ -z "$PREVIOUS_SHA" ]; then
-  echo "  VERCEL_GIT_PREVIOUS_SHA not set, using HEAD^"
-  PREVIOUS_SHA="HEAD^"
+  # On first push of a branch, compare against the merge base with master
+  # so we see ALL changes in the branch, not just the last commit
+  MERGE_BASE=$(git merge-base origin/master HEAD 2>/dev/null || true)
+  if [ -n "$MERGE_BASE" ]; then
+    echo "  VERCEL_GIT_PREVIOUS_SHA not set, using merge-base with master ($MERGE_BASE)"
+    PREVIOUS_SHA="$MERGE_BASE"
+  else
+    echo "  VERCEL_GIT_PREVIOUS_SHA not set, using HEAD^"
+    PREVIOUS_SHA="HEAD^"
+  fi
 fi
 
 # Get list of changed files
