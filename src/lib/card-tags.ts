@@ -35,12 +35,16 @@ const BASIC_LAND_RE = /^Basic Land/i;
 const LAND_TYPE_RE = /\bLand\b/;
 const RAMP_TAP_ADD_RE = /\{T\}.*?[Aa]dd\s+\{[WUBRGC]\}/;
 const RAMP_MULTI_MANA_RE = /[Aa]dd\s+\{[WUBRGC]\}.*?\{[WUBRGC]\}/;
-const RAMP_LAND_SEARCH_RE =
+export const RAMP_LAND_SEARCH_RE =
   /[Ss]earche?s?\s+(?:your|their)\s+library\s+for.+?(?:basic\s+)?(?:land|Forest|Plains|Island|Swamp|Mountain)\b/;
 const RAMP_ANY_COLOR_RE =
   /\{T\}.*?[Aa]dd\s+(?:one\s+mana\s+of\s+any|mana\s+of\s+any\s+(?:one\s+)?(?:color|type))\b/;
 const RAMP_AMOUNT_RE = /\{T\}.*?[Aa]dd\s+(?:an\s+amount\s+of\s+|X\s+)\{[WUBRGC]\}/;
 const RAMP_ADDITIONAL_LAND_RE = /\badditional lands?\b/i;
+// Matches mana-producing spell effects (rituals) — excludes tap abilities via
+// negative lookbehind. The Instant/Sorcery type-line gate in the goldfish
+// simulator is the primary filter; this regex is a secondary safety net.
+export const RITUAL_MANA_ADD_RE = /(?<!\{T\}[^.]*)[Aa]dd\s+\{[WUBRGC]\}/;
 const CARD_DRAW_RE = /\bdraw\b.+?\bcards?\b|\bdraw a card\b/i;
 const CARD_ADVANTAGE_RE =
   /\b(?:look at|reveal)\b.+?\bput\b.+?\binto your hand\b/i;

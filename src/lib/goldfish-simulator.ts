@@ -1,5 +1,5 @@
 import type { DeckData, EnrichedCard } from "./types";
-import { getTagsCached } from "./card-tags";
+import { getTagsCached, RAMP_LAND_SEARCH_RE, RITUAL_MANA_ADD_RE } from "./card-tags";
 import { classifyLandEntry } from "./land-base-efficiency";
 import { buildPool, buildCommandZone, canCastWithLands } from "./opening-hand";
 
@@ -55,6 +55,12 @@ export const DEFAULT_GOLDFISH_CONFIG: GoldfishConfig = {
   onThePlay: true,
 };
 
+export type RampEffectType = "land-search" | "ritual";
+
+export interface CastResult {
+  bonusMana: number; // net ritual mana produced (0 for non-rituals)
+}
+
 export interface GoldfishTurnLog {
   turn: number;
   landPlayed: string | null;
@@ -62,6 +68,7 @@ export interface GoldfishTurnLog {
   manaAvailable: number;
   manaUsed: number;
   handSize: number;
+  hand: string[]; // card names in hand at end of turn
   permanentCount: number;
   commanderCast: boolean;
 }
@@ -121,6 +128,147 @@ function shuffleArray<T>(arr: T[]): T[] {
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
+}
+
+// ---------------------------------------------------------------------------
+// Ramp effect classification & simulation
+// ---------------------------------------------------------------------------
+
+function isInstantOrSorcery(card: EnrichedCard): boolean {
+  return (
+    card.typeLine.includes("Instant") || card.typeLine.includes("Sorcery")
+  );
+}
+
+/**
+ * Classify what kind of ramp effect an instant/sorcery produces.
+ * Returns null for non-ramp cards or permanents (which are handled by
+ * the existing battlefield placement logic).
+ */
+export function classifyRampEffect(card: GoldfishCard): RampEffectType | null {
+  if (!isInstantOrSorcery(card.enriched)) return null;
+
+  // Land search takes priority (Cultivate, Rampant Growth, etc.)
+  if (RAMP_LAND_SEARCH_RE.test(card.enriched.oracleText)) {
+    return "land-search";
+  }
+
+  // Ritual: produces mana without {T} (Dark Ritual, Pyretic Ritual, etc.)
+  // Exclude cards with producedMana (would be permanent mana sources)
+  if (
+    card.enriched.producedMana.length === 0 &&
+    RITUAL_MANA_ADD_RE.test(card.enriched.oracleText)
+  ) {
+    return "ritual";
+  }
+
+  return null;
+}
+
+/**
+ * Estimate the net mana a ritual produces beyond its casting cost.
+ * Counts mana symbols after "Add" in oracle text, subtracts CMC.
+ * Returns 0 for non-rituals, capped at 5.
+ */
+export function estimateRitualNetMana(card: GoldfishCard): number {
+  const text = card.enriched.oracleText;
+  const addIndex = text.search(/[Aa]dd\s/);
+  if (addIndex === -1) return 0;
+
+  // Count mana symbols after the first "Add"
+  const afterAdd = text.slice(addIndex);
+  const symbols = Array.from(afterAdd.matchAll(/\{[WUBRGC]\}/g));
+  const produced = symbols.length;
+  const net = produced - card.enriched.cmc;
+  return Math.max(0, Math.min(net, 5));
+}
+
+/**
+ * Create a synthetic basic land card for land-search ramp simulation.
+ */
+function makeSyntheticLand(producedMana: string[]): GoldfishCard {
+  const enriched: EnrichedCard = {
+    name: "Basic Land",
+    manaCost: "",
+    cmc: 0,
+    colorIdentity: [],
+    colors: [],
+    typeLine: "Basic Land",
+    supertypes: ["Basic"],
+    subtypes: [],
+    oracleText: "",
+    keywords: [],
+    power: null,
+    toughness: null,
+    loyalty: null,
+    rarity: "common",
+    imageUris: null,
+    manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    producedMana,
+    flavorName: null,
+    isGameChanger: false,
+    prices: { usd: null, usdFoil: null, eur: null },
+    setCode: "",
+    collectorNumber: "",
+    layout: "normal",
+    cardFaces: [
+      {
+        name: "Basic Land",
+        manaCost: "",
+        typeLine: "Basic Land",
+        oracleText: "",
+        power: null,
+        toughness: null,
+        loyalty: null,
+        imageUris: null,
+      },
+    ],
+  };
+  return { name: "Basic Land", enriched, tags: [] };
+}
+
+/**
+ * Simulate the effect of a ramp instant/sorcery after it resolves.
+ * - Land search: adds a tapped basic land to the battlefield
+ * - Ritual: returns the net bonus mana for the current turn
+ * Returns the amount of bonus mana available this turn (0 for land-search).
+ */
+export function simulateRampEffect(
+  state: GoldfishGameState,
+  card: GoldfishCard
+): number {
+  const effectType = classifyRampEffect(card);
+  if (!effectType) return 0;
+
+  if (effectType === "land-search") {
+    // Determine color from the spell's color identity, fallback to "C"
+    const color =
+      card.enriched.colorIdentity.length > 0
+        ? card.enriched.colorIdentity[0]
+        : "C";
+    const syntheticLand = makeSyntheticLand([color]);
+    state.battlefield.push({
+      card: syntheticLand,
+      tapped: true, // most search effects put land onto battlefield tapped
+      summoningSick: false,
+      producedMana: syntheticLand.enriched.producedMana,
+      enteredTurn: state.turn,
+    });
+    return 0; // tapped land produces no mana this turn
+  }
+
+  // Ritual: return net mana
+  return estimateRitualNetMana(card);
+}
+
+/**
+ * Compute remaining mana after spending some amount this turn.
+ */
+function computeRemainingMana(
+  state: GoldfishGameState,
+  manaUsed: number
+): number {
+  return sumManaPool(computeAvailableMana(state)) - manaUsed;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,23 +348,18 @@ export function computeAvailableMana(state: GoldfishGameState): ManaPool {
   for (const permanent of state.battlefield) {
     const card = permanent.card.enriched;
 
-    if (isLand(card)) {
-      // Lands always tap for mana (not summoning-sick, already untapped at start of turn)
+    if (isLand(card) && !permanent.tapped) {
+      // Untapped lands tap for mana
       const colors =
         card.producedMana.length > 0 ? card.producedMana : ["C"];
-      // Pick the "best" color to add (we'll add one mana per land)
-      // For simplicity, add all produced mana colors contribute 1 mana total
-      // We add one mana of the first available color
-      if (colors.length > 0) {
-        const color = colors[0];
-        if (color === "W") pool.W++;
-        else if (color === "U") pool.U++;
-        else if (color === "B") pool.B++;
-        else if (color === "R") pool.R++;
-        else if (color === "G") pool.G++;
-        else pool.C++;
-      }
-    } else if (isManaProducer(card)) {
+      const color = colors[0];
+      if (color === "W") pool.W++;
+      else if (color === "U") pool.U++;
+      else if (color === "B") pool.B++;
+      else if (color === "R") pool.R++;
+      else if (color === "G") pool.G++;
+      else pool.C++;
+    } else if (isManaProducer(card) && !permanent.tapped) {
       // Non-land mana producers: respect summoning sickness unless haste
       const canAct = !permanent.summoningSick || hasHaste(card);
       if (canAct) {
@@ -289,11 +432,11 @@ function getLandSources(state: GoldfishGameState): string[][] {
 
   for (const permanent of state.battlefield) {
     const card = permanent.card.enriched;
-    if (isLand(card)) {
+    if (isLand(card) && !permanent.tapped) {
       const colors =
         card.producedMana.length > 0 ? card.producedMana : ["C"];
       sources.push(colors);
-    } else if (isManaProducer(card)) {
+    } else if (isManaProducer(card) && !permanent.tapped) {
       const canAct =
         !permanent.summoningSick || hasHaste(card);
       if (canAct) {
@@ -454,12 +597,13 @@ function playLand(state: GoldfishGameState, land: GoldfishCard): void {
 
 /**
  * Cast a spell from hand (or command zone), placing creature/artifact/enchantment on battlefield.
+ * Returns a CastResult with bonus mana from ritual effects.
  */
 function castSpell(
   state: GoldfishGameState,
   card: GoldfishCard,
   isCommander: boolean
-): void {
+): CastResult {
   const cmc = effectiveCmc(card, state, isCommander);
   // Deduct from mana pool (simplified: we track total mana used)
   state.manaPool.C = Math.max(0, state.manaPool.C - cmc); // rough deduction
@@ -483,6 +627,7 @@ function castSpell(
       producedMana: card.enriched.producedMana,
       enteredTurn: state.turn,
     });
+    return { bonusMana: 0 };
   } else {
     // Remove from hand
     state.hand = state.hand.filter((c) => c !== card);
@@ -496,9 +641,13 @@ function castSpell(
         producedMana: card.enriched.producedMana,
         enteredTurn: state.turn,
       });
+      return { bonusMana: 0 };
     } else {
       // Non-permanent (Instant/Sorcery) goes to graveyard
       state.graveyard.push(card);
+      // Simulate ramp effects (land search, rituals)
+      const bonusMana = simulateRampEffect(state, card);
+      return { bonusMana };
     }
   }
 }
@@ -535,10 +684,10 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
   const spellsCast: string[] = [];
   let commanderCast = false;
   let manaUsed = 0;
+  let ritualBonusMana = 0;
 
   // Recompute mana after possibly playing a land (lands contribute mana now)
-  const manaPoolAfterLand = computeAvailableMana(state);
-  let remainingMana = sumManaPool(manaPoolAfterLand);
+  let remainingMana = computeRemainingMana(state, manaUsed);
 
   // We try to cast multiple spells per turn
   let maxAttempts = 30; // safety valve
@@ -547,25 +696,33 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
     if (!choice) break;
 
     const cmc = effectiveCmc(choice.card, state, choice.isCommander);
-    if (cmc > remainingMana) break;
+    if (cmc > remainingMana + ritualBonusMana) break;
 
-    castSpell(state, choice.card, choice.isCommander);
+    const result = castSpell(state, choice.card, choice.isCommander);
     spellsCast.push(choice.card.name);
-    remainingMana -= cmc;
     manaUsed += cmc;
+    ritualBonusMana += result.bonusMana;
+
+    // Always recompute remaining mana after every cast — handles mid-turn
+    // mana rocks (untapped artifacts), summoning-sick dorks, and tapped lands
+    remainingMana = computeRemainingMana(state, manaUsed);
 
     if (choice.isCommander) {
       commanderCast = true;
     }
   }
 
+  // End-of-turn mana reflects ramp benefit (rocks, searched lands untap next turn)
+  const manaAvailableEndOfTurn = sumManaPool(computeAvailableMana(state));
+
   return {
     turn: state.turn,
     landPlayed,
     spellsCast,
-    manaAvailable,
+    manaAvailable: manaAvailableEndOfTurn,
     manaUsed,
     handSize: state.hand.length,
+    hand: state.hand.map((c) => c.name),
     permanentCount: state.battlefield.length,
     commanderCast,
   };

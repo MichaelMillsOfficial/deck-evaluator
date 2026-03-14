@@ -114,6 +114,27 @@ export default function GoldfishTurnTimeline({ game }: GoldfishTurnTimelineProps
                 <p className="text-xs text-slate-500 italic">No spells cast</p>
               )}
             </div>
+
+            {/* Hand contents */}
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Hand {log.hand.length > 0 && `(${log.hand.length})`}
+              </p>
+              {log.hand.length > 0 ? (
+                <ul className="space-y-1">
+                  {log.hand.map((card, i) => (
+                    <li
+                      key={i}
+                      className="rounded bg-slate-900/50 px-2 py-1 text-slate-400"
+                    >
+                      {card}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-500 italic">Empty hand</p>
+              )}
+            </div>
           </div>
         </CollapsiblePanel>
       ))}

@@ -9,6 +9,9 @@ import {
   runGoldfishGame,
   runGoldfishSimulation,
   computeAggregateStats,
+  classifyRampEffect,
+  estimateRitualNetMana,
+  simulateRampEffect,
   DEFAULT_GOLDFISH_CONFIG,
 } from "../../src/lib/goldfish-simulator";
 import type {
@@ -522,9 +525,9 @@ test.describe("mana curve development over 10 turns", () => {
     const noRampManaT5 = noRampResult.stats.avgManaByTurn[4];
 
     // Ramp deck should have rampAcceleration > 0
-    expect(rampResult.stats.rampAcceleration).toBeGreaterThanOrEqual(0);
-    // Ramp deck avg mana at T5 should be >= noRamp (allowing for variance)
-    expect(rampManaT5).toBeGreaterThanOrEqual(noRampManaT5 - 1);
+    expect(rampResult.stats.rampAcceleration).toBeGreaterThan(0);
+    // Ramp deck avg mana at T5 should be strictly greater than no-ramp
+    expect(rampManaT5).toBeGreaterThan(noRampManaT5);
   });
 
   test("5-CMC commander should be castable around turn 5 in many games", () => {
@@ -610,6 +613,7 @@ test.describe("computeAggregateStats", () => {
           manaAvailable: 1,
           manaUsed: 0,
           handSize: 6,
+          hand: [],
           permanentCount: 1,
           commanderCast: false,
         },
@@ -620,6 +624,7 @@ test.describe("computeAggregateStats", () => {
           manaAvailable: 2,
           manaUsed: 1,
           handSize: 5,
+          hand: [],
           permanentCount: 3,
           commanderCast: false,
         },
@@ -635,6 +640,7 @@ test.describe("computeAggregateStats", () => {
           manaAvailable: 1,
           manaUsed: 0,
           handSize: 6,
+          hand: [],
           permanentCount: 1,
           commanderCast: false,
         },
@@ -645,6 +651,7 @@ test.describe("computeAggregateStats", () => {
           manaAvailable: 3,
           manaUsed: 2,
           handSize: 4,
+          hand: [],
           permanentCount: 2,
           commanderCast: false,
         },
@@ -733,5 +740,439 @@ test.describe("computeAggregateStats", () => {
     expect(result.games).toHaveLength(1);
     expect(result.games[0].turnLogs).toHaveLength(7);
     expect(result.stats.avgManaByTurn).toHaveLength(7);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ramp effect classification tests
+// ---------------------------------------------------------------------------
+
+function makeGoldfishRitual(overrides: Partial<EnrichedCard> = {}): GoldfishCard {
+  return makeGoldfishCard({
+    name: "Dark Ritual",
+    typeLine: "Instant",
+    manaCost: "{B}",
+    cmc: 1,
+    colorIdentity: ["B"],
+    colors: ["B"],
+    oracleText: "Add {B}{B}{B}.",
+    producedMana: [],
+    ...overrides,
+  });
+}
+
+function makeGoldfishManaRock(overrides: Partial<EnrichedCard> = {}): GoldfishCard {
+  return makeGoldfishCard({
+    name: "Sol Ring",
+    typeLine: "Artifact",
+    manaCost: "{1}",
+    cmc: 1,
+    colorIdentity: [],
+    colors: [],
+    oracleText: "{T}: Add {C}{C}.",
+    producedMana: ["C"],
+    ...overrides,
+  });
+}
+
+test.describe("classifyRampEffect", () => {
+  test("returns 'land-search' for Rampant Growth-type sorcery", () => {
+    const card = makeGoldfishRamp();
+    expect(classifyRampEffect(card)).toBe("land-search");
+  });
+
+  test("returns 'ritual' for Dark Ritual-type instant", () => {
+    const card = makeGoldfishRitual();
+    expect(classifyRampEffect(card)).toBe("ritual");
+  });
+
+  test("returns null for a creature with producedMana", () => {
+    const card = makeGoldfishCreature({
+      name: "Llanowar Elves",
+      producedMana: ["G"],
+      oracleText: "{T}: Add {G}.",
+    });
+    expect(classifyRampEffect(card)).toBeNull();
+  });
+
+  test("returns null for a non-ramp sorcery", () => {
+    const card = makeGoldfishCard({
+      typeLine: "Sorcery",
+      oracleText: "Draw two cards.",
+    });
+    expect(classifyRampEffect(card)).toBeNull();
+  });
+
+  test("returns null for an artifact with producedMana", () => {
+    const card = makeGoldfishManaRock();
+    expect(classifyRampEffect(card)).toBeNull();
+  });
+});
+
+test.describe("estimateRitualNetMana", () => {
+  test("Dark Ritual (CMC 1, Add {B}{B}{B}) returns 2", () => {
+    const card = makeGoldfishRitual();
+    expect(estimateRitualNetMana(card)).toBe(2);
+  });
+
+  test("Pyretic Ritual (CMC 2, Add {R}{R}{R}) returns 1", () => {
+    const card = makeGoldfishRitual({
+      name: "Pyretic Ritual",
+      manaCost: "{1}{R}",
+      cmc: 2,
+      oracleText: "Add {R}{R}{R}.",
+    });
+    expect(estimateRitualNetMana(card)).toBe(1);
+  });
+
+  test("even-mana ritual (CMC 3, Add {R}{R}{R}) returns 0", () => {
+    const card = makeGoldfishRitual({
+      name: "Even Ritual",
+      manaCost: "{2}{R}",
+      cmc: 3,
+      oracleText: "Add {R}{R}{R}.",
+    });
+    expect(estimateRitualNetMana(card)).toBe(0);
+  });
+
+  test("high-output ritual capped at 5", () => {
+    const card = makeGoldfishRitual({
+      name: "Mega Ritual",
+      cmc: 1,
+      oracleText: "Add {R}{R}{R}{R}{R}{R}{R}.",
+    });
+    expect(estimateRitualNetMana(card)).toBe(5);
+  });
+
+  test("non-ritual card returns 0", () => {
+    const card = makeGoldfishCreature({ oracleText: "Flying" });
+    expect(estimateRitualNetMana(card)).toBe(0);
+  });
+});
+
+test.describe("simulateRampEffect", () => {
+  test("land-search sorcery adds a tapped land to battlefield, returns 0", () => {
+    const state = emptyGameState();
+    state.battlefield = [
+      {
+        card: makeGoldfishLand({ name: "Forest 1", producedMana: ["G"] }),
+        tapped: false,
+        summoningSick: false,
+        producedMana: ["G"],
+        enteredTurn: 0,
+      },
+    ];
+    const ramp = makeGoldfishRamp({
+      colorIdentity: ["G"],
+    });
+
+    const bonusMana = simulateRampEffect(state, ramp);
+    expect(bonusMana).toBe(0);
+    // Battlefield should have gained a synthetic land
+    expect(state.battlefield.length).toBe(2);
+    const newLand = state.battlefield[1];
+    expect(newLand.tapped).toBe(true);
+    expect(newLand.card.enriched.typeLine).toBe("Basic Land");
+    expect(newLand.card.enriched.producedMana).toEqual(["G"]);
+  });
+
+  test("ritual instant returns net mana, does not modify battlefield", () => {
+    const state = emptyGameState();
+    const initialBattlefieldSize = state.battlefield.length;
+    const ritual = makeGoldfishRitual();
+
+    const bonusMana = simulateRampEffect(state, ritual);
+    expect(bonusMana).toBe(2);
+    expect(state.battlefield.length).toBe(initialBattlefieldSize);
+  });
+
+  test("non-ramp sorcery returns 0 and does not modify battlefield", () => {
+    const state = emptyGameState();
+    const card = makeGoldfishCard({
+      typeLine: "Sorcery",
+      oracleText: "Destroy target creature.",
+    });
+
+    const bonusMana = simulateRampEffect(state, card);
+    expect(bonusMana).toBe(0);
+    expect(state.battlefield.length).toBe(0);
+  });
+});
+
+test.describe("computeAvailableMana — tapped state", () => {
+  test("tapped land does NOT contribute mana", () => {
+    const state = emptyGameState();
+    state.battlefield = [
+      {
+        card: makeGoldfishLand({ name: "Untapped Forest", producedMana: ["G"] }),
+        tapped: false,
+        summoningSick: false,
+        producedMana: ["G"],
+        enteredTurn: 0,
+      },
+      {
+        card: makeGoldfishLand({ name: "Tapped Forest", producedMana: ["G"] }),
+        tapped: true,
+        summoningSick: false,
+        producedMana: ["G"],
+        enteredTurn: 1,
+      },
+    ];
+    const pool = computeAvailableMana(state);
+    expect(pool.G).toBe(1);
+  });
+
+  test("tapped mana rock does NOT contribute mana", () => {
+    const state = emptyGameState();
+    state.battlefield = [
+      {
+        card: makeGoldfishManaRock(),
+        tapped: true,
+        summoningSick: false,
+        producedMana: ["C"],
+        enteredTurn: 1,
+      },
+    ];
+    const pool = computeAvailableMana(state);
+    expect(pool.C).toBe(0);
+  });
+});
+
+test.describe("mid-turn mana recomputation", () => {
+  test("Sol Ring cast mid-turn frees mana for another spell", () => {
+    const config: GoldfishConfig = { ...DEFAULT_GOLDFISH_CONFIG };
+    const state = emptyGameState();
+    state.turn = 0;
+
+    // 2 lands on battlefield providing mana
+    state.battlefield = [
+      {
+        card: makeGoldfishLand({ name: "Forest 0", producedMana: ["G"] }),
+        tapped: false,
+        summoningSick: false,
+        producedMana: ["G"],
+        enteredTurn: 0,
+      },
+      {
+        card: makeGoldfishLand({ name: "Forest 1", producedMana: ["G"] }),
+        tapped: false,
+        summoningSick: false,
+        producedMana: ["G"],
+        enteredTurn: 0,
+      },
+    ];
+
+    // Hand: Sol Ring (1 CMC, produces 2 colorless) + 2-CMC creature
+    const solRing = makeGoldfishManaRock();
+    solRing.tags = ["Ramp"];
+    const creature = makeGoldfishCreature({
+      name: "Bear",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      colorIdentity: ["G"],
+      colors: ["G"],
+    });
+    state.hand = [solRing, creature];
+
+    const log = executeTurn(state, config);
+    // With 2 lands + Sol Ring (costs 1, adds 2) = 3 total mana available
+    // Should cast both Sol Ring AND the 2-CMC creature
+    expect(log.spellsCast).toContain("Sol Ring");
+    expect(log.spellsCast).toContain("Bear");
+  });
+
+  test("mana dork cast mid-turn does NOT free mana (summoning sickness)", () => {
+    const config: GoldfishConfig = { ...DEFAULT_GOLDFISH_CONFIG };
+    const state = emptyGameState();
+    state.turn = 0;
+
+    // 2 lands on battlefield
+    state.battlefield = [
+      {
+        card: makeGoldfishLand({ name: "Forest 0", producedMana: ["G"] }),
+        tapped: false,
+        summoningSick: false,
+        producedMana: ["G"],
+        enteredTurn: 0,
+      },
+      {
+        card: makeGoldfishLand({ name: "Forest 1", producedMana: ["G"] }),
+        tapped: false,
+        summoningSick: false,
+        producedMana: ["G"],
+        enteredTurn: 0,
+      },
+    ];
+
+    // Hand: Llanowar Elves (1 CMC creature, producedMana: ["G"]) + 2-CMC creature
+    const dork = makeGoldfishCreature({
+      name: "Llanowar Elves",
+      manaCost: "{G}",
+      cmc: 1,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      producedMana: ["G"],
+    });
+    dork.tags = ["Ramp"];
+    const creature = makeGoldfishCreature({
+      name: "Bear",
+      manaCost: "{1}{G}",
+      cmc: 2,
+      colorIdentity: ["G"],
+      colors: ["G"],
+    });
+    state.hand = [dork, creature];
+
+    const log = executeTurn(state, config);
+    // Elves cast (1 mana), but is summoning-sick → only 1 mana left, not enough for 2-CMC
+    expect(log.spellsCast).toContain("Llanowar Elves");
+    expect(log.spellsCast).not.toContain("Bear");
+  });
+});
+
+test.describe("deck with mana rocks acceleration", () => {
+  test("deck with mana rocks has higher T4 mana than no-ramp deck", () => {
+    // Deck with rocks: 24 lands, 12 mana rocks, 24 creatures
+    const rockDeckMainboard = [
+      ...Array.from({ length: 24 }, (_, i) => ({ name: `Forest ${i}`, quantity: 1 })),
+      ...Array.from({ length: 12 }, (_, i) => ({ name: `Rock ${i}`, quantity: 1 })),
+      ...Array.from({ length: 24 }, (_, i) => ({ name: `Creature ${i}`, quantity: 1 })),
+    ];
+
+    // Deck without rocks: 24 lands, 36 creatures
+    const noRockDeckMainboard = [
+      ...Array.from({ length: 24 }, (_, i) => ({ name: `Forest ${i}`, quantity: 1 })),
+      ...Array.from({ length: 36 }, (_, i) => ({ name: `Creature ${i}`, quantity: 1 })),
+    ];
+
+    const baseCardMap: Record<string, EnrichedCard> = {};
+    for (let i = 0; i < 24; i++) {
+      baseCardMap[`Forest ${i}`] = makeCard({
+        name: `Forest ${i}`,
+        typeLine: "Basic Land — Forest",
+        supertypes: ["Basic"],
+        producedMana: ["G"],
+        oracleText: "{T}: Add {G}.",
+      });
+    }
+    for (let i = 0; i < 36; i++) {
+      baseCardMap[`Creature ${i}`] = makeCard({
+        name: `Creature ${i}`,
+        typeLine: "Creature — Elf",
+        manaCost: "{3}{G}",
+        cmc: 4,
+        colorIdentity: ["G"],
+        colors: ["G"],
+      });
+    }
+
+    const rockCardMap = { ...baseCardMap };
+    for (let i = 0; i < 12; i++) {
+      rockCardMap[`Rock ${i}`] = makeCard({
+        name: `Rock ${i}`,
+        typeLine: "Artifact",
+        manaCost: "{2}",
+        cmc: 2,
+        colorIdentity: [],
+        colors: [],
+        oracleText: "{T}: Add {C}.",
+        producedMana: ["C"],
+      });
+    }
+
+    const config: GoldfishConfig = { turns: 10, iterations: 300, onThePlay: true };
+    const rockDeck = makeDeck({ mainboard: rockDeckMainboard });
+    const noRockDeck = makeDeck({ mainboard: noRockDeckMainboard });
+
+    const rockResult = runGoldfishSimulation(rockDeck, rockCardMap, config);
+    const noRockResult = runGoldfishSimulation(noRockDeck, baseCardMap, config);
+
+    const rockManaT4 = rockResult.stats.avgManaByTurn[3];
+    const noRockManaT4 = noRockResult.stats.avgManaByTurn[3];
+
+    expect(rockResult.stats.rampAcceleration).toBeGreaterThan(0);
+    expect(rockManaT4).toBeGreaterThan(noRockManaT4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hand contents in turn logs
+// ---------------------------------------------------------------------------
+
+test.describe("turn log hand contents", () => {
+  test("turn log includes hand contents after spells are cast", () => {
+    const config: GoldfishConfig = { ...DEFAULT_GOLDFISH_CONFIG };
+    const state = emptyGameState();
+    state.turn = 0;
+
+    // 3 lands on battlefield
+    state.battlefield = Array.from({ length: 3 }, (_, i) => ({
+      card: makeGoldfishLand({ name: `Forest ${i}`, producedMana: ["G"] }),
+      tapped: false,
+      summoningSick: false,
+      producedMana: ["G"],
+      enteredTurn: 0,
+    }));
+
+    const castable = makeGoldfishCreature({
+      name: "Elf",
+      manaCost: "{G}",
+      cmc: 1,
+      colorIdentity: ["G"],
+      colors: ["G"],
+    });
+    const expensive = makeGoldfishCreature({
+      name: "Dragon",
+      manaCost: "{5}{G}{G}",
+      cmc: 7,
+      colorIdentity: ["G"],
+      colors: ["G"],
+    });
+
+    state.hand = [castable, expensive];
+
+    const log = executeTurn(state, config);
+    // Elf should be cast, Dragon should remain in hand
+    expect(log.spellsCast).toContain("Elf");
+    expect(log.hand).toContain("Dragon");
+    expect(log.hand).not.toContain("Elf");
+    expect(log.handSize).toBe(log.hand.length);
+  });
+
+  test("hand shrinks after casting a spell and playing a land", () => {
+    const config: GoldfishConfig = { ...DEFAULT_GOLDFISH_CONFIG };
+    const state = emptyGameState();
+    state.turn = 0;
+
+    // 2 lands on battlefield
+    state.battlefield = Array.from({ length: 2 }, (_, i) => ({
+      card: makeGoldfishLand({ name: `Forest ${i}`, producedMana: ["G"] }),
+      tapped: false,
+      summoningSick: false,
+      producedMana: ["G"],
+      enteredTurn: 0,
+    }));
+
+    const land = makeGoldfishLand({ name: "Forest 2" });
+    const castable = makeGoldfishCreature({
+      name: "Elf",
+      manaCost: "{G}",
+      cmc: 1,
+      colorIdentity: ["G"],
+      colors: ["G"],
+    });
+    const expensive = makeGoldfishCreature({
+      name: "Dragon",
+      manaCost: "{5}{G}{G}",
+      cmc: 7,
+    });
+
+    state.hand = [land, castable, expensive];
+
+    const log = executeTurn(state, config);
+    // Played land + cast Elf → only Dragon should remain
+    expect(log.landPlayed).toBe("Forest 2");
+    expect(log.spellsCast).toContain("Elf");
+    expect(log.hand).toEqual(["Dragon"]);
   });
 });
