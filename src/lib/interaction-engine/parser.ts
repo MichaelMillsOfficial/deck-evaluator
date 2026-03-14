@@ -848,6 +848,19 @@ function parseEffects(tokens: Token[]): Effect[] {
         }
       }
 
+      // Blink context: if no explicit "from ZONE" was found and a preceding
+      // exile effect exists in this ability (e.g. "exile X, then return that
+      // card to the battlefield"), the return is from exile, not graveyard.
+      if (!foundFrom) {
+        const hasPrecedingExile = effects.some(
+          (e) => e.type === "exile" || e.type === "exile_zone_transition" ||
+                 (e.zoneTransition?.to === "exile")
+        );
+        if (hasPrecedingExile) {
+          fromZone = "exile";
+        }
+      }
+
       effects.push({
         type: "return",
         gameEffect: {

@@ -1641,3 +1641,77 @@ test.describe("generateTags — multi-face cards", () => {
     expect(generateTags(card)).toContain("Removal");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// Self-only cost reduction — should NOT get "Cost Reduction" tag
+// ═══════════════════════════════════════════════════════════════════
+
+test.describe("generateTags — Cost Reduction self-only exclusion", () => {
+  test("Emry (self cost reduction) should NOT get Cost Reduction tag", () => {
+    const card = makeCard({
+      name: "Emry, Lurker of the Loch",
+      typeLine: "Legendary Creature — Merfolk Wizard",
+      oracleText:
+        "This spell costs {1} less to cast for each artifact you control.\nWhen Emry, Lurker of the Loch enters the battlefield, mill four cards.\n{T}: Choose target artifact card in your graveyard. You may cast that card this turn.",
+      keywords: [],
+      manaCost: "{2}{U}",
+    });
+    expect(generateTags(card)).not.toContain("Cost Reduction");
+  });
+
+  test("Blinkmoth Infusion (Affinity — self only) should NOT get Cost Reduction tag", () => {
+    const card = makeCard({
+      name: "Blinkmoth Infusion",
+      typeLine: "Instant",
+      oracleText:
+        "Affinity for artifacts (This spell costs {1} less to cast for each artifact you control.)\nUntap all artifacts you control.",
+      keywords: ["Affinity"],
+      manaCost: "{12}{U}{U}",
+    });
+    expect(generateTags(card)).not.toContain("Cost Reduction");
+  });
+
+  test("Convoke creature (self only) should NOT get Cost Reduction tag", () => {
+    const card = makeCard({
+      name: "Stoke the Flames",
+      typeLine: "Instant",
+      oracleText:
+        "Convoke (Your creatures can help cast this spell. Each creature you tap while casting this spell pays for {1} or one mana of that creature's color.)\nStoke the Flames deals 4 damage to any target.",
+      keywords: ["Convoke"],
+      manaCost: "{2}{R}{R}",
+    });
+    expect(generateTags(card)).not.toContain("Cost Reduction");
+  });
+
+  test("Goblin Warchief (reduces other Goblin spells) SHOULD get Cost Reduction tag", () => {
+    const card = makeCard({
+      name: "Goblin Warchief",
+      typeLine: "Creature — Goblin Warrior",
+      oracleText:
+        "Goblin spells you cast cost {1} less to cast.\nGoblin creatures you control have haste.",
+      manaCost: "{1}{R}{R}",
+    });
+    expect(generateTags(card)).toContain("Cost Reduction");
+  });
+
+  test("Helm of Awakening (reduces all spells) SHOULD get Cost Reduction tag", () => {
+    const card = makeCard({
+      name: "Helm of Awakening",
+      typeLine: "Artifact",
+      oracleText: "Spells cost {1} less to cast.",
+      manaCost: "{2}",
+    });
+    expect(generateTags(card)).toContain("Cost Reduction");
+  });
+
+  test("Urza's Incubator (reduces chosen type) SHOULD get Cost Reduction tag", () => {
+    const card = makeCard({
+      name: "Urza's Incubator",
+      typeLine: "Artifact",
+      oracleText:
+        "As Urza's Incubator enters the battlefield, choose a creature type.\nCreature spells of the chosen type cost {2} less to cast.",
+      manaCost: "{3}",
+    });
+    expect(generateTags(card)).toContain("Cost Reduction");
+  });
+});

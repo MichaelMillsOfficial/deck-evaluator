@@ -467,6 +467,7 @@ export const KEYWORD_DATABASE: KeywordEntry[] = [
     expand: () => [
       {
         abilityType: "static",
+        affectedObjects: { self: true, types: [], quantity: "one" as const, modifiers: [] },
         effects: [
           {
             type: "cost_reduction",
@@ -488,6 +489,7 @@ export const KEYWORD_DATABASE: KeywordEntry[] = [
     expand: () => [
       {
         abilityType: "static",
+        affectedObjects: { self: true, types: [], quantity: "one" as const, modifiers: [] },
         effects: [
           {
             type: "cost_reduction",
@@ -509,6 +511,7 @@ export const KEYWORD_DATABASE: KeywordEntry[] = [
     expand: (parameter?: string) => [
       {
         abilityType: "static",
+        affectedObjects: { self: true, types: [], quantity: "one" as const, modifiers: [] },
         effects: [
           {
             type: "cost_reduction",
@@ -551,6 +554,7 @@ export const KEYWORD_DATABASE: KeywordEntry[] = [
     expand: () => [
       {
         abilityType: "static",
+        affectedObjects: { self: true, types: [], quantity: "one" as const, modifiers: [] },
         effects: [
           {
             type: "cost_reduction",

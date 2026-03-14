@@ -89,9 +89,9 @@ From existing plan files:
 ### Gaps vs. Competitors
 
 1. **No goldfish simulation** -- Archidekt has playtester logs tracking mana production, cards drawn, and power over simulated turns. Moxfield has a full sandbox. MTG-Mana-Simulator (open source) runs Monte Carlo simulations tracking on-curve probability. DeckCheck estimates "win turn." This app has opening hand simulation but no turn-by-turn progression.
-2. **No deck comparison** -- Moxfield and Archidekt both offer side-by-side comparison. Plan exists but not implemented.
+2. ~~**No deck comparison**~~ ✅ Shipped — `/compare` page with side-by-side analysis.
 3. **No playtester** -- Not a strategic gap (Moxfield/Archidekt own this) but worth noting.
-4. **Limited card swap suggestions** -- Candidate analysis exists for the Additions tab but is not gap-driven (doesn't connect composition scorecard deficiencies to specific recommendations).
+4. ~~**Limited card swap suggestions**~~ ✅ Shipped — Gap-driven category fills, weak card identification, deck-context-aware upgrades, and land swap recommendations.
 
 ---
 
@@ -208,62 +208,59 @@ Based on review of `types.ts` and the codebase:
 
 ## Feature Roadmap
 
-### Phase 1: Quick Wins and UX Improvements (1-2 sprints)
+### ~~Phase 1: Quick Wins and UX Improvements (1-2 sprints)~~ ✅ COMPLETE
 
 #### ~~Epic 1.1: Moxfield Direct Import~~ (DEFERRED)
 > *Deferred due to Moxfield API constraints -- direct URL import is not feasible at this time.*
 
 ---
 
-#### Epic 1.1: Card Swap Suggestions (Gap-Driven)
+#### ~~Epic 1.1: Card Swap Suggestions (Gap-Driven)~~ ✅ SHIPPED
 > *Close the loop between "what's wrong" (composition scorecard) and "how to fix it" (actionable card recommendations).*
 
 **Business Value:** Highest engagement feature in deck evaluation tools. No competitor connects composition gap analysis to specific card recommendations automatically. This is the feature that turns a diagnostic tool into an advisory tool.
 
-**Stories:**
-| Story | Points | Description |
-|---|---|---|
-| As a deckbuilder, I want to see which cards in my deck are underperforming based on synergy scores | M | Implement weak card identification using synergy scores + tag role analysis |
-| As a deckbuilder, I want cards recommended to fill composition gaps in my color identity | L | Build API route querying Scryfall Search filtered by color identity + functional tag |
-| As a deckbuilder, I want upgrade suggestions for moderate-synergy cards | M | Identify upgrade candidates, query Scryfall for same-role alternatives at equal/lower CMC |
-| As a deckbuilder, I want to see suggestions in a dedicated "Suggestions" tab | M | Add tab to DeckViewTabs with category fills, weak cards, and upgrades sections |
+**Shipped Features:**
+- Weak card identification using synergy scores + tag role analysis
+- API route querying Scryfall Search filtered by color identity + functional tag for category fills
+- Upgrade candidates with deck-context-aware filtering (protects theme-relevant cards)
+- "Replace with Lands" section when land count is low/critical
+- Dedicated "Suggestions" tab with category fills, weak cards, land swaps, and upgrades sections
+- Combo piece and sole-provider protection
 
-**Dependencies:** Deck Composition Scorecard (shipped). Plan exists at `docs/plans/card-swap-suggestions.md`.
-**Prework:** None -- all dependencies are shipped.
+**Dependencies:** Deck Composition Scorecard (shipped). Plan at `docs/plans/card-swap-suggestions.md`.
 
 ---
 
-#### Epic 1.2: Deck Comparison
+#### ~~Epic 1.2: Deck Comparison~~ ✅ SHIPPED
 > *Enable side-by-side comparison of two decklists with analysis diff.*
 
 **Business Value:** High demand in Commander community for comparing deck iterations, analyzing a friend's build, or evaluating against an archetype reference. Moxfield and Archidekt both have this; we should too.
 
-**Stories:**
-| Story | Points | Description |
-|---|---|---|
-| As a deckbuilder, I want to import two decks on a `/compare` page | M | New page route with two independent DeckInput slots |
-| As a deckbuilder, I want to see card overlap and unique-to-each-deck lists | M | Venn computation + sorted card lists |
-| As a deckbuilder, I want to compare mana curves, color distributions, and power levels side by side | L | Run existing analysis modules on both decks, render comparison charts |
+**Shipped Features:**
+- `/compare` page with two independent import slots
+- Editable deck names (default "Deck 1" / "Deck 2")
+- Card overlap and unique-to-each-deck lists
+- Side-by-side mana curve, color distribution, and power level comparison
+- Back navigation to main evaluator
 
-**Dependencies:** None -- uses all existing shipped modules. Plan exists at `docs/plans/deck-comparison.md`.
-**Prework:** Extract lightweight import slot from `DeckImportSection.tsx`.
+**Dependencies:** None. Plan at `docs/plans/deck-comparison.md`.
 
 ---
 
-#### Epic 1.3: Interaction Presentation Enhancements
+#### ~~Epic 1.3: Interaction Presentation Enhancements~~ ✅ SHIPPED
 > *Make the interaction engine's output more actionable with per-card scores and removal impact.*
 
 **Business Value:** The interaction engine produces rich data but the current flat-list presentation doesn't surface high-level insights. Adding interaction centrality scores and removal impact analysis makes the data actionable for deck editing decisions.
 
-**Stories:**
-| Story | Points | Description |
-|---|---|---|
-| As a deckbuilder, I want to see an "interaction score" per card showing how connected it is | S | Aggregate interaction count and strength per card into a centrality metric |
-| As a deckbuilder, I want to see what happens if I remove a key card (removal impact) | M | Surface `RemovalImpact` data in UI -- interactions lost, chains disrupted, loops broken |
-| As a deckbuilder, I want to see rules text citations showing exactly which ability text creates each interaction | M | Link interaction `mechanical` descriptions to specific oracle text snippets |
+**Shipped Features:**
+- Per-card interaction centrality scores with ranked display
+- Floating removal impact panel (slide-in, non-modal, dismiss on Escape/collapse)
+- Interaction type filter pills with flex-wrap layout
+- Rules text citations linking interactions to specific oracle text
+- Auto-close floating panel on section collapse or tab navigation
 
 **Dependencies:** Interaction engine (shipped).
-**Prework:** None.
 
 ---
 
@@ -487,11 +484,11 @@ Phase 4 (Ecosystem, ongoing):
 
 ## Priority Ranking Rationale
 
-0. **UX Nav Redesign + Interaction Engine Rules Fixes** -- Prework that unblocks scalable feature development and fixes P0 accuracy issues.
-1. **Card Swap Suggestions** (Epic 1.1) -- Highest user impact. Closes the diagnosis-to-action loop. All dependencies shipped.
-2. **Interaction Presentation** (Epic 1.3) -- Makes the most technically impressive feature (interaction engine) more useful. Unlocks Phase 3 visualization.
-3. **Deck Comparison** (Epic 1.2) -- Feature parity with competitors. Self-contained scope.
-4. **Goldfish Simulator** (Epic 2.1) -- Fills the biggest feature gap vs. competitors. High technical complexity.
+0. ~~**UX Nav Redesign + Interaction Engine Rules Fixes**~~ ✅ Complete.
+1. ~~**Card Swap Suggestions** (Epic 1.1)~~ ✅ Shipped with deck-context-aware filtering and land swap recommendations.
+2. ~~**Interaction Presentation** (Epic 1.3)~~ ✅ Shipped with centrality scores, floating removal impact panel, and citation links.
+3. ~~**Deck Comparison** (Epic 1.2)~~ ✅ Shipped with editable deck names and back navigation.
+4. **Goldfish Simulator** (Epic 2.1) -- Next priority. Fills the biggest feature gap vs. competitors. High technical complexity.
 5. **Lexicon Expansion** (Epic 2.2) -- Improves the primary differentiator. Ongoing value per keyword added.
 6. **Remaining epics** follow dependency ordering.
 
