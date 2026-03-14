@@ -2,16 +2,22 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
-import type { GoldfishConfig, GoldfishResult } from "@/lib/goldfish-simulator";
+import type {
+  GoldfishConfig,
+  GoldfishResult,
+  GoldfishGameLog,
+  GoldfishGameSummary,
+} from "@/lib/goldfish-simulator";
 import {
   runGoldfishGame,
   buildGoldfishPoolFromDeck,
   buildGoldfishCommandZoneFromDeck,
   computeAggregateStats,
   computeRampSources,
+  computeNotableGames,
   DEFAULT_GOLDFISH_CONFIG,
 } from "@/lib/goldfish-simulator";
-import type { GoldfishGameLog } from "@/lib/goldfish-simulator";
+import { randomSeed } from "@/lib/prng";
 
 export interface GoldfishStep {
   id: "building" | "simulating" | "aggregating";
@@ -55,6 +61,29 @@ function deckCacheKey(
     hash = ((hash << 5) + hash + combined.charCodeAt(i)) | 0;
   }
   return (hash >>> 0).toString(36);
+}
+
+function extractGameSummary(
+  game: GoldfishGameLog,
+  seed: number
+): GoldfishGameSummary {
+  const totalSpells = game.turnLogs.reduce(
+    (sum, l) => sum + l.spellsCast.length,
+    0
+  );
+  const t4Log = game.turnLogs[3];
+  return {
+    seed,
+    totalSpells,
+    handVerdict: game.openingHand.verdict,
+    handScore: game.openingHand.score,
+    commanderCastTurn: game.commanderFirstCastTurn,
+    manaAtT4: t4Log?.manaAvailable ?? 0,
+    finalPermanentCount:
+      game.turnLogs.length > 0
+        ? game.turnLogs[game.turnLogs.length - 1].permanentCount
+        : 0,
+  };
 }
 
 /**
@@ -137,6 +166,7 @@ export function useGoldfishSimulation(
 
         // Step 2: Run simulation in batches, yielding between batches
         const games: GoldfishGameLog[] = [];
+        const gameSummaries: GoldfishGameSummary[] = [];
         const batchSize = Math.max(10, Math.floor(config.iterations / 20));
 
         for (let i = 0; i < config.iterations; i += batchSize) {
@@ -144,7 +174,10 @@ export function useGoldfishSimulation(
 
           const batchEnd = Math.min(i + batchSize, config.iterations);
           for (let j = i; j < batchEnd; j++) {
-            games.push(runGoldfishGame(pool, commandZone, config));
+            const seed = randomSeed();
+            const game = runGoldfishGame(pool, commandZone, config, seed);
+            games.push(game);
+            gameSummaries.push(extractGameSummary(game, seed));
           }
 
           const pct = 10 + Math.round((i / config.iterations) * 75);
@@ -168,7 +201,16 @@ export function useGoldfishSimulation(
         updateStep("aggregating", "done");
         setProgress(100);
 
-        const goldfishResult: GoldfishResult = { games, stats };
+        const notableGames = computeNotableGames(gameSummaries);
+
+        const goldfishResult: GoldfishResult = {
+          games,
+          stats,
+          gameSummaries,
+          notableGames,
+          pool,
+          commandZone,
+        };
         sessionCache.set(cacheKey, { result: goldfishResult, config });
         computedKeyRef.current = cacheKey;
         setResult(goldfishResult);

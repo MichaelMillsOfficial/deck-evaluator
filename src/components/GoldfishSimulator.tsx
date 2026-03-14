@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
-import type { GoldfishConfig, RampSource } from "@/lib/goldfish-simulator";
-import { DEFAULT_GOLDFISH_CONFIG } from "@/lib/goldfish-simulator";
+import type { GoldfishConfig, RampSource, GoldfishGameLog } from "@/lib/goldfish-simulator";
+import { DEFAULT_GOLDFISH_CONFIG, replayGoldfishGame, runGoldfishGame } from "@/lib/goldfish-simulator";
 import { useGoldfishSimulation } from "@/hooks/useGoldfishSimulation";
+import { randomSeed } from "@/lib/prng";
 import GoldfishManaChart from "@/components/GoldfishManaChart";
 import GoldfishTurnTimeline from "@/components/GoldfishTurnTimeline";
+import GoldfishGameSelector from "@/components/GoldfishGameSelector";
+import type { GameSelection } from "@/components/GoldfishGameSelector";
 
 interface GoldfishSimulatorProps {
   deck: DeckData;
@@ -95,6 +98,10 @@ function ProgressSteps({
 
 export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorProps) {
   const [config, setConfig] = useState<GoldfishConfig>(DEFAULT_GOLDFISH_CONFIG);
+  const [activeSelection, setActiveSelection] = useState<GameSelection>({
+    type: "notable",
+    index: 0,
+  });
 
   // Stable config reference to avoid re-triggering simulation on every render
   const stableConfig = useMemo(() => config, [config]);
@@ -108,16 +115,39 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
 
   const stats = result?.stats;
 
-  // Pick a representative sample game (first game with most spells)
-  const sampleGame = useMemo(() => {
-    if (!result?.games.length) return null;
-    const sorted = [...result.games].sort(
-      (a, b) =>
-        b.turnLogs.reduce((s, l) => s + l.spellsCast.length, 0) -
-        a.turnLogs.reduce((s, l) => s + l.spellsCast.length, 0)
-    );
-    return sorted[0] ?? null;
-  }, [result]);
+  // Compute displayed game based on selection
+  const displayedGame = useMemo<GoldfishGameLog | null>(() => {
+    if (!result) return null;
+
+    if (activeSelection.type === "notable") {
+      const notable = result.notableGames[activeSelection.index];
+      if (!notable) return result.games[0] ?? null;
+      const summary = result.gameSummaries[notable.summaryIndex];
+      if (!summary) return result.games[0] ?? null;
+      return replayGoldfishGame(result.pool, result.commandZone, config, summary.seed);
+    }
+
+    if (activeSelection.type === "random") {
+      // Pick a random summary from the batch
+      const idx = Math.floor(Math.random() * result.gameSummaries.length);
+      const summary = result.gameSummaries[idx];
+      if (!summary) return result.games[0] ?? null;
+      return replayGoldfishGame(result.pool, result.commandZone, config, summary.seed);
+    }
+
+    if (activeSelection.type === "new") {
+      // Generate a fresh game with a new seed
+      const seed = randomSeed();
+      return runGoldfishGame(result.pool, result.commandZone, config, seed);
+    }
+
+    return result.games[0] ?? null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, activeSelection]);
+
+  const handleGameSelect = useCallback((selection: GameSelection) => {
+    setActiveSelection(selection);
+  }, []);
 
   const manaT4 = stats ? (stats.avgManaByTurn[3] ?? 0).toFixed(2) : "—";
   const commanderCastRate = stats
@@ -368,19 +398,20 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
             </div>
           </section>
 
-          {/* Turn timeline for sample game */}
-          {sampleGame && (
+          {/* Game selector + turn timeline */}
+          {result && (
             <section aria-labelledby="goldfish-timeline-heading">
-              <h4
-                id="goldfish-timeline-heading"
-                className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
-              >
-                Sample Game
-              </h4>
-              <p className="mb-3 text-xs text-slate-400">
-                Turn-by-turn breakdown of a representative game (highest spell count)
-              </p>
-              <GoldfishTurnTimeline game={sampleGame} />
+              <GoldfishGameSelector
+                notableGames={result.notableGames}
+                activeSelection={activeSelection}
+                onSelect={handleGameSelect}
+              />
+
+              {displayedGame && (
+                <div className="mt-4">
+                  <GoldfishTurnTimeline game={displayedGame} />
+                </div>
+              )}
             </section>
           )}
         </>

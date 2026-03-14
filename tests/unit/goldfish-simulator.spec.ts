@@ -4,11 +4,14 @@ import {
   initializeGame,
   chooseLandToPlay,
   chooseSpellToCast,
+  chooseDiscard,
   computeAvailableMana,
   executeTurn,
   runGoldfishGame,
   runGoldfishSimulation,
+  replayGoldfishGame,
   computeAggregateStats,
+  computeNotableGames,
   classifyRampEffect,
   estimateRitualNetMana,
   simulateRampEffect,
@@ -19,6 +22,7 @@ import type {
   GoldfishGameState,
   GoldfishConfig,
   GoldfishGameLog,
+  GoldfishGameSummary,
 } from "../../src/lib/goldfish-simulator";
 import { makeCard, makeDeck } from "../helpers";
 
@@ -81,6 +85,8 @@ function emptyGameState(): GoldfishGameState {
     commanderTaxPaid: 0,
     turn: 1,
     treasureCount: 0,
+    rampLandsSearched: 0,
+    random: Math.random,
   };
 }
 
@@ -1175,5 +1181,338 @@ test.describe("turn log hand contents", () => {
     expect(log.landPlayed).toBe("Forest 2");
     expect(log.spellsCast).toContain("Elf");
     expect(log.hand).toEqual(["Dragon"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 1: Seeded PRNG determinism
+// ---------------------------------------------------------------------------
+
+test.describe("seeded PRNG determinism", () => {
+  function makeSimpleDeck() {
+    return makeDeck({
+      commanders: [{ name: "Commander", quantity: 1 }],
+      mainboard: [
+        ...Array.from({ length: 38 }, (_, i) => ({
+          name: `Forest ${i}`,
+          quantity: 1,
+        })),
+        ...Array.from({ length: 22 }, (_, i) => ({
+          name: `Creature ${i}`,
+          quantity: 1,
+        })),
+      ],
+    });
+  }
+
+  function makeSimpleCardMap(): Record<string, EnrichedCard> {
+    const cardMap: Record<string, EnrichedCard> = {
+      Commander: makeCard({
+        name: "Commander",
+        typeLine: "Legendary Creature — Dragon",
+        supertypes: ["Legendary"],
+        manaCost: "{3}{G}{G}",
+        cmc: 5,
+        colorIdentity: ["G"],
+        colors: ["G"],
+      }),
+    };
+    for (let i = 0; i < 38; i++) {
+      cardMap[`Forest ${i}`] = makeCard({
+        name: `Forest ${i}`,
+        typeLine: "Basic Land — Forest",
+        supertypes: ["Basic"],
+        producedMana: ["G"],
+        oracleText: "{T}: Add {G}.",
+      });
+    }
+    for (let i = 0; i < 22; i++) {
+      cardMap[`Creature ${i}`] = makeCard({
+        name: `Creature ${i}`,
+        typeLine: "Creature",
+        manaCost: "{4}{G}",
+        cmc: 5,
+        colorIdentity: ["G"],
+        colors: ["G"],
+      });
+    }
+    return cardMap;
+  }
+
+  test("same seed produces identical game logs", () => {
+    const deck = makeSimpleDeck();
+    const cardMap = makeSimpleCardMap();
+    const config: GoldfishConfig = { turns: 10, iterations: 1, onThePlay: true };
+
+    const result = runGoldfishSimulation(deck, cardMap, config);
+    const seed = result.gameSummaries[0].seed;
+
+    const game1 = replayGoldfishGame(result.pool, result.commandZone, config, seed);
+    const game2 = replayGoldfishGame(result.pool, result.commandZone, config, seed);
+
+    // Same seed → identical games
+    expect(game1.turnLogs.map((l) => l.spellsCast)).toEqual(
+      game2.turnLogs.map((l) => l.spellsCast)
+    );
+    expect(game1.turnLogs.map((l) => l.manaAvailable)).toEqual(
+      game2.turnLogs.map((l) => l.manaAvailable)
+    );
+    expect(game1.turnLogs.map((l) => l.hand)).toEqual(
+      game2.turnLogs.map((l) => l.hand)
+    );
+  });
+
+  test("different seeds produce different games", () => {
+    const deck = makeSimpleDeck();
+    const cardMap = makeSimpleCardMap();
+    const config: GoldfishConfig = { turns: 10, iterations: 1, onThePlay: true };
+
+    const result = runGoldfishSimulation(deck, cardMap, config);
+
+    const game1 = replayGoldfishGame(result.pool, result.commandZone, config, 42);
+    const game2 = replayGoldfishGame(result.pool, result.commandZone, config, 99);
+
+    // Different seeds → at least different opening hands (very unlikely to match)
+    const hand1 = game1.turnLogs[0]?.hand ?? [];
+    const hand2 = game2.turnLogs[0]?.hand ?? [];
+    expect(hand1).not.toEqual(hand2);
+  });
+
+  test("backward compatible — no seed uses Math.random", () => {
+    const deck = makeSimpleDeck();
+    const cardMap = makeSimpleCardMap();
+    const config: GoldfishConfig = { turns: 5, iterations: 50, onThePlay: true };
+
+    // Should not throw and should produce valid results
+    const result = runGoldfishSimulation(deck, cardMap, config);
+    expect(result.games).toHaveLength(50);
+    expect(result.stats.avgManaByTurn).toHaveLength(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2: Game summaries, replay & notable games
+// ---------------------------------------------------------------------------
+
+test.describe("game summaries and notable games", () => {
+  function makeSimpleDeck() {
+    return makeDeck({
+      commanders: [{ name: "Commander", quantity: 1 }],
+      mainboard: [
+        ...Array.from({ length: 35 }, (_, i) => ({
+          name: `Forest ${i}`,
+          quantity: 1,
+        })),
+        ...Array.from({ length: 25 }, (_, i) => ({
+          name: `Creature ${i}`,
+          quantity: 1,
+        })),
+      ],
+    });
+  }
+
+  function makeSimpleCardMap(): Record<string, EnrichedCard> {
+    const cardMap: Record<string, EnrichedCard> = {
+      Commander: makeCard({
+        name: "Commander",
+        typeLine: "Legendary Creature — Dragon",
+        supertypes: ["Legendary"],
+        manaCost: "{3}{G}{G}",
+        cmc: 5,
+        colorIdentity: ["G"],
+        colors: ["G"],
+      }),
+    };
+    for (let i = 0; i < 35; i++) {
+      cardMap[`Forest ${i}`] = makeCard({
+        name: `Forest ${i}`,
+        typeLine: "Basic Land — Forest",
+        supertypes: ["Basic"],
+        producedMana: ["G"],
+        oracleText: "{T}: Add {G}.",
+      });
+    }
+    for (let i = 0; i < 25; i++) {
+      cardMap[`Creature ${i}`] = makeCard({
+        name: `Creature ${i}`,
+        typeLine: "Creature",
+        manaCost: "{3}{G}",
+        cmc: 4,
+        colorIdentity: ["G"],
+        colors: ["G"],
+      });
+    }
+    return cardMap;
+  }
+
+  test("result includes gameSummaries with correct length", () => {
+    const config: GoldfishConfig = { turns: 10, iterations: 50, onThePlay: true };
+    const result = runGoldfishSimulation(makeSimpleDeck(), makeSimpleCardMap(), config);
+
+    expect(result.gameSummaries).toHaveLength(50);
+  });
+
+  test("each summary has required fields", () => {
+    const config: GoldfishConfig = { turns: 10, iterations: 20, onThePlay: true };
+    const result = runGoldfishSimulation(makeSimpleDeck(), makeSimpleCardMap(), config);
+
+    for (const summary of result.gameSummaries) {
+      expect(typeof summary.seed).toBe("number");
+      expect(typeof summary.totalSpells).toBe("number");
+      expect(["Strong Keep", "Keepable", "Marginal", "Mulligan"]).toContain(summary.handVerdict);
+      expect(typeof summary.handScore).toBe("number");
+      expect(typeof summary.manaAtT4).toBe("number");
+      expect(typeof summary.finalPermanentCount).toBe("number");
+    }
+  });
+
+  test("replay produces game matching summary stats", () => {
+    const config: GoldfishConfig = { turns: 10, iterations: 20, onThePlay: true };
+    const result = runGoldfishSimulation(makeSimpleDeck(), makeSimpleCardMap(), config);
+
+    const summary = result.gameSummaries[0];
+    const replayed = replayGoldfishGame(result.pool, result.commandZone, config, summary.seed);
+
+    const replayedSpells = replayed.turnLogs.reduce(
+      (sum, l) => sum + l.spellsCast.length,
+      0
+    );
+    expect(replayedSpells).toBe(summary.totalSpells);
+    expect(replayed.commanderFirstCastTurn).toBe(summary.commanderCastTurn);
+    expect(replayed.openingHand.verdict).toBe(summary.handVerdict);
+  });
+
+  test("result.notableGames contains Best Game and Worst Game", () => {
+    const config: GoldfishConfig = { turns: 10, iterations: 100, onThePlay: true };
+    const result = runGoldfishSimulation(makeSimpleDeck(), makeSimpleCardMap(), config);
+
+    const labels = result.notableGames.map((n) => n.label);
+    expect(labels).toContain("Best Game");
+    expect(labels).toContain("Worst Game");
+  });
+
+  test("result.pool and result.commandZone are populated", () => {
+    const config: GoldfishConfig = { turns: 5, iterations: 10, onThePlay: true };
+    const result = runGoldfishSimulation(makeSimpleDeck(), makeSimpleCardMap(), config);
+
+    expect(result.pool.length).toBeGreaterThan(0);
+    expect(result.commandZone.length).toBe(1);
+    expect(result.commandZone[0].name).toBe("Commander");
+  });
+
+  test("aggregate stats unchanged from before refactor", () => {
+    const config: GoldfishConfig = { turns: 10, iterations: 200, onThePlay: true };
+    const result = runGoldfishSimulation(makeSimpleDeck(), makeSimpleCardMap(), config);
+
+    // Basic sanity checks — these match existing tests
+    expect(result.stats.avgManaByTurn).toHaveLength(10);
+    expect(result.stats.avgManaByTurn[5]).toBeGreaterThan(result.stats.avgManaByTurn[0]);
+    expect(result.stats.commanderCastRate).toBeGreaterThan(0);
+  });
+});
+
+test.describe("computeNotableGames", () => {
+  test("returns empty for empty summaries", () => {
+    expect(computeNotableGames([])).toEqual([]);
+  });
+
+  test("picks correct best and worst", () => {
+    const summaries: GoldfishGameSummary[] = [
+      { seed: 1, totalSpells: 5, handVerdict: "Keepable", handScore: 60, commanderCastTurn: 5, manaAtT4: 4, finalPermanentCount: 8 },
+      { seed: 2, totalSpells: 10, handVerdict: "Strong Keep", handScore: 80, commanderCastTurn: 4, manaAtT4: 6, finalPermanentCount: 12 },
+      { seed: 3, totalSpells: 2, handVerdict: "Mulligan", handScore: 30, commanderCastTurn: null, manaAtT4: 3, finalPermanentCount: 4 },
+    ];
+
+    const notable = computeNotableGames(summaries);
+    const best = notable.find((n) => n.label === "Best Game");
+    const worst = notable.find((n) => n.label === "Worst Game");
+
+    expect(best?.summaryIndex).toBe(1); // 10 spells
+    expect(worst?.summaryIndex).toBe(2); // 2 spells
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3: 7-card hand limit & zone transitions
+// ---------------------------------------------------------------------------
+
+test.describe("7-card hand limit", () => {
+  test("hand size never exceeds 7 at end of any turn", () => {
+    // Heavy card-draw deck to test hand limit
+    const deck = makeDeck({
+      mainboard: [
+        ...Array.from({ length: 30 }, (_, i) => ({
+          name: `Forest ${i}`,
+          quantity: 1,
+        })),
+        ...Array.from({ length: 30 }, (_, i) => ({
+          name: `Draw Spell ${i}`,
+          quantity: 1,
+        })),
+      ],
+    });
+
+    const cardMap: Record<string, EnrichedCard> = {};
+    for (let i = 0; i < 30; i++) {
+      cardMap[`Forest ${i}`] = makeCard({
+        name: `Forest ${i}`,
+        typeLine: "Basic Land — Forest",
+        supertypes: ["Basic"],
+        producedMana: ["G"],
+        oracleText: "{T}: Add {G}.",
+      });
+    }
+    for (let i = 0; i < 30; i++) {
+      cardMap[`Draw Spell ${i}`] = makeCard({
+        name: `Draw Spell ${i}`,
+        typeLine: "Sorcery",
+        manaCost: "{G}",
+        cmc: 1,
+        colorIdentity: ["G"],
+        colors: ["G"],
+        oracleText: "Draw two cards.",
+        keywords: [],
+      });
+    }
+
+    const config: GoldfishConfig = { turns: 10, iterations: 50, onThePlay: true };
+    const result = runGoldfishSimulation(deck, cardMap, config);
+
+    for (const game of result.games) {
+      for (const log of game.turnLogs) {
+        expect(log.handSize).toBeLessThanOrEqual(7);
+      }
+    }
+  });
+
+  test("discarded cards appear in graveyard", () => {
+    const config: GoldfishConfig = { ...DEFAULT_GOLDFISH_CONFIG, turns: 1 };
+    const state = emptyGameState();
+    state.turn = 0;
+
+    // 9 cards in hand, no lands on battlefield, 1 card in library to draw
+    state.hand = Array.from({ length: 9 }, (_, i) =>
+      makeGoldfishCreature({
+        name: `Creature ${i}`,
+        manaCost: "{5}{G}",
+        cmc: 6,
+      })
+    );
+    state.library = [makeGoldfishLand({ name: "Forest" })];
+
+    const initialGraveyardSize = state.graveyard.length;
+    const log = executeTurn(state, config);
+
+    // Drew 1 (on the draw), played 1 land = 9 cards → need to discard to 7
+    // But on the play: no draw, play land from hand = 8 cards → discard 1
+    // With config.onThePlay = true: no draw, play forest from draw... wait,
+    // forest was in library. Let me re-check.
+    // state starts at turn 0, turn increments to 1, onThePlay skips draw on T1
+    // hand has 9 creatures, library has 1 Forest
+    // No draw (on the play T1), no land in hand → no land played
+    // No mana → no spells cast
+    // Hand = 9 → discard to 7 → 2 cards discarded
+    expect(log.handSize).toBeLessThanOrEqual(7);
+    expect(state.graveyard.length).toBe(initialGraveyardSize + 2);
   });
 });

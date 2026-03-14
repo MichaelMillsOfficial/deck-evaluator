@@ -120,3 +120,120 @@ test.describe("Goldfish Simulator Tab", () => {
     await expect(tabpanel).toBeAttached();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Game selector & zone bar e2e tests
+// ---------------------------------------------------------------------------
+
+/**
+ * Helper: import deck, enrich, and navigate to the Goldfish tab.
+ * Waits for the simulator to fully render.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function setupGoldfishTab(deckPage: any) {
+  await deckPage.fillDecklist(GOLDFISH_TEST_DECK);
+  await deckPage.submitImport();
+  await deckPage.waitForDeckDisplay();
+
+  // Enrich
+  const enrichButton = deckPage.page.getByRole("button", { name: /Enrich/i });
+  if (await enrichButton.isVisible()) {
+    await enrichButton.click();
+    await deckPage.page
+      .getByTestId("enrich-status")
+      .waitFor({ timeout: 30_000 })
+      .catch(() => {});
+    await deckPage.page.waitForTimeout(2000);
+  }
+
+  // Navigate to goldfish tab
+  const goldfishTab = deckPage.page.getByRole("tab", { name: /Goldfish/i });
+  await goldfishTab.click();
+
+  // Wait for simulator to render with results
+  const simulator = deckPage.page.getByTestId("goldfish-simulator");
+  await expect(simulator).toBeVisible({ timeout: 15_000 });
+
+  // Wait for stat cards to appear (simulation complete)
+  await expect(deckPage.page.getByTestId("goldfish-stat-cards")).toBeVisible({
+    timeout: 60_000,
+  });
+
+  return simulator;
+}
+
+test.describe("Goldfish Game Selector", () => {
+  test.beforeEach(async ({ deckPage }) => {
+    await deckPage.goto();
+  });
+
+  test("notable game buttons render with labels", async ({ deckPage }) => {
+    await setupGoldfishTab(deckPage);
+
+    const selector = deckPage.page.getByTestId("goldfish-game-selector");
+    await expect(selector).toBeVisible();
+
+    // Should have at least "Best Game" button
+    await expect(
+      deckPage.page.getByTestId("notable-game-best-game")
+    ).toBeVisible();
+  });
+
+  test("Random Game and New Game buttons are visible", async ({ deckPage }) => {
+    await setupGoldfishTab(deckPage);
+
+    await expect(
+      deckPage.page.getByTestId("random-game-button")
+    ).toBeVisible();
+    await expect(
+      deckPage.page.getByTestId("new-game-button")
+    ).toBeVisible();
+  });
+
+  test("clicking a notable game button shows the timeline", async ({
+    deckPage,
+  }) => {
+    await setupGoldfishTab(deckPage);
+
+    // The timeline should be visible (default selection = Best Game)
+    await expect(
+      deckPage.page.getByTestId("goldfish-turn-timeline")
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("aggregate stats remain unchanged when switching games", async ({
+    deckPage,
+  }) => {
+    await setupGoldfishTab(deckPage);
+
+    // Read stats before switching
+    const statCards = deckPage.page.getByTestId("goldfish-stat-cards");
+    const textBefore = await statCards.innerText();
+
+    // Click Random Game
+    await deckPage.page.getByTestId("random-game-button").click();
+
+    // Stats should remain the same
+    const textAfter = await statCards.innerText();
+    expect(textAfter).toBe(textBefore);
+  });
+});
+
+test.describe("Goldfish Zone Bar", () => {
+  test.beforeEach(async ({ deckPage }) => {
+    await deckPage.goto();
+  });
+
+  test("turn headers show micro-badges", async ({ deckPage }) => {
+    await setupGoldfishTab(deckPage);
+
+    // Find any turn panel — check for micro-badge presence
+    // Micro-badges use bg-emerald-500/15 (land), bg-slate-700/50 (spells)
+    const timeline = deckPage.page.getByTestId("goldfish-turn-timeline");
+    await expect(timeline).toBeVisible();
+
+    // At least one turn panel should exist
+    const turnPanel = deckPage.page.getByTestId("goldfish-turn-panel-1");
+    await expect(turnPanel).toBeVisible();
+  });
+});

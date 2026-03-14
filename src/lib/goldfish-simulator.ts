@@ -8,6 +8,7 @@ import {
   evaluateHandQuality,
 } from "./opening-hand";
 import type { HandCard, Verdict } from "./opening-hand";
+import { createPRNG, randomSeed } from "./prng";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,6 +50,7 @@ export interface GoldfishGameState {
   turn: number;
   treasureCount: number;
   rampLandsSearched: number; // lands fetched by ramp spells (not natural land drops)
+  random: () => number; // PRNG function — seeded for deterministic replay
 }
 
 export interface GoldfishConfig {
@@ -123,9 +125,29 @@ export interface GoldfishGameLog {
   openingHand: GoldfishOpeningHand;
 }
 
+export interface GoldfishGameSummary {
+  seed: number;
+  totalSpells: number;
+  handVerdict: Verdict;
+  handScore: number;
+  commanderCastTurn: number | null;
+  manaAtT4: number;
+  finalPermanentCount: number;
+}
+
+export interface NotableGame {
+  label: string;
+  description: string;
+  summaryIndex: number;
+}
+
 export interface GoldfishResult {
   games: GoldfishGameLog[];
   stats: GoldfishAggregateStats;
+  gameSummaries: GoldfishGameSummary[];
+  notableGames: NotableGame[];
+  pool: GoldfishCard[];
+  commandZone: GoldfishCard[];
 }
 
 export type RampSourceType = "rock" | "dork" | "land-search" | "ritual";
@@ -177,10 +199,10 @@ function hasHaste(card: EnrichedCard): boolean {
   return card.keywords.map((k) => k.toLowerCase()).includes("haste");
 }
 
-function shuffleArray<T>(arr: T[]): T[] {
+function shuffleArray<T>(arr: T[], random: () => number = Math.random): T[] {
   const copy = [...arr];
   for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(random() * (i + 1));
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
@@ -312,7 +334,7 @@ export function simulateRampEffect(
     });
     state.rampLandsSearched++;
     // Shuffle library after searching
-    state.library = shuffleArray(state.library);
+    state.library = shuffleArray(state.library, state.random);
     return 0; // tapped land produces no mana this turn
   }
 
@@ -368,9 +390,10 @@ export function buildGoldfishCommandZoneFromDeck(
  */
 export function initializeGame(
   pool: GoldfishCard[],
-  commandZone: GoldfishCard[]
+  commandZone: GoldfishCard[],
+  random: () => number = Math.random
 ): GoldfishGameState {
-  const library = shuffleArray(pool);
+  const library = shuffleArray(pool, random);
   const hand: GoldfishCard[] = [];
 
   // Draw opening hand of 7
@@ -392,6 +415,7 @@ export function initializeGame(
     turn: 0,
     treasureCount: 0,
     rampLandsSearched: 0,
+    random,
   };
 }
 
@@ -902,7 +926,7 @@ export function simulatePonder(
 
   if (allBad) {
     // Shuffle the library
-    state.library = shuffleArray(state.library);
+    state.library = shuffleArray(state.library, state.random);
     actions.push({ cardName: "", action: "shuffled", source: sourceName });
   } else {
     // Remove top cards, reorder by score desc, put back
@@ -1023,6 +1047,27 @@ function castSpell(
 }
 
 /**
+ * Choose which card to discard when over the hand limit.
+ * Prefers highest-CMC non-utility cards (not Ramp, not Card Draw, not lands).
+ */
+export function chooseDiscard(state: GoldfishGameState): GoldfishCard | null {
+  if (state.hand.length === 0) return null;
+
+  const scored = state.hand.map((card) => {
+    let priority = card.enriched.cmc; // higher CMC = more likely to discard
+    // Prefer keeping ramp, card draw, and lands
+    if (card.tags.includes("Ramp")) priority -= 100;
+    if (card.tags.includes("Card Draw")) priority -= 50;
+    if (isLand(card.enriched)) priority -= 80;
+    return { card, priority };
+  });
+
+  // Sort by priority descending — highest priority = discard first
+  scored.sort((a, b) => b.priority - a.priority);
+  return scored[0].card;
+}
+
+/**
  * Execute a full turn: untap, draw, play land, cast spells.
  * Returns the turn log.
  */
@@ -1135,7 +1180,7 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
 
     // 6. Shuffle after Tutor
     if (castCard.tags.includes("Tutor")) {
-      state.library = shuffleArray(state.library);
+      state.library = shuffleArray(state.library, state.random);
       libraryActions.push({ cardName: "", action: "shuffled", source: castCard.name });
     }
 
@@ -1146,6 +1191,15 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
     if (choice.isCommander) {
       commanderCast = true;
     }
+  }
+
+  // End-of-turn: discard to 7
+  const MAX_HAND_SIZE = 7;
+  while (state.hand.length > MAX_HAND_SIZE) {
+    const toDiscard = chooseDiscard(state);
+    if (!toDiscard) break;
+    state.hand = state.hand.filter((c) => c !== toDiscard);
+    state.graveyard.push(toDiscard);
   }
 
   // End-of-turn mana reflects ramp benefit (rocks, searched lands untap next turn)
@@ -1176,13 +1230,16 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
 
 /**
  * Run a single goldfish game for N turns, returning the game log.
+ * When a seed is provided, the game is fully deterministic (same seed = same game).
  */
 export function runGoldfishGame(
   pool: GoldfishCard[],
   commandZone: GoldfishCard[],
-  config: GoldfishConfig
+  config: GoldfishConfig,
+  seed?: number
 ): GoldfishGameLog {
-  const state = initializeGame(pool, commandZone);
+  const random = seed !== undefined ? createPRNG(seed) : Math.random;
+  const state = initializeGame(pool, commandZone, random);
 
   // Capture opening hand before any turns execute
   const openingHandCards = state.hand.map((c) => ({
@@ -1467,11 +1524,136 @@ export function computeRampSources(
 }
 
 // ---------------------------------------------------------------------------
+// Replay
+// ---------------------------------------------------------------------------
+
+/**
+ * Replay a goldfish game from its seed — deterministic, produces full detail.
+ */
+export function replayGoldfishGame(
+  pool: GoldfishCard[],
+  commandZone: GoldfishCard[],
+  config: GoldfishConfig,
+  seed: number
+): GoldfishGameLog {
+  return runGoldfishGame(pool, commandZone, config, seed);
+}
+
+// ---------------------------------------------------------------------------
+// Notable games
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan game summaries and pick notable games (best, worst, fastest commander, most ramp).
+ */
+export function computeNotableGames(
+  summaries: GoldfishGameSummary[]
+): NotableGame[] {
+  if (summaries.length === 0) return [];
+
+  const notable: NotableGame[] = [];
+
+  // Best game: highest totalSpells
+  let bestIdx = 0;
+  for (let i = 1; i < summaries.length; i++) {
+    if (summaries[i].totalSpells > summaries[bestIdx].totalSpells) {
+      bestIdx = i;
+    }
+  }
+  notable.push({
+    label: "Best Game",
+    description: `${summaries[bestIdx].totalSpells} spells cast`,
+    summaryIndex: bestIdx,
+  });
+
+  // Worst game: lowest totalSpells
+  let worstIdx = 0;
+  for (let i = 1; i < summaries.length; i++) {
+    if (summaries[i].totalSpells < summaries[worstIdx].totalSpells) {
+      worstIdx = i;
+    }
+  }
+  if (worstIdx !== bestIdx) {
+    notable.push({
+      label: "Worst Game",
+      description: `${summaries[worstIdx].totalSpells} spells cast`,
+      summaryIndex: worstIdx,
+    });
+  }
+
+  // Fastest commander: earliest commanderCastTurn
+  let fastCmdIdx = -1;
+  for (let i = 0; i < summaries.length; i++) {
+    if (summaries[i].commanderCastTurn !== null) {
+      if (
+        fastCmdIdx === -1 ||
+        summaries[i].commanderCastTurn! < summaries[fastCmdIdx].commanderCastTurn!
+      ) {
+        fastCmdIdx = i;
+      }
+    }
+  }
+  if (fastCmdIdx !== -1 && fastCmdIdx !== bestIdx && fastCmdIdx !== worstIdx) {
+    notable.push({
+      label: "Fastest Commander",
+      description: `Cast on turn ${summaries[fastCmdIdx].commanderCastTurn}`,
+      summaryIndex: fastCmdIdx,
+    });
+  }
+
+  // Most ramp: highest manaAtT4
+  let mostRampIdx = 0;
+  for (let i = 1; i < summaries.length; i++) {
+    if (summaries[i].manaAtT4 > summaries[mostRampIdx].manaAtT4) {
+      mostRampIdx = i;
+    }
+  }
+  const usedIndices = new Set(notable.map((n) => n.summaryIndex));
+  if (!usedIndices.has(mostRampIdx)) {
+    notable.push({
+      label: "Most Ramp",
+      description: `${summaries[mostRampIdx].manaAtT4} mana at T4`,
+      summaryIndex: mostRampIdx,
+    });
+  }
+
+  return notable;
+}
+
+// ---------------------------------------------------------------------------
+// Game summary extraction
+// ---------------------------------------------------------------------------
+
+function extractGameSummary(
+  game: GoldfishGameLog,
+  seed: number
+): GoldfishGameSummary {
+  const totalSpells = game.turnLogs.reduce(
+    (sum, l) => sum + l.spellsCast.length,
+    0
+  );
+  const t4Log = game.turnLogs[3]; // 0-based index for turn 4
+  return {
+    seed,
+    totalSpells,
+    handVerdict: game.openingHand.verdict,
+    handScore: game.openingHand.score,
+    commanderCastTurn: game.commanderFirstCastTurn,
+    manaAtT4: t4Log?.manaAvailable ?? 0,
+    finalPermanentCount:
+      game.turnLogs.length > 0
+        ? game.turnLogs[game.turnLogs.length - 1].permanentCount
+        : 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Monte Carlo runner
 // ---------------------------------------------------------------------------
 
 /**
  * Run the full goldfish simulation: builds pool, runs N games, aggregates stats.
+ * Each game gets a unique seed for deterministic replay.
  */
 export function runGoldfishSimulation(
   deck: DeckData,
@@ -1482,12 +1664,19 @@ export function runGoldfishSimulation(
   const commandZone = buildGoldfishCommandZoneFromDeck(deck, cardMap);
 
   const games: GoldfishGameLog[] = [];
+  const gameSummaries: GoldfishGameSummary[] = [];
+
   for (let i = 0; i < config.iterations; i++) {
-    games.push(runGoldfishGame(pool, commandZone, config));
+    const seed = randomSeed();
+    const game = runGoldfishGame(pool, commandZone, config, seed);
+    games.push(game);
+    gameSummaries.push(extractGameSummary(game, seed));
   }
 
   const stats = computeAggregateStats(games, config.turns);
   stats.rampSources = computeRampSources(pool, commandZone, games);
 
-  return { games, stats };
+  const notableGames = computeNotableGames(gameSummaries);
+
+  return { games, stats, gameSummaries, notableGames, pool, commandZone };
 }

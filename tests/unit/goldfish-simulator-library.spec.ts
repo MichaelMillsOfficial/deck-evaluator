@@ -54,6 +54,8 @@ function emptyGameState(): GoldfishGameState {
     commanderTaxPaid: 0,
     turn: 1,
     treasureCount: 0,
+    rampLandsSearched: 0,
+    random: Math.random,
   };
 }
 
