@@ -8,6 +8,7 @@ import type {
   GoldfishTurnLog,
   GoldfishOpeningHand,
   CardDraw,
+  LibraryAction,
 } from "@/lib/goldfish-simulator";
 
 interface GoldfishTurnTimelineProps {
@@ -212,9 +213,61 @@ export default function GoldfishTurnTimeline({ game }: GoldfishTurnTimelineProps
                       <div className="min-w-0">
                         <p className="text-sm text-sky-300">{draw.name}</p>
                         <p className="text-[10px] text-slate-500">
-                          {draw.source === "draw-step" ? "Draw step" : "Card draw spell"}
+                          {draw.source === "draw-step"
+                            ? "Draw step"
+                            : draw.source === "brainstorm"
+                              ? "Brainstorm"
+                              : draw.source === "ponder"
+                                ? "Ponder"
+                                : draw.source === "scry-kept"
+                                  ? "Scry (kept)"
+                                  : "Card draw spell"}
                         </p>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Library manipulation */}
+            {log.libraryActions && log.libraryActions.length > 0 && (
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Library Manipulation ({log.libraryActions.length})
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {log.libraryActions.map((action: LibraryAction, i: number) => (
+                    <div key={i} className="flex items-center gap-2 rounded bg-slate-900/50 px-2 py-1">
+                      {action.cardName && (
+                        <span className="text-sm text-slate-300">{action.cardName}</span>
+                      )}
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          action.action === "kept-on-top"
+                            ? "bg-cyan-500/20 text-cyan-300"
+                            : action.action === "bottomed"
+                              ? "bg-slate-500/20 text-slate-400"
+                              : action.action === "graveyard"
+                                ? "bg-rose-500/20 text-rose-300"
+                                : action.action === "put-back-from-hand"
+                                  ? "bg-amber-500/20 text-amber-300"
+                                  : "bg-purple-500/20 text-purple-300"
+                        }`}
+                      >
+                        {action.action === "kept-on-top"
+                          ? "Kept on top"
+                          : action.action === "bottomed"
+                            ? "Bottomed"
+                            : action.action === "graveyard"
+                              ? "To graveyard"
+                              : action.action === "put-back-from-hand"
+                                ? "Put back"
+                                : "Shuffled"}
+                      </span>
+                      {action.source && (
+                        <span className="text-[10px] text-slate-500">({action.source})</span>
+                      )}
                     </div>
                   ))}
                 </div>

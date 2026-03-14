@@ -70,7 +70,20 @@ export interface CastResult {
 export interface CardDraw {
   name: string;
   imageUri: string | null;
-  source: "draw-step" | "card-draw-spell";
+  source: "draw-step" | "card-draw-spell" | "scry-kept" | "brainstorm" | "ponder";
+}
+
+export type LibraryActionType =
+  | "kept-on-top"
+  | "bottomed"
+  | "graveyard"
+  | "put-back-from-hand"
+  | "shuffled";
+
+export interface LibraryAction {
+  cardName: string;
+  action: LibraryActionType;
+  source: string;
 }
 
 export interface GoldfishTurnLog {
@@ -84,6 +97,7 @@ export interface GoldfishTurnLog {
   hand: string[]; // card names in hand at end of turn
   permanentCount: number;
   commanderCast: boolean;
+  libraryActions: LibraryAction[];
 }
 
 export interface GoldfishOpeningHand {
@@ -291,6 +305,8 @@ export function simulateRampEffect(
       producedMana: syntheticLand.enriched.producedMana,
       enteredTurn: state.turn,
     });
+    // Shuffle library after searching
+    state.library = shuffleArray(state.library);
     return 0; // tapped land produces no mana this turn
   }
 
@@ -651,6 +667,260 @@ function estimateCardDrawCount(oracleText: string): number {
   return 1; // default
 }
 
+export function computeCardDesirability(card: GoldfishCard, state: GoldfishGameState): number {
+  const enriched = card.enriched;
+
+  if (isLand(enriched)) {
+    const battlefieldLands = state.battlefield.filter(p => isLand(p.card.enriched)).length;
+    const handLands = state.hand.filter(c => isLand(c.enriched)).length;
+
+    if (battlefieldLands >= 6) return 0.1;
+    if (battlefieldLands >= 4) {
+      if (handLands === 0) return 0.6;
+      if (handLands >= 2) return 0.15;
+      return 0.5;
+    }
+    // battlefieldLands < 4
+    if (handLands === 0) return 0.9;
+    return 0.5;
+  }
+
+  // Non-land
+  const availableMana = sumManaPool(computeAvailableMana(state));
+  const cmc = enriched.cmc;
+
+  // Ramp + early turn + cheap
+  if (card.tags.includes("Ramp") && state.turn <= 4 && cmc <= 3) return 0.95;
+  // Card draw + castable next turn
+  if (card.tags.includes("Card Draw") && cmc <= availableMana + 1) return 0.85;
+  // Castable next turn
+  if (cmc <= availableMana + 1) return 0.7;
+  // Castable in 2-3 turns
+  if (cmc <= availableMana + 3) return 0.4;
+  // Too expensive
+  return 0.15;
+}
+
+export function estimateScryCount(oracleText: string): number {
+  const match = oracleText.match(/scry\s+(\w+)/i);
+  if (!match) return 0;
+  const wordToNum: Record<string, number> = {
+    one: 1, two: 2, three: 3, four: 4, five: 5,
+    "1": 1, "2": 2, "3": 3, "4": 4, "5": 5,
+  };
+  return wordToNum[match[1].toLowerCase()] ?? 0;
+}
+
+export function estimateSurveilCount(oracleText: string): number {
+  const match = oracleText.match(/surveil\s+(\w+)/i);
+  if (!match) return 0;
+  const wordToNum: Record<string, number> = {
+    one: 1, two: 2, three: 3, four: 4, five: 5,
+    "1": 1, "2": 2, "3": 3, "4": 4, "5": 5,
+  };
+  return wordToNum[match[1].toLowerCase()] ?? 0;
+}
+
+export function isBrainstormEffect(oracleText: string): boolean {
+  return /draw three cards.*put two cards from your hand on top/i.test(oracleText);
+}
+
+export function isPonderEffect(oracleText: string): boolean {
+  return (
+    /look at the top three cards of your library/i.test(oracleText) &&
+    /you may shuffle/i.test(oracleText) &&
+    /draw a card/i.test(oracleText)
+  );
+}
+
+export function isTopReorderEffect(oracleText: string): boolean {
+  return /look at the top \w+ cards? of your library.*put them back in any order/i.test(oracleText) &&
+    !isPonderEffect(oracleText);
+}
+
+export function estimateTopReorderCount(oracleText: string): number {
+  const match = oracleText.match(/look at the top (\w+) cards? of your library/i);
+  if (!match) return 0;
+  const wordToNum: Record<string, number> = {
+    one: 1, two: 2, three: 3, four: 4, five: 5,
+    "1": 1, "2": 2, "3": 3, "4": 4, "5": 5,
+  };
+  return wordToNum[match[1].toLowerCase()] ?? 0;
+}
+
+export function scryAppearsBeforeDraw(oracleText: string): boolean {
+  const scryIndex = oracleText.search(/scry/i);
+  const drawIndex = oracleText.search(/draw/i);
+  if (scryIndex === -1 || drawIndex === -1) return false;
+  return scryIndex < drawIndex;
+}
+
+export function simulateScry(
+  state: GoldfishGameState,
+  n: number,
+  sourceName: string
+): LibraryAction[] {
+  const actions: LibraryAction[] = [];
+  const cards = state.library.splice(0, Math.min(n, state.library.length));
+
+  const kept: { card: GoldfishCard; score: number }[] = [];
+  const bottomed: GoldfishCard[] = [];
+
+  for (const card of cards) {
+    const score = computeCardDesirability(card, state);
+    if (score >= 0.5) {
+      kept.push({ card, score });
+    } else {
+      bottomed.push(card);
+      actions.push({ cardName: card.name, action: "bottomed", source: sourceName });
+    }
+  }
+
+  // Sort kept by score descending (best on very top)
+  kept.sort((a, b) => b.score - a.score);
+  for (const { card } of kept) {
+    actions.push({ cardName: card.name, action: "kept-on-top", source: sourceName });
+  }
+
+  // Prepend kept to top of library (in order, best first)
+  state.library.unshift(...kept.map(k => k.card));
+  // Append bottomed to end
+  state.library.push(...bottomed);
+
+  return actions;
+}
+
+export function simulateSurveil(
+  state: GoldfishGameState,
+  n: number,
+  sourceName: string
+): LibraryAction[] {
+  const actions: LibraryAction[] = [];
+  const cards = state.library.splice(0, Math.min(n, state.library.length));
+
+  const kept: { card: GoldfishCard; score: number }[] = [];
+
+  for (const card of cards) {
+    const score = computeCardDesirability(card, state);
+    if (score >= 0.5) {
+      kept.push({ card, score });
+    } else {
+      state.graveyard.push(card);
+      actions.push({ cardName: card.name, action: "graveyard", source: sourceName });
+    }
+  }
+
+  kept.sort((a, b) => b.score - a.score);
+  for (const { card } of kept) {
+    actions.push({ cardName: card.name, action: "kept-on-top", source: sourceName });
+  }
+
+  state.library.unshift(...kept.map(k => k.card));
+
+  return actions;
+}
+
+export function simulateBrainstorm(
+  state: GoldfishGameState,
+  sourceName: string
+): { drawn: CardDraw[]; actions: LibraryAction[] } {
+  const drawn: CardDraw[] = [];
+  const actions: LibraryAction[] = [];
+
+  // Draw 3 cards
+  for (let i = 0; i < 3; i++) {
+    const card = drawCardTracked(state);
+    if (card) {
+      drawn.push({ ...card, source: "brainstorm" });
+    }
+  }
+
+  // Score all cards in hand
+  const scored = state.hand.map(card => ({
+    card,
+    score: computeCardDesirability(card, state),
+  }));
+
+  // Find the 2 lowest-scoring cards
+  scored.sort((a, b) => a.score - b.score);
+  const putBack = scored.slice(0, 2);
+
+  for (const { card } of putBack) {
+    state.hand = state.hand.filter(c => c !== card);
+    actions.push({ cardName: card.name, action: "put-back-from-hand", source: sourceName });
+  }
+
+  // Prepend to library (put back on top)
+  state.library.unshift(...putBack.map(p => p.card));
+
+  return { drawn, actions };
+}
+
+export function simulatePonder(
+  state: GoldfishGameState,
+  sourceName: string
+): { drawn: CardDraw[]; actions: LibraryAction[] } {
+  const drawn: CardDraw[] = [];
+  const actions: LibraryAction[] = [];
+
+  const topCount = Math.min(3, state.library.length);
+  const topCards = state.library.slice(0, topCount);
+
+  // Score each
+  const scored = topCards.map(card => ({
+    card,
+    score: computeCardDesirability(card, state),
+  }));
+
+  const allBad = scored.every(s => s.score < 0.4);
+
+  if (allBad) {
+    // Shuffle the library
+    state.library = shuffleArray(state.library);
+    actions.push({ cardName: "", action: "shuffled", source: sourceName });
+  } else {
+    // Remove top cards, reorder by score desc, put back
+    state.library.splice(0, topCount);
+    scored.sort((a, b) => b.score - a.score);
+    state.library.unshift(...scored.map(s => s.card));
+    for (const { card } of scored) {
+      actions.push({ cardName: card.name, action: "kept-on-top", source: sourceName });
+    }
+  }
+
+  // Draw 1
+  const card = drawCardTracked(state);
+  if (card) {
+    drawn.push({ ...card, source: "ponder" });
+  }
+
+  return { drawn, actions };
+}
+
+export function simulateTopReorder(
+  state: GoldfishGameState,
+  n: number,
+  sourceName: string
+): LibraryAction[] {
+  const actions: LibraryAction[] = [];
+  const topCount = Math.min(n, state.library.length);
+  const topCards = state.library.splice(0, topCount);
+
+  const scored = topCards.map(card => ({
+    card,
+    score: computeCardDesirability(card, state),
+  }));
+
+  scored.sort((a, b) => b.score - a.score);
+  state.library.unshift(...scored.map(s => s.card));
+
+  for (const { card } of scored) {
+    actions.push({ cardName: card.name, action: "kept-on-top", source: sourceName });
+  }
+
+  return actions;
+}
+
 /**
  * Play a land from hand onto the battlefield.
  */
@@ -739,6 +1009,7 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
 
   // Track cards drawn this turn
   const cardsDrawn: CardDraw[] = [];
+  const libraryActions: LibraryAction[] = [];
 
   // Draw (skip first draw on the play)
   if (!(state.turn === 1 && config.onThePlay)) {
@@ -784,15 +1055,62 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
     manaUsed += cmc;
     ritualBonusMana += result.bonusMana;
 
-    // Simulate card draw effects from Card Draw spells
-    if (castCard.tags.includes("Card Draw")) {
-      const drawCount = estimateCardDrawCount(castCard.enriched.oracleText);
+    // --- Library manipulation & card draw effect resolution ---
+    let handledSpecialDraw = false;
+    const oracle = castCard.enriched.oracleText;
+
+    // 1. Brainstorm/Ponder special cases (handle their own draws)
+    if (isBrainstormEffect(oracle)) {
+      const r = simulateBrainstorm(state, castCard.name);
+      cardsDrawn.push(...r.drawn);
+      libraryActions.push(...r.actions);
+      handledSpecialDraw = true;
+    } else if (isPonderEffect(oracle)) {
+      const r = simulatePonder(state, castCard.name);
+      cardsDrawn.push(...r.drawn);
+      libraryActions.push(...r.actions);
+      handledSpecialDraw = true;
+    }
+
+    // 2. Scry-before-draw (e.g., Opt "Scry 1, then draw a card")
+    const scryN = estimateScryCount(oracle);
+    const scryBeforeDraw = scryN > 0 && scryAppearsBeforeDraw(oracle);
+    if (scryBeforeDraw) {
+      libraryActions.push(...simulateScry(state, scryN, castCard.name));
+    }
+
+    // 3. Generic card draw (skipped if brainstorm/ponder handled it)
+    if (!handledSpecialDraw && castCard.tags.includes("Card Draw")) {
+      const drawCount = estimateCardDrawCount(oracle);
       for (let d = 0; d < drawCount; d++) {
         const drawn = drawCardTracked(state);
         if (drawn) {
           cardsDrawn.push({ ...drawn, source: "card-draw-spell" });
         }
       }
+    }
+
+    // 4. Draw-before-scry or standalone scry/surveil
+    if (scryN > 0 && !scryBeforeDraw) {
+      libraryActions.push(...simulateScry(state, scryN, castCard.name));
+    }
+    const surveilN = estimateSurveilCount(oracle);
+    if (surveilN > 0) {
+      libraryActions.push(...simulateSurveil(state, surveilN, castCard.name));
+    }
+
+    // 5. Top-reorder effects (Sensei's Divining Top)
+    if (isTopReorderEffect(oracle)) {
+      const n = estimateTopReorderCount(oracle);
+      if (n > 0) {
+        libraryActions.push(...simulateTopReorder(state, n, castCard.name));
+      }
+    }
+
+    // 6. Shuffle after Tutor
+    if (castCard.tags.includes("Tutor")) {
+      state.library = shuffleArray(state.library);
+      libraryActions.push({ cardName: "", action: "shuffled", source: castCard.name });
     }
 
     // Always recompute remaining mana after every cast — handles mid-turn
@@ -818,6 +1136,7 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
     hand: state.hand.map((c) => c.name),
     permanentCount: state.battlefield.length,
     commanderCast,
+    libraryActions,
   };
 }
 
