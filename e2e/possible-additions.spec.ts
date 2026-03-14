@@ -427,8 +427,8 @@ test.describe("Additions tab", () => {
     const tablist = page.getByRole("tablist", { name: "Deck view" });
     const tabs = tablist.getByRole("tab");
 
-    // Should have 6 tabs total (Interactions added after Additions)
-    await expect(tabs).toHaveCount(6);
+    // Should have 7 tabs total (Interactions + Suggestions added after Additions)
+    await expect(tabs).toHaveCount(7);
 
     // Additions should be the second-to-last tab
     const additionsTab = tablist.getByRole("tab", { name: "Additions" });

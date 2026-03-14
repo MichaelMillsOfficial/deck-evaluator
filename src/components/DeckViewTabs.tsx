@@ -13,7 +13,12 @@ import SynergySection from "@/components/SynergySection";
 import HandSimulator from "@/components/HandSimulator";
 import AdditionsPanel from "@/components/AdditionsPanel";
 import InteractionSection from "@/components/InteractionSection";
+import SuggestionsPanel from "@/components/SuggestionsPanel";
 import { useInteractionAnalysis } from "@/hooks/useInteractionAnalysis";
+import {
+  computeCompositionScorecard,
+  AVAILABLE_TEMPLATES,
+} from "@/lib/deck-composition";
 
 interface DeckViewTabsProps {
   deck: DeckData;
@@ -46,9 +51,20 @@ export default function DeckViewTabs({
     synergy: new Set<string>(),
     hands: new Set<string>(),
     interactions: new Set<string>(),
+    suggestions: new Set<string>(),
   });
 
   const synergyAnalysis = analysisResults?.synergyAnalysis ?? null;
+
+  // Scorecard for the suggestions tab (uses the first template by default)
+  const scorecard = useMemo(() => {
+    if (!cardMap) return null;
+    return computeCompositionScorecard(
+      deck,
+      cardMap,
+      AVAILABLE_TEMPLATES[0]
+    );
+  }, [deck, cardMap]);
 
   // --- Interaction engine (lazy: only runs when tab is active) ---
   const {
@@ -353,6 +369,26 @@ export default function DeckViewTabs({
             />
           </section>
         )}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="tabpanel-deck-suggestions"
+        aria-labelledby="tab-deck-suggestions"
+        hidden={activeTab !== "suggestions"}
+      >
+        {activeTab === "suggestions" &&
+          cardMap &&
+          !enrichLoading &&
+          synergyAnalysis &&
+          scorecard && (
+            <SuggestionsPanel
+              deck={deck}
+              cardMap={cardMap}
+              synergyAnalysis={synergyAnalysis}
+              scorecard={scorecard}
+            />
+          )}
       </div>
     </div>
   );

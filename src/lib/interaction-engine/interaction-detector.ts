@@ -36,6 +36,7 @@ import type {
   SacrificeCost,
 } from "./types";
 import { PERMANENT_TYPES, matchesCompositeType } from "./game-model";
+import { detectLoopsFromChains } from "./loop-chain-solver";
 
 // ═══════════════════════════════════════════════════════════════
 // PUBLIC API
@@ -504,7 +505,10 @@ function detectEnables(a: CardProfile, b: CardProfile): Interaction[] {
           resource.category === "create_token" &&
           cost.costType === "sacrifice"
         ) {
-          strength = 0.8;
+          // Permanents with sacrifice costs are repeatable engine pieces (0.8).
+          // Sorceries/instants with sacrifice costs are one-shot effects — the
+          // sacrifice only happens once per cast (CR 304-305), so reduce strength.
+          strength = isPermanentCard(b.cardTypes) ? 0.8 : 0.5;
           mechanical = `${a.cardName} creates tokens that ${b.cardName} can sacrifice`;
           seen.add(`enables:sacrifice:${a.cardName}:${b.cardName}`);
         } else if (resource.category === "mana" && cost.costType === "mana") {
@@ -643,8 +647,14 @@ function detectTriggers(a: CardProfile, b: CardProfile): Interaction[] {
         }
         seen.add(dedupKey);
 
-        const strength = computeTriggerStrength(caused, trigger);
+        let strength = computeTriggerStrength(caused, trigger);
         const mechanical = describeTriggerInteraction(a, b, caused, trigger);
+
+        // Sorceries/instants cause events only once per cast — not a repeatable
+        // engine. Reduce trigger strength for non-permanent sources (CR 304-305).
+        if (!isPermanentCard(a.cardTypes)) {
+          strength *= 0.6;
+        }
 
         results.push({
           cards: [a.cardName, b.cardName],
@@ -657,7 +667,444 @@ function detectTriggers(a: CardProfile, b: CardProfile): Interaction[] {
     }
   }
 
+  // Oracle text fallback: detect trigger patterns the structured parser misses
+  if (results.length === 0) {
+    results.push(...detectTriggersFromOraclePatterns(a, b, seen));
+  }
+
   return results;
+}
+
+// ─── Oracle trigger detection patterns ───
+
+/**
+ * Oracle text fallback for trigger detection. Catches:
+ * - Life gain → "whenever you gain life" triggers
+ * - Spell cast type → "whenever you cast an instant or sorcery"
+ * - Draw events → "whenever you draw a card"
+ * - Enchantment ETB → constellation ("whenever an enchantment enters")
+ * - Land ETB → landfall ("whenever a land enters")
+ * - Attack triggers → "whenever a [type] attacks"
+ */
+function detectTriggersFromOraclePatterns(
+  a: CardProfile,
+  b: CardProfile,
+  seen: Set<string>
+): Interaction[] {
+  const results: Interaction[] = [];
+  const aOracle = a.rawOracleText || "";
+  const bOracle = b.rawOracleText || "";
+
+  // A causes life gain → B triggers on life gain
+  if (cardCausesLifeGain(a, aOracle) && cardTriggersOnLifeGain(b, bOracle)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:player_action:player_action:life_gain`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${a.cardName} gains life, triggering ${b.cardName}`,
+        events: [],
+      });
+    }
+  }
+
+  // A is an instant/sorcery → B triggers on instant/sorcery cast
+  if (cardIsSpellType(a, ["instant", "sorcery"]) && cardTriggersOnSpellCast(b, bOracle, ["instant", "sorcery"])) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:player_action:player_action:spell_cast`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `Casting ${a.cardName} triggers ${b.cardName}'s spell cast trigger`,
+        events: [],
+      });
+    }
+  }
+
+  // A causes draw → B triggers on draw
+  if (cardCausesDraw(a, aOracle) && cardTriggersOnDraw(b, bOracle)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:player_action:player_action:draw`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${a.cardName} draws cards, triggering ${b.cardName}`,
+        events: [],
+      });
+    }
+  }
+
+  // A is an enchantment → B triggers on enchantment ETB (constellation)
+  if (a.cardTypes.includes("enchantment") && cardTriggersOnEnchantmentETB(b, bOracle)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:enchantment`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${a.cardName} entering triggers ${b.cardName}'s enchantment ETB ability`,
+        events: [],
+      });
+    }
+  }
+
+  // A is a creature → B triggers on creature ETB ("whenever another creature enters")
+  if (a.cardTypes.includes("creature") && cardTriggersOnCreatureETB(b, bOracle)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:creature_etb`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${a.cardName} entering the battlefield triggers ${b.cardName}`,
+        events: [],
+      });
+    }
+  }
+
+  // A puts a land onto the battlefield → B has landfall
+  if (cardCausesLandETB(a, aOracle) && cardTriggersOnLandfall(b, bOracle)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:land`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${a.cardName} puts a land onto the battlefield, triggering ${b.cardName}'s landfall`,
+        events: [],
+      });
+    }
+  }
+
+  // A is a creature with matching subtype → B triggers on that subtype attacking
+  if (a.cardTypes.includes("creature") && cardTriggersOnSubtypeAttack(b, bOracle, a.subtypes)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:player_action:player_action:attack`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${a.cardName} attacking triggers ${b.cardName}`,
+        events: [],
+      });
+    }
+  }
+
+  // A is a permanent → B triggers on permanent ETB ("whenever another permanent enters")
+  if (isPermanentCard(a.cardTypes) && cardTriggersOnPermanentETB(b, bOracle)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:permanent_etb`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${a.cardName} entering triggers ${b.cardName}'s permanent ETB ability`,
+        events: [],
+      });
+    }
+  }
+
+  // A has equipment death trigger + B creates tokens (Skullclamp + token makers)
+  if (cardHasEquipmentDeathTrigger(a, aOracle) && cardCreatesTokens(b)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:equipment_death:token_creation`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${b.cardName} creates tokens that ${a.cardName} can equip and trigger on death`,
+        events: [],
+      });
+    }
+  }
+
+  // A has draw replacement for opponents + B triggers on opponent draws (Notion Thief + Consecrated Sphinx)
+  if (cardReplacesOpponentDraws(a, aOracle) && cardTriggersOnOpponentDraws(b, bOracle)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:draw_replacement:draw_trigger`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${a.cardName} redirects opponent draws while ${b.cardName} triggers on them, creating synergy`,
+        events: [],
+      });
+    }
+  }
+
+  // Both A and B grant extra combat phases → synergy
+  if (cardGrantsExtraCombat(a, aOracle) && cardGrantsExtraCombat(b, bOracle)) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:extra_combat:extra_combat`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "triggers",
+        strength: 0.7,
+        mechanical: `${a.cardName} and ${b.cardName} both create extra combat phases, amplifying attack triggers`,
+        events: [],
+      });
+    }
+  }
+
+  // A copies/imprints instants + B is an instant that untaps (Isochron Scepter + Dramatic Reversal)
+  if (cardCopiesImprinted(a, aOracle) && b.cardTypes.includes("instant")) {
+    const dedupKey = `triggers:${a.cardName}:${b.cardName}:imprint:instant`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "enables",
+        strength: 0.8,
+        mechanical: `${a.cardName} can copy ${b.cardName} (imprinted instant)`,
+        events: [],
+      });
+    }
+  }
+
+  // B untaps nonland permanents + A is an artifact with activated abilities
+  if (cardUntapsNonlands(b, bOracle) && a.cardTypes.includes("artifact") && cardHasActivatedAbilities(a)) {
+    const dedupKey = `triggers:${b.cardName}:${a.cardName}:untap:artifact`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [b.cardName, a.cardName],
+        type: "triggers",
+        strength: 0.8,
+        mechanical: `${b.cardName} untaps ${a.cardName}, enabling repeated activation`,
+        events: [],
+      });
+    }
+  }
+
+  // A grants undying/persist to creatures → enables B (creature)
+  if (b.cardTypes.includes("creature") && cardGrantsUndyingOrPersist(a, aOracle, b)) {
+    const dedupKey = `enables:${a.cardName}:${b.cardName}:keyword_grant`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "enables",
+        strength: 0.8,
+        mechanical: `${a.cardName} grants undying/persist to ${b.cardName}, enabling recursion`,
+        events: [],
+      });
+    }
+  }
+
+  // A prevents -1/-1 counters + B has persist (Vizier of Remedies + Kitchen Finks)
+  if (cardPreventsMinusCounters(a, aOracle) && cardHasPersist(b, bOracle)) {
+    const dedupKey = `enables:${a.cardName}:${b.cardName}:counter_prevention:persist`;
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "enables",
+        strength: 0.9,
+        mechanical: `${a.cardName} prevents persist counters on ${b.cardName}, enabling infinite recurrence`,
+        events: [],
+      });
+    }
+  }
+
+  return results;
+}
+
+// ─── Trigger helper predicates ───
+
+function cardCausesLifeGain(card: CardProfile, oracle: string): boolean {
+  if (card.produces.some((p) => p.category === "life")) return true;
+  for (const event of card.causesEvents) {
+    if (event.kind === "player_action" && event.action === "gain_life") return true;
+  }
+  // Lifelink causes life gain, keywords that produce life
+  if (card.abilities.some((a) => a.abilityType === "keyword" && a.keyword.toLowerCase() === "lifelink")) return true;
+  if (/(?:you )?gain\s+(?:\d+|X)\s+life/i.test(oracle)) return true;
+  if (/lifelink/i.test(oracle)) return true;
+  return false;
+}
+
+function cardTriggersOnLifeGain(card: CardProfile, oracle: string): boolean {
+  for (const trigger of card.triggersOn) {
+    if (trigger.kind === "player_action" && trigger.action === "gain_life") return true;
+  }
+  if (/whenever you gain life/i.test(oracle)) return true;
+  return false;
+}
+
+function cardIsSpellType(card: CardProfile, types: string[]): boolean {
+  return card.cardTypes.some((t) => types.includes(t));
+}
+
+function cardTriggersOnSpellCast(card: CardProfile, oracle: string, spellTypes: string[]): boolean {
+  for (const trigger of card.triggersOn) {
+    if (trigger.kind === "player_action" && trigger.action === "cast_spell") {
+      // Check if trigger specifies spell types
+      if (trigger.object) {
+        if (trigger.object.types.length === 0) return true; // "whenever you cast a spell"
+        if (trigger.object.types.some((t) => spellTypes.includes(t))) return true;
+      }
+      return true;
+    }
+  }
+  // Oracle text fallback
+  const typePattern = spellTypes.map(escapeRegExp).join("|");
+  const regex = new RegExp(`whenever (?:you|a player) cast[s]? (?:an? )?(?:${typePattern})`, "i");
+  if (regex.test(oracle)) return true;
+  // Also match "whenever you cast an instant or sorcery spell"
+  if (/whenever (?:you|a player) casts? an? (?:instant or sorcery|noncreature) spell/i.test(oracle)) return true;
+  return false;
+}
+
+function cardCausesDraw(card: CardProfile, oracle: string): boolean {
+  if (card.produces.some((p) => p.category === "cards")) return true;
+  for (const event of card.causesEvents) {
+    if (event.kind === "player_action" && event.action === "draw") return true;
+  }
+  if (/draw (?:a|one|\d+) cards?/i.test(oracle)) return true;
+  return false;
+}
+
+function cardTriggersOnDraw(card: CardProfile, oracle: string): boolean {
+  for (const trigger of card.triggersOn) {
+    if (trigger.kind === "player_action" && trigger.action === "draw") return true;
+  }
+  if (/whenever you draw a card/i.test(oracle)) return true;
+  return false;
+}
+
+function cardTriggersOnEnchantmentETB(card: CardProfile, oracle: string): boolean {
+  for (const trigger of card.triggersOn) {
+    if (trigger.kind === "zone_transition" && trigger.to === "battlefield") {
+      if (trigger.object?.types.includes("enchantment")) return true;
+    }
+  }
+  if (/whenever (?:an(?:other)? )?enchantment enters the battlefield/i.test(oracle)) return true;
+  if (/constellation/i.test(oracle)) return true;
+  return false;
+}
+
+function cardCausesLandETB(card: CardProfile, oracle: string): boolean {
+  // Check for zone transitions that put lands onto battlefield
+  for (const event of card.causesEvents) {
+    if (event.kind === "zone_transition" && event.to === "battlefield") {
+      if (event.object?.types.includes("land")) return true;
+    }
+  }
+  // Oracle fallback: "search your library for a land card, put it onto the battlefield"
+  if (/(?:search|put)\s+(?:a |one |up to \S+ )?(?:\S+ )?land\s+(?:card\s+)?(?:onto|into|on) the battlefield/i.test(oracle)) return true;
+  // Fetchlands: "Search your library for a Forest or Plains card, put it onto the battlefield"
+  // Match land type names (basic land types and common dual-land references)
+  if (/search your library for (?:a|an)\s+(?:basic )?(?:Plains|Island|Swamp|Mountain|Forest|Desert|Gate|land)(?:\s+or\s+(?:Plains|Island|Swamp|Mountain|Forest|Desert|Gate|land))*\s+card,?\s+put it onto the battlefield/i.test(oracle)) return true;
+  return false;
+}
+
+function cardTriggersOnLandfall(card: CardProfile, oracle: string): boolean {
+  for (const trigger of card.triggersOn) {
+    if (trigger.kind === "zone_transition" && trigger.to === "battlefield") {
+      if (trigger.object?.types.includes("land")) return true;
+    }
+  }
+  if (/landfall/i.test(oracle)) return true;
+  if (/whenever a land enters the battlefield under your control/i.test(oracle)) return true;
+  return false;
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function cardTriggersOnSubtypeAttack(card: CardProfile, oracle: string, attackerSubtypes: Subtype[]): boolean {
+  if (!attackerSubtypes || attackerSubtypes.length === 0) return false;
+  // Check for oracle text pattern "whenever a [subtype] attacks"
+  for (const subtype of attackerSubtypes) {
+    const regex = new RegExp(`whenever (?:a |an )?${escapeRegExp(subtype)} (?:you control )?attacks`, "i");
+    if (regex.test(oracle)) return true;
+  }
+  return false;
+}
+
+function cardTriggersOnCreatureETB(_card: CardProfile, oracle: string): boolean {
+  return /whenever (?:a(?:nother)? )?creature enters the battlefield/i.test(oracle);
+}
+
+function cardTriggersOnPermanentETB(_card: CardProfile, oracle: string): boolean {
+  return /whenever another permanent enters the battlefield/i.test(oracle);
+}
+
+function cardHasEquipmentDeathTrigger(card: CardProfile, oracle: string): boolean {
+  if (card.cardTypes.includes("artifact") && /whenever equipped creature dies/i.test(oracle)) return true;
+  return false;
+}
+
+function cardReplacesOpponentDraws(_card: CardProfile, oracle: string): boolean {
+  return /if an opponent would draw/i.test(oracle);
+}
+
+function cardTriggersOnOpponentDraws(_card: CardProfile, oracle: string): boolean {
+  return /whenever an opponent draws/i.test(oracle);
+}
+
+function cardGrantsExtraCombat(_card: CardProfile, oracle: string): boolean {
+  return /additional combat (?:phase|step)/i.test(oracle) ||
+    /untap (?:all|each) .+ (?:and|that) (?:attack|attacks)/i.test(oracle);
+}
+
+function cardCopiesImprinted(_card: CardProfile, oracle: string): boolean {
+  return /copy the (?:exiled|imprinted) card/i.test(oracle) ||
+    /you may copy the (?:exiled|imprinted)/i.test(oracle);
+}
+
+function cardUntapsNonlands(_card: CardProfile, oracle: string): boolean {
+  return /untap all nonland permanents/i.test(oracle) ||
+    /untap each nonland permanent/i.test(oracle);
+}
+
+function cardGrantsUndyingOrPersist(granter: CardProfile, oracle: string, target: CardProfile): boolean {
+  // Match "have undying" anywhere in a sentence about "creatures you control"
+  // e.g., "Other non-Human creatures you control get +1/+1 and have undying."
+  const undyingMatch = oracle.match(/(?:other )?(.+?)creatures? you control .+?(?:have|gain) undying/i)
+    || oracle.match(/(?:other )?(.+?)creatures? you control (?:have|get|gain) undying/i);
+  if (undyingMatch) {
+    const qualifier = (undyingMatch[1] || "").trim().toLowerCase();
+    // "non-Human" check
+    if (qualifier.includes("non-human")) {
+      // Target must not be a Human
+      const isHuman = target.subtypes?.some((s) => s.toLowerCase() === "human");
+      return !isHuman;
+    }
+    return true; // No type restriction
+  }
+  // Check for persist grants too
+  if (/(?:other )?creatures? you control .+?(?:have|gain) persist/i.test(oracle) ||
+      /(?:other )?creatures? you control (?:have|get|gain) persist/i.test(oracle)) {
+    return true;
+  }
+  return false;
+}
+
+function cardPreventsMinusCounters(_card: CardProfile, oracle: string): boolean {
+  return /if one or more -1\/-1 counters would be (?:placed|put)/i.test(oracle) ||
+    /that many -1\/-1 counters minus one/i.test(oracle) ||
+    /enters? (?:the battlefield )?with one fewer -1\/-1 counter/i.test(oracle);
+}
+
+function cardHasPersist(card: CardProfile, oracle: string): boolean {
+  if (card.abilities.some((a) => a.abilityType === "keyword" && (a as { keyword: string }).keyword.toLowerCase() === "persist")) return true;
+  return /persist/i.test(oracle);
 }
 
 /**
@@ -805,6 +1252,15 @@ function detectProtects(a: CardProfile, b: CardProfile): Interaction[] {
           continue;
         }
 
+        // Oracle text cross-check: if the structured parser gave a wildcard
+        // grant target (empty types), verify against oracle text type constraints.
+        // E.g., "Target creature you control gains protection" shouldn't match Sol Ring.
+        if (grant.to.types.length === 0 && a.rawOracleText) {
+          if (!oracleProtectionTargetMatches(a.rawOracleText, b)) {
+            continue;
+          }
+        }
+
         results.push({
           cards: [a.cardName, b.cardName],
           type: "protects",
@@ -812,6 +1268,69 @@ function detectProtects(a: CardProfile, b: CardProfile): Interaction[] {
           mechanical: `${a.cardName} grants ${keywordName} to ${b.cardName}`,
           events: [],
         });
+      }
+    }
+  }
+
+  // Oracle text fallback: detect protection patterns the parser misses
+  if (results.length === 0 && a.rawOracleText) {
+    const oracleProtects = detectProtectsFromOraclePatterns(a, b);
+    results.push(...oracleProtects);
+  }
+
+  return results;
+}
+
+/**
+ * Oracle text cross-check for protection target types.
+ * When the structured parser gives a wildcard grant target, verify that
+ * the oracle text's type constraints match card B.
+ */
+function oracleProtectionTargetMatches(oracle: string, b: CardProfile): boolean {
+  // Check for "target creature" pattern
+  if (/target creature/i.test(oracle)) {
+    return b.cardTypes.includes("creature");
+  }
+  // Check for "target permanent" or "permanents you control"
+  if (/(?:target permanent|permanents? you control)/i.test(oracle)) {
+    return isPermanentCard(b.cardTypes);
+  }
+  // No type constraint found in oracle — allow anything
+  return true;
+}
+
+// ─── Oracle protection detection ───
+
+/** Protection-granting oracle patterns */
+const PROTECTION_GRANT_PATTERNS = [
+  { pattern: /(?:permanents?|creatures?) you control gain hexproof and indestructible/i, keyword: "hexproof and indestructible", types: ["permanent"] as string[] },
+  { pattern: /target creature (?:you control )?gains? protection from the color/i, keyword: "protection from a color", types: ["creature"] as string[] },
+  { pattern: /target creature (?:you control )?gains? hexproof/i, keyword: "hexproof", types: ["creature"] as string[] },
+  { pattern: /target creature (?:you control )?gains? indestructible/i, keyword: "indestructible", types: ["creature"] as string[] },
+  { pattern: /target creature (?:you control )?gains? protection/i, keyword: "protection", types: ["creature"] as string[] },
+  { pattern: /target permanent (?:you control )?gains? protection/i, keyword: "protection", types: ["permanent"] as string[] },
+];
+
+function detectProtectsFromOraclePatterns(a: CardProfile, b: CardProfile): Interaction[] {
+  const results: Interaction[] = [];
+  const oracle = a.rawOracleText!;
+
+  for (const { pattern, keyword, types } of PROTECTION_GRANT_PATTERNS) {
+    if (pattern.test(oracle)) {
+      // Check if B's type matches what the protection grants to
+      const matchesType = types.includes("permanent")
+        ? isPermanentCard(b.cardTypes)
+        : b.cardTypes.some((t) => types.includes(t));
+
+      if (matchesType) {
+        results.push({
+          cards: [a.cardName, b.cardName],
+          type: "protects",
+          strength: 0.8,
+          mechanical: `${a.cardName} grants ${keyword} to ${b.cardName}`,
+          events: [],
+        });
+        return results; // One protection per pair
       }
     }
   }
@@ -847,8 +1366,11 @@ function detectAmplifies(a: CardProfile, b: CardProfile): Interaction[] {
       isAmplifying = AMPLIFY_KEYWORDS.has(grant.ability.toLowerCase());
       description = `grants ${grant.ability}`;
     } else if (grant.ability.category === "stat_mod") {
-      isAmplifying = true;
       const sm = grant.ability;
+      // Negative stat mods (e.g. -4/-4) are removal, not amplification
+      const pNum = typeof sm.power === "number" ? sm.power : 1;   // treat "X" as positive
+      const tNum = typeof sm.toughness === "number" ? sm.toughness : 1;
+      isAmplifying = pNum > 0 || tNum > 0;
       const pSign = typeof sm.power === "number" && sm.power >= 0 ? "+" : "";
       const tSign = typeof sm.toughness === "number" && sm.toughness >= 0 ? "+" : "";
       description = `grants ${pSign}${sm.power}/${tSign}${sm.toughness}`;
@@ -895,7 +1417,159 @@ function detectAmplifies(a: CardProfile, b: CardProfile): Interaction[] {
     }
   }
 
+  // Oracle text fallback: detect replacement-based amplification patterns
+  if (a.rawOracleText) {
+    const oracleAmplify = detectAmplifyFromOraclePatterns(a, b);
+    for (const oa of oracleAmplify) {
+      const alreadyFound = results.some(
+        (r) => r.type === "amplifies" && r.cards[0] === oa.cards[0] && r.cards[1] === oa.cards[1]
+      );
+      if (!alreadyFound) {
+        results.push(oa);
+      }
+    }
+  }
+
   return results;
+}
+
+// ─── Oracle text amplification patterns ───
+
+/** Token-doubling: Doubling Season, Parallel Lives, Anointed Procession */
+const TOKEN_DOUBLING_PATTERNS = [
+  /if (?:an )?effect would (?:create|put) one or more tokens/i,
+  /twice that many (?:of those )?tokens/i,
+  /creates? (?:one or more )?tokens?,? (?:it )?creates? twice that many/i,
+];
+
+/** Counter-doubling: Doubling Season, Hardened Scales, Branching Evolution */
+const COUNTER_DOUBLING_PATTERNS = [
+  /if (?:an )?effect would (?:place|put) one or more .+ counters/i,
+  /twice that many .+ counters/i,
+  /additional \+1\/\+1 counter/i,
+];
+
+/** ETB trigger doubling: Panharmonicon, Yarok */
+const ETB_DOUBLING_PATTERNS = [
+  /(?:artifact|creature|permanent)s? entering the battlefield (?:under your control )?(?:causes|triggers) a triggered ability.+(?:additional|extra) time/i,
+  /triggered ability.+triggers (?:an )?additional time/i,
+  /if (?:an? )?(?:artifact|creature|permanent) entering the battlefield causes a triggered ability/i,
+];
+
+/** Damage amplification: Torbran, Fiery Emancipation, Furnace of Rath */
+const DAMAGE_AMPLIFY_PATTERNS = [
+  /(?:a red source|~) (?:you control )?would deal damage.+(?:plus \d+|that much damage plus|deals? (?:that much damage )?plus)/i,
+  /deals? that much damage plus \d+ (?:instead|to)/i,
+  /if a (?:source|red source) you control would deal damage.+deals? that much (?:damage )?plus/i,
+  /damage.+(?:doubled|tripled|triple that damage)/i,
+];
+
+function detectAmplifyFromOraclePatterns(a: CardProfile, b: CardProfile): Interaction[] {
+  const results: Interaction[] = [];
+  const oracle = a.rawOracleText!;
+
+  // Token-doubling amplifies token creators
+  const isTokenDoubler = TOKEN_DOUBLING_PATTERNS.some((p) => p.test(oracle));
+  if (isTokenDoubler && cardCreatesTokens(b)) {
+    results.push({
+      cards: [a.cardName, b.cardName],
+      type: "amplifies",
+      strength: 0.9,
+      mechanical: `${a.cardName} doubles token creation from ${b.cardName}`,
+      events: [],
+    });
+  }
+
+  // Counter-doubling amplifies counter placers
+  const isCounterDoubler = COUNTER_DOUBLING_PATTERNS.some((p) => p.test(oracle));
+  if (isCounterDoubler && cardPlacesCounters(b)) {
+    results.push({
+      cards: [a.cardName, b.cardName],
+      type: "amplifies",
+      strength: 0.9,
+      mechanical: `${a.cardName} doubles counter placement from ${b.cardName}`,
+      events: [],
+    });
+  }
+
+  // ETB trigger doubling amplifies ETB trigger creatures/artifacts
+  const isETBDoubler = ETB_DOUBLING_PATTERNS.some((p) => p.test(oracle));
+  if (isETBDoubler && cardHasETBTriggers(b) &&
+      (b.cardTypes.includes("creature") || b.cardTypes.includes("artifact"))) {
+    results.push({
+      cards: [a.cardName, b.cardName],
+      type: "amplifies",
+      strength: 0.9,
+      mechanical: `${a.cardName} doubles ETB triggers from ${b.cardName}`,
+      events: [],
+    });
+  }
+
+  // Damage amplification amplifies damage dealers (checking color for Torbran)
+  const isDamageAmplifier = DAMAGE_AMPLIFY_PATTERNS.some((p) => p.test(oracle));
+  if (isDamageAmplifier && cardDealsDamage(b)) {
+    // Torbran specifically says "a red source" — check if B is red
+    const isRedSpecific = /a red source/i.test(oracle);
+    if (!isRedSpecific || cardIsRed(b)) {
+      results.push({
+        cards: [a.cardName, b.cardName],
+        type: "amplifies",
+        strength: 0.8,
+        mechanical: `${a.cardName} amplifies damage from ${b.cardName}`,
+        events: [],
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Check if card creates tokens.
+ */
+function cardCreatesTokens(card: CardProfile): boolean {
+  if (card.produces.some((p) => p.category === "create_token")) return true;
+  for (const event of card.causesEvents) {
+    if (event.kind === "player_action" && event.action === "create_token") return true;
+  }
+  if (card.rawOracleText && /creates?\s+(?:\d+|[Xx]|a|an|that many)\s+\S*\s*tokens?/i.test(card.rawOracleText)) return true;
+  return false;
+}
+
+/**
+ * Check if card places counters.
+ */
+function cardPlacesCounters(card: CardProfile): boolean {
+  if (card.produces.some((p) => p.category === "counter")) return true;
+  for (const event of card.causesEvents) {
+    if (event.kind === "state_change" && event.property === "counters") return true;
+  }
+  if (card.rawOracleText && /put\s+(?:\d+|[Xx]|a|an)\s+\+1\/\+1\s+counter/i.test(card.rawOracleText)) return true;
+  return false;
+}
+
+/**
+ * Check if card deals damage.
+ */
+function cardDealsDamage(card: CardProfile): boolean {
+  for (const event of card.causesEvents) {
+    if (event.kind === "damage") return true;
+  }
+  if (card.rawOracleText && /deals?\s+\d+\s+damage/i.test(card.rawOracleText)) return true;
+  // Creatures deal combat damage
+  if (card.cardTypes.includes("creature")) return true;
+  return false;
+}
+
+/**
+ * Check if card is red (has red in mana cost or color identity).
+ * Handles pure {R} and hybrid symbols like {R/W}, {R/G}, {R/P}.
+ */
+function cardIsRed(card: CardProfile): boolean {
+  const redPattern = /\{R(?:\/[WUBGP2])?\}|\{[WUBG2]\/R\}/i;
+  if (card.castingCost?.manaCost && redPattern.test(card.castingCost.manaCost)) return true;
+  if (card.rawOracleText && redPattern.test(card.rawOracleText)) return true;
+  return false;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -908,6 +1582,19 @@ function detectAmplifies(a: CardProfile, b: CardProfile): Interaction[] {
  */
 function detectRecurs(a: CardProfile, b: CardProfile): Interaction[] {
   const results: Interaction[] = [];
+
+  // Pre-check: if A's oracle text has explicit type filters for recursion,
+  // enforce them even when the structured parser missed the filter.
+  // This prevents false positives like Meren (creature-only) recurring Lightning Bolt.
+  if (a.rawOracleText && !oracleRecursionTypeMatches(a.rawOracleText, b)) {
+    return results;
+  }
+
+  // Pre-check: if A's oracle text has explicit MV filters for recursion,
+  // enforce them even when the structured parser missed the filter.
+  if (a.rawOracleText && !oracleRecursionMVMatches(a.rawOracleText, b)) {
+    return results;
+  }
 
   // 1. Check A's causesEvents for ZoneTransition{from: graveyard, to: battlefield|hand}
   for (const event of a.causesEvents) {
@@ -994,7 +1681,129 @@ function detectRecurs(a: CardProfile, b: CardProfile): Interaction[] {
     results.push(oracleRecurs);
   }
 
+  // 4. Oracle text fallback: detect recursion with type/MV filters
+  if (results.length === 0 && a.rawOracleText) {
+    const oracleMvRecurs = detectRecursFromOraclePatterns(a, b);
+    if (oracleMvRecurs) {
+      results.push(oracleMvRecurs);
+    }
+  }
+
   return results;
+}
+
+/**
+ * Check if A's oracle text has a type filter for recursion and B matches it.
+ * Returns true if B is a valid recursion target, false if filtered out.
+ */
+function oracleRecursionTypeMatches(oracle: string, b: CardProfile): boolean {
+  // Look for graveyard return patterns that mention a specific type.
+  // Patterns can be:
+  //   "return target creature card from your graveyard" (return...type...graveyard)
+  //   "target creature card in your graveyard...return it" (type...graveyard...return)
+  // Type strings here intentionally include "permanent" which is not a CardType,
+  // so we use plain strings and handle "permanent" via isPermanentCard().
+  const typePatterns: { pattern: RegExp; type: string }[] = [
+    { pattern: /creature card (?:from|in) (?:your |a )?graveyard/i, type: "creature" },
+    { pattern: /(?:return|put).*?creature card/i, type: "creature" },
+    { pattern: /artifact card (?:from|in) (?:your |a )?graveyard/i, type: "artifact" },
+    { pattern: /(?:return|put).*?artifact card/i, type: "artifact" },
+    { pattern: /enchantment card (?:from|in) (?:your |a )?graveyard/i, type: "enchantment" },
+    { pattern: /(?:return|put).*?enchantment card/i, type: "enchantment" },
+    { pattern: /instant (?:or sorcery )?card (?:from|in) (?:your |a )?graveyard/i, type: "instant" },
+    { pattern: /(?:return|put).*?instant (?:or sorcery )?card/i, type: "instant" },
+    { pattern: /permanent card (?:from|in) (?:your |a )?graveyard/i, type: "permanent" },
+    { pattern: /(?:return|put).*?permanent card/i, type: "permanent" },
+    { pattern: /permanent spell with mana value/i, type: "permanent" },
+  ];
+
+  // Only check patterns that are in a graveyard recursion context
+  const hasGraveyardContext = /graveyard/i.test(oracle);
+  if (!hasGraveyardContext) return true; // Not a recursion card, no filter applies
+
+  let hasTypeFilter = false;
+  const matchedTypes = new Set<string>();
+  for (const { pattern, type } of typePatterns) {
+    if (pattern.test(oracle)) {
+      hasTypeFilter = true;
+      matchedTypes.add(type);
+    }
+  }
+
+  if (!hasTypeFilter) return true; // No type filter found
+
+  // Check if B matches any of the matched types
+  for (const type of matchedTypes) {
+    if (type === "permanent") {
+      if (isPermanentCard(b.cardTypes)) return true;
+    } else if (b.cardTypes.includes(type as CardType)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Check if A's oracle text has a mana value filter for recursion and B fits it.
+ * Returns true if B is within the MV limit, false if filtered out.
+ */
+function oracleRecursionMVMatches(oracle: string, b: CardProfile): boolean {
+  const mvMatch = oracle.match(
+    /(?:return|put|cast).*?(?:mana value|converted mana cost)\s+(\d+)\s+or\s+less.*?(?:from|in)\s+(?:your |a )?graveyard/i
+  );
+  if (!mvMatch) return true; // No MV filter found
+  const maxMV = parseInt(mvMatch[1], 10);
+  if (!b.castingCost) return true; // No cost info, can't filter
+  return b.castingCost.manaValue <= maxMV;
+}
+
+/**
+ * Oracle text fallback for recursion. Handles:
+ * - MV-filtered recursion: "mana value 3 or less" (Sun Titan), "mana value 2 or less" (Lurrus)
+ * - Type-filtered recursion: "creature card" (Meren), "permanent card" (Lurrus)
+ */
+function detectRecursFromOraclePatterns(a: CardProfile, b: CardProfile): Interaction | null {
+  const oracle = a.rawOracleText!;
+
+  // Patterns for returning from graveyard
+  const recursionPatterns = [
+    /(?:return|put)\s+(?:target\s+)?(.+?)\s+(?:card\s+)?(?:from (?:your |a )?graveyard|in (?:your |a )?graveyard)\s+(?:to|onto|into)\s+(?:the\s+)?(?:battlefield|your hand)/i,
+    /(?:return|put)\s+(?:target\s+)?(.+?)\s+(?:card\s+)?(?:with|that has)\s+(?:mana value|converted mana cost)\s+(\d+)\s+or less.*?(?:from (?:your |a )?graveyard)/i,
+    /(?:you may )?cast\s+(?:target\s+)?(.+?)\s+(?:card\s+|spell\s+)?(?:from (?:your |a )?graveyard|in (?:your |a )?graveyard)/i,
+  ];
+
+  // Check each recursion pattern
+  for (const pattern of recursionPatterns) {
+    const match = oracle.match(pattern);
+    if (!match) continue;
+
+    const targetDesc = match[1]?.toLowerCase() || "";
+
+    // Check type filter: "creature card", "permanent card", "artifact card", etc.
+    if (targetDesc.includes("creature") && !b.cardTypes.includes("creature")) return null;
+    if (targetDesc.includes("artifact") && !b.cardTypes.includes("artifact")) return null;
+    if (targetDesc.includes("enchantment") && !b.cardTypes.includes("enchantment")) return null;
+    if (targetDesc.includes("instant") && !b.cardTypes.includes("instant")) return null;
+    if (targetDesc.includes("sorcery") && !b.cardTypes.includes("sorcery")) return null;
+    if (targetDesc.includes("permanent") && !isPermanentCard(b.cardTypes)) return null;
+
+    // Check MV filter from oracle text
+    const mvMatch = oracle.match(/(?:mana value|converted mana cost)\s+(\d+)\s+or\s+less/i);
+    if (mvMatch && b.castingCost) {
+      const maxMV = parseInt(mvMatch[1], 10);
+      if (b.castingCost.manaValue > maxMV) return null;
+    }
+
+    return {
+      cards: [a.cardName, b.cardName],
+      type: "recurs",
+      strength: 0.7,
+      mechanical: `${a.cardName} can return ${b.cardName} from the graveyard`,
+      events: [],
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -1139,6 +1948,13 @@ function detectReducesCost(a: CardProfile, b: CardProfile): Interaction[] {
         !affectedObjects ||
         cardMatchesRef(b.cardTypes, affectedObjects, b.subtypes, b.supertypes)
       ) {
+        // Oracle text cross-check: verify subtype/type constraints from oracle
+        // when the structured parser gave a wildcard target
+        if (a.rawOracleText && (!affectedObjects || affectedObjects.types.length === 0)) {
+          if (!oracleCostReductionTargetMatches(a.rawOracleText, b)) {
+            continue;
+          }
+        }
         results.push({
           cards: [a.cardName, b.cardName],
           type: "reduces_cost",
@@ -1151,7 +1967,105 @@ function detectReducesCost(a: CardProfile, b: CardProfile): Interaction[] {
     }
   }
 
+  // 3. Oracle text fallback: detect cost reduction patterns
+  if (a.rawOracleText && b.castingCost && b.castingCost.manaValue > 0) {
+    const oracleReduction = detectReducesCostFromOracle(a, b);
+    if (oracleReduction) {
+      results.push(oracleReduction);
+      return results;
+    }
+  }
+
   return results;
+}
+
+/**
+ * Oracle text cross-check for cost reduction targets.
+ * When the structured parser gives a wildcard target, verify that
+ * the oracle text's subtype/type constraints match card B.
+ */
+function oracleCostReductionTargetMatches(oracle: string, b: CardProfile): boolean {
+  // Check for tribal pattern: "[Subtype] spells you cast cost less"
+  const tribalMatch = oracle.match(/(\w+) spells (?:you cast )?cost \{\d+\} less/i);
+  if (tribalMatch) {
+    const tribeName = tribalMatch[1].toLowerCase();
+    // "Spells" is universal, "Creature spells" is type-filtered
+    if (tribeName === "spells") return !b.cardTypes.includes("land");
+    if (tribeName === "creature") return b.cardTypes.includes("creature");
+    // Tribal name (Goblin, Elf, etc.) — check subtypes
+    const bSubtypesLower = (b.subtypes || []).map((s) => s.toLowerCase());
+    return bSubtypesLower.includes(tribeName);
+  }
+  // No specific constraint found
+  return true;
+}
+
+function detectReducesCostFromOracle(a: CardProfile, b: CardProfile): Interaction | null {
+  const oracle = a.rawOracleText!;
+
+  // Tribal cost reduction: "[Subtype] spells you cast cost {1} less"
+  // Check BEFORE universal pattern to prevent "Goblin spells" matching as universal
+  const tribalMatch = oracle.match(/(\w+) spells (?:you cast )?cost \{(\d+)\} less/i);
+  if (tribalMatch) {
+    const tribeName = tribalMatch[1].toLowerCase();
+    if (tribeName === "creature") {
+      // Creature-type cost reduction
+      if (b.cardTypes.includes("creature")) {
+        return {
+          cards: [a.cardName, b.cardName],
+          type: "reduces_cost",
+          strength: 0.7,
+          mechanical: `${a.cardName} reduces creature spell costs, including ${b.cardName}`,
+          events: [],
+        };
+      }
+      return null; // Creature-only reduction, B is not a creature
+    }
+    if (tribeName !== "spells") {
+      // Specific tribe reduction (Goblin, Elf, Wizard, etc.)
+      const bSubtypesLower = (b.subtypes || []).map((s) => s.toLowerCase());
+      if (bSubtypesLower.includes(tribeName)) {
+        return {
+          cards: [a.cardName, b.cardName],
+          type: "reduces_cost",
+          strength: 0.8,
+          mechanical: `${a.cardName} reduces ${tribalMatch[1]} spell costs, including ${b.cardName}`,
+          events: [],
+        };
+      }
+      return null; // Tribal reduction, B is not the right tribe
+    }
+  }
+
+  // Universal cost reduction: "Spells cost {1} less to cast" / "Spells you cast cost {1} less"
+  // Only matches when "Spells" starts the sentence (not preceded by a type qualifier)
+  if (/(?:^|\. |\n)spells (?:you cast )?cost \{\d+\} less to cast/im.test(oracle)) {
+    // B must be a spell (not a land)
+    if (!b.cardTypes.includes("land")) {
+      return {
+        cards: [a.cardName, b.cardName],
+        type: "reduces_cost",
+        strength: 0.6,
+        mechanical: `${a.cardName} reduces the cost of ${b.cardName}`,
+        events: [],
+      };
+    }
+  }
+
+  // "Creature spells of the chosen type cost {N} less" (Urza's Incubator)
+  if (/creature spells of the chosen type cost \{\d+\} less/i.test(oracle)) {
+    if (b.cardTypes.includes("creature")) {
+      return {
+        cards: [a.cardName, b.cardName],
+        type: "reduces_cost",
+        strength: 0.6,
+        mechanical: `${a.cardName} can reduce the cost of ${b.cardName} (if matching chosen type)`,
+        events: [],
+      };
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -1285,8 +2199,17 @@ function detectBlocks(a: CardProfile, b: CardProfile): Interaction[] {
   }
 
   // 3. Oracle text fallback: detect "can't" restriction patterns the parser misses
-  if (results.length === 0) {
-    results.push(...detectBlocksFromOraclePatterns(a, b));
+  // Always run oracle fallback — structured detection may miss patterns like
+  // Torpor Orb, Cursed Totem, Null Rod that the parser doesn't extract
+  const oracleBlocks = detectBlocksFromOraclePatterns(a, b);
+  for (const ob of oracleBlocks) {
+    // Only add if we don't already have a blocks interaction for this pair
+    const alreadyFound = results.some(
+      (r) => r.type === "blocks" && r.cards[0] === ob.cards[0] && r.cards[1] === ob.cards[1]
+    );
+    if (!alreadyFound) {
+      results.push(ob);
+    }
   }
 
   return results;
@@ -1413,6 +2336,31 @@ const LIBRARY_HATE_PATTERNS = [
   /can't cast spells? from.+libraries/i,
 ];
 
+/** ETB trigger suppression: Torpor Orb, Hushbringer, Hushwing Gryff */
+const ETB_SUPPRESSION_PATTERNS = [
+  /creatures entering the battlefield don't cause (?:triggered )?abilities (?:of|to) trigger/i,
+  /creatures entering the battlefield don't cause abilities to trigger/i,
+  /entering the battlefield don't cause (?:triggered )?abilities to trigger/i,
+  /permanents entering the battlefield don't cause abilities to trigger/i,
+];
+
+/** Creature activated ability restrictions: Cursed Totem, Linvala */
+const CREATURE_ABILITY_HATE_PATTERNS = [
+  /activated abilities of creatures can't be activated/i,
+  /creatures can't activate abilities/i,
+];
+
+/** Artifact activated ability restrictions: Null Rod, Stony Silence */
+const ARTIFACT_ABILITY_HATE_PATTERNS = [
+  /activated abilities of artifacts can't be activated/i,
+  /artifacts can't activate abilities/i,
+];
+
+/** Type-changing effects: Blood Moon */
+const TYPE_CHANGE_HATE_PATTERNS = [
+  /nonbasic lands are ([A-Za-z]+)/i,
+];
+
 /**
  * Raw oracle text fallback: match "can't" patterns in A's oracle text
  * and check if B's strategy is affected.
@@ -1451,7 +2399,110 @@ function detectOracleTextBlock(a: CardProfile, b: CardProfile): Interaction | nu
     }
   }
 
+  // Check ETB trigger suppression (Torpor Orb, Hushbringer)
+  const isETBSuppression = ETB_SUPPRESSION_PATTERNS.some((p) => p.test(oracle));
+  if (isETBSuppression) {
+    if (cardHasETBTriggers(b)) {
+      return {
+        cards: [a.cardName, b.cardName],
+        type: "blocks",
+        strength: 0.9,
+        mechanical: `${a.cardName} suppresses ETB triggers, blocking ${b.cardName}'s enter-the-battlefield abilities`,
+        events: [],
+      };
+    }
+  }
+
+  // Check creature activated ability restrictions (Cursed Totem, Linvala)
+  const isCreatureAbilityHate = CREATURE_ABILITY_HATE_PATTERNS.some((p) => p.test(oracle));
+  if (isCreatureAbilityHate) {
+    if (b.cardTypes.includes("creature") && cardHasActivatedAbilities(b)) {
+      return {
+        cards: [a.cardName, b.cardName],
+        type: "blocks",
+        strength: 0.9,
+        mechanical: `${a.cardName} prevents creature activated abilities, blocking ${b.cardName}'s abilities`,
+        events: [],
+      };
+    }
+  }
+
+  // Check artifact activated ability restrictions (Null Rod, Stony Silence)
+  const isArtifactAbilityHate = ARTIFACT_ABILITY_HATE_PATTERNS.some((p) => p.test(oracle));
+  if (isArtifactAbilityHate) {
+    if (b.cardTypes.includes("artifact") && cardHasActivatedAbilities(b)) {
+      return {
+        cards: [a.cardName, b.cardName],
+        type: "blocks",
+        strength: 0.9,
+        mechanical: `${a.cardName} prevents artifact activated abilities, blocking ${b.cardName}'s abilities`,
+        events: [],
+      };
+    }
+  }
+
+  // Check type-changing effects (Blood Moon)
+  const isTypeChange = TYPE_CHANGE_HATE_PATTERNS.some((p) => p.test(oracle));
+  if (isTypeChange) {
+    // Blood Moon blocks nonbasic lands with special abilities
+    if (b.cardTypes.includes("land") && !b.supertypes.includes("basic") && cardHasActivatedAbilities(b)) {
+      return {
+        cards: [a.cardName, b.cardName],
+        type: "blocks",
+        strength: 0.8,
+        mechanical: `${a.cardName} removes abilities from nonbasic lands, blocking ${b.cardName}`,
+        events: [],
+      };
+    }
+  }
+
   return null;
+}
+
+/**
+ * Check if a card has ETB triggered abilities (enters-the-battlefield triggers).
+ */
+function cardHasETBTriggers(card: CardProfile): boolean {
+  // Check triggersOn for ETB events
+  for (const trigger of card.triggersOn) {
+    if (trigger.kind === "zone_transition" && trigger.to === "battlefield") {
+      return true;
+    }
+  }
+  // Check abilities for triggered abilities with ETB patterns
+  for (const ability of card.abilities) {
+    if (ability.abilityType === "triggered" && ability.trigger) {
+      if (ability.trigger.kind === "zone_transition" && ability.trigger.to === "battlefield") {
+        return true;
+      }
+    }
+  }
+  // Oracle text fallback: check for ETB trigger patterns
+  if (card.rawOracleText) {
+    if (/when(ever)?\s+.+enters\s+(the\s+)?battlefield/i.test(card.rawOracleText)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Check if a card has activated abilities (cost : effect pattern).
+ */
+function cardHasActivatedAbilities(card: CardProfile): boolean {
+  for (const ability of card.abilities) {
+    if (ability.abilityType === "activated") {
+      return true;
+    }
+  }
+  // Oracle text fallback: colon-separated cost and effect
+  if (card.rawOracleText) {
+    // Match "cost: effect" pattern (mana/tap/sacrifice before colon)
+    if (/\{[^}]+\}[^:]*:|^[Tt]ap:/.test(card.rawOracleText)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -1861,6 +2912,10 @@ function detectChains(
 ): InteractionChain[] {
   if (profiles.length < 3) return [];
 
+  // Build profile lookup for card type checks (sorcery/instant penalty)
+  const profileMap = new Map<string, CardProfile>();
+  for (const p of profiles) profileMap.set(p.cardName, p);
+
   // Build adjacency list from causal interactions (directional)
   // Only include meaningful-strength edges — a chain is only as strong
   // as its weakest link, so weak edges produce weak chains.
@@ -1914,7 +2969,7 @@ function detectChains(
           const key = newPath.join(" → ");
           if (!seen.has(key)) {
             seen.add(key);
-            const chain = buildChain(newPath, newInteractions);
+            const chain = buildChain(newPath, newInteractions, profileMap);
             // Only keep chains where every edge is meaningful
             if (chain.strength >= MIN_CHAIN_AVG_STRENGTH) {
               candidates.push(chain);
@@ -1978,7 +3033,8 @@ function generateChainReasoning(
 
 function buildChain(
   path: string[],
-  interactions: Interaction[]
+  interactions: Interaction[],
+  profileMap: Map<string, CardProfile>
 ): InteractionChain {
   const steps: InteractionChain["steps"] = [];
   for (let i = 0; i < interactions.length; i++) {
@@ -1997,9 +3053,28 @@ function buildChain(
   }
 
   // Chain strength = minimum edge strength (weakest link)
-  const strength = interactions.length > 0
+  let strength = interactions.length > 0
     ? Math.min(...interactions.map((i) => i.strength))
     : 0;
+
+  // Penalize chains containing sorceries/instants — they are one-shot effects,
+  // not repeatable engine pieces. A chain implies sustained synergy, but
+  // sorceries/instants can only fire once per cast (CR 111, CR 304-305).
+  // Interior positions (not first or last) get the heaviest penalty because
+  // the chain narrative implies the card is a repeatable conduit.
+  for (let i = 0; i < path.length; i++) {
+    const p = profileMap.get(path[i]);
+    if (!p) continue;
+    if (!isPermanentCard(p.cardTypes)) {
+      // Interior position: sorcery/instant acting as conduit — heavy penalty
+      if (i > 0 && i < path.length - 1) {
+        strength *= 0.5;
+      } else {
+        // Start or end position: minor penalty (one-shot initiator/payoff)
+        strength *= 0.75;
+      }
+    }
+  }
 
   const reasoning = generateChainReasoning(path, interactions);
 
@@ -2030,7 +3105,7 @@ function detectLoops(
   if (profiles.length < 2) return [];
 
   // Build adjacency from causal interactions
-  const causalTypes = new Set<string>(["enables", "triggers"]);
+  const causalTypes = new Set<string>(["enables", "triggers", "recurs"]);
   const adjacency = new Map<string, Map<string, Interaction[]>>();
 
   for (const inter of interactions) {
@@ -2050,6 +3125,17 @@ function detectLoops(
   for (const startCard of adjacency.keys()) {
     if (loops.length >= MAX_LOOPS) break;
     findCycles(startCard, [startCard], adjacency, loops, seen, profiles);
+  }
+
+  // Second pass: action-chain solver catches loops the graph-cycle approach misses
+  // (e.g., intermediary resources, self-loops via granted keywords, replacement effects)
+  const chainLoops = detectLoopsFromChains(profiles);
+  for (const cl of chainLoops) {
+    const key = [...cl.cards].sort().join("+");
+    if (!seen.has(key)) {
+      seen.add(key);
+      loops.push(cl);
+    }
   }
 
   return loops;

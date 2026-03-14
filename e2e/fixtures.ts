@@ -109,7 +109,7 @@ export class DeckPage {
   }
 
   /** Click a deck view tab */
-  async selectDeckViewTab(tab: "Deck List" | "Analysis" | "Synergy" | "Hands" | "Additions" | "Interactions") {
+  async selectDeckViewTab(tab: "Deck List" | "Analysis" | "Synergy" | "Hands" | "Additions" | "Interactions" | "Suggestions") {
     await this.page
       .getByTestId("deck-header")
       .getByRole("tab", { name: tab })
