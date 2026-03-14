@@ -84,6 +84,54 @@ function OpeningHandDisplay({ hand }: { hand: GoldfishOpeningHand }) {
   );
 }
 
+function ZoneDisclosure({
+  label,
+  count,
+  cards,
+  color,
+  testId,
+}: {
+  label: string;
+  count: number;
+  cards: string[];
+  color: string;
+  testId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div data-testid={testId}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-400"
+        aria-expanded={open}
+      >
+        <span
+          className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}
+        >
+          ▶
+        </span>
+        <span>
+          {label}{" "}
+          <span className={color}>({count})</span>
+        </span>
+      </button>
+      {open && (
+        <ul className="space-y-1">
+          {cards.map((card, i) => (
+            <li
+              key={i}
+              className="rounded bg-slate-900/50 px-2 py-1 text-slate-400"
+            >
+              {card}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function TurnSummary({ log }: { log: GoldfishTurnLog }) {
   const parts: string[] = [];
   if (log.cardsDrawn.length > 0) {
@@ -332,6 +380,28 @@ export default function GoldfishTurnTimeline({ game }: GoldfishTurnTimelineProps
                 <p className="text-xs text-slate-500 italic">Empty hand</p>
               )}
             </div>
+
+            {/* Graveyard */}
+            {log.graveyard && log.graveyard.length > 0 && (
+              <ZoneDisclosure
+                label="Graveyard"
+                count={log.graveyard.length}
+                cards={log.graveyard}
+                color="text-rose-400"
+                testId={`goldfish-graveyard-${log.turn}`}
+              />
+            )}
+
+            {/* Exile */}
+            {log.exile && log.exile.length > 0 && (
+              <ZoneDisclosure
+                label="Exile"
+                count={log.exile.length}
+                cards={log.exile}
+                color="text-amber-400"
+                testId={`goldfish-exile-${log.turn}`}
+              />
+            )}
           </div>
         </CollapsiblePanel>
       ))}

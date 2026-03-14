@@ -41,6 +41,7 @@ export interface GoldfishGameState {
   battlefield: GoldfishPermanent[];
   library: GoldfishCard[];
   graveyard: GoldfishCard[];
+  exile: GoldfishCard[];
   commandZone: GoldfishCard[];
   manaPool: ManaPool;
   landsPlayedThisTurn: number;
@@ -98,6 +99,8 @@ export interface GoldfishTurnLog {
   permanentCount: number;
   commanderCast: boolean;
   libraryActions: LibraryAction[];
+  graveyard: string[]; // card names in graveyard at end of turn
+  exile: string[]; // card names in exile at end of turn
 }
 
 export interface GoldfishOpeningHand {
@@ -378,6 +381,7 @@ export function initializeGame(
     battlefield: [],
     library,
     graveyard: [],
+    exile: [],
     commandZone: [...commandZone],
     manaPool: emptyManaPool(),
     landsPlayedThisTurn: 0,
@@ -1137,6 +1141,8 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
     permanentCount: state.battlefield.length,
     commanderCast,
     libraryActions,
+    graveyard: state.graveyard.map((c) => c.name),
+    exile: state.exile.map((c) => c.name),
   };
 }
 
