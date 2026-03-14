@@ -90,6 +90,15 @@ export interface LibraryAction {
   source: string;
 }
 
+export type PermanentCategory = "land" | "creature" | "artifact" | "enchantment" | "planeswalker" | "token";
+
+export interface PermanentSnapshot {
+  name: string;
+  category: PermanentCategory;
+  tapped: boolean;
+  enteredTurn: number;
+}
+
 export interface GoldfishTurnLog {
   turn: number;
   cardsDrawn: CardDraw[];
@@ -101,6 +110,7 @@ export interface GoldfishTurnLog {
   handSize: number;
   hand: string[]; // card names in hand at end of turn
   permanentCount: number;
+  permanents: PermanentSnapshot[]; // full battlefield snapshot
   commanderCast: boolean;
   libraryActions: LibraryAction[];
   graveyard: string[]; // card names in graveyard at end of turn
@@ -176,6 +186,41 @@ export interface GoldfishAggregateStats {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function categorizePermanent(permanent: GoldfishPermanent): PermanentCategory {
+  const typeLine = permanent.card.enriched.typeLine;
+  if (typeLine.includes("Land")) return "land";
+  if (typeLine.includes("Creature")) return "creature";
+  if (typeLine.includes("Artifact")) return "artifact";
+  if (typeLine.includes("Enchantment")) return "enchantment";
+  if (typeLine.includes("Planeswalker")) return "planeswalker";
+  return "artifact"; // fallback for unknown permanent types
+}
+
+function snapshotBattlefield(state: GoldfishGameState): PermanentSnapshot[] {
+  const snapshots: PermanentSnapshot[] = [];
+
+  for (const perm of state.battlefield) {
+    snapshots.push({
+      name: perm.card.name,
+      category: categorizePermanent(perm),
+      tapped: perm.tapped,
+      enteredTurn: perm.enteredTurn,
+    });
+  }
+
+  // Include treasure tokens as virtual permanents
+  for (let i = 0; i < state.treasureCount; i++) {
+    snapshots.push({
+      name: "Treasure Token",
+      category: "token",
+      tapped: false,
+      enteredTurn: state.turn,
+    });
+  }
+
+  return snapshots;
+}
 
 function emptyManaPool(): ManaPool {
   return { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
@@ -1217,6 +1262,7 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
     handSize: state.hand.length,
     hand: state.hand.map((c) => c.name),
     permanentCount: state.battlefield.length,
+    permanents: snapshotBattlefield(state),
     commanderCast,
     libraryActions,
     graveyard: state.graveyard.map((c) => c.name),

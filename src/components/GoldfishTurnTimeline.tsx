@@ -103,6 +103,7 @@ export default function GoldfishTurnTimeline({ game }: GoldfishTurnTimelineProps
         >
           <GoldfishTurnPanel
             log={log}
+            previousLog={idx > 0 ? game.turnLogs[idx - 1] : undefined}
           />
         </CollapsiblePanel>
       ))}

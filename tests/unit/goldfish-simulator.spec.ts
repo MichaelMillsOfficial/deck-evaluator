@@ -1516,3 +1516,152 @@ test.describe("7-card hand limit", () => {
     expect(state.graveyard.length).toBe(initialGraveyardSize + 2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Battlefield snapshot (permanents array)
+// ---------------------------------------------------------------------------
+
+test.describe("battlefield permanents snapshot", () => {
+  test("permanents array contains lands and creatures with correct categories", () => {
+    const config: GoldfishConfig = { ...DEFAULT_GOLDFISH_CONFIG };
+    const state = emptyGameState();
+    state.turn = 0;
+
+    // Pre-place a land on battlefield
+    state.battlefield = [
+      {
+        card: makeGoldfishLand({ name: "Forest", producedMana: ["G"] }),
+        tapped: false,
+        summoningSick: false,
+        producedMana: ["G"],
+        enteredTurn: 0,
+      },
+    ];
+
+    // Hand: a creature we can cast
+    state.hand = [
+      makeGoldfishCreature({
+        name: "Elf",
+        manaCost: "{G}",
+        cmc: 1,
+        colorIdentity: ["G"],
+        colors: ["G"],
+      }),
+    ];
+
+    const log = executeTurn(state, config);
+
+    // Should have both Forest and Elf in permanents
+    expect(log.permanents.length).toBe(2);
+
+    const forest = log.permanents.find((p) => p.name === "Forest");
+    expect(forest).toBeDefined();
+    expect(forest?.category).toBe("land");
+
+    const elf = log.permanents.find((p) => p.name === "Elf");
+    expect(elf).toBeDefined();
+    expect(elf?.category).toBe("creature");
+    expect(elf?.enteredTurn).toBe(log.turn);
+  });
+
+  test("artifacts are categorized correctly", () => {
+    const config: GoldfishConfig = { ...DEFAULT_GOLDFISH_CONFIG };
+    const state = emptyGameState();
+    state.turn = 0;
+
+    state.battlefield = [
+      {
+        card: makeGoldfishLand({ name: "Forest", producedMana: ["G"] }),
+        tapped: false,
+        summoningSick: false,
+        producedMana: ["G"],
+        enteredTurn: 0,
+      },
+    ];
+
+    const solRing = makeGoldfishCard({
+      name: "Sol Ring",
+      typeLine: "Artifact",
+      manaCost: "{1}",
+      cmc: 1,
+      colorIdentity: [],
+      colors: [],
+      oracleText: "{T}: Add {C}{C}.",
+      producedMana: ["C"],
+    });
+    state.hand = [solRing];
+
+    const log = executeTurn(state, config);
+    const ring = log.permanents.find((p) => p.name === "Sol Ring");
+    expect(ring).toBeDefined();
+    expect(ring?.category).toBe("artifact");
+  });
+
+  test("ramp-searched synthetic lands appear in permanents", () => {
+    const deck = makeDeck({
+      mainboard: [
+        ...Array.from({ length: 35 }, (_, i) => ({
+          name: `Forest ${i}`,
+          quantity: 1,
+        })),
+        ...Array.from({ length: 10 }, (_, i) => ({
+          name: `Ramp ${i}`,
+          quantity: 1,
+        })),
+        ...Array.from({ length: 15 }, (_, i) => ({
+          name: `Creature ${i}`,
+          quantity: 1,
+        })),
+      ],
+    });
+
+    const cardMap: Record<string, EnrichedCard> = {};
+    for (let i = 0; i < 35; i++) {
+      cardMap[`Forest ${i}`] = makeCard({
+        name: `Forest ${i}`,
+        typeLine: "Basic Land — Forest",
+        supertypes: ["Basic"],
+        producedMana: ["G"],
+        oracleText: "{T}: Add {G}.",
+      });
+    }
+    for (let i = 0; i < 10; i++) {
+      cardMap[`Ramp ${i}`] = makeCard({
+        name: `Ramp ${i}`,
+        typeLine: "Sorcery",
+        manaCost: "{1}{G}",
+        cmc: 2,
+        colorIdentity: ["G"],
+        colors: ["G"],
+        oracleText:
+          "Search your library for a basic land card and put it onto the battlefield tapped.",
+      });
+    }
+    for (let i = 0; i < 15; i++) {
+      cardMap[`Creature ${i}`] = makeCard({
+        name: `Creature ${i}`,
+        typeLine: "Creature",
+        manaCost: "{3}{G}",
+        cmc: 4,
+        colorIdentity: ["G"],
+        colors: ["G"],
+      });
+    }
+
+    const config: GoldfishConfig = { turns: 10, iterations: 50, onThePlay: true };
+    const result = runGoldfishSimulation(deck, cardMap, config);
+
+    // At least some games should have "Basic Land" in permanents (from ramp)
+    let foundSyntheticLand = false;
+    for (const game of result.games) {
+      for (const log of game.turnLogs) {
+        if (log.permanents.some((p) => p.name === "Basic Land" && p.category === "land")) {
+          foundSyntheticLand = true;
+          break;
+        }
+      }
+      if (foundSyntheticLand) break;
+    }
+    expect(foundSyntheticLand).toBe(true);
+  });
+});

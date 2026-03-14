@@ -5,14 +5,14 @@ import type {
   CardDraw,
   LibraryAction,
 } from "@/lib/goldfish-simulator";
-import ZoneDisclosure from "@/components/ZoneDisclosure";
 import GoldfishZoneBar from "@/components/GoldfishZoneBar";
 
 interface GoldfishTurnPanelProps {
   log: GoldfishTurnLog;
+  previousLog?: GoldfishTurnLog;
 }
 
-export default function GoldfishTurnPanel({ log }: GoldfishTurnPanelProps) {
+export default function GoldfishTurnPanel({ log, previousLog }: GoldfishTurnPanelProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-[1fr_220px] gap-4">
       {/* Left column: actions */}
@@ -181,7 +181,7 @@ export default function GoldfishTurnPanel({ log }: GoldfishTurnPanelProps) {
 
       {/* Right column: zone bar */}
       <div className="order-first sm:order-last">
-        <GoldfishZoneBar log={log} />
+        <GoldfishZoneBar log={log} previousLog={previousLog} />
       </div>
     </div>
   );
