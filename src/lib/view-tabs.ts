@@ -1,4 +1,4 @@
-export type ViewTab = "list" | "analysis" | "synergy" | "hands" | "additions" | "interactions" | "suggestions";
+export type ViewTab = "list" | "analysis" | "synergy" | "hands" | "additions" | "interactions" | "suggestions" | "goldfish";
 
 export interface NavCategory {
   id: string;
@@ -20,7 +20,7 @@ export const NAV_CATEGORIES: NavCategory[] = [
   {
     id: "tools",
     label: "Tools",
-    items: ["hands", "additions"],
+    items: ["hands", "additions", "goldfish"],
   },
   {
     id: "actions",
@@ -36,6 +36,7 @@ export const ENRICHMENT_REQUIRED_TABS = new Set<ViewTab>([
   "hands",
   "interactions",
   "suggestions",
+  "goldfish",
 ]);
 
 export const ALL_TABS: { key: ViewTab; label: string; badge?: string }[] = [
@@ -46,4 +47,5 @@ export const ALL_TABS: { key: ViewTab; label: string; badge?: string }[] = [
   { key: "additions", label: "Additions" },
   { key: "interactions", label: "Interactions", badge: "BETA" },
   { key: "suggestions", label: "Suggestions" },
+  { key: "goldfish", label: "Goldfish", badge: "BETA" },
 ];

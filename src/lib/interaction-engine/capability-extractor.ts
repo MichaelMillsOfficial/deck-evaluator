@@ -54,7 +54,7 @@ import type {
 } from "./types";
 import type { Speed, Layer } from "./rules/types";
 import { tokenize } from "./lexer";
-import { parseAbilities } from "./parser";
+import { parseAbilities, parseSagaChapters, parseClassLevels } from "./parser";
 import { expandKeyword, lookupKeyword } from "./keyword-database";
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1233,10 +1233,43 @@ export function profileCard(card: EnrichedCard): CardProfile {
   // 1. Parse type line
   const { cardTypes, supertypes, subtypes } = parseTypeLine(card.typeLine);
 
-  // 2. Tokenize + parse oracle text
+  // 2. Tokenize + parse oracle text — route special card types to specialized parsers
   const oracleText = card.oracleText || "";
-  const { blocks } = tokenize(oracleText, card.name);
-  const parsedAbilities = parseAbilities(blocks);
+
+  // Detect whether this card is a Saga or Class based on subtypes
+  const subtypeLower = (subtypes as string[]).map((s) => s.toLowerCase());
+  const isSaga = subtypeLower.includes("saga");
+  const isClass = subtypeLower.includes("class");
+
+  let parsedAbilities: AbilityNode[];
+
+  if (isSaga) {
+    // Saga: parse each chapter into a TriggeredAbility
+    parsedAbilities = parseSagaChapters(oracleText);
+  } else if (isClass) {
+    // Class: parse base ability + level-up activated abilities + gated abilities
+    parsedAbilities = parseClassLevels(oracleText);
+  } else {
+    // Normal parsing path
+    const { blocks } = tokenize(oracleText, card.name);
+    parsedAbilities = parseAbilities(blocks);
+  }
+
+  // For Room cards (split layout with Room subtype), also parse second face abilities
+  const isRoom = subtypeLower.includes("room");
+  if (isRoom && card.layout === "split" && card.cardFaces && card.cardFaces.length >= 2) {
+    // Parse oracle text from both faces and merge
+    const allFaceAbilities: AbilityNode[] = [];
+    for (const face of card.cardFaces) {
+      if (face.oracleText) {
+        const { blocks: faceBlocks } = tokenize(face.oracleText, face.name);
+        const faceAbilities = parseAbilities(faceBlocks);
+        allFaceAbilities.push(...faceAbilities);
+      }
+    }
+    // Use per-face parsing instead of full card oracle (which may duplicate)
+    parsedAbilities = allFaceAbilities;
+  }
 
   // 3. Expand keywords
   const expandedAbilities = expandKeywords(parsedAbilities, card);

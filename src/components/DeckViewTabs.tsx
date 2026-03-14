@@ -14,6 +14,7 @@ import HandSimulator from "@/components/HandSimulator";
 import AdditionsPanel from "@/components/AdditionsPanel";
 import InteractionSection from "@/components/InteractionSection";
 import SuggestionsPanel from "@/components/SuggestionsPanel";
+import GoldfishSimulator from "@/components/GoldfishSimulator";
 import { useInteractionAnalysis } from "@/hooks/useInteractionAnalysis";
 import {
   computeCompositionScorecard,
@@ -367,6 +368,29 @@ export default function DeckViewTabs({
                 handleToggleSection("interactions", id)
               }
             />
+          </section>
+        )}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="tabpanel-deck-goldfish"
+        aria-labelledby="tab-deck-goldfish"
+        hidden={activeTab !== "goldfish"}
+      >
+        {activeTab === "goldfish" && cardMap && !enrichLoading && (
+          <section aria-labelledby="goldfish-heading">
+            <h3
+              id="goldfish-heading"
+              className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
+            >
+              Goldfish Simulator
+            </h3>
+            <p className="mb-4 text-xs text-slate-400">
+              Monte Carlo solitaire simulation: mana development and spell casting over {/* turns shown dynamically */}
+              10 turns across 1,000+ games
+            </p>
+            <GoldfishSimulator deck={deck} cardMap={cardMap} />
           </section>
         )}
       </div>

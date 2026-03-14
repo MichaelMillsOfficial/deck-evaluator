@@ -156,6 +156,19 @@ const MULTI_WORD_ALIASES: AliasEntry[] = [
   { pattern: "up to two", type: "QUANTITY", normalized: "up_to_2" },
   { pattern: "up to three", type: "QUANTITY", normalized: "up_to_3" },
   { pattern: "up to one", type: "QUANTITY", normalized: "up_to_1" },
+
+  // Saga chapter markers — combined chapters must come before individual ones (longest first)
+  { pattern: "i, ii, iii —", type: "TRIGGER_WORD", normalized: "saga_chapter_1_2_3" },
+  { pattern: "i, ii —", type: "TRIGGER_WORD", normalized: "saga_chapter_1_2" },
+  { pattern: "ii, iii —", type: "TRIGGER_WORD", normalized: "saga_chapter_2_3" },
+  { pattern: "iv —", type: "TRIGGER_WORD", normalized: "saga_chapter_4" },
+  { pattern: "iii —", type: "TRIGGER_WORD", normalized: "saga_chapter_3" },
+  { pattern: "ii —", type: "TRIGGER_WORD", normalized: "saga_chapter_2" },
+  { pattern: "i —", type: "TRIGGER_WORD", normalized: "saga_chapter_1" },
+
+  // Class level markers
+  { pattern: "level 3", type: "TRIGGER_WORD", normalized: "class_level_3" },
+  { pattern: "level 2", type: "TRIGGER_WORD", normalized: "class_level_2" },
 ];
 
 // ─── First-word alias lookup Map ───

@@ -112,6 +112,8 @@ export type {
   // Duration & Conditions
   EffectDuration,
   Condition,
+  ConditionCheck,
+  SatisfiabilityResult,
 
   // Effects & Abilities
   Effect,

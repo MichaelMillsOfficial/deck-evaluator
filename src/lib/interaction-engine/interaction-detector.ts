@@ -35,8 +35,10 @@ import type {
   Supertype,
   SacrificeCost,
 } from "./types";
+import type { EnrichedCard } from "../types";
 import { PERMANENT_TYPES, matchesCompositeType } from "./game-model";
 import { detectLoopsFromChains } from "./loop-chain-solver";
+import { adjustInteractionStrengths } from "./satisfiability-analyzer";
 
 // ═══════════════════════════════════════════════════════════════
 // PUBLIC API
@@ -89,7 +91,8 @@ function deduplicateInteractions(interactions: Interaction[]): Interaction[] {
 function buildAnalysisResult(
   profileMap: Record<string, CardProfile>,
   interactions: Interaction[],
-  profiles: CardProfile[]
+  profiles: CardProfile[],
+  deckCards?: EnrichedCard[]
 ): InteractionAnalysis {
   // Global dedup: keep highest-strength interaction per (type, cardA, cardB) triple
   interactions = deduplicateInteractions(interactions);
@@ -99,6 +102,13 @@ function buildAnalysisResult(
   // results that would pollute chains, loops, and enablers.
   const MIN_PAIRWISE_STRENGTH = 0.5;
   interactions = interactions.filter((i) => i.strength >= MIN_PAIRWISE_STRENGTH);
+
+  // Step 2.5: Satisfiability analysis — adjust strengths based on deck composition
+  if (deckCards && deckCards.length > 0) {
+    interactions = adjustInteractionStrengths(interactions, profileMap, deckCards);
+    // Re-apply quality gate after strength adjustment
+    interactions = interactions.filter((i) => i.strength >= MIN_PAIRWISE_STRENGTH);
+  }
 
   // Derive conflicts from blocks (bidirectional view of blocking)
   interactions.push(...deriveConflicts(interactions));
@@ -121,7 +131,10 @@ function buildAnalysisResult(
   };
 }
 
-export function findInteractions(profiles: CardProfile[]): InteractionAnalysis {
+export function findInteractions(
+  profiles: CardProfile[],
+  deckCards?: EnrichedCard[]
+): InteractionAnalysis {
   const profileMap: Record<string, CardProfile> = {};
   for (const p of profiles) {
     if (!profileMap[p.cardName]) {
@@ -138,7 +151,7 @@ export function findInteractions(profiles: CardProfile[]): InteractionAnalysis {
     }
   }
 
-  return buildAnalysisResult(profileMap, interactions, profiles);
+  return buildAnalysisResult(profileMap, interactions, profiles, deckCards);
 }
 
 /**
@@ -147,11 +160,13 @@ export function findInteractions(profiles: CardProfile[]): InteractionAnalysis {
  *
  * @param onProgress - Called with (0-1) progress during pair detection
  * @param cancelled  - Function returning true if computation should abort
+ * @param deckCards  - Optional enriched card list for satisfiability scoring
  */
 export async function findInteractionsAsync(
   profiles: CardProfile[],
   onProgress?: (progress: number) => void,
-  cancelled?: () => boolean
+  cancelled?: () => boolean,
+  deckCards?: EnrichedCard[]
 ): Promise<InteractionAnalysis> {
   const profileMap: Record<string, CardProfile> = {};
   for (const p of profiles) {
@@ -171,7 +186,7 @@ export async function findInteractionsAsync(
   for (let i = 0; i < profiles.length; i++) {
     for (let j = i + 1; j < profiles.length; j++) {
       if (cancelled?.()) {
-        return buildAnalysisResult(profileMap, interactions, profiles);
+        return buildAnalysisResult(profileMap, interactions, profiles, deckCards);
       }
 
       interactions.push(...detectPairInteractions(profiles[i], profiles[j]));
@@ -187,7 +202,7 @@ export async function findInteractionsAsync(
   onProgress?.(1);
   await yield_();
 
-  return buildAnalysisResult(profileMap, interactions, profiles);
+  return buildAnalysisResult(profileMap, interactions, profiles, deckCards);
 }
 
 // ═══════════════════════════════════════════════════════════════

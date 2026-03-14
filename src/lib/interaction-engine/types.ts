@@ -601,19 +601,55 @@ export type EffectDuration =
 // CONDITIONS — Predicates that gate ability effects
 // ═══════════════════════════════════════════════════════════════════
 
+export type ConditionCheck =
+  | "creature_count"
+  | "artifact_count"
+  | "enchantment_count"
+  | "permanent_count"
+  | "graveyard_card_types"
+  | "graveyard_size"
+  | "devotion"
+  | "life_total"
+  | "land_subtype"
+  | "creature_type_count"
+  | "spell_frequency"
+  | "class_level" // class enchantment level gating
+  | "runtime"   // cannot evaluate statically
+  | "unknown";  // parser couldn't classify
+
 export interface Condition {
   type: "if" | "unless" | "as_long_as";
   /** Phase 1: preserved as text */
   predicate: string;
   /** Phase 2+: parsed predicate */
   structured?: {
-    check: string;
+    check: ConditionCheck;
     object?: GameObjectRef;
     count?: number;
     zone?: Zone;
-    comparison?: "less_than" | "greater_equal" | "equal";
+    comparison?: "less_than" | "greater_equal" | "equal" | "greater_than";
     /** Devotion color(s): ["R", "G"] for Xenagos */
     devotionColors?: string[];
+    /** Required land subtype for land_subtype check */
+    subtypeRequired?: string;
+    /** Required card types for graveyard_card_types check */
+    cardTypesRequired?: string[];
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SATISFIABILITY — Deck-aware condition evaluation
+// ═══════════════════════════════════════════════════════════════════
+
+export interface SatisfiabilityResult {
+  check: ConditionCheck;
+  satisfiable: "yes" | "no" | "partial" | "unknown";
+  score: number;  // 0.3 to 1.0
+  reason: string;
+  deckSupport?: {
+    relevantCards: number;
+    totalCards: number;
+    density: number;
   };
 }
 

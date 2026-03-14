@@ -1921,6 +1921,181 @@ export const KEYWORD_DATABASE: KeywordEntry[] = [
       } as StaticAbility,
     ],
   },
+
+  // ─── New Keywords (Crimson Vow / New Capenna / Wilds of Eldraine era) ───
+
+  {
+    keyword: "connive",
+    hasParameter: false,
+    category: "simple",
+    crReference: "CR 701.47",
+    expand: (_parameter?: string, _cardName?: string): AbilityNode[] => [
+      {
+        abilityType: "triggered",
+        trigger: {
+          kind: "player_action",
+          action: "activate_ability",
+        } as PlayerAction,
+        effects: [
+          // 1. Draw a card
+          {
+            type: "draw",
+            resource: { category: "cards", quantity: 1 } as import("./types").CardsResource,
+          },
+          // 2. Discard a card
+          {
+            type: "discard",
+            resource: { category: "cards", quantity: 1 } as import("./types").CardsResource,
+          },
+          // 3. If you discarded a nonland card, put a +1/+1 counter (conditional)
+          {
+            type: "counter",
+            attribute: {
+              category: "counter",
+              counterType: "+1/+1",
+              quantity: 1,
+            } as import("./types").CounterAttribute,
+          },
+        ],
+        condition: {
+          type: "if",
+          predicate: "you discarded a nonland card",
+        } as Condition,
+        speed: "instant" as const,
+      } as TriggeredAbility,
+    ],
+  },
+
+  {
+    keyword: "disturb",
+    hasParameter: true, // parameter is the disturb cost, e.g. "{1}{W}"
+    category: "zone_casting",
+    crReference: "CR 702.146",
+    expand: (parameter?: string, _cardName?: string): AbilityNode[] => [
+      // Zone-cast permission: can be cast from graveyard (transformed)
+      {
+        abilityType: "static",
+        effects: [
+          {
+            type: "zone_cast",
+            gameEffect: {
+              category: "zone_cast_permission",
+              fromZone: "graveyard",
+              alternativeCost: parameter
+                ? [{ costType: "mana", mana: parameter } as ManaCostUnit]
+                : [],
+              grantedAbility: "disturb",
+            } as import("./types").ZoneCastPermission,
+          },
+        ],
+      } as StaticAbility,
+      // Keyword node for the disturb keyword itself
+      {
+        abilityType: "keyword",
+        keyword: "disturb",
+        parameter,
+      } as KeywordAbility,
+    ],
+  },
+
+  {
+    keyword: "bargain",
+    hasParameter: false,
+    category: "cost_modifying",
+    crReference: "CR 702.168",
+    expand: (_parameter?: string, _cardName?: string): AbilityNode[] => [
+      {
+        abilityType: "static",
+        effects: [
+          {
+            type: "optional_additional_cost",
+            details: {
+              mechanic: "bargain",
+              costType: "sacrifice",
+              costFilter: "artifact, enchantment, or token",
+              description:
+                "You may sacrifice an artifact, enchantment, or token as you cast this spell. " +
+                "If you do, this spell is bargained and gains its bonus effect.",
+            },
+          },
+        ],
+      } as StaticAbility,
+    ],
+  },
+
+  {
+    keyword: "incubate",
+    hasParameter: true, // parameter is the number of +1/+1 counters
+    category: "simple",
+    crReference: "CR 701.49",
+    expand: (parameter?: string, _cardName?: string): AbilityNode[] => {
+      const n = parseInt(parameter ?? "1", 10);
+      return [
+        {
+          abilityType: "static",
+          effects: [
+            {
+              type: "create_token",
+              details: {
+                mechanic: "incubate",
+                counterCount: n,
+                description:
+                  `Create an Incubator token with ${n} +1/+1 counters on it. ` +
+                  "It has \"{2}: Transform this artifact.\"",
+                token: {
+                  types: ["artifact"],
+                  subtypes: ["Incubator"],
+                  counters: { "+1/+1": n },
+                },
+              },
+              gameEffect: {
+                category: "create_token",
+                token: {
+                  types: ["artifact"],
+                  subtypes: ["Incubator"],
+                },
+                quantity: 1,
+              } as import("./types").CreateTokenEffect,
+            },
+          ],
+        } as StaticAbility,
+      ];
+    },
+  },
+
+  {
+    keyword: "craft",
+    hasParameter: true, // parameter is the craft cost, e.g. "{2}{R}"
+    category: "cost_modifying",
+    crReference: "CR 702.167",
+    expand: (parameter?: string, _cardName?: string): AbilityNode[] => [
+      {
+        abilityType: "activated",
+        costs: parameter
+          ? [{ costType: "mana", mana: parameter } as ManaCostUnit]
+          : [],
+        effects: [
+          {
+            type: "craft_transform",
+            details: {
+              mechanic: "craft",
+              cost: parameter,
+              description:
+                `Craft with ${parameter}: Exile this permanent, exile artifact(s) from your graveyard, ` +
+                "then return this card transformed. Craft only as a sorcery.",
+              sorceryOnly: true,
+              requiresExileFromGraveyard: true,
+            },
+          },
+        ],
+        condition: {
+          type: "if",
+          predicate: "sorcery speed",
+        } as Condition,
+        speed: "sorcery" as const,
+      } as ActivatedAbility,
+    ],
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
