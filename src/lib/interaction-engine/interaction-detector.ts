@@ -34,6 +34,7 @@ import type {
   Subtype,
   Supertype,
   SacrificeCost,
+  ZoneTransition,
 } from "./types";
 import { PERMANENT_TYPES, matchesCompositeType } from "./game-model";
 import { detectLoopsFromChains } from "./loop-chain-solver";
