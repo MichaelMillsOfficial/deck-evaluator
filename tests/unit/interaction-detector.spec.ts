@@ -2053,6 +2053,91 @@ test.describe("self-only cost reduction should NOT produce reduces_cost interact
 });
 
 // ═══════════════════════════════════════════════════════════════
+// MULTI-TYPE COST REDUCTION — "Artifact and enchantment spells"
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("multi-type cost reduction (e.g. Enthusiastic Mechanaut)", () => {
+  test("Enthusiastic Mechanaut reduces cost of artifact spells", () => {
+    const mechanaut = profile({
+      name: "Enthusiastic Mechanaut",
+      typeLine: "Artifact Creature — Goblin Artificer",
+      oracleText:
+        "Flying\nArtifact and enchantment spells you cast cost {1} less to cast.",
+      manaCost: "{U}{R}",
+      cmc: 2,
+    });
+    const solRing = profile({
+      name: "Sol Ring",
+      typeLine: "Artifact",
+      oracleText: "{T}: Add {C}{C}.",
+      manaCost: "{1}",
+      cmc: 1,
+    });
+    const analysis = findInteractions([mechanaut, solRing]);
+    const reduces = findDirectional(
+      analysis,
+      "reduces_cost",
+      "Enthusiastic Mechanaut",
+      "Sol Ring"
+    );
+    expect(reduces.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test("Enthusiastic Mechanaut reduces cost of enchantment spells", () => {
+    const mechanaut = profile({
+      name: "Enthusiastic Mechanaut",
+      typeLine: "Artifact Creature — Goblin Artificer",
+      oracleText:
+        "Flying\nArtifact and enchantment spells you cast cost {1} less to cast.",
+      manaCost: "{U}{R}",
+      cmc: 2,
+    });
+    const rhystic = profile({
+      name: "Rhystic Study",
+      typeLine: "Enchantment",
+      oracleText:
+        "Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.",
+      manaCost: "{2}{U}",
+      cmc: 3,
+    });
+    const analysis = findInteractions([mechanaut, rhystic]);
+    const reduces = findDirectional(
+      analysis,
+      "reduces_cost",
+      "Enthusiastic Mechanaut",
+      "Rhystic Study"
+    );
+    expect(reduces.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test("Enthusiastic Mechanaut does NOT reduce cost of non-artifact non-enchantment", () => {
+    const mechanaut = profile({
+      name: "Enthusiastic Mechanaut",
+      typeLine: "Artifact Creature — Goblin Artificer",
+      oracleText:
+        "Flying\nArtifact and enchantment spells you cast cost {1} less to cast.",
+      manaCost: "{U}{R}",
+      cmc: 2,
+    });
+    const bolt = profile({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+      manaCost: "{R}",
+      cmc: 1,
+    });
+    const analysis = findInteractions([mechanaut, bolt]);
+    const reduces = findDirectional(
+      analysis,
+      "reduces_cost",
+      "Enthusiastic Mechanaut",
+      "Lightning Bolt"
+    );
+    expect(reduces.length).toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
 // FALSE POSITIVE FIX — Self-ETB triggers should NOT be triggered
 // by token creation, copy effects, or unrelated ETBs
 // ═══════════════════════════════════════════════════════════════

@@ -2042,22 +2042,42 @@ function detectReducesCost(a: CardProfile, b: CardProfile): Interaction[] {
   return results;
 }
 
+/** Known card types for cost reduction qualifier matching */
+const COST_REDUCTION_CARD_TYPES = new Set([
+  "creature", "artifact", "enchantment", "instant", "sorcery", "planeswalker",
+]);
+
+/**
+ * Check if a cost reduction qualifier (e.g. "artifact and enchantment", "creature",
+ * "goblin") matches card B. Handles multi-word qualifiers with "and"/"or".
+ * Card types are checked against cardTypes, tribal names against subtypes.
+ */
+function costReductionQualifierMatchesCard(qualifier: string, b: CardProfile): boolean {
+  const parts = qualifier.split(/\s+(?:and|or)\s+/).map((s) => s.trim().toLowerCase());
+  const bTypesLower = b.cardTypes.map((t) => t.toLowerCase());
+  const bSubtypesLower = (b.subtypes || []).map((s) => s.toLowerCase());
+
+  return parts.some((part) => {
+    if (COST_REDUCTION_CARD_TYPES.has(part)) {
+      return bTypesLower.includes(part);
+    }
+    // Tribal name (Goblin, Elf, Wizard, etc.) — check subtypes
+    return bSubtypesLower.includes(part);
+  });
+}
+
 /**
  * Oracle text cross-check for cost reduction targets.
  * When the structured parser gives a wildcard target, verify that
  * the oracle text's subtype/type constraints match card B.
  */
 function oracleCostReductionTargetMatches(oracle: string, b: CardProfile): boolean {
-  // Check for tribal pattern: "[Subtype] spells you cast cost less"
-  const tribalMatch = oracle.match(/(\w+) spells (?:you cast )?cost \{\d+\} less/i);
+  // Match multi-word type qualifiers: "Artifact and enchantment spells", "Creature spells", etc.
+  const tribalMatch = oracle.match(/([\w]+(?:\s+(?:and|or)\s+\w+)*)\s+spells\s+(?:you cast\s+)?cost\s+\{\d+\}\s+less/i);
   if (tribalMatch) {
-    const tribeName = tribalMatch[1].toLowerCase();
-    // "Spells" is universal, "Creature spells" is type-filtered
-    if (tribeName === "spells") return !b.cardTypes.includes("land");
-    if (tribeName === "creature") return b.cardTypes.includes("creature");
-    // Tribal name (Goblin, Elf, etc.) — check subtypes
-    const bSubtypesLower = (b.subtypes || []).map((s) => s.toLowerCase());
-    return bSubtypesLower.includes(tribeName);
+    const qualifier = tribalMatch[1].toLowerCase();
+    if (qualifier === "spells") return !b.cardTypes.includes("land");
+    return costReductionQualifierMatchesCard(qualifier, b);
   }
   // No specific constraint found
   return true;
@@ -2066,37 +2086,23 @@ function oracleCostReductionTargetMatches(oracle: string, b: CardProfile): boole
 function detectReducesCostFromOracle(a: CardProfile, b: CardProfile): Interaction | null {
   const oracle = a.rawOracleText!;
 
-  // Tribal cost reduction: "[Subtype] spells you cast cost {1} less"
+  // Type/tribal cost reduction: "[Type] spells you cast cost {1} less"
+  // Handles multi-word qualifiers: "Artifact and enchantment spells"
   // Check BEFORE universal pattern to prevent "Goblin spells" matching as universal
-  const tribalMatch = oracle.match(/(\w+) spells (?:you cast )?cost \{(\d+)\} less/i);
+  const tribalMatch = oracle.match(/([\w]+(?:\s+(?:and|or)\s+\w+)*)\s+spells\s+(?:you cast\s+)?cost\s+\{(\d+)\}\s+less/i);
   if (tribalMatch) {
-    const tribeName = tribalMatch[1].toLowerCase();
-    if (tribeName === "creature") {
-      // Creature-type cost reduction
-      if (b.cardTypes.includes("creature")) {
+    const qualifier = tribalMatch[1].toLowerCase();
+    if (qualifier !== "spells") {
+      if (costReductionQualifierMatchesCard(qualifier, b)) {
         return {
           cards: [a.cardName, b.cardName],
           type: "reduces_cost",
           strength: 0.7,
-          mechanical: `${a.cardName} reduces creature spell costs, including ${b.cardName}`,
-          events: [],
-        };
-      }
-      return null; // Creature-only reduction, B is not a creature
-    }
-    if (tribeName !== "spells") {
-      // Specific tribe reduction (Goblin, Elf, Wizard, etc.)
-      const bSubtypesLower = (b.subtypes || []).map((s) => s.toLowerCase());
-      if (bSubtypesLower.includes(tribeName)) {
-        return {
-          cards: [a.cardName, b.cardName],
-          type: "reduces_cost",
-          strength: 0.8,
           mechanical: `${a.cardName} reduces ${tribalMatch[1]} spell costs, including ${b.cardName}`,
           events: [],
         };
       }
-      return null; // Tribal reduction, B is not the right tribe
+      return null; // Type/tribal reduction, B doesn't match
     }
   }
 
