@@ -2051,3 +2051,113 @@ test.describe("self-only cost reduction should NOT produce reduces_cost interact
     expect(selfOnlyEffects.length).toBe(0);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// FALSE POSITIVE FIX — Self-ETB triggers should NOT be triggered
+// by token creation, copy effects, or unrelated ETBs
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("self-ETB triggers should NOT match token creation or copy effects", () => {
+  test("token creation (Kaldra Living weapon) should NOT trigger Breya's self-ETB", () => {
+    const kaldra = profile({
+      name: "Kaldra Compleat",
+      typeLine: "Legendary Artifact — Equipment",
+      oracleText:
+        "Living weapon\nIndestructible\nWhenever equipped creature deals combat damage to a player, exile all permanents that player controls.\n{7}: Attach Kaldra Compleat to target creature you control.",
+      manaCost: "{7}",
+      keywords: ["Living weapon", "Indestructible"],
+    });
+    const breya = profile({
+      name: "Breya, Etherium Shaper",
+      typeLine: "Legendary Artifact Creature — Human",
+      oracleText:
+        "When Breya, Etherium Shaper enters the battlefield, create two 1/1 blue Thopter artifact creature tokens with flying.\n{W}{U}{B}{R}, Sacrifice two artifacts: Choose one —\n• Breya deals 3 damage to target player or planeswalker.\n• Target creature gets -4/-4 until end of turn.\n• You gain 5 life.",
+      manaCost: "{W}{U}{B}{R}",
+    });
+    const analysis = findInteractions([kaldra, breya]);
+    const triggers = findByType(analysis, "triggers", "Kaldra Compleat", "Breya, Etherium Shaper");
+    expect(triggers.length).toBe(0);
+  });
+
+  test("Thopter token creation should NOT trigger Breya's self-ETB", () => {
+    const tezzeret = profile({
+      name: "Tezzeret, Artifice Master",
+      typeLine: "Legendary Planeswalker — Tezzeret",
+      oracleText:
+        "[+1]: Create a 1/1 colorless Thopter artifact creature token with flying.\n[0]: Draw a card. If you control three or more artifacts, draw two cards instead.",
+      manaCost: "{3}{U}{U}",
+    });
+    const breya = profile({
+      name: "Breya, Etherium Shaper",
+      typeLine: "Legendary Artifact Creature — Human",
+      oracleText:
+        "When Breya, Etherium Shaper enters the battlefield, create two 1/1 blue Thopter artifact creature tokens with flying.",
+      manaCost: "{W}{U}{B}{R}",
+    });
+    const analysis = findInteractions([tezzeret, breya]);
+    const triggers = findByType(analysis, "triggers", "Tezzeret, Artifice Master", "Breya, Etherium Shaper");
+    expect(triggers.length).toBe(0);
+  });
+
+  test("Sharuum (recursion) interaction with Breya should be detected as recurs", () => {
+    const sharuum = profile({
+      name: "Sharuum the Hegemon",
+      typeLine: "Legendary Artifact Creature — Sphinx",
+      oracleText:
+        "Flying\nWhen Sharuum the Hegemon enters the battlefield, you may return target artifact card from your graveyard to the battlefield.",
+      manaCost: "{3}{W}{U}{B}",
+      keywords: ["Flying"],
+    });
+    const breya = profile({
+      name: "Breya, Etherium Shaper",
+      typeLine: "Legendary Artifact Creature — Human",
+      oracleText:
+        "When Breya, Etherium Shaper enters the battlefield, create two 1/1 blue Thopter artifact creature tokens with flying.",
+      manaCost: "{W}{U}{B}{R}",
+    });
+    const analysis = findInteractions([sharuum, breya]);
+    // Sharuum returning Breya from graveyard should be detected as recurs
+    const recurs = findByType(analysis, "recurs", "Sharuum the Hegemon", "Breya, Etherium Shaper");
+    expect(recurs.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test("self-ETB gate works even when trigger has types leaked (regression)", () => {
+    // Simulate a case where the parser adds types to a self-ETB trigger.
+    // This tests the robustness of the self-gate.
+    const tokenMaker = profile({
+      name: "Thopter Spy Network",
+      typeLine: "Enchantment",
+      oracleText:
+        "At the beginning of your upkeep, if you control an artifact, create a 1/1 colorless Thopter artifact creature token with flying.",
+      manaCost: "{2}{U}{U}",
+    });
+    const breya = profile({
+      name: "Breya, Etherium Shaper",
+      typeLine: "Legendary Artifact Creature — Human",
+      oracleText:
+        "When Breya, Etherium Shaper enters the battlefield, create two 1/1 blue Thopter artifact creature tokens with flying.",
+      manaCost: "{W}{U}{B}{R}",
+    });
+
+    // Manually tamper Breya's trigger to have types (regression scenario)
+    const tamperedBreya = {
+      ...breya,
+      triggersOn: breya.triggersOn.map((t) => {
+        if (t.kind === "zone_transition" && (t as { object?: { self?: boolean } }).object?.self) {
+          return {
+            ...t,
+            object: {
+              ...(t as { object: Record<string, unknown> }).object,
+              types: ["artifact", "creature"],
+            },
+          };
+        }
+        return t;
+      }),
+    };
+
+    const analysis = findInteractions([tokenMaker, tamperedBreya as typeof breya]);
+    const triggers = findByType(analysis, "triggers", "Thopter Spy Network", "Breya, Etherium Shaper");
+    expect(triggers.length).toBe(0);
+  });
+});

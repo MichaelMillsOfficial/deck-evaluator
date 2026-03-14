@@ -204,11 +204,26 @@ function eventsMatch(caused: GameEvent, trigger: GameEvent): boolean {
 
   if (caused.kind === "zone_transition" && trigger.kind === "zone_transition") {
     // Self-ONLY triggers ("When ~ enters the battlefield") only trigger on the
-    // card itself — never on another card's events. Detected by self: true with
-    // no additional types (empty types = specifically this card, not a class).
-    // Self-INCLUDED triggers ("Whenever ~ or another creature dies") have types
-    // alongside self, so they DO match other cards' events of those types.
-    if (trigger.object?.self && (!trigger.object.types || trigger.object.types.length === 0)) {
+    // card itself — never on another card's events. Detected by self: true
+    // WITHOUT an "other"/"another" modifier.
+    // Self-INCLUDED triggers ("Whenever ~ or another creature dies") have an
+    // "other" modifier or "another" quantity alongside self, so they DO match.
+    // Note: we check modifiers/quantity rather than types.length because the
+    // parser may sometimes leak card types onto self-only triggers.
+    if (trigger.object?.self) {
+      const hasOther =
+        trigger.object.modifiers?.includes("other") ||
+        trigger.object.quantity === "another";
+      if (!hasOther) {
+        return false;
+      }
+    }
+
+    // Token creation events can never trigger a self-ETB ability.
+    // A token entering the battlefield is a new game object — even if it's a
+    // copy, the copy has its own ETB (CR 707.10). The original card is not
+    // re-entering, so its self-ETB does not retrigger.
+    if (trigger.object?.self && caused.object?.modifiers?.includes("token")) {
       return false;
     }
 
