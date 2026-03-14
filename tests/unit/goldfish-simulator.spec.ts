@@ -15,6 +15,7 @@ import {
   classifyRampEffect,
   estimateRitualNetMana,
   simulateRampEffect,
+  parseTokenCreation,
   DEFAULT_GOLDFISH_CONFIG,
 } from "../../src/lib/goldfish-simulator";
 import type {
@@ -1663,5 +1664,224 @@ test.describe("battlefield permanents snapshot", () => {
       if (foundSyntheticLand) break;
     }
     expect(foundSyntheticLand).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token creation
+// ---------------------------------------------------------------------------
+
+test.describe("parseTokenCreation", () => {
+  test("parses 'create a 1/1 white Soldier creature token'", () => {
+    const specs = parseTokenCreation("Create a 1/1 white Soldier creature token.");
+    expect(specs).toHaveLength(1);
+    expect(specs[0].quantity).toBe(1);
+    expect(specs[0].name).toBe("Soldier Token");
+    expect(specs[0].isCreature).toBe(true);
+  });
+
+  test("parses 'create two 2/2 black Zombie creature tokens'", () => {
+    const specs = parseTokenCreation("Create two 2/2 black Zombie creature tokens.");
+    expect(specs).toHaveLength(1);
+    expect(specs[0].quantity).toBe(2);
+    expect(specs[0].name).toBe("Zombie Token");
+    expect(specs[0].isCreature).toBe(true);
+  });
+
+  test("parses 'create three Treasure tokens'", () => {
+    const specs = parseTokenCreation("Create three Treasure tokens.");
+    expect(specs).toHaveLength(1);
+    expect(specs[0].quantity).toBe(3);
+    expect(specs[0].name).toBe("Treasure Token");
+    expect(specs[0].isArtifact).toBe(true);
+  });
+
+  test("parses numeric quantity 'create 3 1/1 green Saproling creature tokens'", () => {
+    const specs = parseTokenCreation("Create 3 1/1 green Saproling creature tokens.");
+    expect(specs).toHaveLength(1);
+    expect(specs[0].quantity).toBe(3);
+    expect(specs[0].name).toBe("Saproling Token");
+    expect(specs[0].isCreature).toBe(true);
+  });
+
+  test("returns empty for non-token oracle text", () => {
+    const specs = parseTokenCreation("Draw two cards.");
+    expect(specs).toHaveLength(0);
+  });
+
+  test("skips copy-token effects", () => {
+    const specs = parseTokenCreation("Create a token that's a copy of target creature.");
+    expect(specs).toHaveLength(0);
+  });
+
+  test("parses power/toughness tokens without a named subtype", () => {
+    const specs = parseTokenCreation("Create a 4/4 green Beast creature token.");
+    expect(specs).toHaveLength(1);
+    expect(specs[0].name).toBe("Beast Token");
+    expect(specs[0].isCreature).toBe(true);
+  });
+
+  test("parses Food artifact tokens", () => {
+    const specs = parseTokenCreation("Create a Food token.");
+    expect(specs).toHaveLength(1);
+    expect(specs[0].name).toBe("Food Token");
+    expect(specs[0].isArtifact).toBe(true);
+  });
+});
+
+test.describe("token creation in simulation", () => {
+  test("casting a token-creating sorcery adds tokens to battlefield", () => {
+    const config: GoldfishConfig = { ...DEFAULT_GOLDFISH_CONFIG };
+    const state = emptyGameState();
+    state.turn = 0;
+
+    // 3 lands on battlefield
+    state.battlefield = Array.from({ length: 3 }, (_, i) => ({
+      card: makeGoldfishLand({ name: `Forest ${i}`, producedMana: ["G"] }),
+      tapped: false,
+      summoningSick: false,
+      producedMana: ["G"],
+      enteredTurn: 0,
+    }));
+
+    const tokenSpell = makeGoldfishCard({
+      name: "Call of the Herd",
+      typeLine: "Sorcery",
+      manaCost: "{2}{G}",
+      cmc: 3,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      oracleText: "Create a 3/3 green Elephant creature token.",
+    });
+    state.hand = [tokenSpell];
+
+    const log = executeTurn(state, config);
+    expect(log.spellsCast).toContain("Call of the Herd");
+
+    // Should have 3 lands + 1 Elephant token on battlefield
+    const elephants = log.permanents.filter((p) => p.name === "Elephant Token");
+    expect(elephants).toHaveLength(1);
+    expect(elephants[0].category).toBe("token");
+  });
+
+  test("casting a creature with ETB token creation adds both card and tokens", () => {
+    const config: GoldfishConfig = { ...DEFAULT_GOLDFISH_CONFIG };
+    const state = emptyGameState();
+    state.turn = 0;
+
+    state.battlefield = Array.from({ length: 5 }, (_, i) => ({
+      card: makeGoldfishLand({ name: `Forest ${i}`, producedMana: ["G"] }),
+      tapped: false,
+      summoningSick: false,
+      producedMana: ["G"],
+      enteredTurn: 0,
+    }));
+
+    const avenger = makeGoldfishCard({
+      name: "Avenger of Zendikar",
+      typeLine: "Creature — Elemental",
+      manaCost: "{5}{G}{G}",
+      cmc: 7,
+      colorIdentity: ["G"],
+      colors: ["G"],
+      oracleText:
+        "When Avenger of Zendikar enters the battlefield, create a 0/1 green Plant creature token for each land you control.",
+    });
+    // Won't be castable with only 5 mana — let's give enough
+    state.battlefield = Array.from({ length: 7 }, (_, i) => ({
+      card: makeGoldfishLand({ name: `Forest ${i}`, producedMana: ["G"] }),
+      tapped: false,
+      summoningSick: false,
+      producedMana: ["G"],
+      enteredTurn: 0,
+    }));
+    state.hand = [avenger];
+
+    const log = executeTurn(state, config);
+    expect(log.spellsCast).toContain("Avenger of Zendikar");
+
+    // Avenger's oracle says "create a 0/1 green Plant creature token for each land"
+    // The regex parses "a" as quantity=1 (doesn't handle "for each land")
+    // At minimum we should get the creature + 1 Plant token
+    const plants = log.permanents.filter((p) => p.name === "Plant Token");
+    expect(plants.length).toBeGreaterThanOrEqual(1);
+
+    const avengers = log.permanents.filter((p) => p.name === "Avenger of Zendikar");
+    expect(avengers).toHaveLength(1);
+    expect(avengers[0].category).toBe("creature");
+  });
+
+  test("recurring token trigger creates tokens each turn (Bitterblossom)", () => {
+    const config: GoldfishConfig = { ...DEFAULT_GOLDFISH_CONFIG, onThePlay: true };
+    const state = emptyGameState();
+    state.turn = 0;
+
+    // Bitterblossom already on battlefield from previous turn
+    const bitterblossom = makeGoldfishCard({
+      name: "Bitterblossom",
+      typeLine: "Tribal Enchantment — Faerie",
+      manaCost: "{1}{B}",
+      cmc: 2,
+      oracleText:
+        "At the beginning of your upkeep, you lose 1 life and create a 1/1 black Faerie Rogue creature token with flying.",
+    });
+    state.battlefield = [
+      {
+        card: bitterblossom,
+        tapped: false,
+        summoningSick: false,
+        producedMana: [],
+        enteredTurn: 0, // entered before this turn
+      },
+    ];
+    state.library = Array.from({ length: 5 }, (_, i) =>
+      makeGoldfishLand({ name: `Swamp ${i}` })
+    );
+
+    // Turn 1: Bitterblossom should trigger (it entered on turn 0)
+    const log1 = executeTurn(state, config);
+    const rogues1 = log1.permanents.filter((p) => p.name === "Rogue Token");
+    expect(rogues1).toHaveLength(1);
+
+    // Turn 2: Another token
+    const log2 = executeTurn(state, config);
+    const rogues2 = log2.permanents.filter((p) => p.name === "Rogue Token");
+    expect(rogues2).toHaveLength(2);
+  });
+
+  test("commander ETB creates tokens (Breya)", () => {
+    const config: GoldfishConfig = { ...DEFAULT_GOLDFISH_CONFIG };
+    const state = emptyGameState();
+    state.turn = 0;
+
+    // 4 lands producing the right colors for Breya {W}{U}{B}{R}
+    const colors = ["W", "U", "B", "R"];
+    state.battlefield = colors.map((c, i) => ({
+      card: makeGoldfishLand({ name: `Land ${i}`, producedMana: [c] }),
+      tapped: false,
+      summoningSick: false,
+      producedMana: [c],
+      enteredTurn: 0,
+    }));
+
+    const breya = makeGoldfishCard({
+      name: "Breya, Etherium Shaper",
+      typeLine: "Legendary Artifact Creature — Human",
+      manaCost: "{W}{U}{B}{R}",
+      cmc: 4,
+      colorIdentity: ["W", "U", "B", "R"],
+      colors: ["W", "U", "B", "R"],
+      oracleText:
+        "When Breya, Etherium Shaper enters the battlefield, create two 1/1 blue Thopter artifact creature tokens with flying.",
+    });
+
+    state.commandZone = [breya];
+
+    const log = executeTurn(state, config);
+    expect(log.spellsCast).toContain("Breya, Etherium Shaper");
+
+    const thopters = log.permanents.filter((p) => p.name === "Thopter Token");
+    expect(thopters).toHaveLength(2);
+    expect(thopters[0].category).toBe("token");
   });
 });

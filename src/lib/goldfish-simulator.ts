@@ -189,6 +189,8 @@ export interface GoldfishAggregateStats {
 
 function categorizePermanent(permanent: GoldfishPermanent): PermanentCategory {
   const typeLine = permanent.card.enriched.typeLine;
+  // Token permanents have a type line starting with "Token"
+  if (typeLine.startsWith("Token")) return "token";
   if (typeLine.includes("Land")) return "land";
   if (typeLine.includes("Creature")) return "creature";
   if (typeLine.includes("Artifact")) return "artifact";
@@ -385,6 +387,178 @@ export function simulateRampEffect(
 
   // Ritual: return net mana
   return estimateRitualNetMana(card);
+}
+
+// ---------------------------------------------------------------------------
+// Token creation
+// ---------------------------------------------------------------------------
+
+const QUANTITY_WORDS: Record<string, number> = {
+  a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5,
+  six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+};
+
+const TOKEN_RE =
+  /create\s+(a|an|\d+|two|three|four|five|six|seven|eight|nine|ten|[Xx]|that many)\s+(.+?)\s+tokens?\b/gi;
+
+interface TokenSpec {
+  quantity: number;
+  name: string;
+  isCreature: boolean;
+  isArtifact: boolean;
+}
+
+/**
+ * Parse token creation from oracle text.
+ * Returns specs for each "create N description token(s)" found.
+ */
+export function parseTokenCreation(oracleText: string): TokenSpec[] {
+  const specs: TokenSpec[] = [];
+  TOKEN_RE.lastIndex = 0;
+  let match;
+
+  while ((match = TOKEN_RE.exec(oracleText)) !== null) {
+    const qtyStr = match[1].toLowerCase();
+    const description = match[2].toLowerCase();
+
+    // Skip copy effects
+    if (/copy of/i.test(description)) continue;
+
+    // Parse quantity
+    let quantity = QUANTITY_WORDS[qtyStr] ?? parseInt(qtyStr, 10);
+    if (isNaN(quantity) || qtyStr === "x" || qtyStr === "that many") {
+      quantity = 1; // conservative fallback for X / "that many"
+    }
+
+    // Classify type
+    const isCreature = description.includes("creature") ||
+      // Most tokens without an explicit type are creatures (e.g. "1/1 white Soldier")
+      /\d+\/\d+/.test(description);
+    const isArtifact = description.includes("artifact") ||
+      /treasure|food|clue|blood|map|gold|powerstone/i.test(description);
+
+    // Build a readable name from the description
+    // e.g. "3/3 green Elephant creature" → "Elephant Token"
+    //       "Treasure artifact" → "Treasure Token"
+    // Strategy: find the last capitalized-looking word that isn't a color,
+    // type keyword, or p/t stats.
+    const SKIP_WORDS = new Set([
+      "white", "blue", "black", "red", "green", "colorless",
+      "creature", "artifact", "enchantment", "token", "tokens",
+      "legendary", "and", "with",
+    ]);
+    let name: string | null = null;
+    const words = description.split(/\s+/);
+    for (let wi = words.length - 1; wi >= 0; wi--) {
+      const w = words[wi].replace(/[^a-z]/gi, "");
+      if (!w || SKIP_WORDS.has(w) || /^\d+\/\d+$/.test(words[wi])) continue;
+      name = w.charAt(0).toUpperCase() + w.slice(1) + " Token";
+      break;
+    }
+    if (!name) {
+      const ptMatch = description.match(/(\d+)\/(\d+)/);
+      name = ptMatch ? `${ptMatch[1]}/${ptMatch[2]} Token` : "Token";
+    }
+
+    specs.push({ quantity, name, isCreature, isArtifact });
+  }
+
+  return specs;
+}
+
+/**
+ * Create synthetic GoldfishCard for a token permanent.
+ */
+function makeTokenCard(spec: TokenSpec): GoldfishCard {
+  const typeParts: string[] = [];
+  if (spec.isArtifact) typeParts.push("Artifact");
+  if (spec.isCreature) typeParts.push("Creature");
+  if (typeParts.length === 0) typeParts.push("Creature"); // default
+  const typeLine = `Token ${typeParts.join(" ")}`;
+
+  const enriched: EnrichedCard = {
+    name: spec.name,
+    manaCost: "",
+    cmc: 0,
+    colorIdentity: [],
+    colors: [],
+    typeLine,
+    supertypes: [],
+    subtypes: [],
+    oracleText: "",
+    keywords: [],
+    power: null,
+    toughness: null,
+    loyalty: null,
+    rarity: "common",
+    imageUris: null,
+    manaPips: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+    producedMana: [],
+    flavorName: null,
+    isGameChanger: false,
+    prices: { usd: null, usdFoil: null, eur: null },
+    setCode: "",
+    collectorNumber: "",
+    layout: "normal",
+    cardFaces: [
+      {
+        name: spec.name,
+        manaCost: "",
+        typeLine,
+        oracleText: "",
+        power: null,
+        toughness: null,
+        loyalty: null,
+        imageUris: null,
+      },
+    ],
+  };
+  return { name: spec.name, enriched, tags: [] };
+}
+
+/**
+ * Simulate token creation from a spell's oracle text.
+ * Creates token permanents on the battlefield.
+ */
+function simulateTokenCreation(
+  state: GoldfishGameState,
+  card: GoldfishCard
+): void {
+  const specs = parseTokenCreation(card.enriched.oracleText);
+  for (const spec of specs) {
+    for (let i = 0; i < spec.quantity; i++) {
+      const tokenCard = makeTokenCard(spec);
+      state.battlefield.push({
+        card: tokenCard,
+        tapped: false,
+        summoningSick: spec.isCreature,
+        producedMana: [],
+        enteredTurn: state.turn,
+      });
+    }
+  }
+}
+
+const RECURRING_TOKEN_RE =
+  /\bat the beginning of (?:your |each )?(?:upkeep|end step|combat)\b/i;
+
+/**
+ * Check battlefield permanents for recurring token triggers
+ * (e.g. "At the beginning of your upkeep, create a 1/1 token").
+ * Only fires for permanents that were on the battlefield before this turn.
+ */
+function simulateRecurringTokens(state: GoldfishGameState): void {
+  for (const permanent of state.battlefield) {
+    // Skip permanents that just entered (they won't trigger until next turn)
+    if (permanent.enteredTurn >= state.turn) continue;
+    // Skip tokens — they don't have oracle text triggers
+    if (permanent.card.enriched.typeLine.startsWith("Token")) continue;
+
+    const oracle = permanent.card.enriched.oracleText;
+    if (RECURRING_TOKEN_RE.test(oracle)) {
+      simulateTokenCreation(state, permanent.card);
+    }
+  }
 }
 
 /**
@@ -1066,6 +1240,8 @@ function castSpell(
       producedMana: card.enriched.producedMana,
       enteredTurn: state.turn,
     });
+    // ETB token creation (e.g. commander with "when ~ enters, create tokens")
+    simulateTokenCreation(state, card);
     return { bonusMana: 0 };
   } else {
     // Remove from hand
@@ -1080,12 +1256,16 @@ function castSpell(
         producedMana: card.enriched.producedMana,
         enteredTurn: state.turn,
       });
+      // ETB token creation (e.g. "when ~ enters, create tokens")
+      simulateTokenCreation(state, card);
       return { bonusMana: 0 };
     } else {
       // Non-permanent (Instant/Sorcery) goes to graveyard
       state.graveyard.push(card);
       // Simulate ramp effects (land search, rituals)
       const bonusMana = simulateRampEffect(state, card);
+      // Token creation from spells (e.g. "Create three 1/1 tokens")
+      simulateTokenCreation(state, card);
       return { bonusMana };
     }
   }
@@ -1122,6 +1302,10 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
 
   // Untap
   untapAll(state);
+
+  // Upkeep: process recurring token triggers from permanents on battlefield
+  // (e.g. Bitterblossom "At the beginning of your upkeep, create a token")
+  simulateRecurringTokens(state);
 
   // Track cards drawn this turn
   const cardsDrawn: CardDraw[] = [];
