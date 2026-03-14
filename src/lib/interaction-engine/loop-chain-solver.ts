@@ -100,7 +100,44 @@ function extractFilter(ref?: GameObjectRef): ObjectFilter | undefined {
 }
 
 /**
+ * Resolve the numeric quantity from a GameObjectRef quantity field.
+ * "one" → 1, "another" → 1, number → number, "X" → 1 (conservative), "all"/"each" → 99 (prohibitive).
+ */
+function resolveQuantity(quantity: GameObjectRef["quantity"]): number {
+  if (typeof quantity === "number") return quantity;
+  switch (quantity) {
+    case "one":
+    case "another":
+      return 1;
+    case "X":
+      return 1; // Conservative: treat X as 1
+    case "all":
+    case "each":
+      return 99; // Prohibitively high — prevents loop validation
+    default:
+      return 1;
+  }
+}
+
+/**
+ * Parse English word quantities from oracle text (e.g., "two" → 2, "ten" → 10).
+ */
+function parseWordQuantity(word: string): number {
+  const map: Record<string, number> = {
+    a: 1, an: 1, another: 1, one: 1,
+    two: 2, three: 3, four: 4, five: 5,
+    six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  };
+  const n = parseInt(word, 10);
+  if (!isNaN(n)) return n;
+  return map[word.toLowerCase()] ?? 1;
+}
+
+/**
  * Extract LoopSteps from a CardProfile's structured data and oracle text.
+ *
+ * Sorceries and instants are excluded: they are one-shot spells that cannot
+ * form repeatable loops without external recursion (e.g., Underworld Breach).
  */
 export function extractLoopSteps(profile: CardProfile): LoopStep[] {
   const steps: LoopStep[] = [];
@@ -108,12 +145,21 @@ export function extractLoopSteps(profile: CardProfile): LoopStep[] {
   const types = profile.cardTypes?.map((t) => String(t)) ?? [];
   const subtypes = profile.subtypes?.map((t) => String(t)) ?? [];
 
+  // Sorceries and instants are one-shot spells — skip them for loop detection.
+  // They cannot be part of a repeatable loop unless an external engine recurs them,
+  // which the loop solver does not model.
+  const isSorceryOrInstant = types.some(
+    (t) => /^sorcery$/i.test(t) || /^instant$/i.test(t)
+  );
+  if (isSorceryOrInstant) return steps;
+
   // --- Structured extraction ---
 
   // 1. Sacrifice outlets from consumes
   for (const cost of profile.consumes) {
     if (cost.costType === "sacrifice" && cost.object?.types?.some((t) => t === "creature")) {
       const filter = extractFilter(cost.object);
+      const sacQty = resolveQuantity(cost.object?.quantity ?? "one");
 
       // Check what this sacrifice produces by looking at produces and causesEvents
       const manaProduced = profile.produces.filter(
@@ -130,8 +176,8 @@ export function extractLoopSteps(profile: CardProfile): LoopStep[] {
               step(
                 card,
                 `sacrifice creature for ${color === "any" ? "any color" : `{${color}}`} mana`,
-                [req(CREATURE_ON_BF, 1, filter)],
-                [prod(CREATURE_DEATH), prod(manaToken(color), qty)],
+                [req(CREATURE_ON_BF, sacQty, filter)],
+                [prod(CREATURE_DEATH, sacQty), prod(manaToken(color), qty)],
                 [],
                 "structured",
                 types,
@@ -146,8 +192,8 @@ export function extractLoopSteps(profile: CardProfile): LoopStep[] {
           step(
             card,
             "sacrifice creature",
-            [req(CREATURE_ON_BF, 1, filter)],
-            [prod(CREATURE_DEATH)],
+            [req(CREATURE_ON_BF, sacQty, filter)],
+            [prod(CREATURE_DEATH, sacQty)],
             [],
             "structured",
             types,
@@ -472,6 +518,7 @@ export function extractLoopSteps(profile: CardProfile): LoopStep[] {
   for (const cost of profile.consumes) {
     if (cost.costType === "sacrifice" && cost.object?.types?.some((t) => t === "artifact")) {
       const filter = extractFilter(cost.object);
+      const sacQty = resolveQuantity(cost.object?.quantity ?? "one");
 
       const manaProduced = profile.produces.filter(
         (p) => "category" in p && p.category === "mana"
@@ -483,14 +530,14 @@ export function extractLoopSteps(profile: CardProfile): LoopStep[] {
             const qty = typeof mp.quantity === "number" ? mp.quantity : 1;
             const color = mp.color === "any" ? "any" : (mp.color ?? "C");
             const productions: ResourceProduction[] = [
-              prod(ARTIFACT_TO_GY),
+              prod(ARTIFACT_TO_GY, sacQty),
               prod(manaToken(color), qty),
             ];
             steps.push(
               step(
                 card,
                 `sacrifice artifact for ${color === "any" ? "any color" : `{${color}}`} mana`,
-                [req(ARTIFACT_ON_BF, 1, filter)],
+                [req(ARTIFACT_ON_BF, sacQty, filter)],
                 productions,
                 [],
                 "structured",
@@ -505,8 +552,8 @@ export function extractLoopSteps(profile: CardProfile): LoopStep[] {
           step(
             card,
             "sacrifice artifact",
-            [req(ARTIFACT_ON_BF, 1, filter)],
-            [prod(ARTIFACT_TO_GY)],
+            [req(ARTIFACT_ON_BF, sacQty, filter)],
+            [prod(ARTIFACT_TO_GY, sacQty)],
             [],
             "structured",
             types,
@@ -641,11 +688,13 @@ function extractFromOracleText(profile: CardProfile, steps: LoopStep[]): void {
 
   // Sacrifice outlets — upgrade existing structured step if oracle has more info (mana production)
   const sacMatch = oracle.match(
-    /Sacrifice (another |a )creature[^.]*?:(.*?)(?:\.|$)/i
+    /Sacrifice (another|a|two|three|four|five|six|seven|eight|nine|ten|\d+) creature[s]?[^.]*?:(.*?)(?:\.|$)/i
   );
   if (sacMatch) {
-    const isAnother = /another/i.test(sacMatch[1]);
+    const quantifier = sacMatch[1].toLowerCase();
+    const isAnother = quantifier === "another";
     const filter: ObjectFilter | undefined = isAnother ? { self: false } : undefined;
+    const oracleSacQty = parseWordQuantity(quantifier);
     const effectText = sacMatch[2] ?? "";
 
     // Check for mana production in effect
@@ -653,7 +702,7 @@ function extractFromOracleText(profile: CardProfile, steps: LoopStep[]): void {
     const anyManaMatch = effectText.match(/Add one mana of any color/i);
     const hasManaInOracle = !!(manaMatch || anyManaMatch);
 
-    // Remove existing sac step for this card if oracle has better info (mana)
+    // Remove existing sac step for this card if oracle has better info (mana or quantity)
     const existingSacIdx = steps.findIndex(
       (s) => s.card === card && s.requires.some((r) => r.token === CREATURE_ON_BF) &&
         s.produces.some((p) => p.token === CREATURE_DEATH)
@@ -676,8 +725,8 @@ function extractFromOracleText(profile: CardProfile, steps: LoopStep[]): void {
           step(
             card,
             `sacrifice creature for {${color1}}{${color2}}`,
-            [req(CREATURE_ON_BF, 1, filter)],
-            [prod(CREATURE_DEATH), prod(manaToken(color1)), prod(manaToken(color2))],
+            [req(CREATURE_ON_BF, oracleSacQty, filter)],
+            [prod(CREATURE_DEATH, oracleSacQty), prod(manaToken(color1)), prod(manaToken(color2))],
             [],
             "oracle",
             types,
@@ -689,8 +738,8 @@ function extractFromOracleText(profile: CardProfile, steps: LoopStep[]): void {
           step(
             card,
             "sacrifice creature for any mana",
-            [req(CREATURE_ON_BF, 1, filter)],
-            [prod(CREATURE_DEATH), prod(manaToken("any"))],
+            [req(CREATURE_ON_BF, oracleSacQty, filter)],
+            [prod(CREATURE_DEATH, oracleSacQty), prod(manaToken("any"))],
             [],
             "oracle",
             types,
@@ -703,8 +752,8 @@ function extractFromOracleText(profile: CardProfile, steps: LoopStep[]): void {
           step(
             card,
             "sacrifice creature",
-            [req(CREATURE_ON_BF, 1, filter)],
-            [prod(CREATURE_DEATH)],
+            [req(CREATURE_ON_BF, oracleSacQty, filter)],
+            [prod(CREATURE_DEATH, oracleSacQty)],
             [],
             "oracle",
             types,
@@ -846,19 +895,21 @@ function extractFromOracleText(profile: CardProfile, steps: LoopStep[]): void {
 
   // ─── Artifact Oracle Fallback (Epic 2.4) ───
 
-  // Artifact sacrifice outlets: "Sacrifice an artifact:" or "Sacrifice an artifact creature:"
+  // Artifact sacrifice outlets: "Sacrifice an artifact:" or "Sacrifice two artifacts:" etc.
   const artifactSacMatch = oracle.match(
-    /Sacrifice (an?|another)\s+artifact(?:\s+creature)?[^.]*?:(.*?)(?:\.|$)/i
+    /Sacrifice (an?|another|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(?:nonland )?artifact(?:s|creature)?[^.]*?:(.*?)(?:\.|$)/i
   );
   if (artifactSacMatch && !alreadyProduces(ARTIFACT_TO_GY)) {
+    const quantifier = artifactSacMatch[1].toLowerCase();
+    const oracleSacQty = parseWordQuantity(quantifier);
     const effectText = artifactSacMatch[2] ?? "";
     const manaMatch = effectText.match(/Add \{([^}]+)\}(?:\{([^}]+)\})?/i);
     const anyManaMatch = effectText.match(/Add one mana of any color/i);
 
-    const productions: ResourceProduction[] = [prod(ARTIFACT_TO_GY)];
+    const productions: ResourceProduction[] = [prod(ARTIFACT_TO_GY, oracleSacQty)];
     // If sacrificing an artifact creature, also produce creature_death
     if (/artifact creature/i.test(artifactSacMatch[0])) {
-      productions.push(prod(CREATURE_DEATH));
+      productions.push(prod(CREATURE_DEATH, oracleSacQty));
     }
 
     if (manaMatch) {
@@ -871,16 +922,16 @@ function extractFromOracleText(profile: CardProfile, steps: LoopStep[]): void {
         productions.push(prod(manaToken(color2)));
       }
       steps.push(
-        step(card, `sacrifice artifact for mana`, [req(ARTIFACT_ON_BF)], productions, [], "oracle", types, subtypes)
+        step(card, `sacrifice artifact for mana`, [req(ARTIFACT_ON_BF, oracleSacQty)], productions, [], "oracle", types, subtypes)
       );
     } else if (anyManaMatch) {
       productions.push(prod(manaToken("any")));
       steps.push(
-        step(card, "sacrifice artifact for any mana", [req(ARTIFACT_ON_BF)], productions, [], "oracle", types, subtypes)
+        step(card, "sacrifice artifact for any mana", [req(ARTIFACT_ON_BF, oracleSacQty)], productions, [], "oracle", types, subtypes)
       );
     } else {
       steps.push(
-        step(card, "sacrifice artifact", [req(ARTIFACT_ON_BF)], productions, [], "oracle", types, subtypes)
+        step(card, "sacrifice artifact", [req(ARTIFACT_ON_BF, oracleSacQty)], productions, [], "oracle", types, subtypes)
       );
     }
   }
