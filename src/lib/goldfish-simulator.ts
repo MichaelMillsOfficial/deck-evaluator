@@ -1448,5 +1448,25 @@ export function runGoldfishSimulation(
   const stats = computeAggregateStats(games, config.turns);
   stats.rampSources = computeRampSources(pool, commandZone, games);
 
+  // Recompute ramp acceleration with a deck-aware baseline instead of
+  // the hardcoded "4" in computeAggregateStats.  Commander decks have
+  // lower land density and many ETB-tapped lands, so the naive baseline
+  // of 4 hides real ramp contributions.
+  const landCards = pool.filter((c) => isLand(c.enriched));
+  const landCount = landCards.length;
+  const deckSize = pool.length;
+  // By T4 on the play you've seen 10 cards (7 opening + 3 draws T2-T4)
+  const cardsSeen = 10;
+  const expectedLandDraws = deckSize > 0 ? cardsSeen * (landCount / deckSize) : 0;
+  const expectedLandDrops = Math.min(4, expectedLandDraws);
+  const tappedCount = landCards.filter(
+    (c) => classifyLandEntry(c.enriched) === "tapped"
+  ).length;
+  const untappedRatio = landCount > 0 ? 1 - tappedCount / landCount : 1;
+  const baselineT4 = expectedLandDrops * untappedRatio;
+  const avgManaT4 = stats.avgManaByTurn[3] ?? 0;
+  stats.rampAcceleration =
+    Math.round(Math.max(0, avgManaT4 - baselineT4) * 100) / 100;
+
   return { games, stats };
 }
