@@ -38,7 +38,7 @@ import type {
 } from "./types";
 import type { EnrichedCard } from "../types";
 import { PERMANENT_TYPES, matchesCompositeType } from "./game-model";
-import { detectLoopsFromChains, isNonLoopableSpell } from "./loop-chain-solver";
+import { detectLoopsFromChains } from "./loop-chain-solver";
 import { adjustInteractionStrengths } from "./satisfiability-analyzer";
 
 // ═══════════════════════════════════════════════════════════════
@@ -3165,230 +3165,27 @@ function buildChain(
  * 2. The cycle involves "enables" or "triggers" interactions
  * 3. Net resource computation determines if the loop is infinite
  */
-const MAX_LOOPS = 50;
-
 function detectLoops(
-  interactions: Interaction[],
+  _interactions: Interaction[],
   profiles: CardProfile[]
 ): InteractionLoop[] {
   if (profiles.length < 2) return [];
 
-  // Sorceries and instants are one-shot spells that cannot form repeatable loops
-  // without external recursion. Exclude them from the graph-based cycle search.
-  const nonLoopableCards = new Set<string>(
-    profiles.filter(isNonLoopableSpell).map((p) => p.cardName)
-  );
-
-  // Build adjacency from causal interactions
-  const causalTypes = new Set<string>(["enables", "triggers", "recurs"]);
-  const adjacency = new Map<string, Map<string, Interaction[]>>();
-
-  for (const inter of interactions) {
-    if (!causalTypes.has(inter.type)) continue;
-    if (inter.strength < 0.3) continue; // Skip weak edges
-    const from = inter.cards[0];
-    const to = inter.cards[1];
-    // Skip edges involving sorceries/instants — they can't loop
-    if (nonLoopableCards.has(from) || nonLoopableCards.has(to)) continue;
-    if (!adjacency.has(from)) adjacency.set(from, new Map());
-    if (!adjacency.get(from)!.has(to)) adjacency.get(from)!.set(to, []);
-    adjacency.get(from)!.get(to)!.push(inter);
-  }
-
-  const loops: InteractionLoop[] = [];
-  const seen = new Set<string>();
-
-  // Find cycles using DFS from each node
-  for (const startCard of adjacency.keys()) {
-    if (loops.length >= MAX_LOOPS) break;
-    findCycles(startCard, [startCard], adjacency, loops, seen, profiles);
-  }
-
-  // Second pass: action-chain solver catches loops the graph-cycle approach misses
-  // (e.g., intermediary resources, self-loops via granted keywords, replacement effects)
-  const chainLoops = detectLoopsFromChains(profiles);
-  for (const cl of chainLoops) {
-    const key = [...cl.cards].sort().join("+");
-    if (!seen.has(key)) {
-      seen.add(key);
-      loops.push(cl);
-    }
-  }
-
-  return loops;
-}
-
-function findCycles(
-  start: string,
-  path: string[],
-  adjacency: Map<string, Map<string, Interaction[]>>,
-  loops: InteractionLoop[],
-  seen: Set<string>,
-  profiles: CardProfile[]
-): void {
-  if (loops.length >= MAX_LOOPS) return;
-
-  const current = path[path.length - 1];
-  const neighbors = adjacency.get(current);
-  if (!neighbors) return;
-
-  for (const [next] of neighbors) {
-    if (loops.length >= MAX_LOOPS) return;
-
-    if (next === start && path.length >= 2) {
-      // Found a cycle back to start
-      const key = [...path].sort().join("+");
-      if (!seen.has(key)) {
-        seen.add(key);
-        loops.push(buildLoop(path, start, adjacency, profiles));
-      }
-    } else if (!path.includes(next) && path.length < 5) {
-      findCycles(start, [...path, next], adjacency, loops, seen, profiles);
-    }
-  }
+  // Use only the resource-aware chain solver for loop detection.
+  // The previous graph-based DFS (Pass 1) followed enables/triggers edges to
+  // find cycles, but it had no resource feasibility validation — producing false
+  // loops where sacrifice costs were wrong (Breya needs 2 artifacts, not 1),
+  // activation costs were impractical (Bolas's Citadel needs 10 permanents),
+  // or self-sacrificing permanents appeared in loops (Buried Ruin destroys itself).
+  // The chain solver validates that each step's resource requirements are satisfied
+  // by the previous step's production, eliminating these false positives.
+  return detectLoopsFromChains(profiles);
 }
 
 function profilesByName(profiles: CardProfile[]): Map<string, CardProfile> {
   const map = new Map<string, CardProfile>();
   for (const p of profiles) map.set(p.cardName, p);
   return map;
-}
-
-function buildLoop(
-  path: string[],
-  start: string,
-  adjacency: Map<string, Map<string, Interaction[]>>,
-  profiles: CardProfile[]
-): InteractionLoop {
-  const steps: InteractionChain["steps"] = [];
-  const fullPath = [...path, start]; // close the cycle
-
-  for (let i = 0; i < fullPath.length - 1; i++) {
-    const from = fullPath[i];
-    const to = fullPath[i + 1];
-    const inters = adjacency.get(from)?.get(to) || [];
-    const best = inters[0];
-    steps.push({
-      from,
-      to,
-      event: best?.events[0] || {
-        kind: "zone_transition" as const,
-        to: "battlefield" as const,
-        object: { types: [], quantity: "one" as const, modifiers: [] },
-      },
-      description: best?.mechanical || `${from} interacts with ${to}`,
-      interactionType: best?.type || "enables",
-    });
-  }
-
-  // Compute net effect
-  const netEffect = computeNetEffect(path, profiles);
-
-  // Determine if infinite: loop is infinite if it produces all resources
-  // it consumes (net non-negative for all resource types)
-  const isInfinite = checkInfinite(path, profiles);
-
-  return {
-    cards: path,
-    description: `Loop: ${path.join(" → ")} → ${start}`,
-    steps,
-    netEffect,
-    isInfinite,
-  };
-}
-
-function computeNetEffect(
-  loopCards: string[],
-  profiles: CardProfile[]
-): InteractionLoop["netEffect"] {
-  const resources: PlayerResource[] = [];
-  const attributes: ObjectAttribute[] = [];
-  const events: GameEvent[] = [];
-  const pMap = profilesByName(profiles);
-
-  for (const cardName of loopCards) {
-    const p = pMap.get(cardName);
-    if (!p) continue;
-
-    // Collect produced resources
-    for (const prod of p.produces) {
-      if (prod.category === "mana" || prod.category === "life" || prod.category === "cards") {
-        resources.push(prod);
-      } else if (prod.category === "counter" || prod.category === "stat_mod" || prod.category === "keyword_grant") {
-        attributes.push(prod);
-      } else if (prod.category === "create_token") {
-        // Token creation causes an ETB event
-        events.push({
-          kind: "zone_transition",
-          to: "battlefield",
-          object: { types: ["creature"], quantity: "one", modifiers: [] },
-        });
-      }
-    }
-
-    // Collect caused events
-    for (const event of p.causesEvents) {
-      events.push(event);
-    }
-  }
-
-  return { resources, attributes, events };
-}
-
-function checkInfinite(
-  loopCards: string[],
-  profiles: CardProfile[]
-): boolean {
-  // A loop is infinite if the mana produced covers the mana consumed.
-  // Simple heuristic: sum all mana production and compare to costs.
-  let totalManaProduced = 0;
-  let totalManaCost = 0;
-  const producedColors = new Set<string>();
-  const requiredColors = new Set<string>();
-  const pMap = profilesByName(profiles);
-
-  for (const cardName of loopCards) {
-    const p = pMap.get(cardName);
-    if (!p) continue;
-
-    for (const prod of p.produces) {
-      if ("category" in prod && prod.category === "mana") {
-        const qty = typeof prod.quantity === "number" ? prod.quantity : 0;
-        totalManaProduced += qty;
-        if (prod.color === "any") {
-          // "Any color" satisfies all color requirements
-          for (const c of ["W", "U", "B", "R", "G", "C"]) producedColors.add(c);
-        } else if (prod.color) {
-          producedColors.add(prod.color);
-        }
-      }
-    }
-
-    for (const cost of p.consumes) {
-      if (cost.costType === "mana") {
-        // Parse mana symbols properly: {1} = 1 generic, {B} = 1 colored
-        const symbolRegex = /\{([^}]+)\}/g;
-        let match;
-        while ((match = symbolRegex.exec(cost.mana)) !== null) {
-          const sym = match[1];
-          if (/^\d+$/.test(sym)) {
-            totalManaCost += parseInt(sym, 10);
-          } else {
-            totalManaCost += 1;
-            if (/^[WUBRG]$/.test(sym)) requiredColors.add(sym);
-          }
-        }
-      }
-    }
-  }
-
-  // All required colors must be produced within the loop
-  for (const color of requiredColors) {
-    if (!producedColors.has(color)) return false;
-  }
-
-  // Loop is infinite if it produces at least as much mana as it consumes
-  return totalManaProduced >= totalManaCost;
 }
 
 /**

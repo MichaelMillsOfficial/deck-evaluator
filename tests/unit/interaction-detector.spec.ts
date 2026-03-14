@@ -1089,15 +1089,39 @@ test.describe("chain detection", () => {
 });
 
 test.describe("loop detection", () => {
-  test("Ashnod's Altar + Reassembling Skeleton forms a resource loop", () => {
+  test("Altar + Skeleton: no loop without external {B} source", () => {
     const altar = ashnodAltar();
     const skeleton = reassemblingSkeleton();
     const analysis = findInteractions([altar, skeleton]);
 
     // Altar sacs Skeleton → produces {C}{C}
-    // Skeleton returns from GY for {1}{B} → loop (needs external {B})
-    expect(analysis.loops.length).toBeGreaterThanOrEqual(1);
+    // Skeleton returns from GY for {1}{B}
+    // The chain solver correctly rejects this: resources don't balance
+    // without an external {B} source. This is NOT a self-sustaining loop.
+    const loop = analysis.loops.find(
+      (l) =>
+        l.cards.includes("Ashnod's Altar") &&
+        l.cards.includes("Reassembling Skeleton")
+    );
+    expect(loop).toBeUndefined();
+  });
 
+  test("Altar + Skeleton + Plunderer: loop with mana production", () => {
+    const altar = ashnodAltar();
+    const skeleton = reassemblingSkeleton();
+    const plunderer = profile({
+      name: "Pitiless Plunderer",
+      typeLine: "Creature — Human Pirate",
+      oracleText: "Whenever another creature you control dies, create a Treasure token.",
+      manaCost: "{3}{B}",
+      cmc: 4,
+      power: "1",
+      toughness: "4",
+    });
+    const analysis = findInteractions([altar, skeleton, plunderer]);
+
+    // Altar sacs Skeleton → {C}{C} + Plunderer creates Treasure → {B}
+    // Skeleton returns for {1}{B} — resources balance
     const loop = analysis.loops.find(
       (l) =>
         l.cards.includes("Ashnod's Altar") &&
@@ -1106,53 +1130,9 @@ test.describe("loop detection", () => {
     expect(loop).toBeDefined();
     expect(loop!.steps.length).toBeGreaterThanOrEqual(2);
     expect(loop!.description.length).toBeGreaterThan(0);
-  });
-
-  test("loop has netEffect with resources", () => {
-    const altar = ashnodAltar();
-    const skeleton = reassemblingSkeleton();
-    const analysis = findInteractions([altar, skeleton]);
-
-    const loop = analysis.loops.find(
-      (l) =>
-        l.cards.includes("Ashnod's Altar") &&
-        l.cards.includes("Reassembling Skeleton")
-    );
-    expect(loop).toBeDefined();
     expect(loop!.netEffect).toBeDefined();
     expect(loop!.netEffect.resources).toBeDefined();
     expect(loop!.netEffect.events).toBeDefined();
-  });
-
-  test("Altar + Skeleton loop is not fully infinite (needs external {B})", () => {
-    const altar = ashnodAltar();
-    const skeleton = reassemblingSkeleton();
-    const analysis = findInteractions([altar, skeleton]);
-
-    const loop = analysis.loops.find(
-      (l) =>
-        l.cards.includes("Ashnod's Altar") &&
-        l.cards.includes("Reassembling Skeleton")
-    );
-    expect(loop).toBeDefined();
-    // Not fully infinite — needs {B} each iteration
-    expect(loop!.isInfinite).toBe(false);
-  });
-
-  test("three-card loop: Altar + Skeleton + Blood Artist (with drain output)", () => {
-    const altar = ashnodAltar();
-    const skeleton = reassemblingSkeleton();
-    const artist = bloodArtist();
-    const analysis = findInteractions([altar, skeleton, artist]);
-
-    // Even with Blood Artist, the loop still needs external {B}
-    // But it should detect a loop that includes the drain
-    const loop = analysis.loops.find(
-      (l) =>
-        l.cards.includes("Ashnod's Altar") &&
-        l.cards.includes("Reassembling Skeleton")
-    );
-    expect(loop).toBeDefined();
   });
 
   test("loop with sufficient mana production is infinite", () => {
@@ -1190,9 +1170,18 @@ test.describe("loop detection", () => {
   });
 
   test("loop steps describe the cycle clearly", () => {
+    // Use Free Recurrer + Altar which forms a valid self-sustaining loop
+    const freeRecurrer = profile({
+      name: "Free Recurrer",
+      typeLine: "Artifact Creature — Construct",
+      oracleText: "{1}: Return Free Recurrer from your graveyard to the battlefield.",
+      manaCost: "{0}",
+      cmc: 0,
+      power: "1",
+      toughness: "1",
+    });
     const altar = ashnodAltar();
-    const skeleton = reassemblingSkeleton();
-    const analysis = findInteractions([altar, skeleton]);
+    const analysis = findInteractions([altar, freeRecurrer]);
 
     for (const loop of analysis.loops) {
       expect(loop.cards.length).toBeGreaterThanOrEqual(2);
