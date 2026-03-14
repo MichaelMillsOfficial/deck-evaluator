@@ -204,26 +204,11 @@ function eventsMatch(caused: GameEvent, trigger: GameEvent): boolean {
 
   if (caused.kind === "zone_transition" && trigger.kind === "zone_transition") {
     // Self-ONLY triggers ("When ~ enters the battlefield") only trigger on the
-    // card itself — never on another card's events. Detected by self: true
-    // WITHOUT an "other"/"another" modifier.
-    // Self-INCLUDED triggers ("Whenever ~ or another creature dies") have an
-    // "other" modifier or "another" quantity alongside self, so they DO match.
-    // Note: we check modifiers/quantity rather than types.length because the
-    // parser may sometimes leak card types onto self-only triggers.
-    if (trigger.object?.self) {
-      const hasOther =
-        trigger.object.modifiers?.includes("other") ||
-        trigger.object.quantity === "another";
-      if (!hasOther) {
-        return false;
-      }
-    }
-
-    // Token creation events can never trigger a self-ETB ability.
-    // A token entering the battlefield is a new game object — even if it's a
-    // copy, the copy has its own ETB (CR 707.10). The original card is not
-    // re-entering, so its self-ETB does not retrigger.
-    if (trigger.object?.self && caused.object?.modifiers?.includes("token")) {
+    // card itself — never on another card's events. Detected by self: true with
+    // no additional types (empty types = specifically this card, not a class).
+    // Self-INCLUDED triggers ("Whenever ~ or another creature dies") have types
+    // alongside self, so they DO match other cards' events of those types.
+    if (trigger.object?.self && (!trigger.object.types || trigger.object.types.length === 0)) {
       return false;
     }
 
@@ -629,7 +614,22 @@ function detectTriggers(a: CardProfile, b: CardProfile): Interaction[] {
   const results: Interaction[] = [];
   const seen = new Set<string>();
 
+  // Pre-check: if B has ONLY self-ETB triggers (no general triggers), skip
+  // A's events that are token creation. A token entering the battlefield is
+  // a new game object and cannot retrigger B's "When [CARDNAME] enters"
+  // ability. This is a safety net beyond the eventsMatch gate.
+  const bHasOnlySelfETB = b.triggersOn.length > 0 && b.triggersOn.every(
+    (t) => t.kind === "zone_transition" && (t as ZoneTransition).to === "battlefield" &&
+           t.object?.self === true
+  );
+
   for (const caused of a.causesEvents) {
+    // Token creation can never trigger a self-only ETB trigger (CR 707.10)
+    if (bHasOnlySelfETB && caused.kind === "zone_transition" &&
+        (caused as ZoneTransition).to === "battlefield" &&
+        caused.object?.modifiers?.includes("token")) {
+      continue;
+    }
     for (const trigger of b.triggersOn) {
       if (eventsMatch(caused, trigger)) {
         // For damage events where the trigger requires specific source types
@@ -684,7 +684,7 @@ function detectTriggers(a: CardProfile, b: CardProfile): Interaction[] {
 
   // Oracle text fallback: detect trigger patterns the structured parser misses
   if (results.length === 0) {
-    results.push(...detectTriggersFromOraclePatterns(a, b, seen));
+    results.push(...detectTriggersFromOraclePatterns(a, b, seen, bHasOnlySelfETB));
   }
 
   return results;
@@ -704,7 +704,8 @@ function detectTriggers(a: CardProfile, b: CardProfile): Interaction[] {
 function detectTriggersFromOraclePatterns(
   a: CardProfile,
   b: CardProfile,
-  seen: Set<string>
+  seen: Set<string>,
+  bHasOnlySelfETB = false,
 ): Interaction[] {
   const results: Interaction[] = [];
   const aOracle = a.rawOracleText || "";
@@ -756,7 +757,8 @@ function detectTriggersFromOraclePatterns(
   }
 
   // A is an enchantment → B triggers on enchantment ETB (constellation)
-  if (a.cardTypes.includes("enchantment") && cardTriggersOnEnchantmentETB(b, bOracle)) {
+  // Skip if B only has self-ETB triggers — entering does not retrigger self-ETB
+  if (!bHasOnlySelfETB && a.cardTypes.includes("enchantment") && cardTriggersOnEnchantmentETB(b, bOracle)) {
     const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:enchantment`;
     if (!seen.has(dedupKey)) {
       seen.add(dedupKey);
@@ -771,7 +773,8 @@ function detectTriggersFromOraclePatterns(
   }
 
   // A is a creature → B triggers on creature ETB ("whenever another creature enters")
-  if (a.cardTypes.includes("creature") && cardTriggersOnCreatureETB(b, bOracle)) {
+  // Skip if B only has self-ETB triggers — another creature entering does not retrigger self-ETB
+  if (!bHasOnlySelfETB && a.cardTypes.includes("creature") && cardTriggersOnCreatureETB(b, bOracle)) {
     const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:creature_etb`;
     if (!seen.has(dedupKey)) {
       seen.add(dedupKey);
@@ -816,7 +819,8 @@ function detectTriggersFromOraclePatterns(
   }
 
   // A is a permanent → B triggers on permanent ETB ("whenever another permanent enters")
-  if (isPermanentCard(a.cardTypes) && cardTriggersOnPermanentETB(b, bOracle)) {
+  // Skip if B only has self-ETB triggers — another permanent entering does not retrigger self-ETB
+  if (!bHasOnlySelfETB && isPermanentCard(a.cardTypes) && cardTriggersOnPermanentETB(b, bOracle)) {
     const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:permanent_etb`;
     if (!seen.has(dedupKey)) {
       seen.add(dedupKey);
