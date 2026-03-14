@@ -67,8 +67,15 @@ export interface CastResult {
   bonusMana: number; // net ritual mana produced (0 for non-rituals)
 }
 
+export interface CardDraw {
+  name: string;
+  imageUri: string | null;
+  source: "draw-step" | "card-draw-spell";
+}
+
 export interface GoldfishTurnLog {
   turn: number;
+  cardsDrawn: CardDraw[];
   landPlayed: string | null;
   spellsCast: string[];
   manaAvailable: number;
@@ -608,6 +615,43 @@ function drawCard(state: GoldfishGameState): void {
 }
 
 /**
+ * Draw one card and return its info for tracking.
+ */
+function drawCardTracked(
+  state: GoldfishGameState
+): { name: string; imageUri: string | null } | null {
+  if (state.library.length === 0) return null;
+  const card = state.library.shift()!;
+  state.hand.push(card);
+  return {
+    name: card.name,
+    imageUri: card.enriched.imageUris?.normal ?? null,
+  };
+}
+
+/**
+ * Estimate how many cards a "Card Draw" spell draws from its oracle text.
+ * Returns 1-3 for most draw spells, capped at 3 for simulation simplicity.
+ */
+function estimateCardDrawCount(oracleText: string): number {
+  // "draw three cards" / "draw 3 cards"
+  const numMatch = oracleText.match(
+    /draw\s+(\w+)\s+cards?/i
+  );
+  if (numMatch) {
+    const wordToNum: Record<string, number> = {
+      a: 1, one: 1, two: 2, three: 3, four: 3, five: 3,
+      "1": 1, "2": 2, "3": 3,
+    };
+    const n = wordToNum[numMatch[1].toLowerCase()];
+    if (n) return Math.min(n, 3);
+  }
+  // "draw a card" → 1
+  if (/draw a card/i.test(oracleText)) return 1;
+  return 1; // default
+}
+
+/**
  * Play a land from hand onto the battlefield.
  */
 function playLand(state: GoldfishGameState, land: GoldfishCard): void {
@@ -693,9 +737,15 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
   // Untap
   untapAll(state);
 
+  // Track cards drawn this turn
+  const cardsDrawn: CardDraw[] = [];
+
   // Draw (skip first draw on the play)
   if (!(state.turn === 1 && config.onThePlay)) {
-    drawCard(state);
+    const drawn = drawCardTracked(state);
+    if (drawn) {
+      cardsDrawn.push({ ...drawn, source: "draw-step" });
+    }
   }
 
   // Compute mana available for this turn
@@ -728,10 +778,22 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
     const cmc = effectiveCmc(choice.card, state, choice.isCommander);
     if (cmc > remainingMana + ritualBonusMana) break;
 
-    const result = castSpell(state, choice.card, choice.isCommander);
-    spellsCast.push(choice.card.name);
+    const castCard = choice.card;
+    const result = castSpell(state, castCard, choice.isCommander);
+    spellsCast.push(castCard.name);
     manaUsed += cmc;
     ritualBonusMana += result.bonusMana;
+
+    // Simulate card draw effects from Card Draw spells
+    if (castCard.tags.includes("Card Draw")) {
+      const drawCount = estimateCardDrawCount(castCard.enriched.oracleText);
+      for (let d = 0; d < drawCount; d++) {
+        const drawn = drawCardTracked(state);
+        if (drawn) {
+          cardsDrawn.push({ ...drawn, source: "card-draw-spell" });
+        }
+      }
+    }
 
     // Always recompute remaining mana after every cast — handles mid-turn
     // mana rocks (untapped artifacts), summoning-sick dorks, and tapped lands
@@ -747,6 +809,7 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
 
   return {
     turn: state.turn,
+    cardsDrawn,
     landPlayed,
     spellsCast,
     manaAvailable: manaAvailableEndOfTurn,

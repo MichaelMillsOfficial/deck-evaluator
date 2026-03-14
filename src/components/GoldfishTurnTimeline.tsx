@@ -7,6 +7,7 @@ import type {
   GoldfishGameLog,
   GoldfishTurnLog,
   GoldfishOpeningHand,
+  CardDraw,
 } from "@/lib/goldfish-simulator";
 
 interface GoldfishTurnTimelineProps {
@@ -84,6 +85,14 @@ function OpeningHandDisplay({ hand }: { hand: GoldfishOpeningHand }) {
 
 function TurnSummary({ log }: { log: GoldfishTurnLog }) {
   const parts: string[] = [];
+  if (log.cardsDrawn.length > 0) {
+    const drawStepCount = log.cardsDrawn.filter((d) => d.source === "draw-step").length;
+    const spellDrawCount = log.cardsDrawn.length - drawStepCount;
+    const drawParts: string[] = [];
+    if (drawStepCount > 0) drawParts.push(`${drawStepCount} draw step`);
+    if (spellDrawCount > 0) drawParts.push(`${spellDrawCount} from spells`);
+    parts.push(`Drew ${log.cardsDrawn.length}`);
+  }
   if (log.landPlayed) parts.push(`Land: ${log.landPlayed}`);
   if (log.spellsCast.length > 0) {
     parts.push(
@@ -181,6 +190,36 @@ export default function GoldfishTurnTimeline({ game }: GoldfishTurnTimelineProps
                 <p className="font-semibold text-green-300">{log.permanentCount}</p>
               </div>
             </div>
+
+            {/* Cards drawn */}
+            {log.cardsDrawn.length > 0 && (
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Cards Drawn ({log.cardsDrawn.length})
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {log.cardsDrawn.map((draw: CardDraw, i: number) => (
+                    <div key={i} className="flex items-center gap-2 rounded bg-slate-900/50 px-2 py-1">
+                      {draw.imageUri && (
+                        <img
+                          src={draw.imageUri}
+                          alt={draw.name}
+                          width={32}
+                          height={45}
+                          className="rounded border border-slate-600"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm text-sky-300">{draw.name}</p>
+                        <p className="text-[10px] text-slate-500">
+                          {draw.source === "draw-step" ? "Draw step" : "Card draw spell"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Land played */}
             <div>
