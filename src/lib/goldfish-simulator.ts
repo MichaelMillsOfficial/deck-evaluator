@@ -48,6 +48,7 @@ export interface GoldfishGameState {
   commanderTaxPaid: number;
   turn: number;
   treasureCount: number;
+  rampLandsSearched: number; // lands fetched by ramp spells (not natural land drops)
 }
 
 export interface GoldfishConfig {
@@ -93,6 +94,7 @@ export interface GoldfishTurnLog {
   landPlayed: string | null;
   spellsCast: string[];
   manaAvailable: number;
+  manaFromLandsOnly: number;
   manaUsed: number;
   handSize: number;
   hand: string[]; // card names in hand at end of turn
@@ -308,6 +310,7 @@ export function simulateRampEffect(
       producedMana: syntheticLand.enriched.producedMana,
       enteredTurn: state.turn,
     });
+    state.rampLandsSearched++;
     // Shuffle library after searching
     state.library = shuffleArray(state.library);
     return 0; // tapped land produces no mana this turn
@@ -388,6 +391,7 @@ export function initializeGame(
     commanderTaxPaid: 0,
     turn: 0,
     treasureCount: 0,
+    rampLandsSearched: 0,
   };
 }
 
@@ -437,6 +441,24 @@ export function computeAvailableMana(state: GoldfishGameState): ManaPool {
   pool.C += state.treasureCount;
 
   return pool;
+}
+
+/**
+ * Compute the natural-land-drop mana baseline: untapped lands minus any
+ * lands that were fetched by ramp spells (which would not exist without ramp).
+ * This gives the mana the player would have from just playing one land per turn.
+ */
+function computeNaturalLandMana(state: GoldfishGameState): number {
+  let untappedLands = 0;
+  for (const permanent of state.battlefield) {
+    if (isLand(permanent.card.enriched) && !permanent.tapped) {
+      untappedLands++;
+    }
+  }
+  // Subtract ramp-searched lands (they might be tapped or untapped, but
+  // we conservatively subtract from the untapped total since the baseline
+  // should reflect only natural land drops)
+  return Math.max(0, untappedLands - state.rampLandsSearched);
 }
 
 // ---------------------------------------------------------------------------
@@ -1128,6 +1150,7 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
 
   // End-of-turn mana reflects ramp benefit (rocks, searched lands untap next turn)
   const manaAvailableEndOfTurn = sumManaPool(computeAvailableMana(state));
+  const landOnlyMana = computeNaturalLandMana(state);
 
   return {
     turn: state.turn,
@@ -1135,6 +1158,7 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
     landPlayed,
     spellsCast,
     manaAvailable: manaAvailableEndOfTurn,
+    manaFromLandsOnly: landOnlyMana,
     manaUsed,
     handSize: state.hand.length,
     hand: state.hand.map((c) => c.name),
@@ -1247,8 +1271,11 @@ export function computeAggregateStats(
   const avgHandSizeByTurn: number[] = [];
   const medianManaByTurn: number[] = [];
 
+  const avgLandOnlyManaByTurn: number[] = [];
+
   for (let t = 0; t < turns; t++) {
     const manaValues: number[] = [];
+    const landOnlyValues: number[] = [];
     let totalManaUsed = 0;
     let totalSpells = 0;
     let totalHandSize = 0;
@@ -1257,6 +1284,7 @@ export function computeAggregateStats(
       const log = game.turnLogs[t];
       if (!log) continue;
       manaValues.push(log.manaAvailable);
+      landOnlyValues.push(log.manaFromLandsOnly);
       totalManaUsed += log.manaUsed;
       totalSpells += log.spellsCast.length;
       totalHandSize += log.handSize;
@@ -1266,6 +1294,11 @@ export function computeAggregateStats(
     avgManaByTurn.push(
       validGames > 0
         ? Math.round((manaValues.reduce((a, b) => a + b, 0) / validGames) * 100) / 100
+        : 0
+    );
+    avgLandOnlyManaByTurn.push(
+      validGames > 0
+        ? Math.round((landOnlyValues.reduce((a, b) => a + b, 0) / validGames) * 100) / 100
         : 0
     );
     avgManaUsedByTurn.push(
@@ -1293,11 +1326,13 @@ export function computeAggregateStats(
         ) / gamesWithCommander.length
       : null;
 
-  // Ramp acceleration: avg mana at turn 4 minus expected baseline (turn number)
+  // Ramp acceleration: avg total mana at T4 minus avg land-only mana at T4.
+  // Both values come from the same simulation so variance cancels out.
   const t4Index = 3; // 0-based index for turn 4
   const avgManaT4 = avgManaByTurn[t4Index] ?? 0;
-  const baselineT4 = 4; // without ramp, you'd expect ~4 mana on T4
-  const rampAcceleration = Math.max(0, avgManaT4 - baselineT4);
+  const avgLandOnlyT4 = avgLandOnlyManaByTurn[t4Index] ?? 0;
+  const rampAcceleration =
+    Math.round(Math.max(0, avgManaT4 - avgLandOnlyT4) * 100) / 100;
 
   // Avg total spells cast per game
   const avgTotalSpellsCast =
@@ -1453,26 +1488,6 @@ export function runGoldfishSimulation(
 
   const stats = computeAggregateStats(games, config.turns);
   stats.rampSources = computeRampSources(pool, commandZone, games);
-
-  // Recompute ramp acceleration with a deck-aware baseline instead of
-  // the hardcoded "4" in computeAggregateStats.  Commander decks have
-  // lower land density and many ETB-tapped lands, so the naive baseline
-  // of 4 hides real ramp contributions.
-  const landCards = pool.filter((c) => isLand(c.enriched));
-  const landCount = landCards.length;
-  const deckSize = pool.length;
-  // By T4 on the play you've seen 10 cards (7 opening + 3 draws T2-T4)
-  const cardsSeen = 10;
-  const expectedLandDraws = deckSize > 0 ? cardsSeen * (landCount / deckSize) : 0;
-  const expectedLandDrops = Math.min(4, expectedLandDraws);
-  const tappedCount = landCards.filter(
-    (c) => classifyLandEntry(c.enriched) === "tapped"
-  ).length;
-  const untappedRatio = landCount > 0 ? 1 - tappedCount / landCount : 1;
-  const baselineT4 = expectedLandDrops * untappedRatio;
-  const avgManaT4 = stats.avgManaByTurn[3] ?? 0;
-  stats.rampAcceleration =
-    Math.round(Math.max(0, avgManaT4 - baselineT4) * 100) / 100;
 
   return { games, stats };
 }
