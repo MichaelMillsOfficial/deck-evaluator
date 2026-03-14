@@ -30,12 +30,28 @@ const MINUS_COUNTER = "minus_counter";
 const UNDYING_GRANT = "undying_grant";
 const PERSIST_KEYWORD = "persist_keyword";
 
+// ─── Artifact Resource Tokens (Epic 2.4) ───
+const ARTIFACT_ON_BF = "permanent_on_bf:artifact";
+const ARTIFACT_TO_GY = "permanent_to_gy:artifact";
+const TAP_PERMANENT = "tap:artifact";
+const UNTAP_PERMANENT = "untap:artifact";
+const ETB_ARTIFACT = "etb:artifact";
+
 function manaToken(color: string): string {
   return `mana_${color}`;
 }
 
 function isManaToken(token: string): boolean {
   return token.startsWith("mana_");
+}
+
+/**
+ * Check if a token is an artifact-related token.
+ */
+function isArtifactToken(token: string): boolean {
+  return token === ARTIFACT_ON_BF || token === ARTIFACT_TO_GY ||
+    token === TAP_PERMANENT || token === UNTAP_PERMANENT ||
+    token === ETB_ARTIFACT;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -165,9 +181,9 @@ export function extractLoopSteps(profile: CardProfile): LoopStep[] {
       if (tokenProducers.length > 0 && !isSacOutlet) {
         for (const tp of tokenProducers) {
           if ("category" in tp && tp.category === "create_token") {
-            const isT = tp.token?.name?.toLowerCase().includes("treasure") ||
+            const isTreasure = tp.token?.name?.toLowerCase().includes("treasure") ||
               tp.token?.subtypes?.some((s: string) => /treasure/i.test(String(s)));
-            if (isT) {
+            if (isTreasure) {
               steps.push(
                 step(
                   card,
@@ -181,6 +197,57 @@ export function extractLoopSteps(profile: CardProfile): LoopStep[] {
                 )
               );
             }
+
+            // Artifact creature tokens (Thopters, Wurms, Myr, Servos, etc.)
+            const tokenTypes = tp.token?.types?.map((t: string) => String(t).toLowerCase()) ?? [];
+            const isArtifactCreatureToken = tokenTypes.includes("artifact") && tokenTypes.includes("creature");
+            if (isArtifactCreatureToken) {
+              steps.push(
+                step(
+                  card,
+                  "creature dies → create artifact creature token",
+                  [req(CREATURE_DEATH, 1, filter)],
+                  [prod(ETB_ARTIFACT), prod(CREATURE_ON_BF)],
+                  [],
+                  "structured",
+                  types,
+                  subtypes
+                )
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 2b. ETB triggers that produce artifact creature tokens (Breya, Myr Battlesphere)
+  for (const trigger of profile.triggersOn) {
+    if (
+      trigger.kind === "zone_transition" &&
+      trigger.to === "battlefield"
+    ) {
+      const tokenProducers = profile.produces.filter(
+        (p) => "category" in p && p.category === "create_token"
+      );
+
+      for (const tp of tokenProducers) {
+        if ("category" in tp && tp.category === "create_token") {
+          const tokenTypes = tp.token?.types?.map((t: string) => String(t).toLowerCase()) ?? [];
+          const isArtifactCreatureToken = tokenTypes.includes("artifact") && tokenTypes.includes("creature");
+          if (isArtifactCreatureToken) {
+            steps.push(
+              step(
+                card,
+                "enters battlefield → create artifact creature token",
+                [req(CREATURE_ON_BF)],
+                [prod(ETB_ARTIFACT), prod(CREATURE_ON_BF)],
+                [],
+                "structured",
+                types,
+                subtypes
+              )
+            );
           }
         }
       }
@@ -392,6 +459,132 @@ export function extractLoopSteps(profile: CardProfile): LoopStep[] {
             subtypes
           )
         );
+      }
+    }
+  }
+
+  // --- Artifact structured extraction (Epic 2.4) ---
+
+  const isArtifact = types.some((t) => /artifact/i.test(t));
+  const isArtifactCreature = isArtifact && types.some((t) => /creature/i.test(t));
+
+  // 10. Artifact sacrifice outlets
+  for (const cost of profile.consumes) {
+    if (cost.costType === "sacrifice" && cost.object?.types?.some((t) => t === "artifact")) {
+      const filter = extractFilter(cost.object);
+
+      const manaProduced = profile.produces.filter(
+        (p) => "category" in p && p.category === "mana"
+      );
+
+      if (manaProduced.length > 0) {
+        for (const mp of manaProduced) {
+          if ("category" in mp && mp.category === "mana") {
+            const qty = typeof mp.quantity === "number" ? mp.quantity : 1;
+            const color = mp.color === "any" ? "any" : (mp.color ?? "C");
+            const productions: ResourceProduction[] = [
+              prod(ARTIFACT_TO_GY),
+              prod(manaToken(color), qty),
+            ];
+            steps.push(
+              step(
+                card,
+                `sacrifice artifact for ${color === "any" ? "any color" : `{${color}}`} mana`,
+                [req(ARTIFACT_ON_BF, 1, filter)],
+                productions,
+                [],
+                "structured",
+                types,
+                subtypes
+              )
+            );
+          }
+        }
+      } else {
+        steps.push(
+          step(
+            card,
+            "sacrifice artifact",
+            [req(ARTIFACT_ON_BF, 1, filter)],
+            [prod(ARTIFACT_TO_GY)],
+            [],
+            "structured",
+            types,
+            subtypes
+          )
+        );
+      }
+    }
+  }
+
+  // 11. Artifact death/GY triggers
+  for (const trigger of profile.triggersOn) {
+    if (trigger.kind !== "zone_transition" || trigger.to !== "graveyard") continue;
+    const triggerTypes = trigger.object?.types?.map((t) => String(t)) ?? [];
+    const isArtifactTrigger = triggerTypes.some((t) => t === "artifact");
+    if (!isArtifactTrigger) continue;
+
+    const filter = extractFilter(trigger.object);
+    const isSacOutlet = profile.consumes.some(
+      (c) => c.costType === "sacrifice" && c.object?.types?.some((t) => t === "artifact")
+    );
+
+    if (!isSacOutlet) {
+      // Generic artifact-to-GY trigger step (effects handled by oracle fallback)
+      steps.push(
+        step(
+          card,
+          "artifact goes to graveyard trigger",
+          [req(ARTIFACT_TO_GY, 1, filter)],
+          [], // Productions filled by oracle fallback
+          [],
+          "structured",
+          types,
+          subtypes
+        )
+      );
+    }
+  }
+
+  // 12. Tap-cost activated abilities on artifacts
+  if (isArtifact) {
+    for (const ability of profile.abilities) {
+      if (ability.abilityType !== "activated") continue;
+      const costs = ability.costs ?? [];
+      const hasTapCost = costs.some((c) => c.costType === "tap");
+      if (!hasTapCost) continue;
+
+      const manaReqs: ResourceRequirement[] = [];
+      for (const c of costs) {
+        if (c.costType === "mana") {
+          parseManaRequirements(c.mana, manaReqs);
+        }
+      }
+
+      // Check for mana production
+      const manaProduced = profile.produces.filter(
+        (p) => "category" in p && p.category === "mana"
+      );
+
+      if (manaProduced.length > 0) {
+        for (const mp of manaProduced) {
+          if ("category" in mp && mp.category === "mana") {
+            const qty = typeof mp.quantity === "number" ? mp.quantity : 1;
+            const color = mp.color === "any" ? "any" : (mp.color ?? "C");
+            steps.push(
+              step(
+                card,
+                `tap for ${color === "any" ? "any color" : `{${color}}`} mana`,
+                manaReqs,
+                [prod(TAP_PERMANENT), prod(manaToken(color), qty)],
+                [],
+                "structured",
+                types,
+                subtypes
+              )
+            );
+          }
+        }
       }
     }
   }
@@ -650,6 +843,185 @@ function extractFromOracleText(profile: CardProfile, steps: LoopStep[]): void {
       );
     }
   }
+
+  // ─── Artifact Oracle Fallback (Epic 2.4) ───
+
+  // Artifact sacrifice outlets: "Sacrifice an artifact:" or "Sacrifice an artifact creature:"
+  const artifactSacMatch = oracle.match(
+    /Sacrifice (an?|another)\s+artifact(?:\s+creature)?[^.]*?:(.*?)(?:\.|$)/i
+  );
+  if (artifactSacMatch && !alreadyProduces(ARTIFACT_TO_GY)) {
+    const effectText = artifactSacMatch[2] ?? "";
+    const manaMatch = effectText.match(/Add \{([^}]+)\}(?:\{([^}]+)\})?/i);
+    const anyManaMatch = effectText.match(/Add one mana of any color/i);
+
+    const productions: ResourceProduction[] = [prod(ARTIFACT_TO_GY)];
+    // If sacrificing an artifact creature, also produce creature_death
+    if (/artifact creature/i.test(artifactSacMatch[0])) {
+      productions.push(prod(CREATURE_DEATH));
+    }
+
+    if (manaMatch) {
+      const sym1 = manaMatch[1];
+      const color1 = sym1 === "C" ? "C" : sym1;
+      productions.push(prod(manaToken(color1)));
+      if (manaMatch[2]) {
+        const sym2 = manaMatch[2];
+        const color2 = sym2 === "C" ? "C" : sym2;
+        productions.push(prod(manaToken(color2)));
+      }
+      steps.push(
+        step(card, `sacrifice artifact for mana`, [req(ARTIFACT_ON_BF)], productions, [], "oracle", types, subtypes)
+      );
+    } else if (anyManaMatch) {
+      productions.push(prod(manaToken("any")));
+      steps.push(
+        step(card, "sacrifice artifact for any mana", [req(ARTIFACT_ON_BF)], productions, [], "oracle", types, subtypes)
+      );
+    } else {
+      steps.push(
+        step(card, "sacrifice artifact", [req(ARTIFACT_ON_BF)], productions, [], "oracle", types, subtypes)
+      );
+    }
+  }
+
+  // Artifact death/GY triggers: "Whenever an artifact creature dies" or "Whenever an artifact ... is put into a graveyard"
+  const artifactDeathMatch = oracle.match(
+    /Whenever (?:an?|another)\s+artifact(?:\s+creature)?\s+(?:you control\s+)?(?:dies|is put into a graveyard from the battlefield)/i
+  );
+  if (artifactDeathMatch) {
+    const isCreatureDeath = /artifact creature.*dies/i.test(oracle);
+    const triggerToken = isCreatureDeath ? CREATURE_DEATH : ARTIFACT_TO_GY;
+
+    // Check for untap effects
+    if (/untap target artifact/i.test(oracle) || /untap all artifacts/i.test(oracle)) {
+      if (!alreadyProduces(UNTAP_PERMANENT)) {
+        steps.push(
+          step(card, "artifact dies → untap artifact", [req(triggerToken)], [prod(UNTAP_PERMANENT)], [], "oracle", types, subtypes)
+        );
+      }
+    }
+
+    // Also add a generic artifact-to-GY trigger if not already present
+    if (!steps.some((s) => s.card === card && s.requires.some((r) => r.token === ARTIFACT_TO_GY))) {
+      steps.push(
+        step(card, "artifact to graveyard trigger", [req(ARTIFACT_TO_GY)], [], [], "oracle", types, subtypes)
+      );
+    }
+  }
+
+  // Untap artifact patterns: "untap target artifact", "Untap all artifacts you control"
+  if (/[Uu]ntap target artifact/i.test(oracle) && !alreadyProduces(UNTAP_PERMANENT)) {
+    // Already handled if from a death trigger above, but catch standalone cases
+    if (!steps.some((s) => s.card === card && s.produces.some((p) => p.token === UNTAP_PERMANENT))) {
+      steps.push(
+        step(card, "untap artifact", [], [prod(UNTAP_PERMANENT)], [], "oracle", types, subtypes)
+      );
+    }
+  }
+
+  // Clock of Omens pattern: "Tap two untapped artifacts you control: Untap target artifact."
+  const clockMatch = oracle.match(/Tap (?:two|2) untapped artifacts you control.*?[Uu]ntap target artifact/i);
+  if (clockMatch && !alreadyProduces(UNTAP_PERMANENT)) {
+    steps.push(
+      step(card, "tap two artifacts → untap artifact", [req(TAP_PERMANENT, 2)], [prod(UNTAP_PERMANENT)], [], "oracle", types, subtypes)
+    );
+  }
+
+  // Tap-for-mana on artifacts (oracle fallback for "{T}: Add" patterns)
+  const isArtifactType = types.some((t) => /artifact/i.test(t));
+  if (isArtifactType) {
+    const tapManaMatch = oracle.match(/\{T\}.*?:\s*Add\s+(\{[^}]+\}(?:\{[^}]+\})*)/i);
+    if (tapManaMatch && !alreadyProduces(TAP_PERMANENT)) {
+      const manaCostStr = tapManaMatch[1];
+      const manaProds: ResourceProduction[] = [prod(TAP_PERMANENT)];
+      const symbolRegex = /\{([^}]+)\}/g;
+      let m;
+      while ((m = symbolRegex.exec(manaCostStr)) !== null) {
+        const sym = m[1];
+        if (/^[WUBRGC]$/.test(sym)) {
+          manaProds.push(prod(manaToken(sym)));
+        } else if (sym === "C") {
+          manaProds.push(prod(manaToken("C")));
+        }
+      }
+      if (manaProds.length > 1) {
+        steps.push(
+          step(card, "tap for mana", [], manaProds, [], "oracle", types, subtypes)
+        );
+      }
+    }
+
+    // Untap self ability: "{N}: Untap ~" pattern
+    const untapSelfMatch = oracle.match(/\{(\d+)\}.*?:\s*Untap/i);
+    if (untapSelfMatch && !alreadyProduces(UNTAP_PERMANENT)) {
+      const cost = parseInt(untapSelfMatch[1], 10);
+      const manaReqs: ResourceRequirement[] = [];
+      if (cost > 0) manaReqs.push(req(manaToken("generic"), cost));
+      steps.push(
+        step(card, "untap self", manaReqs, [prod(UNTAP_PERMANENT)], [], "oracle", types, subtypes)
+      );
+    }
+  }
+
+  // Nim Deathmantle pattern: "Whenever a nontoken creature dies, you may pay {N}. If you do, return that card to the battlefield"
+  const deathmantleMatch = oracle.match(
+    /Whenever a (nontoken )?creature dies.*?you may pay \{(\d+)\}.*?return (?:that card|it) to the battlefield/i
+  );
+  if (deathmantleMatch) {
+    const isNontoken = !!deathmantleMatch[1];
+    const manaCost = parseInt(deathmantleMatch[2], 10);
+    const deathFilter: ObjectFilter | undefined = isNontoken ? { isToken: false } : undefined;
+    const manaReqs: ResourceRequirement[] = [req(CREATURE_DEATH, 1, deathFilter)];
+    if (manaCost > 0) manaReqs.push(req(manaToken("generic"), manaCost));
+
+    const productions: ResourceProduction[] = [prod(CREATURE_ON_BF)];
+    // If returning an artifact creature, also produce ETB_ARTIFACT
+    productions.push(prod(ETB_ARTIFACT));
+
+    steps.push(
+      step(card, "creature dies → pay to return", manaReqs, productions, [], "oracle", types, subtypes)
+    );
+  }
+
+  // Myr Retriever pattern: "When ~ dies, return another artifact card from your graveyard to your hand"
+  const retrieverMatch = oracle.match(
+    /When .+ dies, return another artifact card from your graveyard to your hand/i
+  );
+  if (retrieverMatch) {
+    steps.push(
+      step(card, "dies → return artifact to hand", [req(CREATURE_DEATH)], [prod(ARTIFACT_TO_GY)], [], "oracle", types, subtypes)
+    );
+  }
+
+  // ─── Artifact Creature Token Creation (Oracle Fallback) ───
+
+  // Death → artifact creature token (Wurmcoil Engine)
+  if (/(When|Whenever).*dies.*create.*artifact creature token/i.test(oracle)) {
+    if (!steps.some((s) => s.card === card && s.action === "creature dies → create artifact creature token")) {
+      steps.push(
+        step(card, "creature dies → create artifact creature token", [req(CREATURE_DEATH)], [prod(ETB_ARTIFACT), prod(CREATURE_ON_BF)], [], "oracle", types, subtypes)
+      );
+    }
+  }
+
+  // ETB → artifact creature token (Breya, Myr Battlesphere)
+  if (/(When|Whenever).*enters the battlefield.*create.*artifact creature token/i.test(oracle)) {
+    if (!steps.some((s) => s.card === card && s.action === "enters battlefield → create artifact creature token")) {
+      steps.push(
+        step(card, "enters battlefield → create artifact creature token", [req(CREATURE_ON_BF)], [prod(ETB_ARTIFACT), prod(CREATURE_ON_BF)], [], "oracle", types, subtypes)
+      );
+    }
+  }
+
+  // Sacrifice → artifact creature token (Thopter Foundry)
+  if (/Sacrifice.*:.*[Cc]reate.*artifact creature token/i.test(oracle)) {
+    if (!steps.some((s) => s.card === card && s.action === "sacrifice → create artifact creature token")) {
+      steps.push(
+        step(card, "sacrifice → create artifact creature token", [req(ARTIFACT_ON_BF)], [prod(ETB_ARTIFACT), prod(CREATURE_ON_BF)], [], "oracle", types, subtypes)
+      );
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -671,6 +1043,23 @@ function addImplicitSteps(steps: LoopStep[]): LoopStep[] {
         "sacrifice for mana",
         [req(TREASURE_TOKEN)],
         [prod(manaToken("any"))],
+        [],
+        "structured"
+      )
+    );
+  }
+
+  // Artifact implicit conversions: ETB_ARTIFACT → ARTIFACT_ON_BF
+  const hasArtifactETB = steps.some((s) =>
+    s.produces.some((p) => p.token === ETB_ARTIFACT)
+  );
+  if (hasArtifactETB) {
+    steps.push(
+      step(
+        "(Artifact ETB)",
+        "artifact enters → on battlefield",
+        [req(ETB_ARTIFACT)],
+        [prod(ARTIFACT_ON_BF)],
         [],
         "structured"
       )
@@ -868,10 +1257,70 @@ function validateFilters(subset: LoopStep[]): boolean {
 // CHAIN SOLVER
 // ═══════════════════════════════════════════════════════════════
 
+/** Budget counter for subset enumeration. */
+interface BudgetCounter {
+  count: number;
+  limit: number;
+  exceeded: boolean;
+}
+
+/**
+ * Build a connectivity graph: steps that share at least one token (produced by one,
+ * required by the other) are connected. Returns indices of connected steps only.
+ */
+function filterConnectedSteps(steps: LoopStep[]): LoopStep[] {
+  if (steps.length <= 6) return steps;
+
+  // Build token-flow adjacency: step i connects to step j if i produces something j requires or vice versa
+  const connected = new Set<number>();
+
+  for (let i = 0; i < steps.length; i++) {
+    for (let j = i + 1; j < steps.length; j++) {
+      let linked = false;
+      // Check if i's productions match j's requirements
+      for (const p of [...steps[i].produces, ...steps[i].blocking]) {
+        for (const r of steps[j].requires) {
+          if (tokensMatch(p.token, r.token)) { linked = true; break; }
+        }
+        if (linked) break;
+      }
+      // Check reverse
+      if (!linked) {
+        for (const p of [...steps[j].produces, ...steps[j].blocking]) {
+          for (const r of steps[i].requires) {
+            if (tokensMatch(p.token, r.token)) { linked = true; break; }
+          }
+          if (linked) break;
+        }
+      }
+      if (linked) {
+        connected.add(i);
+        connected.add(j);
+      }
+    }
+  }
+
+  return [...connected].sort((a, b) => a - b).map((i) => steps[i]);
+}
+
+/**
+ * Check if a step involves artifact tokens (either requires or produces).
+ */
+function involvesArtifactTokens(s: LoopStep): boolean {
+  return s.requires.some((r) => isArtifactToken(r.token)) ||
+    s.produces.some((p) => isArtifactToken(p.token)) ||
+    s.blocking.some((b) => isArtifactToken(b.token)) ||
+    (s.cardTypes?.some((t) => /artifact/i.test(t)) ?? false);
+}
+
 /**
  * Find all valid loop chains from a set of steps.
  * A valid chain has: all requires satisfied, all blocking outputs consumed,
  * and at least one circular dependency.
+ *
+ * Uses split-pass enumeration: creature-only steps (max 10) and
+ * artifact-involving steps (max 6), with connectivity pre-filter
+ * and budget cutoff at 50,000 evaluations.
  */
 export function solveChain(steps: LoopStep[]): LoopStep[][] {
   if (steps.length < 2) return [];
@@ -881,21 +1330,44 @@ export function solveChain(steps: LoopStep[]): LoopStep[][] {
 
   const results: LoopStep[][] = [];
   const seen = new Set<string>();
+  const budget: BudgetCounter = { count: 0, limit: 50_000, exceeded: false };
 
-  // Enumerate subsets of steps (2 to min(steps.length, 10))
-  const maxSubset = Math.min(steps.length, 10);
+  // Pre-filter: only include steps connected to at least one other step
+  const connected = filterConnectedSteps(steps);
+  if (connected.length < 2) return [];
 
-  for (let size = 2; size <= maxSubset; size++) {
-    enumerateSubsets(steps, size, 0, [], (subset) => {
-      // Deduplicate by sorted card set
-      const cardKey = [...new Set(subset.map((s) => s.card))].sort().join("+");
-      if (seen.has(cardKey)) return;
+  // Split-pass enumeration: separate creature-only and artifact-involving steps
+  const artifactSteps = connected.filter(involvesArtifactTokens);
+  const creatureOnlySteps = connected.filter((s) => !involvesArtifactTokens(s));
 
-      if (isValidChain(subset)) {
-        seen.add(cardKey);
-        results.push([...subset]);
-      }
-    });
+  const enumeratePass = (passSteps: LoopStep[], maxSize: number) => {
+    if (passSteps.length < 2) return;
+    const limit = Math.min(passSteps.length, maxSize);
+
+    for (let size = 2; size <= limit; size++) {
+      if (budget.exceeded) break;
+      enumerateSubsets(passSteps, size, 0, [], budget, (subset) => {
+        const cardKey = [...new Set(subset.map((s) => s.card))].sort().join("+");
+        if (seen.has(cardKey)) return;
+
+        if (isValidChain(subset)) {
+          seen.add(cardKey);
+          results.push([...subset]);
+        }
+      });
+    }
+  };
+
+  // Pass 1: creature-only steps (max subset 10)
+  enumeratePass(creatureOnlySteps, 10);
+
+  // Pass 2: artifact-involving steps (max subset 6)
+  enumeratePass(artifactSteps, 6);
+
+  // Pass 3: mixed steps — try combining artifact and creature steps
+  // Only if both exist and budget remains
+  if (!budget.exceeded && artifactSteps.length > 0 && creatureOnlySteps.length > 0) {
+    enumeratePass(connected, 6);
   }
 
   return results;
@@ -906,9 +1378,17 @@ function enumerateSubsets(
   targetSize: number,
   startIdx: number,
   current: LoopStep[],
+  budget: BudgetCounter,
   callback: (subset: LoopStep[]) => void
 ): void {
+  if (budget.exceeded) return;
+
   if (current.length === targetSize) {
+    budget.count++;
+    if (budget.count >= budget.limit) {
+      budget.exceeded = true;
+      return;
+    }
     callback(current);
     return;
   }
@@ -916,8 +1396,9 @@ function enumerateSubsets(
   if (steps.length - startIdx < targetSize - current.length) return;
 
   for (let i = startIdx; i < steps.length; i++) {
+    if (budget.exceeded) return;
     current.push(steps[i]);
-    enumerateSubsets(steps, targetSize, i + 1, current, callback);
+    enumerateSubsets(steps, targetSize, i + 1, current, budget, callback);
     current.pop();
   }
 }
@@ -1014,6 +1495,12 @@ function tokensMatch(produced: string, required: string): boolean {
   if (produced === manaToken("any") && isManaToken(required)) return true;
   // Any specific mana matches generic
   if (isManaToken(produced) && required === manaToken("generic")) return true;
+  // Parameterized token matching: "creature_death:artifact" matches "creature_death"
+  // A qualified token satisfies an unqualified requirement of the same base
+  if (produced.includes(":") && !required.includes(":")) {
+    const base = produced.split(":")[0];
+    if (base === required) return true;
+  }
   return false;
 }
 
@@ -1196,7 +1683,7 @@ function chainToLoop(
   profiles: CardProfile[]
 ): InteractionLoop {
   const cards = [...new Set(chain.map((s) => s.card))].filter(
-    (c) => c !== "(Treasure)"
+    (c) => c !== "(Treasure)" && c !== "(Artifact ETB)"
   );
 
   const steps: InteractionChain["steps"] = [];
