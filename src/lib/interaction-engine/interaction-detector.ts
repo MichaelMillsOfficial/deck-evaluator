@@ -36,8 +36,10 @@ import type {
   SacrificeCost,
   ZoneTransition,
 } from "./types";
+import type { EnrichedCard } from "../types";
 import { PERMANENT_TYPES, matchesCompositeType } from "./game-model";
 import { detectLoopsFromChains } from "./loop-chain-solver";
+import { adjustInteractionStrengths } from "./satisfiability-analyzer";
 
 // ═══════════════════════════════════════════════════════════════
 // PUBLIC API
@@ -90,7 +92,8 @@ function deduplicateInteractions(interactions: Interaction[]): Interaction[] {
 function buildAnalysisResult(
   profileMap: Record<string, CardProfile>,
   interactions: Interaction[],
-  profiles: CardProfile[]
+  profiles: CardProfile[],
+  deckCards?: EnrichedCard[]
 ): InteractionAnalysis {
   // Global dedup: keep highest-strength interaction per (type, cardA, cardB) triple
   interactions = deduplicateInteractions(interactions);
@@ -100,6 +103,13 @@ function buildAnalysisResult(
   // results that would pollute chains, loops, and enablers.
   const MIN_PAIRWISE_STRENGTH = 0.5;
   interactions = interactions.filter((i) => i.strength >= MIN_PAIRWISE_STRENGTH);
+
+  // Step 2.5: Satisfiability analysis — adjust strengths based on deck composition
+  if (deckCards && deckCards.length > 0) {
+    interactions = adjustInteractionStrengths(interactions, profileMap, deckCards);
+    // Re-apply quality gate after strength adjustment
+    interactions = interactions.filter((i) => i.strength >= MIN_PAIRWISE_STRENGTH);
+  }
 
   // Derive conflicts from blocks (bidirectional view of blocking)
   interactions.push(...deriveConflicts(interactions));
@@ -122,7 +132,10 @@ function buildAnalysisResult(
   };
 }
 
-export function findInteractions(profiles: CardProfile[]): InteractionAnalysis {
+export function findInteractions(
+  profiles: CardProfile[],
+  deckCards?: EnrichedCard[]
+): InteractionAnalysis {
   const profileMap: Record<string, CardProfile> = {};
   for (const p of profiles) {
     if (!profileMap[p.cardName]) {
@@ -139,7 +152,7 @@ export function findInteractions(profiles: CardProfile[]): InteractionAnalysis {
     }
   }
 
-  return buildAnalysisResult(profileMap, interactions, profiles);
+  return buildAnalysisResult(profileMap, interactions, profiles, deckCards);
 }
 
 /**
@@ -148,11 +161,13 @@ export function findInteractions(profiles: CardProfile[]): InteractionAnalysis {
  *
  * @param onProgress - Called with (0-1) progress during pair detection
  * @param cancelled  - Function returning true if computation should abort
+ * @param deckCards  - Optional enriched card list for satisfiability scoring
  */
 export async function findInteractionsAsync(
   profiles: CardProfile[],
   onProgress?: (progress: number) => void,
-  cancelled?: () => boolean
+  cancelled?: () => boolean,
+  deckCards?: EnrichedCard[]
 ): Promise<InteractionAnalysis> {
   const profileMap: Record<string, CardProfile> = {};
   for (const p of profiles) {
@@ -172,7 +187,7 @@ export async function findInteractionsAsync(
   for (let i = 0; i < profiles.length; i++) {
     for (let j = i + 1; j < profiles.length; j++) {
       if (cancelled?.()) {
-        return buildAnalysisResult(profileMap, interactions, profiles);
+        return buildAnalysisResult(profileMap, interactions, profiles, deckCards);
       }
 
       interactions.push(...detectPairInteractions(profiles[i], profiles[j]));
@@ -188,7 +203,7 @@ export async function findInteractionsAsync(
   onProgress?.(1);
   await yield_();
 
-  return buildAnalysisResult(profileMap, interactions, profiles);
+  return buildAnalysisResult(profileMap, interactions, profiles, deckCards);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2027,22 +2042,42 @@ function detectReducesCost(a: CardProfile, b: CardProfile): Interaction[] {
   return results;
 }
 
+/** Known card types for cost reduction qualifier matching */
+const COST_REDUCTION_CARD_TYPES = new Set([
+  "creature", "artifact", "enchantment", "instant", "sorcery", "planeswalker",
+]);
+
+/**
+ * Check if a cost reduction qualifier (e.g. "artifact and enchantment", "creature",
+ * "goblin") matches card B. Handles multi-word qualifiers with "and"/"or".
+ * Card types are checked against cardTypes, tribal names against subtypes.
+ */
+function costReductionQualifierMatchesCard(qualifier: string, b: CardProfile): boolean {
+  const parts = qualifier.split(/\s+(?:and|or)\s+/).map((s) => s.trim().toLowerCase());
+  const bTypesLower = b.cardTypes.map((t) => t.toLowerCase());
+  const bSubtypesLower = (b.subtypes || []).map((s) => s.toLowerCase());
+
+  return parts.some((part) => {
+    if (COST_REDUCTION_CARD_TYPES.has(part)) {
+      return bTypesLower.includes(part);
+    }
+    // Tribal name (Goblin, Elf, Wizard, etc.) — check subtypes
+    return bSubtypesLower.includes(part);
+  });
+}
+
 /**
  * Oracle text cross-check for cost reduction targets.
  * When the structured parser gives a wildcard target, verify that
  * the oracle text's subtype/type constraints match card B.
  */
 function oracleCostReductionTargetMatches(oracle: string, b: CardProfile): boolean {
-  // Check for tribal pattern: "[Subtype] spells you cast cost less"
-  const tribalMatch = oracle.match(/(\w+) spells (?:you cast )?cost \{\d+\} less/i);
+  // Match multi-word type qualifiers: "Artifact and enchantment spells", "Creature spells", etc.
+  const tribalMatch = oracle.match(/([\w]+(?:\s+(?:and|or)\s+\w+)*)\s+spells\s+(?:you cast\s+)?cost\s+\{\d+\}\s+less/i);
   if (tribalMatch) {
-    const tribeName = tribalMatch[1].toLowerCase();
-    // "Spells" is universal, "Creature spells" is type-filtered
-    if (tribeName === "spells") return !b.cardTypes.includes("land");
-    if (tribeName === "creature") return b.cardTypes.includes("creature");
-    // Tribal name (Goblin, Elf, etc.) — check subtypes
-    const bSubtypesLower = (b.subtypes || []).map((s) => s.toLowerCase());
-    return bSubtypesLower.includes(tribeName);
+    const qualifier = tribalMatch[1].toLowerCase();
+    if (qualifier === "spells") return !b.cardTypes.includes("land");
+    return costReductionQualifierMatchesCard(qualifier, b);
   }
   // No specific constraint found
   return true;
@@ -2051,37 +2086,23 @@ function oracleCostReductionTargetMatches(oracle: string, b: CardProfile): boole
 function detectReducesCostFromOracle(a: CardProfile, b: CardProfile): Interaction | null {
   const oracle = a.rawOracleText!;
 
-  // Tribal cost reduction: "[Subtype] spells you cast cost {1} less"
+  // Type/tribal cost reduction: "[Type] spells you cast cost {1} less"
+  // Handles multi-word qualifiers: "Artifact and enchantment spells"
   // Check BEFORE universal pattern to prevent "Goblin spells" matching as universal
-  const tribalMatch = oracle.match(/(\w+) spells (?:you cast )?cost \{(\d+)\} less/i);
+  const tribalMatch = oracle.match(/([\w]+(?:\s+(?:and|or)\s+\w+)*)\s+spells\s+(?:you cast\s+)?cost\s+\{(\d+)\}\s+less/i);
   if (tribalMatch) {
-    const tribeName = tribalMatch[1].toLowerCase();
-    if (tribeName === "creature") {
-      // Creature-type cost reduction
-      if (b.cardTypes.includes("creature")) {
+    const qualifier = tribalMatch[1].toLowerCase();
+    if (qualifier !== "spells") {
+      if (costReductionQualifierMatchesCard(qualifier, b)) {
         return {
           cards: [a.cardName, b.cardName],
           type: "reduces_cost",
           strength: 0.7,
-          mechanical: `${a.cardName} reduces creature spell costs, including ${b.cardName}`,
-          events: [],
-        };
-      }
-      return null; // Creature-only reduction, B is not a creature
-    }
-    if (tribeName !== "spells") {
-      // Specific tribe reduction (Goblin, Elf, Wizard, etc.)
-      const bSubtypesLower = (b.subtypes || []).map((s) => s.toLowerCase());
-      if (bSubtypesLower.includes(tribeName)) {
-        return {
-          cards: [a.cardName, b.cardName],
-          type: "reduces_cost",
-          strength: 0.8,
           mechanical: `${a.cardName} reduces ${tribalMatch[1]} spell costs, including ${b.cardName}`,
           events: [],
         };
       }
-      return null; // Tribal reduction, B is not the right tribe
+      return null; // Type/tribal reduction, B doesn't match
     }
   }
 
@@ -3144,222 +3165,27 @@ function buildChain(
  * 2. The cycle involves "enables" or "triggers" interactions
  * 3. Net resource computation determines if the loop is infinite
  */
-const MAX_LOOPS = 50;
-
 function detectLoops(
-  interactions: Interaction[],
+  _interactions: Interaction[],
   profiles: CardProfile[]
 ): InteractionLoop[] {
   if (profiles.length < 2) return [];
 
-  // Build adjacency from causal interactions
-  const causalTypes = new Set<string>(["enables", "triggers", "recurs"]);
-  const adjacency = new Map<string, Map<string, Interaction[]>>();
-
-  for (const inter of interactions) {
-    if (!causalTypes.has(inter.type)) continue;
-    if (inter.strength < 0.3) continue; // Skip weak edges
-    const from = inter.cards[0];
-    const to = inter.cards[1];
-    if (!adjacency.has(from)) adjacency.set(from, new Map());
-    if (!adjacency.get(from)!.has(to)) adjacency.get(from)!.set(to, []);
-    adjacency.get(from)!.get(to)!.push(inter);
-  }
-
-  const loops: InteractionLoop[] = [];
-  const seen = new Set<string>();
-
-  // Find cycles using DFS from each node
-  for (const startCard of adjacency.keys()) {
-    if (loops.length >= MAX_LOOPS) break;
-    findCycles(startCard, [startCard], adjacency, loops, seen, profiles);
-  }
-
-  // Second pass: action-chain solver catches loops the graph-cycle approach misses
-  // (e.g., intermediary resources, self-loops via granted keywords, replacement effects)
-  const chainLoops = detectLoopsFromChains(profiles);
-  for (const cl of chainLoops) {
-    const key = [...cl.cards].sort().join("+");
-    if (!seen.has(key)) {
-      seen.add(key);
-      loops.push(cl);
-    }
-  }
-
-  return loops;
-}
-
-function findCycles(
-  start: string,
-  path: string[],
-  adjacency: Map<string, Map<string, Interaction[]>>,
-  loops: InteractionLoop[],
-  seen: Set<string>,
-  profiles: CardProfile[]
-): void {
-  if (loops.length >= MAX_LOOPS) return;
-
-  const current = path[path.length - 1];
-  const neighbors = adjacency.get(current);
-  if (!neighbors) return;
-
-  for (const [next] of neighbors) {
-    if (loops.length >= MAX_LOOPS) return;
-
-    if (next === start && path.length >= 2) {
-      // Found a cycle back to start
-      const key = [...path].sort().join("+");
-      if (!seen.has(key)) {
-        seen.add(key);
-        loops.push(buildLoop(path, start, adjacency, profiles));
-      }
-    } else if (!path.includes(next) && path.length < 5) {
-      findCycles(start, [...path, next], adjacency, loops, seen, profiles);
-    }
-  }
+  // Use only the resource-aware chain solver for loop detection.
+  // The previous graph-based DFS (Pass 1) followed enables/triggers edges to
+  // find cycles, but it had no resource feasibility validation — producing false
+  // loops where sacrifice costs were wrong (Breya needs 2 artifacts, not 1),
+  // activation costs were impractical (Bolas's Citadel needs 10 permanents),
+  // or self-sacrificing permanents appeared in loops (Buried Ruin destroys itself).
+  // The chain solver validates that each step's resource requirements are satisfied
+  // by the previous step's production, eliminating these false positives.
+  return detectLoopsFromChains(profiles);
 }
 
 function profilesByName(profiles: CardProfile[]): Map<string, CardProfile> {
   const map = new Map<string, CardProfile>();
   for (const p of profiles) map.set(p.cardName, p);
   return map;
-}
-
-function buildLoop(
-  path: string[],
-  start: string,
-  adjacency: Map<string, Map<string, Interaction[]>>,
-  profiles: CardProfile[]
-): InteractionLoop {
-  const steps: InteractionChain["steps"] = [];
-  const fullPath = [...path, start]; // close the cycle
-
-  for (let i = 0; i < fullPath.length - 1; i++) {
-    const from = fullPath[i];
-    const to = fullPath[i + 1];
-    const inters = adjacency.get(from)?.get(to) || [];
-    const best = inters[0];
-    steps.push({
-      from,
-      to,
-      event: best?.events[0] || {
-        kind: "zone_transition" as const,
-        to: "battlefield" as const,
-        object: { types: [], quantity: "one" as const, modifiers: [] },
-      },
-      description: best?.mechanical || `${from} interacts with ${to}`,
-      interactionType: best?.type || "enables",
-    });
-  }
-
-  // Compute net effect
-  const netEffect = computeNetEffect(path, profiles);
-
-  // Determine if infinite: loop is infinite if it produces all resources
-  // it consumes (net non-negative for all resource types)
-  const isInfinite = checkInfinite(path, profiles);
-
-  return {
-    cards: path,
-    description: `Loop: ${path.join(" → ")} → ${start}`,
-    steps,
-    netEffect,
-    isInfinite,
-  };
-}
-
-function computeNetEffect(
-  loopCards: string[],
-  profiles: CardProfile[]
-): InteractionLoop["netEffect"] {
-  const resources: PlayerResource[] = [];
-  const attributes: ObjectAttribute[] = [];
-  const events: GameEvent[] = [];
-  const pMap = profilesByName(profiles);
-
-  for (const cardName of loopCards) {
-    const p = pMap.get(cardName);
-    if (!p) continue;
-
-    // Collect produced resources
-    for (const prod of p.produces) {
-      if (prod.category === "mana" || prod.category === "life" || prod.category === "cards") {
-        resources.push(prod);
-      } else if (prod.category === "counter" || prod.category === "stat_mod" || prod.category === "keyword_grant") {
-        attributes.push(prod);
-      } else if (prod.category === "create_token") {
-        // Token creation causes an ETB event
-        events.push({
-          kind: "zone_transition",
-          to: "battlefield",
-          object: { types: ["creature"], quantity: "one", modifiers: [] },
-        });
-      }
-    }
-
-    // Collect caused events
-    for (const event of p.causesEvents) {
-      events.push(event);
-    }
-  }
-
-  return { resources, attributes, events };
-}
-
-function checkInfinite(
-  loopCards: string[],
-  profiles: CardProfile[]
-): boolean {
-  // A loop is infinite if the mana produced covers the mana consumed.
-  // Simple heuristic: sum all mana production and compare to costs.
-  let totalManaProduced = 0;
-  let totalManaCost = 0;
-  const producedColors = new Set<string>();
-  const requiredColors = new Set<string>();
-  const pMap = profilesByName(profiles);
-
-  for (const cardName of loopCards) {
-    const p = pMap.get(cardName);
-    if (!p) continue;
-
-    for (const prod of p.produces) {
-      if ("category" in prod && prod.category === "mana") {
-        const qty = typeof prod.quantity === "number" ? prod.quantity : 0;
-        totalManaProduced += qty;
-        if (prod.color === "any") {
-          // "Any color" satisfies all color requirements
-          for (const c of ["W", "U", "B", "R", "G", "C"]) producedColors.add(c);
-        } else if (prod.color) {
-          producedColors.add(prod.color);
-        }
-      }
-    }
-
-    for (const cost of p.consumes) {
-      if (cost.costType === "mana") {
-        // Parse mana symbols properly: {1} = 1 generic, {B} = 1 colored
-        const symbolRegex = /\{([^}]+)\}/g;
-        let match;
-        while ((match = symbolRegex.exec(cost.mana)) !== null) {
-          const sym = match[1];
-          if (/^\d+$/.test(sym)) {
-            totalManaCost += parseInt(sym, 10);
-          } else {
-            totalManaCost += 1;
-            if (/^[WUBRG]$/.test(sym)) requiredColors.add(sym);
-          }
-        }
-      }
-    }
-  }
-
-  // All required colors must be produced within the loop
-  for (const color of requiredColors) {
-    if (!producedColors.has(color)) return false;
-  }
-
-  // Loop is infinite if it produces at least as much mana as it consumes
-  return totalManaProduced >= totalManaCost;
 }
 
 /**

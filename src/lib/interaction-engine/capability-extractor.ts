@@ -54,7 +54,7 @@ import type {
 } from "./types";
 import type { Speed, Layer } from "./rules/types";
 import { tokenize } from "./lexer";
-import { parseAbilities } from "./parser";
+import { parseAbilities, parseSagaChapters, parseClassLevels } from "./parser";
 import { expandKeyword, lookupKeyword } from "./keyword-database";
 
 // ═══════════════════════════════════════════════════════════════════
@@ -931,13 +931,19 @@ function detectOracleTokenCreation(
 ): CreateTokenEffect[] {
   const tokens: CreateTokenEffect[] = [];
 
-  // Match "create a/an [description] token" or "create [N/X/that many] [description] tokens"
+  // Match "create a/an [description] token" or "create [N/X/that many/two/three/...] [description] tokens"
+  const QUANTITY_ALT = "a|an|\\d+|[Xx]|that many|two|three|four|five|six|seven|eight|nine|ten";
   const tokenPattern =
-    /create\s+(?:a|an|\d+|[Xx]|that many)\s+(.+?)\s+tokens?\b/gi;
+    new RegExp(`create\\s+(?:${QUANTITY_ALT})\\s+(.+?)\\s+tokens?\\b`, "gi");
   let match;
 
   while ((match = tokenPattern.exec(oracleText)) !== null) {
     const description = match[1].toLowerCase();
+
+    // Skip "create a token that's a copy of" — copy effects are variable
+    // and depend on the target; they should not generate generic typed token
+    // interactions (e.g., Adagia, Windswept Bastion copying any artifact).
+    if (/copy of/i.test(description)) continue;
 
     // Extract types from the description
     const types: CardType[] = [];
@@ -1003,16 +1009,17 @@ function detectOracleCausedEvents(
   const events: GameEvent[] = [];
 
   // If oracle text mentions creating tokens but we haven't captured the ETB event
-  const hasTokenCreation = /create\s+(?:a|an|\d+)\s+.+?\s+tokens?\b/i.test(
-    oracleText
-  );
+  // Exclude "create a token that's a copy of" — copy effects are variable
+  const CAUSED_QTY = "a|an|\\d+|two|three|four|five|six|seven|eight|nine|ten";
+  const hasTokenCreation = new RegExp(`create\\s+(?:${CAUSED_QTY})\\s+.+?\\s+tokens?\\b`, "i").test(oracleText) &&
+    !/create\s+(?:a|an)\s+token\s+that'?s\s+a\s+copy\s+of/i.test(oracleText);
   const hasETB = existingCausesEvents.some(
     (e) => e.kind === "zone_transition" && (e as ZoneTransition).to === "battlefield"
   );
 
   if (hasTokenCreation && !hasETB) {
     // Extract token types from oracle text for ETB type matching
-    const tokenMatch = oracleText.match(/create\s+(?:a|an|\d+)\s+(.+?)\s+tokens?\b/i);
+    const tokenMatch = oracleText.match(new RegExp(`create\\s+(?:${CAUSED_QTY})\\s+(.+?)\\s+tokens?\\b`, "i"));
     const tokenTypes: CardType[] = [];
     if (tokenMatch) {
       const desc = tokenMatch[1].toLowerCase();
@@ -1233,10 +1240,43 @@ export function profileCard(card: EnrichedCard): CardProfile {
   // 1. Parse type line
   const { cardTypes, supertypes, subtypes } = parseTypeLine(card.typeLine);
 
-  // 2. Tokenize + parse oracle text
+  // 2. Tokenize + parse oracle text — route special card types to specialized parsers
   const oracleText = card.oracleText || "";
-  const { blocks } = tokenize(oracleText, card.name);
-  const parsedAbilities = parseAbilities(blocks);
+
+  // Detect whether this card is a Saga or Class based on subtypes
+  const subtypeLower = (subtypes as string[]).map((s) => s.toLowerCase());
+  const isSaga = subtypeLower.includes("saga");
+  const isClass = subtypeLower.includes("class");
+
+  let parsedAbilities: AbilityNode[];
+
+  if (isSaga) {
+    // Saga: parse each chapter into a TriggeredAbility
+    parsedAbilities = parseSagaChapters(oracleText);
+  } else if (isClass) {
+    // Class: parse base ability + level-up activated abilities + gated abilities
+    parsedAbilities = parseClassLevels(oracleText);
+  } else {
+    // Normal parsing path
+    const { blocks } = tokenize(oracleText, card.name);
+    parsedAbilities = parseAbilities(blocks);
+  }
+
+  // For Room cards (split layout with Room subtype), also parse second face abilities
+  const isRoom = subtypeLower.includes("room");
+  if (isRoom && card.layout === "split" && card.cardFaces && card.cardFaces.length >= 2) {
+    // Parse oracle text from both faces and merge
+    const allFaceAbilities: AbilityNode[] = [];
+    for (const face of card.cardFaces) {
+      if (face.oracleText) {
+        const { blocks: faceBlocks } = tokenize(face.oracleText, face.name);
+        const faceAbilities = parseAbilities(faceBlocks);
+        allFaceAbilities.push(...faceAbilities);
+      }
+    }
+    // Use per-face parsing instead of full card oracle (which may duplicate)
+    parsedAbilities = allFaceAbilities;
+  }
 
   // 3. Expand keywords
   const expandedAbilities = expandKeywords(parsedAbilities, card);
@@ -1248,10 +1288,28 @@ export function profileCard(card: EnrichedCard): CardProfile {
   const castingCost = buildCastingCost(card);
 
   // 6. Extract all capability fields
-  const produces = extractProduces(allAbilities);
+  // Filter out copy-token effects — "create a token that's a copy of" is a
+  // variable-target copy, not a defined token type. Including it causes the
+  // card to generate spurious "enables" edges to every sacrifice outlet and
+  // ETB trigger that matches the inferred type (e.g., Adagia copies artifacts
+  // → falsely enables every artifact sac outlet in the deck).
+  const isCopyTokenCard = /create\s+(?:a|an)\s+token\s+that'?s\s+a\s+copy\s+of/i.test(oracleText);
+  const producesRaw = extractProduces(allAbilities);
+  const produces = isCopyTokenCard
+    ? producesRaw.filter((p) => p.category !== "create_token")
+    : producesRaw;
   const consumes = extractConsumes(allAbilities);
   const triggersOn = extractTriggersOn(allAbilities);
-  const causesEvents = extractCausesEvents(allAbilities, cardTypes, subtypes);
+  let causesEvents = extractCausesEvents(allAbilities, cardTypes, subtypes);
+  // For copy-token cards, remove the token-ETB caused event since the copy
+  // target is variable — it would falsely trigger every ETB listener for
+  // the inferred type.
+  if (isCopyTokenCard) {
+    causesEvents = causesEvents.filter(
+      (e) => !(e.kind === "zone_transition" && (e as ZoneTransition).to === "battlefield" &&
+        e.object?.modifiers?.includes("token"))
+    );
+  }
   const grants = extractGrants(allAbilities, oracleText);
   const replacements = extractReplacements(allAbilities);
   const speeds = extractSpeeds(allAbilities);
@@ -1286,8 +1344,11 @@ export function profileCard(card: EnrichedCard): CardProfile {
   }
 
   // 10. Oracle text fallback: caused events (e.g., token creation ETB)
-  const oracleCausedEvents = detectOracleCausedEvents(oracleText, causesEvents);
-  causesEvents.push(...oracleCausedEvents);
+  // Skip for copy-token cards — variable target means no reliable ETB type
+  if (!isCopyTokenCard) {
+    const oracleCausedEvents = detectOracleCausedEvents(oracleText, causesEvents);
+    causesEvents.push(...oracleCausedEvents);
+  }
 
   // 11. Oracle text fallback: life gain events (lifelink, "gain N life")
   const oracleLifeGainEvents = detectOracleLifeGainEvents(

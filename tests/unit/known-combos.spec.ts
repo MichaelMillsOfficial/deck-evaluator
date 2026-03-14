@@ -151,4 +151,33 @@ test.describe("findCombosInDeck", () => {
     expect(combo).toBeDefined();
     expect(combo!.type).toBe("value");
   });
+
+  test("finds Basalt Monolith + Rings of Brighthearth infinite mana combo", () => {
+    const cardNames = ["Basalt Monolith", "Rings of Brighthearth"];
+    const found = findCombosInDeck(cardNames);
+    const combo = found.find(
+      (c) =>
+        c.cards.includes("Basalt Monolith") &&
+        c.cards.includes("Rings of Brighthearth")
+    );
+    expect(combo).toBeDefined();
+    expect(combo!.type).toBe("infinite");
+  });
+
+  test("finds multiple artifact combos in Breya-style deck", () => {
+    const cardNames = [
+      "Breya, Etherium Shaper",
+      "Basalt Monolith", "Rings of Brighthearth",
+      "Sensei's Divining Top", "Bolas's Citadel",
+      "Dross Scorpion", "Krark-Clan Ironworks",
+      "Sharuum the Hegemon", "Panharmonicon",
+      "Clock of Omens", "Unwinding Clock",
+      "Skullclamp", "Voltaic Key",
+      "Conjurer's Closet",
+    ];
+    const found = findCombosInDeck(cardNames);
+    // Should find: Basalt+Rings, Top+Citadel, Dross+KCI, Clock+KCI,
+    // Panharmonicon+Sharuum, Sharuum+Closet, Skullclamp+KCI, Clock+Unwinding
+    expect(found.length).toBeGreaterThanOrEqual(6);
+  });
 });

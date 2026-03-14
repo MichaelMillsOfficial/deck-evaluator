@@ -42,6 +42,8 @@ import type {
   CardType,
 } from "./types";
 import type { Speed, Phase, Step } from "./rules/types";
+import { tokenizeAbility } from "./lexer";
+import { parseConditionStructured } from "./condition-parser";
 
 // ═══════════════════════════════════════════════════════════════════
 // TOKEN STREAM HELPERS
@@ -1145,9 +1147,11 @@ function parseCondition(tokens: Token[]): Condition | undefined {
   );
   if (unlessIdx !== -1) {
     const rest = tokens.slice(unlessIdx + 1);
+    const predicate = rest.map((t) => t.value).join(" ");
     return {
       type: "unless",
-      predicate: rest.map((t) => t.value).join(" "),
+      predicate,
+      structured: parseConditionStructured(predicate),
     };
   }
 
@@ -1158,9 +1162,11 @@ function parseCondition(tokens: Token[]): Condition | undefined {
       (t.normalized === "if_you_do" || t.normalized === "if_you_dont")
   );
   if (ifDoIdx !== -1) {
+    const predicate = tokens[ifDoIdx].normalized || "";
     return {
       type: "if",
-      predicate: tokens[ifDoIdx].normalized || "",
+      predicate,
+      structured: parseConditionStructured(predicate),
     };
   }
 
@@ -1170,9 +1176,11 @@ function parseCondition(tokens: Token[]): Condition | undefined {
   );
   if (asLongIdx !== -1) {
     const rest = tokens.slice(asLongIdx + 1);
+    const predicate = rest.map((t) => t.value).join(" ");
     return {
       type: "as_long_as",
-      predicate: rest.map((t) => t.value).join(" "),
+      predicate,
+      structured: parseConditionStructured(predicate),
     };
   }
 
@@ -1832,6 +1840,253 @@ function parseAlternativeCostTokens(tokens: Token[]): Cost[] {
   }
 
   return costs;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SAGA CHAPTER PARSING
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Parse saga oracle text into TriggeredAbility[] — one per chapter.
+ *
+ * Handles:
+ * - Individual chapters: "I —", "II —", "III —", "IV —"
+ * - Combined chapters: "I, II —", "II, III —", "I, II, III —"
+ * - Read-ahead sagas (reminder text stripped by parenthesis skipping)
+ *
+ * Each chapter produces a TriggeredAbility with a lore-counter StateChange
+ * trigger. Combined chapters (e.g., "I, II —") produce two triggers with
+ * identical effects.
+ */
+export function parseSagaChapters(oracleText: string): AbilityNode[] {
+  // Strip all parenthetical reminder text (e.g. the lore counter reminder)
+  const stripped = oracleText.replace(/\([^)]*\)/g, "").trim();
+
+  // Regex to split at chapter markers. Handles Roman numerals I–IV
+  // and combined markers like "I, II —" or "II, III —".
+  const chapterRe =
+    /(?:^|\n)\s*((?:I{1,3}V?|IV)(?:\s*,\s*(?:I{1,3}V?|IV))*)\s*—\s*/gim;
+
+  // Collect all chapter matches with their positions
+  const matches: { romans: string[]; textStart: number }[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = chapterRe.exec(stripped)) !== null) {
+    const romanStr = match[1]; // e.g. "I, II" or "III"
+    const romans = romanStr
+      .split(/\s*,\s*/)
+      .map((r) => r.trim().toUpperCase())
+      .filter((r) => r.length > 0);
+    matches.push({ romans, textStart: chapterRe.lastIndex });
+  }
+
+  // For each match, extract the effect text up to the next marker
+  const abilities: AbilityNode[] = [];
+
+  for (let i = 0; i < matches.length; i++) {
+    const { romans, textStart } = matches[i];
+    const textEnd = i + 1 < matches.length
+      ? stripped.lastIndexOf("\n", matches[i + 1].textStart - 1)
+      : stripped.length;
+
+    const effectText = stripped.slice(textStart, textEnd).trim();
+
+    // Lore counter trigger (StateChange on the saga)
+    const loreCounterTrigger: import("./types").StateChange = {
+      kind: "state_change",
+      property: "counters",
+      object: { types: ["enchantment"], quantity: "one", modifiers: [] },
+      delta: 1,
+    };
+
+    // Parse effects from the chapter text
+    const { blocks } = tokenizeText(effectText, "");
+    let chapterEffects: import("./types").Effect[] = [];
+    for (const block of blocks) {
+      const blockEffects = parseEffects(block);
+      chapterEffects.push(...blockEffects);
+    }
+
+    // Fallback: if no structured effects parsed, store the raw text
+    if (chapterEffects.length === 0) {
+      chapterEffects = [
+        {
+          type: "chapter_effect",
+          details: { text: effectText, chapter: romans.join(", ") },
+        },
+      ];
+    }
+
+    // Create one TriggeredAbility per roman numeral in the marker
+    // (combined chapters like "I, II —" produce two triggers with same effects)
+    for (const roman of romans) {
+      const chapterNumber = romanToNumber(roman);
+      abilities.push({
+        abilityType: "triggered",
+        trigger: {
+          ...loreCounterTrigger,
+          delta: chapterNumber,
+        },
+        effects: chapterEffects,
+        speed: "instant",
+      } as import("./types").TriggeredAbility);
+    }
+  }
+
+  return abilities;
+}
+
+/** Convert Roman numeral chapter string to integer */
+function romanToNumber(roman: string): number {
+  const map: Record<string, number> = { I: 1, II: 2, III: 3, IV: 4, V: 5 };
+  return map[roman.toUpperCase()] ?? 1;
+}
+
+/** Thin wrapper to tokenize a plain text string into ability blocks */
+function tokenizeText(
+  text: string,
+  cardName: string
+): { blocks: Token[][] } {
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  const blocks = lines.map((line) => tokenizeAbility(line, cardName));
+  return { blocks };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CLASS LEVEL PARSING
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Parse Class enchantment oracle text into AbilityNode[].
+ *
+ * Structure:
+ * - Text before the first "Level N" marker → base abilities (no condition)
+ * - "Level N — {cost}" line → ActivatedAbility for level-up (sorcery speed)
+ * - Text after the level marker (on same or subsequent lines until next Level marker)
+ *   → StaticAbility/TriggeredAbility gated with Condition { class_level >= N }
+ */
+export function parseClassLevels(oracleText: string): AbilityNode[] {
+  const abilities: AbilityNode[] = [];
+
+  // Split oracle text into lines
+  const lines = oracleText
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  // Regex to detect level marker lines like "Level 2 — {2}{R}:" or "Level 2 — {2}{R}"
+  // Also handles "Level 2 — {cost}: effect" all-in-one line
+  const levelRe = /^Level\s+(\d+)\s*—\s*(.+)$/i;
+
+  let currentSection: "base" | number = "base";
+  let pendingLines: string[] = [];
+
+  const flushSection = (section: "base" | number, sectionLines: string[]) => {
+    if (sectionLines.length === 0) return;
+
+    const condition: import("./types").Condition | undefined =
+      section === "base"
+        ? undefined
+        : {
+            type: "as_long_as",
+            predicate: `class level is ${section} or more`,
+            structured: {
+              check: "class_level",
+              count: section as number,
+              comparison: "greater_equal",
+            },
+          };
+
+    for (const line of sectionLines) {
+      const { blocks } = tokenizeText(line, "");
+      for (const block of blocks) {
+        if (block.length === 0) continue;
+        const ability = parseAbility(block);
+
+        // Attach the class level condition to non-activated abilities
+        if (section !== "base" && condition) {
+          if (ability.abilityType === "static") {
+            (ability as import("./types").StaticAbility).condition = condition;
+          } else if (ability.abilityType === "triggered") {
+            (ability as import("./types").TriggeredAbility).condition = condition;
+          } else if (ability.abilityType === "spell_effect") {
+            (ability as import("./types").SpellEffect).condition = condition;
+          }
+        }
+
+        abilities.push(ability);
+      }
+    }
+  };
+
+  for (const line of lines) {
+    const levelMatch = line.match(levelRe);
+    if (levelMatch) {
+      // Flush the previous section
+      flushSection(currentSection, pendingLines);
+      pendingLines = [];
+
+      const levelNum = parseInt(levelMatch[1], 10);
+      currentSection = levelNum;
+
+      // The level marker line contains the upgrade cost (and possibly an ability)
+      const levelContent = levelMatch[2].trim();
+
+      // Build an ActivatedAbility for the level-up itself
+      // levelContent looks like: "{2}{R}" or "{2}{R}: Some effect"
+      const colonIdx = levelContent.indexOf(":");
+      const costPart =
+        colonIdx !== -1 ? levelContent.slice(0, colonIdx) : levelContent;
+      const effectPart =
+        colonIdx !== -1 ? levelContent.slice(colonIdx + 1).trim() : "";
+
+      // Parse mana cost from costPart
+      const manaCosts: import("./types").Cost[] = [];
+      const manaRe = /\{[WUBRGCXSTQEP0-9/]+\}/g;
+      let manaMatch;
+      while ((manaMatch = manaRe.exec(costPart)) !== null) {
+        const sym = manaMatch[0];
+        if (sym === "{T}") {
+          manaCosts.push({ costType: "tap" });
+        } else if (sym === "{Q}") {
+          manaCosts.push({ costType: "untap" });
+        } else {
+          manaCosts.push({ costType: "mana", mana: sym });
+        }
+      }
+
+      const levelUpEffects: import("./types").Effect[] = [
+        {
+          type: "class_level_up",
+          details: { targetLevel: levelNum, description: `Upgrade to level ${levelNum}` },
+        },
+      ];
+
+      const levelUpAbility: import("./types").ActivatedAbility = {
+        abilityType: "activated",
+        costs: manaCosts,
+        effects: levelUpEffects,
+        speed: "sorcery",
+      };
+      abilities.push(levelUpAbility);
+
+      // If there's an effect part after the colon, add it to the pending lines
+      // for this level's section (it's a level-gated ability)
+      if (effectPart.length > 0) {
+        pendingLines.push(effectPart);
+      }
+    } else {
+      pendingLines.push(line);
+    }
+  }
+
+  // Flush final section
+  flushSection(currentSection, pendingLines);
+
+  return abilities;
 }
 
 /**

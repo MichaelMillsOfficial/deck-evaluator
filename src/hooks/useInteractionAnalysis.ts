@@ -7,7 +7,7 @@ import { profileCard, findInteractionsAsync } from "@/lib/interaction-engine";
 import { filterInteractionAnalysis } from "@/lib/reasoning-engine";
 
 export interface AnalysisStep {
-  id: "profiling" | "detecting" | "finalizing";
+  id: "profiling" | "detecting" | "conditions" | "finalizing";
   label: string;
   status: "pending" | "active" | "done";
 }
@@ -15,6 +15,7 @@ export interface AnalysisStep {
 const INITIAL_STEPS: AnalysisStep[] = [
   { id: "profiling", label: "Compiling oracle text", status: "pending" },
   { id: "detecting", label: "Detecting interactions", status: "pending" },
+  { id: "conditions", label: "Evaluating conditions", status: "pending" },
   { id: "finalizing", label: "Building dependency graph", status: "pending" },
 ];
 
@@ -94,6 +95,7 @@ export function useInteractionAnalysis(
         if (cached) {
           updateStep("profiling", "done");
           updateStep("detecting", "done");
+          updateStep("conditions", "done");
           updateStep("finalizing", "done");
           setProgress(100);
           computedForRef.current = cardMap;
@@ -145,12 +147,14 @@ export function useInteractionAnalysis(
         const result = await findInteractionsAsync(
           profiles,
           (pairProgress) => {
-            setProgress(45 + Math.round(pairProgress * 40));
+            setProgress(45 + Math.round(pairProgress * 35));
           },
-          () => cancelledRef.current
+          () => cancelledRef.current,
+          cards  // pass enriched cards for satisfiability scoring
         );
 
         updateStep("detecting", "done");
+        updateStep("conditions", "done");
         setProgress(85);
         await yield_();
 

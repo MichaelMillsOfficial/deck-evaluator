@@ -73,6 +73,14 @@ function IconArrowsRightLeft() {
   );
 }
 
+function IconBeaker() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-1.014.846a1.5 1.5 0 01-1.922.043L14 14M5 14.5l1.014.846a1.5 1.5 0 001.922.043L10 14" />
+    </svg>
+  );
+}
+
 function IconChevronLeft() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20" aria-hidden="true">
@@ -134,6 +142,7 @@ const TAB_ICONS: Record<ViewTab, React.ReactNode> = {
   hands: <IconHand />,
   additions: <IconPlusCircle />,
   suggestions: <IconArrowsRightLeft />,
+  goldfish: <IconBeaker />,
 };
 
 // ---------------------------------------------------------------------------

@@ -286,24 +286,22 @@ function serraAngel(): CardProfile {
 // ═══════════════════════════════════════════════════════════════
 
 test.describe("loop & chain detection — classic aristocrats loop", () => {
-  test("Reassembling Skeleton + Ashnod's Altar + Blood Artist detects a loop", () => {
+  test("Reassembling Skeleton + Ashnod's Altar + Blood Artist is NOT a self-sustaining loop", () => {
     const skeleton = reassemblingSkeleton();
     const altar = ashnodAltar();
     const artist = bloodArtist();
     const analysis = findInteractions([skeleton, altar, artist]);
 
-    // The engine should find at least one loop involving Altar + Skeleton
-    // (the core sac-recur cycle). Blood Artist is the payoff that triggers
-    // off each death in the cycle.
-    expect(analysis.loops.length).toBeGreaterThanOrEqual(1);
-
+    // The chain solver correctly rejects this as a self-sustaining loop because
+    // Skeleton requires {1}{B} to recur, but Ashnod's Altar only produces {C}{C}.
+    // The {B} must come from an external source (e.g., a Swamp). Without it, this
+    // is not a resource-feasible loop.
     const loop = analysis.loops.find(
       (l) =>
         l.cards.includes("Ashnod's Altar") &&
         l.cards.includes("Reassembling Skeleton")
     );
-    expect(loop).toBeDefined();
-    expect(loop!.steps.length).toBeGreaterThanOrEqual(2);
+    expect(loop).toBeUndefined();
   });
 
   test("three-card aristocrats chain includes Blood Artist", () => {
@@ -318,21 +316,15 @@ test.describe("loop & chain detection — classic aristocrats loop", () => {
     expect(deathTriggers.length).toBeGreaterThanOrEqual(1);
   });
 
-  test("aristocrats loop has at least 2 steps in the cycle", () => {
+  test("aristocrats combo detected as interactions even without self-sustaining loop", () => {
     const skeleton = reassemblingSkeleton();
     const altar = ashnodAltar();
     const artist = bloodArtist();
     const analysis = findInteractions([skeleton, altar, artist]);
 
-    const loop = analysis.loops.find(
-      (l) =>
-        l.cards.includes("Ashnod's Altar") &&
-        l.cards.includes("Reassembling Skeleton")
-    );
-    expect(loop).toBeDefined();
-    // Sac to Altar → return Skeleton: at minimum 2 steps
-    expect(loop!.steps.length).toBeGreaterThanOrEqual(2);
-    expect(loop!.description.length).toBeGreaterThan(0);
+    // Even though the chain solver rejects the loop (needs external {B}),
+    // the individual interactions should still be detected
+    expect(analysis.interactions.length).toBeGreaterThanOrEqual(1);
   });
 
   test("aristocrats loop netEffect includes death-triggered events", () => {

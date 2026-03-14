@@ -112,6 +112,8 @@ export type {
   // Duration & Conditions
   EffectDuration,
   Condition,
+  ConditionCheck,
+  SatisfiabilityResult,
 
   // Effects & Abilities
   Effect,
@@ -174,6 +176,7 @@ export { findInteractions, findInteractionsAsync } from "./interaction-detector"
 // Loop chain solver
 export {
   extractLoopSteps,
+  isNonLoopableSpell,
   solveChain,
   canSatisfyRequirements,
   detectLoopsFromChains,

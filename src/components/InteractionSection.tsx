@@ -9,7 +9,9 @@ import type {
   InteractionEnabler,
   InteractionType,
   RemovalImpact,
+  Condition,
 } from "@/lib/interaction-engine";
+import { analyzeSatisfiability } from "@/lib/interaction-engine/satisfiability-analyzer";
 import type { AnalysisStep } from "@/hooks/useInteractionAnalysis";
 import { useEffect, useMemo, useState, Component, type ReactNode } from "react";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
@@ -223,6 +225,50 @@ function EmptyState({ message }: { message: string }) {
   return <p className="text-xs text-slate-500 italic py-1">{message}</p>;
 }
 
+// ─── Condition annotation badge ──────────────────────────────────
+
+function ConditionBadge({ conditions }: { conditions: Condition[] }) {
+  // Only show for conditions that have structured checks
+  const structured = conditions.filter((c) => c.structured);
+  if (structured.length === 0) return null;
+
+  // Pick the most restrictive condition to display (lowest score)
+  let minScore = 1.0;
+  let hasRuntime = false;
+  for (const cond of structured) {
+    const result = analyzeSatisfiability(cond, []); // empty deck → use check type only for label
+    if (cond.structured?.check === "runtime") {
+      hasRuntime = true;
+    } else {
+      minScore = Math.min(minScore, result.score);
+    }
+  }
+
+  // We can't pass deckCards here without prop-drilling, so show a simplified
+  // label derived purely from the condition type (not deck composition).
+  // The score already adjusted the interaction.strength — this badge just
+  // communicates "this interaction has a condition" to the user.
+  if (hasRuntime && minScore >= 0.9) {
+    return (
+      <span
+        aria-label="Condition: requires game state"
+        className="rounded-full px-2 py-0.5 text-[9px] font-semibold bg-slate-700/60 text-slate-400 border border-slate-600/40"
+      >
+        Cond: game state
+      </span>
+    );
+  }
+
+  return (
+    <span
+      aria-label="This interaction has deck conditions"
+      className="rounded-full px-2 py-0.5 text-[9px] font-semibold bg-slate-700/60 text-slate-400 border border-slate-600/40"
+    >
+      Conditional
+    </span>
+  );
+}
+
 function InteractionItem({
   interaction,
   index,
@@ -243,6 +289,19 @@ function InteractionItem({
     return extractCitations(interaction, profiles);
   }, [showCitations, interaction, profiles]);
 
+  // Gather conditions from both cards' profiles for annotation
+  const conditions = useMemo((): Condition[] => {
+    if (!profiles) return [];
+    const result: Condition[] = [];
+    for (const cardName of interaction.cards) {
+      const profile = profiles[cardName];
+      if (profile?.requires) {
+        result.push(...profile.requires.filter((c) => c.structured));
+      }
+    }
+    return result;
+  }, [interaction.cards, profiles]);
+
   const badgeColors =
     INTERACTION_TYPE_COLORS[interaction.type] ?? "bg-slate-600/60 text-slate-100";
 
@@ -252,12 +311,17 @@ function InteractionItem({
       className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 hover:bg-slate-700/30 hover:border-slate-600 transition-colors duration-150"
     >
       <div className="flex items-center justify-between mb-2">
-        <span
-          data-testid="interaction-type"
-          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badgeColors}`}
-        >
-          {INTERACTION_TYPE_LABELS[interaction.type] ?? interaction.type}
-        </span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span
+            data-testid="interaction-type"
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badgeColors}`}
+          >
+            {INTERACTION_TYPE_LABELS[interaction.type] ?? interaction.type}
+          </span>
+          {conditions.length > 0 && (
+            <ConditionBadge conditions={conditions} />
+          )}
+        </div>
         <StrengthBar strength={interaction.strength} />
       </div>
       <div className="flex items-center gap-2 mb-2">
