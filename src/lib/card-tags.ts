@@ -59,6 +59,10 @@ const TUTOR_RE = /\bsearch your library\b/i;
 const TUTOR_LAND_EXCLUSION_RE = /search your library for.+?(?:land|Forest|Plains|Island|Swamp|Mountain)\b/i;
 const COST_REDUCTION_RE = /\bcosts?\s+\{\d+\}\s+less\b/i;
 const COST_REDUCTION_LESS_RE = /\bcosts?\s+less\s+to\s+cast\b/i;
+// Self-referential cost reduction: "This spell costs {1} less"
+const SELF_COST_REDUCTION_RE = /\bthis spell costs?\b/i;
+// Keywords that only reduce their own spell's cost
+const SELF_COST_KEYWORDS = new Set(["Affinity", "Convoke", "Delve", "Improvise"]);
 const PROTECTION_KEYWORDS = new Set([
   "Hexproof",
   "Indestructible",
@@ -219,9 +223,21 @@ export function generateTags(card: EnrichedCard): string[] {
     tags.add("Tutor");
   }
 
-  // Cost Reduction
+  // Cost Reduction — exclude self-referential reductions ("This spell costs less",
+  // Affinity, Convoke, Delve, Improvise) that only affect the card itself.
   if (COST_REDUCTION_RE.test(text) || COST_REDUCTION_LESS_RE.test(text)) {
-    tags.add("Cost Reduction");
+    // Strip self-referential sentences and re-test for OTHER cost reduction
+    const hasSelfKeyword = card.keywords.some((kw) => SELF_COST_KEYWORDS.has(kw));
+    const hasSelfText = SELF_COST_REDUCTION_RE.test(text);
+    if (hasSelfKeyword || hasSelfText) {
+      // Remove self-referential sentences and check if any cost reduction remains
+      const strippedText = text.replace(/[^.]*\bthis spell costs?\b[^.]*/gi, "");
+      if (COST_REDUCTION_RE.test(strippedText) || COST_REDUCTION_LESS_RE.test(strippedText)) {
+        tags.add("Cost Reduction");
+      }
+    } else {
+      tags.add("Cost Reduction");
+    }
   }
 
   // Protection

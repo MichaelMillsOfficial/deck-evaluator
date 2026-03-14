@@ -16,6 +16,9 @@ test.describe("Tab Navigation", () => {
     // Load Example should not be visible on Moxfield tab
     await expect(deckPage.loadExampleButton).toBeHidden();
 
+    // Card lookup should not be visible on Moxfield tab
+    await expect(deckPage.cardLookupInput).toBeHidden();
+
     // Textarea should still be present for pasting exported text
     await expect(deckPage.decklistTextarea).toBeVisible();
 
@@ -38,9 +41,11 @@ test.describe("Tab Navigation", () => {
   }) => {
     await deckPage.selectTab("Moxfield");
     await expect(deckPage.loadExampleButton).toBeHidden();
+    await expect(deckPage.cardLookupInput).toBeHidden();
 
     await deckPage.selectTab("Manual Import");
     await expect(deckPage.loadExampleButton).toBeVisible();
+    await expect(deckPage.cardLookupInput).toBeVisible();
 
     // Moxfield export guide should not be visible on Manual tab
     await expect(

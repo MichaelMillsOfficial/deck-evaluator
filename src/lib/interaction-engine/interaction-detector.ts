@@ -34,6 +34,7 @@ import type {
   Subtype,
   Supertype,
   SacrificeCost,
+  ZoneTransition,
 } from "./types";
 import { PERMANENT_TYPES, matchesCompositeType } from "./game-model";
 import { detectLoopsFromChains } from "./loop-chain-solver";
@@ -614,7 +615,22 @@ function detectTriggers(a: CardProfile, b: CardProfile): Interaction[] {
   const results: Interaction[] = [];
   const seen = new Set<string>();
 
+  // Pre-check: if B has ONLY self-ETB triggers (no general triggers), skip
+  // A's events that are token creation. A token entering the battlefield is
+  // a new game object and cannot retrigger B's "When [CARDNAME] enters"
+  // ability. This is a safety net beyond the eventsMatch gate.
+  const bHasOnlySelfETB = b.triggersOn.length > 0 && b.triggersOn.every(
+    (t) => t.kind === "zone_transition" && (t as ZoneTransition).to === "battlefield" &&
+           t.object?.self === true
+  );
+
   for (const caused of a.causesEvents) {
+    // Token creation can never trigger a self-only ETB trigger (CR 707.10)
+    if (bHasOnlySelfETB && caused.kind === "zone_transition" &&
+        (caused as ZoneTransition).to === "battlefield" &&
+        caused.object?.modifiers?.includes("token")) {
+      continue;
+    }
     for (const trigger of b.triggersOn) {
       if (eventsMatch(caused, trigger)) {
         // For damage events where the trigger requires specific source types
@@ -669,7 +685,7 @@ function detectTriggers(a: CardProfile, b: CardProfile): Interaction[] {
 
   // Oracle text fallback: detect trigger patterns the structured parser misses
   if (results.length === 0) {
-    results.push(...detectTriggersFromOraclePatterns(a, b, seen));
+    results.push(...detectTriggersFromOraclePatterns(a, b, seen, bHasOnlySelfETB));
   }
 
   return results;
@@ -689,7 +705,8 @@ function detectTriggers(a: CardProfile, b: CardProfile): Interaction[] {
 function detectTriggersFromOraclePatterns(
   a: CardProfile,
   b: CardProfile,
-  seen: Set<string>
+  seen: Set<string>,
+  bHasOnlySelfETB = false,
 ): Interaction[] {
   const results: Interaction[] = [];
   const aOracle = a.rawOracleText || "";
@@ -741,7 +758,8 @@ function detectTriggersFromOraclePatterns(
   }
 
   // A is an enchantment → B triggers on enchantment ETB (constellation)
-  if (a.cardTypes.includes("enchantment") && cardTriggersOnEnchantmentETB(b, bOracle)) {
+  // Skip if B only has self-ETB triggers — entering does not retrigger self-ETB
+  if (!bHasOnlySelfETB && a.cardTypes.includes("enchantment") && cardTriggersOnEnchantmentETB(b, bOracle)) {
     const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:enchantment`;
     if (!seen.has(dedupKey)) {
       seen.add(dedupKey);
@@ -756,7 +774,8 @@ function detectTriggersFromOraclePatterns(
   }
 
   // A is a creature → B triggers on creature ETB ("whenever another creature enters")
-  if (a.cardTypes.includes("creature") && cardTriggersOnCreatureETB(b, bOracle)) {
+  // Skip if B only has self-ETB triggers — another creature entering does not retrigger self-ETB
+  if (!bHasOnlySelfETB && a.cardTypes.includes("creature") && cardTriggersOnCreatureETB(b, bOracle)) {
     const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:creature_etb`;
     if (!seen.has(dedupKey)) {
       seen.add(dedupKey);
@@ -801,7 +820,8 @@ function detectTriggersFromOraclePatterns(
   }
 
   // A is a permanent → B triggers on permanent ETB ("whenever another permanent enters")
-  if (isPermanentCard(a.cardTypes) && cardTriggersOnPermanentETB(b, bOracle)) {
+  // Skip if B only has self-ETB triggers — another permanent entering does not retrigger self-ETB
+  if (!bHasOnlySelfETB && isPermanentCard(a.cardTypes) && cardTriggersOnPermanentETB(b, bOracle)) {
     const dedupKey = `triggers:${a.cardName}:${b.cardName}:zone_transition:zone_transition:permanent_etb`;
     if (!seen.has(dedupKey)) {
       seen.add(dedupKey);
@@ -1596,6 +1616,18 @@ function detectRecurs(a: CardProfile, b: CardProfile): Interaction[] {
     return results;
   }
 
+  // Pre-check: if A's oracle text describes a blink pattern (exile then return
+  // to battlefield) but does NOT mention graveyard, it's not recursion.
+  if (a.rawOracleText) {
+    const BLINK_PATTERN = /\bexile\b.+?\breturn\b.+?\bto the battlefield\b/i;
+    if (
+      BLINK_PATTERN.test(a.rawOracleText) &&
+      !/\bgraveyard\b/i.test(a.rawOracleText)
+    ) {
+      return results;
+    }
+  }
+
   // 1. Check A's causesEvents for ZoneTransition{from: graveyard, to: battlefield|hand}
   for (const event of a.causesEvents) {
     if (event.kind !== "zone_transition") continue;
@@ -1920,6 +1952,18 @@ function getSearchTarget(effect: Effect): GameObjectRef | undefined {
 function detectReducesCost(a: CardProfile, b: CardProfile): Interaction[] {
   const results: Interaction[] = [];
 
+  // Pre-check: if A's oracle text ONLY has self-referential cost reduction
+  // ("This spell costs ... less"), it doesn't reduce costs for other cards.
+  if (a.rawOracleText && /\bthis spell costs?\b/i.test(a.rawOracleText)) {
+    // Check if there are also OTHER cost reduction patterns (affecting other spells).
+    // Strip self-referential sentences and re-check.
+    const strippedText = a.rawOracleText.replace(/[^.]*\bthis spell costs?\b[^.]*/gi, "");
+    const OTHER_COST_RE = /\bcosts?\s+\{\d+\}\s+less\b|\bcosts?\s+less\s+to\s+cast\b/i;
+    if (!OTHER_COST_RE.test(strippedText)) {
+      return results; // Only self-referential cost reduction
+    }
+  }
+
   // 1. Check A's costSubstitutions
   for (const sub of a.costSubstitutions) {
     if (costSubstitutionAppliesTo(sub, b)) {
@@ -1942,8 +1986,12 @@ function detectReducesCost(a: CardProfile, b: CardProfile): Interaction[] {
       effect.type === "reduce_cost" ||
       effect.type === "cost_modifier"
     ) {
-      // Check if the affected objects match B's types
+      // Self-only cost reduction (Affinity, Convoke, Delve, Improvise,
+      // "This spell costs less") only affects the card itself, not others.
       const affectedObjects = staticEffect.affectedObjects;
+      if (affectedObjects?.self === true) {
+        continue;
+      }
       if (
         !affectedObjects ||
         cardMatchesRef(b.cardTypes, affectedObjects, b.subtypes, b.supertypes)

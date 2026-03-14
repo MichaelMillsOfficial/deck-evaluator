@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useRef, useCallback, type FormEvent } from "react";
 import CommanderInput from "@/components/CommanderInput";
+import CardLookupInput from "@/components/CardLookupInput";
 
 type ImportTab = "manual" | "moxfield" | "archidekt";
 
@@ -38,6 +39,74 @@ export default function DeckInput({
   const [activeTab, setActiveTab] = useState<ImportTab>("manual");
   const [textValue, setTextValue] = useState("");
   const [commanders, setCommanders] = useState<string[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleCardLookup = useCallback(
+    (name: string, quantity: number): string => {
+      const cardLineRe = /^(\d+)x?\s+(.+)$/;
+      const zoneLineRe = /^(commander|sideboard|mainboard|companion):?\s*$/i;
+      let statusMsg = `Added ${quantity} ${name}`;
+
+      setTextValue((prev) => {
+        if (!prev) return `${quantity} ${name}`;
+
+        const lines = prev.split("\n");
+
+        // Determine the last zone header and track which zone each line is in,
+        // so we only consolidate cards within the mainboard zone.
+        let lastZone: string | null = null;
+        const lineZones: (string | null)[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          const zm = lines[i].trim().match(zoneLineRe);
+          if (zm) lastZone = zm[1].toLowerCase();
+          lineZones[i] = lastZone;
+        }
+
+        // Only consolidate if the matching card is in mainboard (or no headers)
+        for (let i = 0; i < lines.length; i++) {
+          const zone = lineZones[i];
+          if (zone !== null && zone !== "mainboard") continue;
+          const match = lines[i].match(cardLineRe);
+          if (match && match[2].toLowerCase() === name.toLowerCase()) {
+            const newQty = parseInt(match[1], 10) + quantity;
+            lines[i] = `${newQty} ${name}`;
+            statusMsg = `Updated ${name} to ${newQty}`;
+            return lines.join("\n");
+          }
+        }
+
+        // If the last zone in the textarea is sideboard or commander,
+        // insert a MAINBOARD: header before appending.
+        const tailZone = lastZone;
+        const needsHeader =
+          tailZone === "sideboard" ||
+          tailZone === "commander" ||
+          tailZone === "companion";
+
+        if (needsHeader) {
+          statusMsg = `Added ${quantity} ${name} (mainboard)`;
+          const suffix = `\n\nMAINBOARD:\n${quantity} ${name}`;
+          return prev.endsWith("\n")
+            ? prev.trimEnd() + suffix
+            : prev + suffix;
+        }
+
+        // Append as new line
+        return prev.endsWith("\n")
+          ? prev + `${quantity} ${name}`
+          : prev + `\n${quantity} ${name}`;
+      });
+
+      // Scroll textarea to bottom after React renders
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+
+      return statusMsg;
+    },
+    []
+  );
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -163,6 +232,58 @@ export default function DeckInput({
             />
           )}
 
+          {/* Card lookup (manual tab only) */}
+          {activeTab === "manual" && (
+            <CardLookupInput
+              onCardSelected={handleCardLookup}
+              disabled={loading}
+            />
+          )}
+
+          {/* Zone format guide (manual tab only) */}
+          {activeTab === "manual" && (
+            <details
+              data-testid="zone-format-guide"
+              className="rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-2 text-sm text-slate-400"
+            >
+              <summary className="cursor-pointer select-none font-medium text-slate-300 hover:text-white">
+                Zone headers &amp; decklist format
+              </summary>
+              <div className="mt-2 space-y-2">
+                <p>
+                  You can optionally organize your decklist into zones using
+                  headers. Each header marks the start of a section — all cards
+                  below it belong to that zone until the next header.
+                </p>
+                <ul className="list-inside list-disc space-y-1 text-slate-400">
+                  <li>
+                    <code className="text-purple-400">COMMANDER:</code> — your
+                    commander(s), max 2
+                  </li>
+                  <li>
+                    <code className="text-purple-400">MAINBOARD:</code> — the
+                    main deck (default if no header)
+                  </li>
+                  <li>
+                    <code className="text-purple-400">SIDEBOARD:</code> — sideboard
+                    cards
+                  </li>
+                  <li>
+                    <code className="text-purple-400">COMPANION:</code> — treated
+                    as sideboard
+                  </li>
+                </ul>
+                <p>
+                  Cards added via search are always placed in the mainboard.
+                  If no headers are used, all cards default to mainboard.
+                  You can also select your commander using the input above
+                  instead of a <code className="text-purple-400">COMMANDER:</code>{" "}
+                  header.
+                </p>
+              </div>
+            </details>
+          )}
+
           {/* Decklist textarea */}
           <div>
             <label
@@ -172,6 +293,7 @@ export default function DeckInput({
               Decklist
             </label>
             <textarea
+              ref={textareaRef}
               id="decklist"
               value={textValue}
               onChange={(e) => setTextValue(e.target.value)}
