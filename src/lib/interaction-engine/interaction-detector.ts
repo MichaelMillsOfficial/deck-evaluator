@@ -38,7 +38,7 @@ import type {
 } from "./types";
 import type { EnrichedCard } from "../types";
 import { PERMANENT_TYPES, matchesCompositeType } from "./game-model";
-import { detectLoopsFromChains } from "./loop-chain-solver";
+import { detectLoopsFromChains, isNonLoopableSpell } from "./loop-chain-solver";
 import { adjustInteractionStrengths } from "./satisfiability-analyzer";
 
 // ═══════════════════════════════════════════════════════════════
@@ -3173,6 +3173,12 @@ function detectLoops(
 ): InteractionLoop[] {
   if (profiles.length < 2) return [];
 
+  // Sorceries and instants are one-shot spells that cannot form repeatable loops
+  // without external recursion. Exclude them from the graph-based cycle search.
+  const nonLoopableCards = new Set<string>(
+    profiles.filter(isNonLoopableSpell).map((p) => p.cardName)
+  );
+
   // Build adjacency from causal interactions
   const causalTypes = new Set<string>(["enables", "triggers", "recurs"]);
   const adjacency = new Map<string, Map<string, Interaction[]>>();
@@ -3182,6 +3188,8 @@ function detectLoops(
     if (inter.strength < 0.3) continue; // Skip weak edges
     const from = inter.cards[0];
     const to = inter.cards[1];
+    // Skip edges involving sorceries/instants — they can't loop
+    if (nonLoopableCards.has(from) || nonLoopableCards.has(to)) continue;
     if (!adjacency.has(from)) adjacency.set(from, new Map());
     if (!adjacency.get(from)!.has(to)) adjacency.get(from)!.set(to, []);
     adjacency.get(from)!.get(to)!.push(inter);

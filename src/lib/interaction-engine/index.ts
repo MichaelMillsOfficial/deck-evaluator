@@ -176,6 +176,7 @@ export { findInteractions, findInteractionsAsync } from "./interaction-detector"
 // Loop chain solver
 export {
   extractLoopSteps,
+  isNonLoopableSpell,
   solveChain,
   canSatisfyRequirements,
   detectLoopsFromChains,

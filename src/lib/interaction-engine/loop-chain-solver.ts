@@ -134,6 +134,16 @@ function parseWordQuantity(word: string): number {
 }
 
 /**
+ * Returns true if the profile represents a sorcery or instant — one-shot spells
+ * that cannot form repeatable loops without external recursion.
+ * Used by both the chain solver (Pass 2) and graph-based cycle detection (Pass 1).
+ */
+export function isNonLoopableSpell(profile: CardProfile): boolean {
+  const types = profile.cardTypes?.map((t) => String(t).toLowerCase()) ?? [];
+  return types.includes("sorcery") || types.includes("instant");
+}
+
+/**
  * Extract LoopSteps from a CardProfile's structured data and oracle text.
  *
  * Sorceries and instants are excluded: they are one-shot spells that cannot
@@ -145,13 +155,7 @@ export function extractLoopSteps(profile: CardProfile): LoopStep[] {
   const types = profile.cardTypes?.map((t) => String(t)) ?? [];
   const subtypes = profile.subtypes?.map((t) => String(t)) ?? [];
 
-  // Sorceries and instants are one-shot spells — skip them for loop detection.
-  // They cannot be part of a repeatable loop unless an external engine recurs them,
-  // which the loop solver does not model.
-  const isSorceryOrInstant = types.some(
-    (t) => /^sorcery$/i.test(t) || /^instant$/i.test(t)
-  );
-  if (isSorceryOrInstant) return steps;
+  if (isNonLoopableSpell(profile)) return steps;
 
   // --- Structured extraction ---
 
