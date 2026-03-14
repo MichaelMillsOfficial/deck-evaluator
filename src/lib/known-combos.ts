@@ -84,6 +84,113 @@ export const KNOWN_COMBOS: KnownCombo[] = [
     type: "value",
   },
 
+  // --- Artifact Combos ---
+  {
+    cards: ["Basalt Monolith", "Rings of Brighthearth"],
+    description: "Infinite colorless mana: copy Monolith's untap ability with Rings for {2}, net +1 mana each loop",
+    type: "infinite",
+  },
+  {
+    cards: ["Basalt Monolith", "Forsaken Monument"],
+    description: "Infinite colorless mana: Monument makes Monolith produce {C}{C}{C}{C}, untap for {3}, net +1",
+    type: "infinite",
+  },
+  {
+    cards: ["Krark-Clan Ironworks", "Nim Deathmantle", "Breya, Etherium Shaper"],
+    description: "Infinite damage/life: sac Breya + thopter to KCI for {C}{C}{C}{C}, pay {4} Deathmantle to return Breya, make 2 thopters, repeat with Breya's ability",
+    type: "infinite",
+  },
+  {
+    cards: ["Krark-Clan Ironworks", "Nim Deathmantle", "Myr Battlesphere"],
+    description: "Infinite tokens and mana: sac Battlesphere + 3 Myr to KCI for {C}{C}{C}{C}{C}{C}{C}{C}, Deathmantle returns Battlesphere, makes 4 Myr",
+    type: "infinite",
+  },
+  {
+    cards: ["Krark-Clan Ironworks", "Nim Deathmantle", "Wurmcoil Engine"],
+    description: "Infinite tokens and mana: sac Wurmcoil to KCI, tokens created, sac one token, Deathmantle returns Wurmcoil",
+    type: "infinite",
+  },
+  {
+    cards: ["Krark-Clan Ironworks", "Scrap Trawler", "Myr Retriever"],
+    description: "Infinite mana: sacrifice chain returns artifacts from graveyard, netting mana via KCI",
+    type: "infinite",
+  },
+  {
+    cards: ["Dross Scorpion", "Krark-Clan Ironworks"],
+    description: "Untap engine: when artifact creature dies to KCI, Scorpion untaps another mana artifact for extra mana",
+    type: "value",
+  },
+  {
+    cards: ["Clock of Omens", "Krark-Clan Ironworks"],
+    description: "Artifact untap engine: tap artifact tokens from KCI fodder to untap mana artifacts",
+    type: "value",
+  },
+  {
+    cards: ["Grinding Station", "Sword of the Meek", "Thopter Foundry"],
+    description: "Infinite mill: sac Sword to Foundry for thopter + life, Sword returns, Station untaps on artifact ETB",
+    type: "infinite",
+  },
+  {
+    cards: ["Grinding Station", "Underworld Breach"],
+    description: "Infinite mill: mill fuels escape costs, replay cheap artifacts to untap Station",
+    type: "infinite",
+  },
+  {
+    cards: ["Voltaic Key", "Time Vault"],
+    description: "Infinite turns: Key untaps Vault, take extra turn, repeat",
+    type: "infinite",
+  },
+  {
+    cards: ["Unwinding Clock", "Winter Orb"],
+    description: "Asymmetric lock: your artifacts untap normally, opponents' lands stay tapped",
+    type: "lock",
+  },
+  {
+    cards: ["Clock of Omens", "Unwinding Clock"],
+    description: "Full artifact untap engine: continuous untapping enables repeated activations each turn cycle",
+    type: "value",
+  },
+  {
+    cards: ["Panharmonicon", "Sharuum the Hegemon"],
+    description: "Double ETB recursion: Sharuum returns an artifact, Panharmonicon doubles the trigger for a second return",
+    type: "value",
+  },
+  {
+    cards: ["Sharuum the Hegemon", "Conjurer's Closet"],
+    description: "Recurring artifact recursion: blink Sharuum each end step to return an artifact from graveyard",
+    type: "value",
+  },
+  {
+    cards: ["Skullclamp", "Krark-Clan Ironworks"],
+    description: "Draw engine: equip Clamp to 1/1 artifact tokens, sac to KCI, draw 2 and gain mana",
+    type: "value",
+  },
+  {
+    cards: ["Lithoform Engine", "Rings of Brighthearth"],
+    description: "Ability copy engine: copy activated abilities twice for redundant doubling",
+    type: "value",
+  },
+  {
+    cards: ["Kuldotha Forgemaster", "Krark-Clan Ironworks"],
+    description: "Artifact tutor engine: sac artifacts to Forgemaster to tutor, KCI refunds mana from sacrificed artifacts",
+    type: "value",
+  },
+  {
+    cards: ["Master Transmuter", "Sharuum the Hegemon"],
+    description: "Artifact recursion loop: bounce and replay Sharuum to return artifacts from graveyard repeatedly",
+    type: "value",
+  },
+  {
+    cards: ["Prototype Portal", "Sol Ring"],
+    description: "Repeatable Sol Ring tokens: imprint Sol Ring, create copies for {1} each",
+    type: "value",
+  },
+  {
+    cards: ["Saheeli, the Gifted", "Lithoform Engine"],
+    description: "Cost reduction + copy: Saheeli reduces artifact costs, Engine copies spells and abilities",
+    type: "value",
+  },
+
   // --- Locks ---
   {
     cards: ["Knowledge Pool", "Drannith Magistrate"],
