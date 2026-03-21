@@ -978,3 +978,95 @@ test.describe("Multi-face card synergy detection", () => {
     expect(axis.detect(card)).toBeGreaterThan(0);
   });
 });
+
+test.describe("Discard axis", () => {
+  test("Waste Not (discard payoff) scores > 0", () => {
+    const axis = getAxisById("discard")!;
+    const card = mockCard({
+      name: "Waste Not",
+      oracleText:
+        "Whenever an opponent discards a creature card, create a 2/2 black Zombie creature token.\nWhenever an opponent discards a land card, add {B}{B}.\nWhenever an opponent discards a noncreature, nonland card, draw a card.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Liliana of the Veil (mass discard) scores > 0", () => {
+    const axis = getAxisById("discard")!;
+    const card = mockCard({
+      name: "Liliana of the Veil",
+      oracleText:
+        "+1: Each player discards a card.\n−2: Target player sacrifices a creature.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Syphon Mind (each other player discards) scores > 0", () => {
+    const axis = getAxisById("discard")!;
+    const card = mockCard({
+      name: "Syphon Mind",
+      oracleText:
+        "Each other player discards a card. You draw a card for each card discarded this way.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Tomb Robber (discard cost) scores > 0", () => {
+    const axis = getAxisById("discard")!;
+    const card = mockCard({
+      name: "Tomb Robber",
+      oracleText: "Menace\n{1}, {T}, Discard a card: This creature explores.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Wheel of Fortune (each player discards their hand) scores > 0", () => {
+    const axis = getAxisById("discard")!;
+    const card = mockCard({
+      name: "Wheel of Fortune",
+      oracleText: "Each player discards their hand, then draws seven cards.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("card with Cycling keyword scores > 0", () => {
+    const axis = getAxisById("discard")!;
+    const card = mockCard({
+      name: "Archfiend of Ifnir",
+      keywords: ["Cycling"],
+      oracleText:
+        "Flying\nWhenever you cycle or discard another card, put a -1/-1 counter on each creature your opponents control.\nCycling {2}",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("card with Madness keyword scores > 0", () => {
+    const axis = getAxisById("discard")!;
+    const card = mockCard({
+      name: "Basking Rootwalla",
+      keywords: ["Madness"],
+      oracleText:
+        "{1}{G}: Basking Rootwalla gets +2/+2 until end of turn. Activate only once each turn.\nMadness {0}",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("card with Connive keyword scores > 0", () => {
+    const axis = getAxisById("discard")!;
+    const card = mockCard({
+      name: "Raffine, Scheming Seer",
+      keywords: ["Connive"],
+      oracleText:
+        "Flying, ward {1}\nWhenever you attack, target attacking creature connives X, where X is the number of attacking creatures.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Lightning Bolt scores 0 on discard axis", () => {
+    const axis = getAxisById("discard")!;
+    const card = mockCard({
+      name: "Lightning Bolt",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(axis.detect(card)).toBe(0);
+  });
+});

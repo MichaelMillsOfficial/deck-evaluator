@@ -89,7 +89,7 @@ Chosen to avoid conflicts with existing TAG_COLORS (`bg-fuchsia-500/20` is taken
 
 ### Phase 1: Write Tests (TDD)
 
-- [ ] 1.1 Add discard tag tests to `tests/unit/card-tags.spec.ts`
+- [x] 1.1 Add discard tag tests to `tests/unit/card-tags.spec.ts`
   - **Targeted Discard:**
     - Test: Liliana Vess (+1 "Target player discards a card") → Targeted Discard
     - Test: Thoughtseize ("Target player reveals their hand. You choose a nonland card from it. That player discards that card.") → Targeted Discard
@@ -118,7 +118,7 @@ Chosen to avoid conflicts with existing TAG_COLORS (`bg-fuchsia-500/20` is taken
     - Test: Lightning Bolt (no discard) → no discard tags
     - Test: Painful Quandary should NOT get Discard Payoff (the "unless they discard" is a choice, not a "whenever...discards" trigger)
 
-- [ ] 1.2 Add discard axis tests to `tests/unit/synergy-axes.spec.ts`
+- [x] 1.2 Add discard axis tests to `tests/unit/synergy-axes.spec.ts`
   - Test: Waste Not detects on discard axis with score > 0
   - Test: Liliana of the Veil detects on discard axis with score > 0
   - Test: Syphon Mind detects on discard axis with score > 0
@@ -129,13 +129,13 @@ Chosen to avoid conflicts with existing TAG_COLORS (`bg-fuchsia-500/20` is taken
   - Test: Card with Madness keyword scores > 0 on discard axis
   - Test: Card with Connive keyword scores > 0 on discard axis
 
-- [ ] 1.3 Add discard synergy pair test to `tests/unit/synergy-engine.spec.ts`
+- [x] 1.3 Add discard synergy pair test to `tests/unit/synergy-engine.spec.ts`
   - Test: Deck with Liliana of the Veil + Waste Not → synergy pair on discard axis
   - Test: Deck with discard enablers + payoffs → "Discard" appears in deckThemes
 
 ### Phase 2: Implement Card Tags
 
-- [ ] 2.1 Add discard regex patterns to `src/lib/card-tags.ts`
+- [x] 2.1 Add discard regex patterns to `src/lib/card-tags.ts`
   - **Targeted Discard** (requires "target" word — 1-for-1 disruption):
     - `TARGETED_DISCARD_RE`: `/\btarget (?:player|opponent) discards/i`
     - `TARGETED_DISCARD_CHOOSE_RE`: `/\btarget (?:player|opponent) reveals[^.]*(?:you choose|discard)/i` (Thoughtseize/Agonizing Remorse style)
@@ -154,13 +154,13 @@ Chosen to avoid conflicts with existing TAG_COLORS (`bg-fuchsia-500/20` is taken
     - ~~`TARGETED_DISCARD_EACH_RE`~~ — "each player discards" is Mass, not Targeted
     - ~~`DISCARD_PAYOFF_GRAVEYARD_FROM_HAND_RE`~~ — Sangromancer's actual text uses "discards", not "put into graveyard from hand"; the primary payoff regex catches it
 
-- [ ] 2.2 Add tag color entries to `TAG_COLORS` in `src/lib/card-tags.ts`
+- [x] 2.2 Add tag color entries to `TAG_COLORS` in `src/lib/card-tags.ts`
   - `"Targeted Discard"`: `{ bg: "bg-neutral-500/20", text: "text-neutral-300" }`
   - `"Mass Discard"`: `{ bg: "bg-neutral-600/20", text: "text-neutral-200" }`
   - `"Self-Discard"`: `{ bg: "bg-gray-500/20", text: "text-gray-300" }`
   - `"Discard Payoff"`: `{ bg: "bg-slate-500/20", text: "text-slate-300" }`
 
-- [ ] 2.3 Add tag detection logic to `generateTags()` function in `src/lib/card-tags.ts`
+- [x] 2.3 Add tag detection logic to `generateTags()` function in `src/lib/card-tags.ts`
   - **Targeted Discard**: match ONLY patterns with "target" word — `TARGETED_DISCARD_RE` or `TARGETED_DISCARD_CHOOSE_RE`. Never match "each player" patterns.
   - **Mass Discard**: match `MASS_DISCARD_EACH_RE` (covers "each player/opponent/other player discards") or `MASS_DISCARD_UNLESS_RE` (Painful Quandary style)
   - **Self-Discard**: match `SELF_DISCARD_COST_RE` (colon-delimited costs only), `SELF_DISCARD_ADDITIONAL_RE`, `SELF_DISCARD_UPKEEP_RE`, OR check `card.keywords` for "Cycling"/"Connive"
@@ -170,7 +170,7 @@ Chosen to avoid conflicts with existing TAG_COLORS (`bg-fuchsia-500/20` is taken
 
 ### Phase 3: Implement Synergy Axis
 
-- [ ] 3.1 Add discard regex patterns and axis definition to `src/lib/synergy-axes.ts`
+- [x] 3.1 Add discard regex patterns and axis definition to `src/lib/synergy-axes.ts`
   - Reuse tag-level regex concepts but combine into a single `detect()` function
   - `DISCARD_PAYOFF_RE`: `/\bwhenever[^.]*discards?\b/i` (plus condition variant for The Raven Man)
   - `DISCARD_MASS_RE`: `/\beach (?:player|opponent|other player)[^.]*discards/i`
@@ -193,7 +193,7 @@ Chosen to avoid conflicts with existing TAG_COLORS (`bg-fuchsia-500/20` is taken
 
 ### Phase 4: Verify & Refine
 
-- [ ] 4.1 Run `npm run test:unit` — all unit tests pass
+- [x] 4.1 Run `npm run test:unit` — all unit tests pass
 - [ ] 4.2 Run `npm test` — full test suite passes (no regressions)
 - [ ] 4.3 Run `npm run build` — production build succeeds
 - [ ] 4.4 Manual smoke test: import the Liliana decklist, verify:
