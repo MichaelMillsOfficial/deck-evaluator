@@ -199,27 +199,11 @@ export default function InteractionHeatmap({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const rulerRef = useRef<HTMLDivElement>(null);
 
   /** 0 = show all */
   const [cardLimit, setCardLimit] = useState<number>(30);
   const [sortMode, setSortMode] = useState<SortMode>("centrality");
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
-  const [availableWidth, setAvailableWidth] = useState<number>(0);
-
-  // Measure available width from a zero-height ruler element.
-  // The ruler is separate from the canvas so the canvas can't inflate the measurement.
-  useEffect(() => {
-    const el = rulerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setAvailableWidth(entry.contentRect.width);
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   // Build full heatmap data (all eligible cards, up to 30 by default)
   const baseHeatmap = useMemo(
@@ -567,8 +551,6 @@ export default function InteractionHeatmap({
   const canvasW = LABEL_WIDTH + N * CELL_SIZE;
   const canvasH = HEADER_HEIGHT + N * CELL_SIZE;
   const containerMaxHeight = Math.min(canvasH + 16, 600);
-  const containerMaxWidth = "100%"; // fill parent; canvas scrolls inside
-
   // ─── Status line text ───────────────────────────────────────────────────────
   const statusText = useMemo(() => {
     const sortLabel =
@@ -659,16 +641,16 @@ export default function InteractionHeatmap({
         {statusText}
       </p>
 
-      {/* Zero-height ruler: measures parent width without being inflated by the canvas */}
-      <div ref={rulerRef} className="h-0 w-full" aria-hidden="true" />
-
-      {/* Scroll container: explicit pixel width from ruler, canvas scrolls inside */}
+      {/* Scroll container: width:0 + min-width:100% prevents the canvas from
+           inflating flex parents while still filling available space. overflow-auto
+           then creates scrollbars inside the component boundary. */}
       <div
         ref={containerRef}
         className="relative overflow-auto rounded-lg border border-slate-700"
         style={{
           maxHeight: containerMaxHeight,
-          width: availableWidth > 0 ? availableWidth : "100%",
+          width: 0,
+          minWidth: "100%",
         }}
         tabIndex={0}
         role="region"
