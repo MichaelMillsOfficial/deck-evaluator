@@ -643,24 +643,28 @@ export default function InteractionHeatmap({
         {statusText}
       </p>
 
-      {/* Canvas container — scrollable viewport for large matrices */}
+      {/* Canvas container — fixed-size viewport with internal scrollbars */}
       <div
-        ref={containerRef}
-        className="relative overflow-auto rounded-lg border border-slate-700"
-        style={{ maxHeight: containerMaxHeight, maxWidth: containerMaxWidth }}
-        tabIndex={0}
-        role="region"
-        aria-label={`Interaction heatmap: ${N} cards. Scroll to explore.`}
+        className="overflow-hidden rounded-lg border border-slate-700"
+        style={{ width: "100%" }}
       >
-        <canvas
-          ref={canvasRef}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          className="block"
-          style={{ width: canvasW, height: canvasH }}
-          aria-label={`Interaction heatmap: ${N} cards`}
-        />
-        {tooltip && <HeatmapTooltip info={tooltip} />}
+        <div
+          ref={containerRef}
+          className="relative overflow-auto"
+          style={{ maxHeight: containerMaxHeight }}
+          tabIndex={0}
+          role="region"
+          aria-label={`Interaction heatmap: ${N} cards. Scroll to explore.`}
+        >
+          <canvas
+            ref={canvasRef}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            style={{ display: "block", minWidth: canvasW, minHeight: canvasH }}
+            aria-label={`Interaction heatmap: ${N} cards`}
+          />
+          {tooltip && <HeatmapTooltip info={tooltip} />}
+        </div>
       </div>
 
       {/* Scroll hint when canvas overflows the container */}
