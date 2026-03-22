@@ -9,6 +9,8 @@ import {
 } from "./opening-hand";
 import type { HandCard, Verdict } from "./opening-hand";
 import { createPRNG, randomSeed } from "./prng";
+import { ComboAssemblyTracker } from "./combo-assembly-tracker";
+import type { KnownCombo } from "./known-combos";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,6 +99,8 @@ export interface PermanentSnapshot {
   category: PermanentCategory;
   tapped: boolean;
   enteredTurn: number;
+  /** For grouped tokens: number of identical tokens (default 1) */
+  count?: number;
 }
 
 export interface GoldfishTurnLog {
@@ -112,6 +116,8 @@ export interface GoldfishTurnLog {
   permanentCount: number;
   permanents: PermanentSnapshot[]; // full battlefield snapshot
   commanderCast: boolean;
+  /** Total commander tax paid this turn (2 per previous cast) */
+  commanderTaxTotal: number;
   libraryActions: LibraryAction[];
   graveyard: string[]; // card names in graveyard at end of turn
   exile: string[]; // card names in exile at end of turn
@@ -158,6 +164,8 @@ export interface GoldfishResult {
   notableGames: NotableGame[];
   pool: GoldfishCard[];
   commandZone: GoldfishCard[];
+  /** Combo assembly statistics (populated when combos are provided to simulation) */
+  comboStats?: import("./combo-assembly-tracker").ComboAssemblyStats;
 }
 
 export type RampSourceType = "rock" | "dork" | "land-search" | "ritual";
@@ -181,6 +189,10 @@ export interface GoldfishAggregateStats {
   rampAcceleration: number; // avg extra mana from ramp vs baseline
   avgTotalSpellsCast: number;
   rampSources: RampSource[]; // ramp cards in the deck with cast statistics
+  /** Average number of times the commander was recast (beyond first cast) */
+  avgCommanderRecasts: number;
+  /** Average total commander tax paid across all turns in a game */
+  avgCommanderTaxTotal: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -202,22 +214,55 @@ function categorizePermanent(permanent: GoldfishPermanent): PermanentCategory {
 function snapshotBattlefield(state: GoldfishGameState): PermanentSnapshot[] {
   const snapshots: PermanentSnapshot[] = [];
 
+  // Separate tokens from non-token permanents
+  const nonTokens: GoldfishPermanent[] = [];
+  const tokenGroups = new Map<string, { perm: GoldfishPermanent; count: number }>();
+
   for (const perm of state.battlefield) {
+    const category = categorizePermanent(perm);
+    if (category === "token") {
+      const key = perm.card.name;
+      const existing = tokenGroups.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        tokenGroups.set(key, { perm, count: 1 });
+      }
+    } else {
+      nonTokens.push(perm);
+    }
+  }
+
+  // Add non-token permanents individually
+  for (const perm of nonTokens) {
     snapshots.push({
       name: perm.card.name,
       category: categorizePermanent(perm),
       tapped: perm.tapped,
       enteredTurn: perm.enteredTurn,
+      count: 1,
     });
   }
 
-  // Include treasure tokens as virtual permanents
-  for (let i = 0; i < state.treasureCount; i++) {
+  // Add grouped tokens
+  for (const [name, { perm, count }] of tokenGroups) {
+    snapshots.push({
+      name,
+      category: "token",
+      tapped: perm.tapped,
+      enteredTurn: perm.enteredTurn,
+      count,
+    });
+  }
+
+  // Include treasure tokens as a single grouped virtual permanent
+  if (state.treasureCount > 0) {
     snapshots.push({
       name: "Treasure Token",
       category: "token",
       tapped: false,
       enteredTurn: state.turn,
+      count: state.treasureCount,
     });
   }
 
@@ -1435,6 +1480,14 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
   const manaAvailableEndOfTurn = sumManaPool(computeAvailableMana(state));
   const landOnlyMana = computeNaturalLandMana(state);
 
+  // Commander tax for this turn = (number of times commander has been recast) * 2
+  // state.commanderTaxPaid tracks how many times the commander has been cast total
+  // Each cast adds 2 to the next cast's cost, so total tax paid = (casts - 1) * 2
+  const commanderTaxThisTurn =
+    commanderCast && state.commanderTaxPaid > 1
+      ? (state.commanderTaxPaid - 1) * 2
+      : 0;
+
   return {
     turn: state.turn,
     cardsDrawn,
@@ -1448,6 +1501,7 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
     permanentCount: state.battlefield.length,
     permanents: snapshotBattlefield(state),
     commanderCast,
+    commanderTaxTotal: commanderTaxThisTurn,
     libraryActions,
     graveyard: state.graveyard.map((c) => c.name),
     exile: state.exile.map((c) => c.name),
@@ -1461,12 +1515,14 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
 /**
  * Run a single goldfish game for N turns, returning the game log.
  * When a seed is provided, the game is fully deterministic (same seed = same game).
+ * Optional comboTracker will be updated at the end of each turn.
  */
 export function runGoldfishGame(
   pool: GoldfishCard[],
   commandZone: GoldfishCard[],
   config: GoldfishConfig,
-  seed?: number
+  seed?: number,
+  comboTracker?: ComboAssemblyTracker
 ): GoldfishGameLog {
   const random = seed !== undefined ? createPRNG(seed) : Math.random;
   const state = initializeGame(pool, commandZone, random);
@@ -1512,6 +1568,11 @@ export function runGoldfishGame(
     if (log.commanderCast && commanderFirstCastTurn === null) {
       commanderFirstCastTurn = log.turn;
     }
+
+    // Update combo tracker at end of each turn
+    if (comboTracker) {
+      comboTracker.update(state, state.turn);
+    }
   }
 
   return { turnLogs, commanderFirstCastTurn, openingHand };
@@ -1546,6 +1607,8 @@ export function computeAggregateStats(
       rampAcceleration: 0,
       avgTotalSpellsCast: 0,
       rampSources: [],
+      avgCommanderRecasts: 0,
+      avgCommanderTaxTotal: 0,
     };
   }
 
@@ -1629,6 +1692,23 @@ export function computeAggregateStats(
       0
     ) / n;
 
+  // Commander recast stats
+  const commanderRecastData = games.map((g) => {
+    // Count commander casts (each commanderCast=true in a turnLog is one cast)
+    const totalCasts = g.turnLogs.filter((l) => l.commanderCast).length;
+    const recasts = Math.max(0, totalCasts - 1);
+    const totalTax = g.turnLogs.reduce((sum, l) => sum + (l.commanderTaxTotal ?? 0), 0);
+    return { recasts, totalTax };
+  });
+  const avgCommanderRecasts =
+    Math.round(
+      (commanderRecastData.reduce((s, d) => s + d.recasts, 0) / n) * 100
+    ) / 100;
+  const avgCommanderTaxTotal =
+    Math.round(
+      (commanderRecastData.reduce((s, d) => s + d.totalTax, 0) / n) * 100
+    ) / 100;
+
   return {
     avgManaByTurn,
     avgManaUsedByTurn,
@@ -1640,6 +1720,8 @@ export function computeAggregateStats(
     rampAcceleration,
     avgTotalSpellsCast: Math.round(avgTotalSpellsCast * 100) / 100,
     rampSources: [], // populated by runGoldfishSimulation after aggregation
+    avgCommanderRecasts,
+    avgCommanderTaxTotal,
   };
 }
 
@@ -1884,23 +1966,40 @@ function extractGameSummary(
 /**
  * Run the full goldfish simulation: builds pool, runs N games, aggregates stats.
  * Each game gets a unique seed for deterministic replay.
+ * Optional combos enables per-game combo assembly tracking.
  */
 export function runGoldfishSimulation(
   deck: DeckData,
   cardMap: Record<string, EnrichedCard>,
-  config: GoldfishConfig = DEFAULT_GOLDFISH_CONFIG
+  config: GoldfishConfig = DEFAULT_GOLDFISH_CONFIG,
+  combos?: Pick<KnownCombo, "id" | "cards" | "zoneRequirements">[]
 ): GoldfishResult {
   const pool = buildGoldfishPoolFromDeck(deck, cardMap);
   const commandZone = buildGoldfishCommandZoneFromDeck(deck, cardMap);
 
   const games: GoldfishGameLog[] = [];
   const gameSummaries: GoldfishGameSummary[] = [];
+  const comboTrackers: ComboAssemblyTracker[] = [];
+
+  const hasComboTracking = combos !== undefined && combos.length > 0;
 
   for (let i = 0; i < config.iterations; i++) {
     const seed = randomSeed();
-    const game = runGoldfishGame(pool, commandZone, config, seed);
+    let comboTracker: ComboAssemblyTracker | undefined;
+    if (hasComboTracking) {
+      comboTracker = new ComboAssemblyTracker(
+        combos!.map((c) => ({
+          id: c.id,
+          name: c.id, // name is used for display; id doubles as name here
+          cards: c.cards,
+          zoneRequirements: c.zoneRequirements,
+        }))
+      );
+    }
+    const game = runGoldfishGame(pool, commandZone, config, seed, comboTracker);
     games.push(game);
     gameSummaries.push(extractGameSummary(game, seed));
+    if (comboTracker) comboTrackers.push(comboTracker);
   }
 
   const stats = computeAggregateStats(games, config.turns);
@@ -1908,5 +2007,21 @@ export function runGoldfishSimulation(
 
   const notableGames = computeNotableGames(gameSummaries);
 
-  return { games, stats, gameSummaries, notableGames, pool, commandZone };
+  const result: GoldfishResult = {
+    games,
+    stats,
+    gameSummaries,
+    notableGames,
+    pool,
+    commandZone,
+  };
+
+  if (hasComboTracking && comboTrackers.length > 0) {
+    result.comboStats = ComboAssemblyTracker.aggregateStats(
+      comboTrackers,
+      config.turns
+    );
+  }
+
+  return result;
 }

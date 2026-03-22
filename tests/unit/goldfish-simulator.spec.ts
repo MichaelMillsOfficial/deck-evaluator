@@ -1841,12 +1841,15 @@ test.describe("token creation in simulation", () => {
     // Turn 1: Bitterblossom should trigger (it entered on turn 0)
     const log1 = executeTurn(state, config);
     const rogues1 = log1.permanents.filter((p) => p.name === "Rogue Token");
+    // Tokens are grouped: one entry with count 1
     expect(rogues1).toHaveLength(1);
+    expect(rogues1[0].count ?? 1).toBe(1);
 
-    // Turn 2: Another token
+    // Turn 2: Another token — grouped entry with count 2
     const log2 = executeTurn(state, config);
     const rogues2 = log2.permanents.filter((p) => p.name === "Rogue Token");
-    expect(rogues2).toHaveLength(2);
+    expect(rogues2).toHaveLength(1);
+    expect(rogues2[0].count ?? 1).toBe(2);
   });
 
   test("commander ETB creates tokens (Breya)", () => {
@@ -1880,8 +1883,10 @@ test.describe("token creation in simulation", () => {
     const log = executeTurn(state, config);
     expect(log.spellsCast).toContain("Breya, Etherium Shaper");
 
+    // Thopter tokens are grouped into a single entry with count = 2
     const thopters = log.permanents.filter((p) => p.name === "Thopter Token");
-    expect(thopters).toHaveLength(2);
+    expect(thopters).toHaveLength(1);
+    expect(thopters[0].count ?? 1).toBe(2);
     expect(thopters[0].category).toBe("token");
   });
 });
