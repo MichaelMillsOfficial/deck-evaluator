@@ -970,4 +970,93 @@ test.describe("analyzeDeckSynergy", () => {
     );
     expect(supertypeTheme).toBeUndefined();
   });
+
+  test("Liliana of the Veil + Waste Not → synergy pair on discard axis", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Liliana of the Veil": mockCard({
+        name: "Liliana of the Veil",
+        typeLine: "Legendary Planeswalker — Liliana",
+        oracleText:
+          "+1: Each player discards a card.\n−2: Target player sacrifices a creature.\n−6: Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile of their choice.",
+      }),
+      "Waste Not": mockCard({
+        name: "Waste Not",
+        typeLine: "Enchantment",
+        oracleText:
+          "Whenever an opponent discards a creature card, create a 2/2 black Zombie creature token.\nWhenever an opponent discards a land card, add {B}{B}.\nWhenever an opponent discards a noncreature, nonland card, draw a card.",
+      }),
+      "Geth's Grimoire": mockCard({
+        name: "Geth's Grimoire",
+        typeLine: "Artifact",
+        oracleText:
+          "Whenever an opponent discards a card, you may draw a card.",
+      }),
+      "Syphon Mind": mockCard({
+        name: "Syphon Mind",
+        typeLine: "Sorcery",
+        oracleText:
+          "Each other player discards a card. You draw a card for each card discarded this way.",
+      }),
+      "Lightning Bolt": mockCard({
+        name: "Lightning Bolt",
+        typeLine: "Instant",
+        oracleText: "Lightning Bolt deals 3 damage to any target.",
+      }),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    // Should have synergy pairs on the discard axis
+    const discardPairs = result.topSynergies.filter(
+      (p) => p.axisId === "discard"
+    );
+    expect(discardPairs.length).toBeGreaterThan(0);
+
+    // Waste Not should score higher than Lightning Bolt
+    const wasteScore = result.cardScores["Waste Not"]?.score ?? 0;
+    const boltScore = result.cardScores["Lightning Bolt"]?.score ?? 50;
+    expect(wasteScore).toBeGreaterThan(boltScore);
+  });
+
+  test("discard-heavy deck detects Discard theme", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Liliana of the Veil": mockCard({
+        name: "Liliana of the Veil",
+        typeLine: "Legendary Planeswalker — Liliana",
+        oracleText:
+          "+1: Each player discards a card.\n−2: Target player sacrifices a creature.",
+      }),
+      "Waste Not": mockCard({
+        name: "Waste Not",
+        typeLine: "Enchantment",
+        oracleText:
+          "Whenever an opponent discards a creature card, create a 2/2 black Zombie creature token.\nWhenever an opponent discards a land card, add {B}{B}.\nWhenever an opponent discards a noncreature, nonland card, draw a card.",
+      }),
+      "Geth's Grimoire": mockCard({
+        name: "Geth's Grimoire",
+        typeLine: "Artifact",
+        oracleText:
+          "Whenever an opponent discards a card, you may draw a card.",
+      }),
+      "Syphon Mind": mockCard({
+        name: "Syphon Mind",
+        typeLine: "Sorcery",
+        oracleText:
+          "Each other player discards a card. You draw a card for each card discarded this way.",
+      }),
+      "Liliana Vess": mockCard({
+        name: "Liliana Vess",
+        typeLine: "Legendary Planeswalker — Liliana",
+        oracleText:
+          "+1: Target player discards a card.\n−2: Search your library for a card, then shuffle and put that card on top.",
+      }),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const discardTheme = result.deckThemes.find(
+      (t) => t.axisId === "discard"
+    );
+    expect(discardTheme).toBeDefined();
+  });
 });

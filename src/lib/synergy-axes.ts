@@ -116,6 +116,17 @@ const LIFEGAIN_TRIGGER_RE = /whenever you gain life/i;
 const LIFEGAIN_PAYOFF_RE = /\byou gain.+?\blife\b/i;
 const LIFEGAIN_KEYWORDS = new Set(["Lifelink"]);
 
+// --- Discard ---
+const DISCARD_PAYOFF_RE = /\bwhenever[^.]*discards?\b/i;
+const DISCARD_PAYOFF_COND_RE = /\bif a player discarded a card this turn\b/i;
+const DISCARD_MASS_RE =
+  /\beach (?:player|opponent|other player)[^.]*discards?\b/i;
+const DISCARD_TARGETED_RE = /\btarget (?:player|opponent) discards/i;
+const DISCARD_COST_RE = /[Dd]iscard (?:a|two|three|x|your) (?:cards?|hand)\s*:/;
+const DISCARD_UNLESS_RE =
+  /\bunless (?:that player|they|he or she) discards?\b/i;
+const DISCARD_KEYWORDS = new Set(["Madness", "Connive", "Cycling"]);
+
 // --- Keyword Matters ---
 // Keywords that can form a deck strategy when a commander/payoff card cares about them
 export const KEYWORD_MATTERS_LIST = [
@@ -437,6 +448,27 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
       if (SUPERTYPE_SNOW_MANA_RE.test(text)) score += 0.4;
       // {S} in mana cost (not just oracle text)
       if (SUPERTYPE_SNOW_MANA_RE.test(card.manaCost)) score += 0.3;
+      return Math.min(score, 1);
+    },
+    conflictsWith: [],
+  },
+  {
+    id: "discard",
+    name: "Discard",
+    description: "Hand disruption, discard triggers, madness",
+    color: { bg: "bg-neutral-500/20", text: "text-neutral-300" },
+    detect(card) {
+      const text = card.oracleText;
+      let score = 0;
+      if (DISCARD_PAYOFF_RE.test(text) || DISCARD_PAYOFF_COND_RE.test(text))
+        score += 0.7;
+      if (DISCARD_MASS_RE.test(text)) score += 0.6;
+      if (DISCARD_TARGETED_RE.test(text)) score += 0.5;
+      if (DISCARD_COST_RE.test(text)) score += 0.3;
+      if (DISCARD_UNLESS_RE.test(text)) score += 0.6;
+      if (card.keywords.includes("Madness")) score += 0.4;
+      if (card.keywords.includes("Connive")) score += 0.3;
+      if (card.keywords.includes("Cycling")) score += 0.3;
       return Math.min(score, 1);
     },
     conflictsWith: [],

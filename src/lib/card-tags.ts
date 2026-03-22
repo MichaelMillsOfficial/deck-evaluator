@@ -29,6 +29,10 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   "Tribal Payoff": { bg: "bg-teal-500/20", text: "text-teal-300" },
   "Legendary Payoff": { bg: "bg-amber-500/20", text: "text-amber-300" },
   "Snow Payoff": { bg: "bg-cyan-500/20", text: "text-cyan-300" },
+  "Targeted Discard": { bg: "bg-neutral-500/20", text: "text-neutral-300" },
+  "Mass Discard": { bg: "bg-neutral-600/20", text: "text-neutral-200" },
+  "Self-Discard": { bg: "bg-gray-600/20", text: "text-gray-300" },
+  "Discard Payoff": { bg: "bg-slate-600/20", text: "text-slate-200" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -131,6 +135,37 @@ const SNOW_BROAD_RE = /\bsnow\b[^.]*?\b(?:permanent|creature|land|mana)s?\b/i;
 const SNOW_OTHER_RE = /\bother snow\b/i;
 const SNOW_TRIGGER_RE = /whenever a snow.*enters|for each snow/i;
 const SNOW_MANA_RE = /\{S\}/;
+
+// --- Discard tag patterns ---
+// Targeted Discard — requires "target" word (1-for-1 disruption)
+const TARGETED_DISCARD_RE = /\btarget (?:player|opponent) discards/i;
+// Multi-sentence pattern: "Target player reveals ... That player discards"
+// Uses [\s\S] instead of . to match across sentence boundaries (newlines)
+// because the reveal and discard clauses are in separate sentences.
+// (Cannot use /s dot-all flag — tsconfig target is ES2017, /s requires ES2018.)
+const TARGETED_DISCARD_CHOOSE_RE =
+  /\btarget (?:player|opponent) reveals[\s\S]+?(?:that player |they )discard/i;
+
+// Mass Discard — affects multiple players, no targeting
+const MASS_DISCARD_EACH_RE =
+  /\beach (?:player|opponent|other player)[^.]*discards?\b/i;
+const MASS_DISCARD_UNLESS_RE =
+  /\bunless (?:that player|they|he or she) discards?\b/i;
+
+// Self-Discard — self-discard as cost or forced trigger
+const SELF_DISCARD_COST_RE =
+  /[Dd]iscard (?:a|two|three|x|your) (?:cards?|hand)\s*:/;
+const SELF_DISCARD_ADDITIONAL_RE = /\bas an additional cost[^.]*discard/i;
+const SELF_DISCARD_UPKEEP_RE =
+  /\b(?:at the beginning of|during) your upkeep[^.]*discard/i;
+const SELF_DISCARD_KEYWORDS = new Set(["Cycling", "Connive"]);
+
+// Discard Payoff — triggers on discard events
+const DISCARD_PAYOFF_TRIGGER_RE = /\bwhenever[^.]*discards?\b/i;
+const DISCARD_PAYOFF_CONDITION_RE =
+  /\bif a player discarded a card this turn\b/i;
+// "unless ... discards" is NOT a payoff trigger — it's a Mass Discard choice
+const DISCARD_UNLESS_EXCLUSION_RE = /\bunless[^.]*discards?\b/i;
 
 const RESOURCE_DENIAL_NAMES = new Set([
   "Blood Moon",
@@ -385,6 +420,49 @@ export function generateTags(card: EnrichedCard): string[] {
     SNOW_MANA_RE.test(card.manaCost)
   ) {
     tags.add("Snow Payoff");
+  }
+
+  // --- Discard tags (all four checked independently — cards can get multiple) ---
+
+  // Targeted Discard — requires "target" word
+  if (TARGETED_DISCARD_RE.test(text) || TARGETED_DISCARD_CHOOSE_RE.test(text)) {
+    tags.add("Targeted Discard");
+  }
+
+  // Mass Discard — each player/opponent discards, or "unless ... discards"
+  if (MASS_DISCARD_EACH_RE.test(text) || MASS_DISCARD_UNLESS_RE.test(text)) {
+    tags.add("Mass Discard");
+  }
+
+  // Self-Discard — cost-position discard (colon-delimited), upkeep triggers, or keywords
+  if (
+    SELF_DISCARD_COST_RE.test(text) ||
+    SELF_DISCARD_ADDITIONAL_RE.test(text) ||
+    SELF_DISCARD_UPKEEP_RE.test(text) ||
+    card.keywords.some((kw) => SELF_DISCARD_KEYWORDS.has(kw))
+  ) {
+    tags.add("Self-Discard");
+  }
+
+  // Discard Payoff — whenever triggers on discard, or conditional checks.
+  // Two-pass approach: the trigger regex is broad (/whenever[^.]*discards/)
+  // which would false-positive on "unless...discards" (Painful Quandary).
+  // We check per-line to exclude lines where the "discard" is inside an
+  // "unless" clause, while still allowing genuine payoff triggers on other lines.
+  if (DISCARD_PAYOFF_CONDITION_RE.test(text)) {
+    tags.add("Discard Payoff");
+  }
+  if (DISCARD_PAYOFF_TRIGGER_RE.test(text)) {
+    const lines = text.split("\n");
+    for (const line of lines) {
+      if (
+        DISCARD_PAYOFF_TRIGGER_RE.test(line) &&
+        !DISCARD_UNLESS_EXCLUSION_RE.test(line)
+      ) {
+        tags.add("Discard Payoff");
+        break;
+      }
+    }
   }
 
   return Array.from(tags).sort();

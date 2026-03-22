@@ -1715,3 +1715,256 @@ test.describe("generateTags — Cost Reduction self-only exclusion", () => {
     expect(generateTags(card)).toContain("Cost Reduction");
   });
 });
+
+// --- Discard tags ---
+
+test.describe("generateTags — Targeted Discard", () => {
+  test("Liliana Vess (+1 target player discards) → Targeted Discard", () => {
+    const card = makeCard({
+      name: "Liliana Vess",
+      typeLine: "Legendary Planeswalker — Liliana",
+      oracleText:
+        "+1: Target player discards a card.\n−2: Search your library for a card, then shuffle and put that card on top.\n−8: Put all creature cards from all graveyards onto the battlefield under your control.",
+    });
+    expect(generateTags(card)).toContain("Targeted Discard");
+    expect(generateTags(card)).not.toContain("Mass Discard");
+  });
+
+  test("Thoughtseize (target player reveals, you choose, they discard) → Targeted Discard", () => {
+    const card = makeCard({
+      name: "Thoughtseize",
+      typeLine: "Sorcery",
+      oracleText:
+        "Target player reveals their hand. You choose a nonland card from it. That player discards that card. You lose 2 life.",
+    });
+    expect(generateTags(card)).toContain("Targeted Discard");
+    expect(generateTags(card)).not.toContain("Mass Discard");
+  });
+});
+
+test.describe("generateTags — Mass Discard", () => {
+  test("Liliana of the Veil (each player discards) → Mass Discard, NOT Targeted", () => {
+    const card = makeCard({
+      name: "Liliana of the Veil",
+      typeLine: "Legendary Planeswalker — Liliana",
+      oracleText:
+        "+1: Each player discards a card.\n−2: Target player sacrifices a creature.\n−6: Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile of their choice.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Mass Discard");
+    expect(tags).not.toContain("Targeted Discard");
+  });
+
+  test("Syphon Mind (each other player discards) → Mass Discard", () => {
+    const card = makeCard({
+      name: "Syphon Mind",
+      typeLine: "Sorcery",
+      oracleText:
+        "Each other player discards a card. You draw a card for each card discarded this way.",
+    });
+    expect(generateTags(card)).toContain("Mass Discard");
+  });
+
+  test("Pox (each player discards) → Mass Discard", () => {
+    const card = makeCard({
+      name: "Pox",
+      typeLine: "Sorcery",
+      oracleText:
+        "Each player loses a third of their life, then discards a third of the cards in their hand, then sacrifices a third of the creatures they control, then sacrifices a third of the lands they control. Round up each time.",
+    });
+    expect(generateTags(card)).toContain("Mass Discard");
+  });
+
+  test("Painful Quandary (unless that player discards) → Mass Discard", () => {
+    const card = makeCard({
+      name: "Painful Quandary",
+      typeLine: "Enchantment",
+      oracleText:
+        "Whenever an opponent casts a spell, that player loses 5 life unless that player discards a card.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Mass Discard");
+    expect(tags).not.toContain("Discard Payoff");
+  });
+
+  test("Wheel of Fortune (each player discards their hand) → Mass Discard", () => {
+    const card = makeCard({
+      name: "Wheel of Fortune",
+      typeLine: "Sorcery",
+      oracleText:
+        "Each player discards their hand, then draws seven cards.",
+    });
+    expect(generateTags(card)).toContain("Mass Discard");
+  });
+
+  test("Professor Onyx (each opponent may discard) → Mass Discard, NOT Targeted", () => {
+    const card = makeCard({
+      name: "Professor Onyx",
+      typeLine: "Legendary Planeswalker — Liliana",
+      oracleText:
+        "Magecraft — Whenever you cast or copy an instant or sorcery spell, each opponent loses 2 life and you gain 2 life.\n+1: You lose 1 life. Look at the top three cards of your library. Put one of them into your hand and the rest into your graveyard.\n−3: Each opponent may discard a card. If they don't, they lose 3 life.\n−8: Each opponent may discard a card. If they don't, they lose 3 life. Repeat this process six more times.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Mass Discard");
+    expect(tags).not.toContain("Targeted Discard");
+  });
+
+  test("Liliana, Heretical Healer back face (DFC each player discards) → Mass Discard", () => {
+    const card = makeCard({
+      name: "Liliana, Heretical Healer",
+      typeLine: "Legendary Creature — Human Cleric",
+      oracleText:
+        "Lifelink\nWhenever another nontoken creature you control dies, exile Liliana, Heretical Healer, then return her to the battlefield transformed under her owner's control. If you do, create a 2/2 black Zombie creature token.\n+2: Each player discards a card.\n−X: Return target nonland creature card with mana value X or less from your graveyard to the battlefield.\n−8: You get an emblem with \"Whenever a creature dies, return it to the battlefield under your control at the beginning of the next end step.\"",
+    });
+    expect(generateTags(card)).toContain("Mass Discard");
+  });
+});
+
+test.describe("generateTags — Self-Discard", () => {
+  test("Tomb Robber (discard a card as activated cost) → Self-Discard", () => {
+    const card = makeCard({
+      name: "Tomb Robber",
+      typeLine: "Creature — Human Pirate",
+      oracleText:
+        "Menace\n{1}, {T}, Discard a card: This creature explores.",
+    });
+    expect(generateTags(card)).toContain("Self-Discard");
+  });
+
+  test("Rotting Regisaur (upkeep discard trigger) → Self-Discard", () => {
+    const card = makeCard({
+      name: "Rotting Regisaur",
+      typeLine: "Creature — Zombie Dinosaur",
+      oracleText: "At the beginning of your upkeep, discard a card.",
+    });
+    expect(generateTags(card)).toContain("Self-Discard");
+  });
+
+  test("card with Cycling keyword → Self-Discard", () => {
+    const card = makeCard({
+      name: "Archfiend of Ifnir",
+      typeLine: "Creature — Demon",
+      keywords: ["Cycling"],
+      oracleText:
+        "Flying\nWhenever you cycle or discard another card, put a -1/-1 counter on each creature your opponents control.\nCycling {2}",
+    });
+    expect(generateTags(card)).toContain("Self-Discard");
+  });
+
+  test("card with Connive keyword → Self-Discard", () => {
+    const card = makeCard({
+      name: "Raffine, Scheming Seer",
+      typeLine: "Legendary Creature — Sphinx Demon",
+      keywords: ["Connive"],
+      oracleText:
+        "Flying, ward {1}\nWhenever you attack, target attacking creature connives X, where X is the number of attacking creatures.",
+    });
+    expect(generateTags(card)).toContain("Self-Discard");
+  });
+
+  test("Lightning Axe (as an additional cost, discard) → Self-Discard", () => {
+    const card = makeCard({
+      name: "Lightning Axe",
+      typeLine: "Instant",
+      oracleText:
+        "As an additional cost to cast this spell, discard a card or pay {5}.\nLightning Axe deals 5 damage to target creature.",
+    });
+    expect(generateTags(card)).toContain("Self-Discard");
+  });
+
+  test("Faithless Looting (period-terminated effect) → NOT Self-Discard", () => {
+    const card = makeCard({
+      name: "Faithless Looting",
+      typeLine: "Sorcery",
+      oracleText:
+        "Draw two cards, then discard two cards.\nFlashback {2}{R}",
+    });
+    expect(generateTags(card)).not.toContain("Self-Discard");
+  });
+});
+
+test.describe("generateTags — Discard Payoff", () => {
+  test("Waste Not (whenever an opponent discards) → Discard Payoff", () => {
+    const card = makeCard({
+      name: "Waste Not",
+      typeLine: "Enchantment",
+      oracleText:
+        "Whenever an opponent discards a creature card, create a 2/2 black Zombie creature token.\nWhenever an opponent discards a land card, add {B}{B}.\nWhenever an opponent discards a noncreature, nonland card, draw a card.",
+    });
+    expect(generateTags(card)).toContain("Discard Payoff");
+  });
+
+  test("Geth's Grimoire (whenever an opponent discards) → Discard Payoff", () => {
+    const card = makeCard({
+      name: "Geth's Grimoire",
+      typeLine: "Artifact",
+      oracleText:
+        "Whenever an opponent discards a card, you may draw a card.",
+    });
+    expect(generateTags(card)).toContain("Discard Payoff");
+  });
+
+  test("Sangromancer (whenever an opponent discards) → Discard Payoff", () => {
+    const card = makeCard({
+      name: "Sangromancer",
+      typeLine: "Creature — Vampire Shaman",
+      oracleText:
+        "Flying\nWhenever a creature an opponent controls dies, you may gain 3 life.\nWhenever an opponent discards a card, you may gain 3 life.",
+    });
+    expect(generateTags(card)).toContain("Discard Payoff");
+  });
+
+  test("Archfiend of Ifnir → both Self-Discard (Cycling) AND Discard Payoff (whenever discard trigger)", () => {
+    const card = makeCard({
+      name: "Archfiend of Ifnir",
+      typeLine: "Creature — Demon",
+      keywords: ["Cycling"],
+      oracleText:
+        "Flying\nWhenever you cycle or discard another card, put a -1/-1 counter on each creature your opponents control.\nCycling {2}",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Self-Discard");
+    expect(tags).toContain("Discard Payoff");
+  });
+
+  test("The Raven Man → both Discard Payoff AND Mass Discard (dual-tag)", () => {
+    const card = makeCard({
+      name: "The Raven Man",
+      typeLine: "Legendary Creature — Human Wizard",
+      oracleText:
+        "At the beginning of each end step, if a player discarded a card this turn, create a 1/1 black Bird creature token with flying and \"This creature can't block.\"\n{3}{B}, {T}: Each opponent discards a card. Activate only as a sorcery.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Discard Payoff");
+    expect(tags).toContain("Mass Discard");
+  });
+});
+
+test.describe("generateTags — Discard negative cases", () => {
+  test("Liliana, Dreadhorde General (no discard text) → no discard tags", () => {
+    const card = makeCard({
+      name: "Liliana, Dreadhorde General",
+      typeLine: "Legendary Planeswalker — Liliana",
+      oracleText:
+        "Whenever a creature you control dies, draw a card.\n+1: Create a 2/2 black Zombie creature token.\n−4: Each player sacrifices two creatures.\n−9: Each opponent chooses a permanent they control of each permanent type and sacrifices the rest.",
+    });
+    const tags = generateTags(card);
+    expect(tags).not.toContain("Targeted Discard");
+    expect(tags).not.toContain("Mass Discard");
+    expect(tags).not.toContain("Self-Discard");
+    expect(tags).not.toContain("Discard Payoff");
+  });
+
+  test("Lightning Bolt (no discard) → no discard tags", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    const tags = generateTags(card);
+    expect(tags).not.toContain("Targeted Discard");
+    expect(tags).not.toContain("Mass Discard");
+    expect(tags).not.toContain("Self-Discard");
+    expect(tags).not.toContain("Discard Payoff");
+  });
+});
