@@ -199,7 +199,7 @@ export default function InteractionHeatmap({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const measureRef = useRef<HTMLDivElement>(null);
+  const rulerRef = useRef<HTMLDivElement>(null);
 
   /** 0 = show all */
   const [cardLimit, setCardLimit] = useState<number>(30);
@@ -207,9 +207,10 @@ export default function InteractionHeatmap({
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
   const [availableWidth, setAvailableWidth] = useState<number>(0);
 
-  // Measure available width from the root div so we can constrain the scroll container
+  // Measure available width from a zero-height ruler element.
+  // The ruler is separate from the canvas so the canvas can't inflate the measurement.
   useEffect(() => {
-    const el = measureRef.current;
+    const el = rulerRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -592,7 +593,7 @@ export default function InteractionHeatmap({
   }
 
   return (
-    <div ref={measureRef} className="space-y-3 min-w-0 overflow-hidden">
+    <div className="space-y-3 min-w-0 overflow-hidden">
       {/* Controls row */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Sort mode */}
@@ -658,13 +659,16 @@ export default function InteractionHeatmap({
         {statusText}
       </p>
 
-      {/* Canvas container — scrollable viewport with explicit pixel width from parent */}
+      {/* Zero-height ruler: measures parent width without being inflated by the canvas */}
+      <div ref={rulerRef} className="h-0 w-full" aria-hidden="true" />
+
+      {/* Scroll container: explicit pixel width from ruler, canvas scrolls inside */}
       <div
         ref={containerRef}
         className="relative overflow-auto rounded-lg border border-slate-700"
         style={{
           maxHeight: containerMaxHeight,
-          ...(availableWidth > 0 ? { width: availableWidth } : {}),
+          width: availableWidth > 0 ? availableWidth : "100%",
         }}
         tabIndex={0}
         role="region"
@@ -674,7 +678,6 @@ export default function InteractionHeatmap({
           ref={canvasRef}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
-          style={{ display: "block", minWidth: canvasW, minHeight: canvasH }}
           aria-label={`Interaction heatmap: ${N} cards`}
         />
         {tooltip && <HeatmapTooltip info={tooltip} />}
