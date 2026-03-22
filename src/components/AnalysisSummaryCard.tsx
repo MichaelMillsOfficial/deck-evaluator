@@ -58,21 +58,25 @@ const styles = {
     gap: 4,
   },
   deckName: {
+    display: "flex" as const,
     fontSize: 20,
     fontWeight: 700,
     color: "#f8fafc",
     lineHeight: 1.2,
   },
   commander: {
+    display: "flex" as const,
     fontSize: 13,
     color: "#a78bfa",
     lineHeight: 1.3,
   },
   cardCount: {
+    display: "flex" as const,
     fontSize: 12,
     color: "#94a3b8",
   },
   appLabel: {
+    display: "flex" as const,
     fontSize: 11,
     color: "#7c3aed",
     fontWeight: 600,
@@ -83,6 +87,7 @@ const styles = {
     marginBottom: 14,
   },
   sectionTitle: {
+    display: "flex" as const,
     fontSize: 11,
     fontWeight: 600,
     color: "#64748b",
@@ -226,7 +231,7 @@ export function AnalysisSummaryCard({
         <div style={styles.headerLeft}>
           <div style={styles.deckName}>{deckName}</div>
           <div style={styles.commander}>{commanderText}</div>
-          <div style={styles.cardCount}>{cardCount} cards</div>
+          <div style={styles.cardCount}>{`${cardCount} cards`}</div>
         </div>
         <div style={styles.headerRight}>
           <div style={styles.appLabel}>MTG Deck Evaluator</div>
@@ -252,7 +257,7 @@ export function AnalysisSummaryCard({
           </div>
           <div style={styles.statBox}>
             <div style={styles.statLabel}>Keep Rate</div>
-            <div style={styles.statValue}>{keepableRate}%</div>
+            <div style={styles.statValue}>{`${keepableRate}%`}</div>
           </div>
           <div style={styles.statBox}>
             <div style={styles.statLabel}>Land Eff.</div>
@@ -305,7 +310,7 @@ export function AnalysisSummaryCard({
       {/* Known Combos */}
       {displayCombos.length > 0 && (
         <div style={styles.section}>
-          <div style={styles.sectionTitle}>Combos ({combos.length})</div>
+          <div style={styles.sectionTitle}>{`Combos (${combos.length})`}</div>
           <div style={styles.comboList}>
             {displayCombos.map((combo, i) => (
               <div key={i} style={styles.comboItem}>
@@ -320,7 +325,7 @@ export function AnalysisSummaryCard({
       {/* Footer */}
       <div style={styles.footer}>
         <div style={styles.footerText}>deck-evaluator.app</div>
-        <div style={styles.footerText}>Exported {exportDate}</div>
+        <div style={styles.footerText}>{`Exported ${exportDate}`}</div>
       </div>
     </div>
   );

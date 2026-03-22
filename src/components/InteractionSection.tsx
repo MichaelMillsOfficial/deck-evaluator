@@ -1645,6 +1645,7 @@ function InteractionSectionInner({
                     analysis={analysis}
                     centrality={centralityResult ?? { scores: [], maxScore: 0, medianScore: 0 }}
                     selectedTypes={activeTypes.size > 0 ? activeTypes : undefined}
+                    cardSearch={cardSearch}
                   />
                 </Suspense>
               </div>
@@ -1667,6 +1668,7 @@ function InteractionSectionInner({
                     analysis={analysis}
                     centrality={centralityResult ?? { scores: [], maxScore: 0, medianScore: 0 }}
                     selectedTypes={activeTypes.size > 0 ? activeTypes : undefined}
+                    cardSearch={cardSearch}
                   />
                 </Suspense>
               </div>

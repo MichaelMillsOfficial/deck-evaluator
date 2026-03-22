@@ -5,16 +5,17 @@
  *
  * Canvas 2D NxN heatmap of card interaction strengths.
  *
- * - Default: top 30 cards by centrality (30x30 = 900 cells)
- * - "Show all N cards" button to expand
+ * - Card count selector: 10 / 20 / 30 / 50 / All N (hidden when total ≤ 30)
  * - Sort modes: Centrality (default), Alphabetical, Interaction count
+ * - Adaptive cell size based on card count (36px → 14px)
  * - Colour ramp: #1e293b (none) → #4c1d95 (weak) → #7e22ce (mod) → #a855f7 (strong) → #e879f9 (max)
- * - Sticky row/column headers (CSS sticky on native table elements when "show all" is active)
+ * - cardSearch prop: dims non-matching cells, highlights matching rows/columns
+ * - "Showing X of Y" status line above canvas
  * - Hover tooltip: card pair + interaction count + strongest type
  * - Color legend bar below matrix
  * - Offscreen canvas for rendering; drawImage() to visible canvas
  * - Accessible: native <table> sr-only mirrors the data with aria-labels
- * - Respects prefers-reduced-motion (no effect — heatmap is static, so no change needed)
+ * - Respects prefers-reduced-motion (heatmap is static, so no change needed)
  */
 
 import React, {
@@ -36,10 +37,41 @@ interface InteractionHeatmapProps {
   analysis: InteractionAnalysis;
   centrality: CentralityResult;
   selectedTypes?: Set<InteractionType>;
+  /** When non-empty, dims non-matching cells and highlights matching rows/cols */
+  cardSearch?: string;
 }
 
 // ─── Sort modes ───────────────────────────────────────────────────────────────
 type SortMode = "centrality" | "alphabetical" | "interactions";
+
+// ─── Adaptive sizing helpers ───────────────────────────────────────────────────
+function getCellSize(n: number): number {
+  if (n <= 10) return 36;
+  if (n <= 20) return 28;
+  if (n <= 30) return 22;
+  if (n <= 50) return 18;
+  return 14;
+}
+
+function getTruncateLen(n: number): number {
+  if (n <= 10) return 22;
+  if (n <= 20) return 17;
+  if (n <= 30) return 14;
+  if (n <= 50) return 11;
+  return 9;
+}
+
+function getHeaderHeight(n: number): number {
+  if (n <= 20) return 110;
+  if (n <= 30) return 100;
+  return 90;
+}
+
+function getLabelWidth(n: number): number {
+  if (n <= 20) return 110;
+  if (n <= 30) return 100;
+  return 80;
+}
 
 // ─── Colour ramp (5 stops, dark slate → vivid fuchsia) ───────────────────────
 function strengthToColor(
@@ -85,12 +117,7 @@ const INTERACTION_TYPE_LABELS: Partial<Record<InteractionType, string>> = {
   loops_with: "Loops With",
 };
 
-const CELL_SIZE = 20;
-const HEADER_HEIGHT = 90; // px — rotated name labels (45°)
-const LABEL_WIDTH = 80;   // px — left-side row labels (truncated)
-const TRUNCATE_LEN = 12;
-
-function truncateName(name: string, maxLen = TRUNCATE_LEN): string {
+function truncateName(name: string, maxLen: number): string {
   if (name.length <= maxLen) return name;
   return name.slice(0, maxLen - 1) + "…";
 }
@@ -158,17 +185,23 @@ function ColorLegend() {
   );
 }
 
+// ─── Card limit options ───────────────────────────────────────────────────────
+/** 0 is the sentinel value meaning "show all" */
+const CARD_LIMIT_OPTIONS = [10, 20, 30, 50] as const;
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function InteractionHeatmap({
   analysis,
   centrality,
   selectedTypes,
+  cardSearch,
 }: InteractionHeatmapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [showAll, setShowAll] = useState(false);
+  /** 0 = show all */
+  const [cardLimit, setCardLimit] = useState<number>(30);
   const [sortMode, setSortMode] = useState<SortMode>("centrality");
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
 
@@ -188,13 +221,23 @@ export default function InteractionHeatmap({
     return counts;
   }, [analysis.interactions]);
 
-  // Sorted + possibly expanded card list
+  // Total participating cards across the whole analysis (for selector + "All N" label)
+  const totalParticipatingCards = useMemo(() => {
+    const s = new Set<string>();
+    for (const interaction of analysis.interactions) {
+      s.add(interaction.cards[0]);
+      s.add(interaction.cards[1]);
+    }
+    return s.size;
+  }, [analysis.interactions]);
+
+  // Sorted + limited card list
   const displayHeatmap = useMemo((): HeatmapData => {
-    // Start from the baseHeatmap's card list (already capped at 30)
+    // Start from the baseHeatmap's card list (already sorted by centrality, capped at 30)
     let cards = [...baseHeatmap.cardNames];
 
-    if (showAll) {
-      // Include all cards that appear in interactions, capped only by total count
+    if (cardLimit === 0) {
+      // Include all cards that appear in interactions
       const all = new Set<string>();
       for (const interaction of analysis.interactions) {
         all.add(interaction.cards[0]);
@@ -211,7 +254,7 @@ export default function InteractionHeatmap({
         (interactionCounts.get(b) ?? 0) - (interactionCounts.get(a) ?? 0)
       );
     } else {
-      // centrality — keep the rank-ordered list from buildHeatmapData, but expand if showAll
+      // centrality — rank-ordered, expand if showing all
       const centralityRankMap = new Map(
         centrality.scores.map((s) => [s.cardName, s.rank])
       );
@@ -221,6 +264,11 @@ export default function InteractionHeatmap({
         if (rankA !== rankB) return rankA - rankB;
         return a.localeCompare(b);
       });
+    }
+
+    // Apply card count limit (when not "show all")
+    if (cardLimit > 0) {
+      cards = cards.slice(0, cardLimit);
     }
 
     // Apply type filter — keep card if it has at least one interaction of a selected type
@@ -283,10 +331,29 @@ export default function InteractionHeatmap({
   // Note: interactionCounts is intentionally omitted — it is derived from analysis.interactions
   // which is already in the dependency array.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseHeatmap, showAll, sortMode, selectedTypes, analysis.interactions, centrality.scores]);
+  }, [baseHeatmap, cardLimit, sortMode, selectedTypes, analysis.interactions, centrality.scores]);
 
   const { cardNames, matrix, typeMatrix, maxStrength } = displayHeatmap;
   const N = cardNames.length;
+
+  // ─── Adaptive sizing (recalculated whenever N changes) ──────────────────────
+  const CELL_SIZE    = getCellSize(N);
+  const TRUNCATE_LEN = getTruncateLen(N);
+  const HEADER_HEIGHT = getHeaderHeight(N);
+  const LABEL_WIDTH   = getLabelWidth(N);
+
+  // ─── Search matching indices ─────────────────────────────────────────────────
+  const matchingIndices = useMemo(() => {
+    if (!cardSearch || cardSearch.trim() === "") return new Set<number>();
+    const q = cardSearch.trim().toLowerCase();
+    const result = new Set<number>();
+    for (let i = 0; i < cardNames.length; i++) {
+      if (cardNames[i].toLowerCase().includes(q)) result.add(i);
+    }
+    return result;
+  }, [cardSearch, cardNames]);
+
+  const hasSearch = matchingIndices.size > 0 || (cardSearch !== undefined && cardSearch.trim().length > 0);
 
   // ─── Canvas render ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -320,6 +387,17 @@ export default function InteractionHeatmap({
     ctx.fillStyle = "#0f172a";
     ctx.fillRect(0, 0, W, H);
 
+    // ── Search highlight: full row/column sweeps for matching cards ────────────
+    if (hasSearch) {
+      ctx.fillStyle = "rgba(168, 85, 247, 0.12)"; // purple-500 @12%
+      for (const idx of matchingIndices) {
+        // Highlight full row (across entire grid width)
+        ctx.fillRect(LABEL_WIDTH, HEADER_HEIGHT + idx * CELL_SIZE, N * CELL_SIZE, CELL_SIZE);
+        // Highlight full column (across entire grid height)
+        ctx.fillRect(LABEL_WIDTH + idx * CELL_SIZE, HEADER_HEIGHT, CELL_SIZE, N * CELL_SIZE);
+      }
+    }
+
     // ── Cells ──────────────────────────────────────────────────────────────────
     for (let i = 0; i < N; i++) {
       for (let j = 0; j < N; j++) {
@@ -338,6 +416,12 @@ export default function InteractionHeatmap({
 
         const strength = matrix[i][j];
         const normalised = maxStrength > 0 ? Math.min(1, strength / maxStrength) : 0;
+
+        // When searching, dim non-matching cells to 30% opacity
+        if (hasSearch && !matchingIndices.has(i) && !matchingIndices.has(j)) {
+          ctx.globalAlpha = 0.3;
+        }
+
         ctx.fillStyle = strengthToColor(normalised);
         ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
 
@@ -345,33 +429,62 @@ export default function InteractionHeatmap({
         ctx.strokeStyle = "rgba(15,23,42,0.6)";
         ctx.lineWidth = 0.5;
         ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+
+        ctx.globalAlpha = 1.0;
       }
     }
 
     // ── Column headers (rotated 45°) ──────────────────────────────────────────
-    ctx.fillStyle = "#94a3b8"; // slate-400
-    ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
+    const fontSize = Math.max(8, Math.min(10, CELL_SIZE - 10));
+    ctx.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`;
     ctx.textBaseline = "bottom";
 
     for (let j = 0; j < N; j++) {
+      const isMatch = matchingIndices.has(j);
+      ctx.fillStyle = hasSearch && !isMatch ? "#475569" : "#94a3b8"; // dim if no match
       const x = LABEL_WIDTH + j * CELL_SIZE + CELL_SIZE / 2;
       const y = HEADER_HEIGHT - 4;
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(-Math.PI / 4);
-      ctx.fillText(truncateName(cardNames[j]), 0, 0);
+      ctx.fillText(truncateName(cardNames[j], TRUNCATE_LEN), 0, 0);
       ctx.restore();
+
+      // 2px purple-400 border for matching column labels
+      if (isMatch) {
+        ctx.strokeStyle = "#c084fc"; // purple-400
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+          LABEL_WIDTH + j * CELL_SIZE,
+          HEADER_HEIGHT,
+          CELL_SIZE,
+          N * CELL_SIZE
+        );
+      }
     }
 
     // ── Row labels ─────────────────────────────────────────────────────────────
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
+    ctx.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`;
     ctx.textBaseline = "middle";
     ctx.textAlign = "right";
 
     for (let i = 0; i < N; i++) {
+      const isMatch = matchingIndices.has(i);
+      ctx.fillStyle = hasSearch && !isMatch ? "#475569" : "#94a3b8";
       const y = HEADER_HEIGHT + i * CELL_SIZE + CELL_SIZE / 2;
-      ctx.fillText(truncateName(cardNames[i]), LABEL_WIDTH - 4, y);
+      ctx.fillText(truncateName(cardNames[i], TRUNCATE_LEN), LABEL_WIDTH - 4, y);
+
+      // 2px purple-400 border for matching row labels
+      if (isMatch) {
+        ctx.strokeStyle = "#c084fc"; // purple-400
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+          LABEL_WIDTH,
+          HEADER_HEIGHT + i * CELL_SIZE,
+          N * CELL_SIZE,
+          CELL_SIZE
+        );
+      }
     }
 
     ctx.textAlign = "left";
@@ -384,7 +497,18 @@ export default function InteractionHeatmap({
         onscreen.drawImage(offscreen, 0, 0);
       }
     }
-  }, [cardNames, matrix, maxStrength, N]);
+  }, [
+    cardNames,
+    matrix,
+    maxStrength,
+    N,
+    CELL_SIZE,
+    TRUNCATE_LEN,
+    HEADER_HEIGHT,
+    LABEL_WIDTH,
+    matchingIndices,
+    hasSearch,
+  ]);
 
   // ─── Hover tooltip ─────────────────────────────────────────────────────────
   const handleMouseMove = useCallback(
@@ -418,20 +542,27 @@ export default function InteractionHeatmap({
         type: typeMatrix[i]?.[j] ?? null,
       });
     },
-    [N, matrix, cardNames, typeMatrix]
+    [N, matrix, cardNames, typeMatrix, LABEL_WIDTH, CELL_SIZE, HEADER_HEIGHT]
   );
 
   const handleMouseLeave = useCallback(() => setTooltip(null), []);
 
-  // ─── Counts for "show all" button ─────────────────────────────────────────
-  const totalParticipatingCards = useMemo(() => {
-    const s = new Set<string>();
-    for (const interaction of analysis.interactions) {
-      s.add(interaction.cards[0]);
-      s.add(interaction.cards[1]);
+  // ─── Dynamic container height (Issue 1) ────────────────────────────────────
+  const containerMaxHeight = Math.min(HEADER_HEIGHT + N * CELL_SIZE + 16, 750);
+
+  // ─── Status line text ───────────────────────────────────────────────────────
+  const statusText = useMemo(() => {
+    const sortLabel =
+      sortMode === "centrality"
+        ? "centrality"
+        : sortMode === "alphabetical"
+        ? "A–Z"
+        : "interaction count";
+    if (N === totalParticipatingCards) {
+      return `Showing all ${N} cards`;
     }
-    return s.size;
-  }, [analysis.interactions]);
+    return `Showing top ${N} of ${totalParticipatingCards} cards, sorted by ${sortLabel}`;
+  }, [N, totalParticipatingCards, sortMode]);
 
   // ─── Empty state ───────────────────────────────────────────────────────────
   if (baseHeatmap.cardNames.length === 0) {
@@ -471,25 +602,49 @@ export default function InteractionHeatmap({
           )}
         </div>
 
-        {/* Show-all toggle */}
+        {/* Card count selector — only shown when total > 30 */}
         {totalParticipatingCards > 30 && (
-          <button
-            type="button"
-            onClick={() => setShowAll((v) => !v)}
-            className="ml-auto rounded-md border border-slate-600 bg-slate-800/50 px-2.5 py-0.5 text-[10px] text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors"
-          >
-            {showAll
-              ? "Show top 30"
-              : `Show all ${totalParticipatingCards} cards`}
-          </button>
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="text-[10px] text-slate-500 shrink-0">Show:</span>
+            {CARD_LIMIT_OPTIONS.map((limit) => (
+              <button
+                key={limit}
+                type="button"
+                onClick={() => setCardLimit(limit)}
+                className={`rounded-md border px-2 py-0.5 text-[10px] transition-colors cursor-pointer ${
+                  cardLimit === limit
+                    ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
+                    : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
+                }`}
+              >
+                {limit}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setCardLimit(0)}
+              className={`rounded-md border px-2 py-0.5 text-[10px] transition-colors cursor-pointer ${
+                cardLimit === 0
+                  ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
+                  : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
+              }`}
+            >
+              All {totalParticipatingCards}
+            </button>
+          </div>
         )}
       </div>
 
-      {/* Canvas container — horizontally scrollable */}
+      {/* Status line */}
+      <p className="text-[11px] text-slate-500" aria-live="polite">
+        {statusText}
+      </p>
+
+      {/* Canvas container — horizontally scrollable, dynamic height */}
       <div
         ref={containerRef}
         className="relative overflow-auto rounded-lg border border-slate-700"
-        style={{ maxHeight: 600 }}
+        style={{ maxHeight: containerMaxHeight }}
       >
         <canvas
           ref={canvasRef}

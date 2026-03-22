@@ -33,32 +33,37 @@ async function ensureWasm() {
   if (!wasmPromise) {
     wasmPromise = (async () => {
       const { initWasm } = resvgModule!;
-      // resvg-wasm needs the WASM binary — fetch it from the bundled location
-      const wasmUrl = new URL(
-        "@resvg/resvg-wasm/index_bg.wasm",
-        import.meta.url
+      // Load the WASM binary from disk. fetch(import.meta.url) and
+      // require.resolve are not supported in Next.js Turbopack, so we
+      // resolve via process.cwd() + node_modules at runtime.
+      const fs = await import("fs");
+      const path = await import("path");
+      const wasmPath = path.join(
+        process.cwd(),
+        "node_modules/@resvg/resvg-wasm/index_bg.wasm"
       );
-      const wasmResponse = await fetch(wasmUrl.toString());
-      const wasmBuffer = await wasmResponse.arrayBuffer();
+      const wasmBuffer = fs.readFileSync(wasmPath);
       await initWasm(wasmBuffer);
     })();
   }
   return wasmPromise;
 }
 
-async function loadInterFont(): Promise<ArrayBuffer> {
-  // Fetch Inter font from Google Fonts at a stable URL
-  // This is cached at the edge / server level after first call
-  const fontUrl =
-    "https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff";
+async function loadInterFont(weight: 400 | 700): Promise<ArrayBuffer> {
+  // Fetch Inter font from Google Fonts at a stable URL.
+  // Using v20 .ttf URLs (the versioned .woff URLs expire over time).
+  const fontUrls: Record<number, string> = {
+    400: "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfMZg.ttf",
+    700: "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYMZg.ttf",
+  };
 
-  const response = await fetch(fontUrl, {
+  const response = await fetch(fontUrls[weight], {
     // Cache for 24 hours to avoid re-fetching on every request
     next: { revalidate: 86400 },
   } as RequestInit);
 
   if (!response.ok) {
-    throw new Error(`Failed to load Inter font: ${response.status}`);
+    throw new Error(`Failed to load Inter ${weight} font: ${response.status}`);
   }
   return response.arrayBuffer();
 }
@@ -106,8 +111,11 @@ export async function POST(request: Request) {
     const satori = satoriModule!.default ?? satoriModule;
     const { Resvg } = resvgModule!;
 
-    // Load font
-    const fontBuffer = await loadInterFont();
+    // Load fonts (both weights in parallel)
+    const [fontRegular, fontBold] = await Promise.all([
+      loadInterFont(400),
+      loadInterFont(700),
+    ]);
 
     // Build the card props
     const cardProps = buildCardProps(body);
@@ -126,13 +134,13 @@ export async function POST(request: Request) {
       fonts: [
         {
           name: "Inter",
-          data: fontBuffer,
+          data: fontRegular,
           weight: 400,
           style: "normal",
         },
         {
           name: "Inter",
-          data: fontBuffer,
+          data: fontBold,
           weight: 700,
           style: "normal",
         },

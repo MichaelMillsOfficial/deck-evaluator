@@ -11,7 +11,11 @@
  * - Click to select node → detail panel slides in
  * - Hover to highlight connected edges / dim others
  * - Wheel to zoom, drag to pan
- * - Reset-view button
+ * - +/- zoom buttons and reset-view button (bottom-right)
+ * - Node labels rendered at zoom >= 1.4x
+ * - cardSearch prop: highlights matching nodes, dims others, pans to first match
+ * - selectedTypes filter: hides orphaned (zero-edge) nodes from canvas and layout
+ * - Card/edge count and isolated-node badge (bottom-left)
  * - Web Worker for d3-force layout (never blocks the main thread)
  * - Visually-hidden accessible table mirrors the graph for screen readers
  * - Keyboard navigation: Tab to focus canvas, arrow keys between nodes, Enter select, Escape deselect
@@ -71,6 +75,8 @@ interface InteractionGraphProps {
   centrality: CentralityResult;
   /** If provided, only show edges whose type is in this set */
   selectedTypes?: Set<InteractionType>;
+  /** If provided, highlight matching nodes and pan to first match */
+  cardSearch?: string;
   /** Height in pixels (default 480) */
   height?: number;
 }
@@ -194,6 +200,7 @@ function InteractionGraphInner({
   analysis,
   centrality,
   selectedTypes,
+  cardSearch,
   height = 480,
 }: InteractionGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -221,6 +228,34 @@ function InteractionGraphInner({
     if (!selectedTypes || selectedTypes.size === 0) return graphData.edges;
     return graphData.edges.filter((e) => selectedTypes.has(e.type));
   }, [graphData.edges, selectedTypes]);
+
+  // Issue 4: hide orphaned nodes when a type filter is active
+  const visibleNodes = useMemo(() => {
+    if (!selectedTypes || selectedTypes.size === 0) return graphData.nodes;
+    const connectedCards = new Set<string>();
+    for (const edge of filteredEdges) {
+      connectedCards.add(edge.source);
+      connectedCards.add(edge.target);
+    }
+    return graphData.nodes.filter((n) => connectedCards.has(n.id));
+  }, [graphData.nodes, filteredEdges, selectedTypes]);
+
+  const hiddenCount = graphData.nodes.length - visibleNodes.length;
+
+  // Issue 3: card search — derive matching node ids and their neighbors
+  const searchMatches = useMemo(() => {
+    if (!cardSearch) return null;
+    const q = cardSearch.toLowerCase();
+    const matching = new Set<string>(
+      visibleNodes.filter((n) => n.id.toLowerCase().includes(q)).map((n) => n.id)
+    );
+    const neighbors = new Set<string>(matching);
+    for (const edge of filteredEdges) {
+      if (matching.has(edge.source)) neighbors.add(edge.target);
+      if (matching.has(edge.target)) neighbors.add(edge.source);
+    }
+    return { matching, neighbors };
+  }, [cardSearch, visibleNodes, filteredEdges]);
 
   // Accessibility: check for prefers-reduced-motion
   const prefersReducedMotion = useMemo(() => {
@@ -280,8 +315,15 @@ function InteractionGraphInner({
         edge.source === hoveredNode ||
         edge.target === hoveredNode;
 
+      // Issue 3: dim edges whose endpoints are not in search neighbors
+      const isInSearch =
+        !searchMatches ||
+        (searchMatches.neighbors.has(edge.source) &&
+          searchMatches.neighbors.has(edge.target));
+
       ctx.save();
-      ctx.globalAlpha = isConnectedToHover ? 0.85 : 0.15;
+      const baseAlpha = isConnectedToHover ? 0.85 : 0.15;
+      ctx.globalAlpha = isInSearch ? baseAlpha : baseAlpha * 0.2;
       ctx.strokeStyle = TYPE_HEX[edge.type] ?? "#64748b";
       ctx.lineWidth = EDGE_WIDTH_BASE + edge.strength * EDGE_WIDTH_SCALE;
 
@@ -299,20 +341,27 @@ function InteractionGraphInner({
     }
 
     // ── Draw nodes ────────────────────────────────────────────────────────────
-    for (const node of graphData.nodes) {
+    for (const node of visibleNodes) {
       const pos = positions.get(node.id);
       if (!pos) continue;
 
       const r = nodeRadius(node);
       const isSelected = selectedNode?.id === node.id;
       const isHovered = hoveredNode === node.id;
-      const isDimmed =
+      const isDimmedByHover =
         hoveredNode !== null &&
         !isHovered &&
         !hoveredEdgeEndpoints.has(node.id);
 
+      // Issue 3: dim non-neighbors when search is active
+      const isSearchMatch = searchMatches?.matching.has(node.id) ?? false;
+      const isSearchNeighbor = searchMatches?.neighbors.has(node.id) ?? false;
+      const isDimmedBySearch =
+        searchMatches !== null && !isSearchNeighbor;
+
       ctx.save();
-      ctx.globalAlpha = isDimmed ? 0.25 : 1;
+      ctx.globalAlpha =
+        isDimmedBySearch ? 0.2 : isDimmedByHover ? 0.25 : 1;
 
       // Fill
       ctx.beginPath();
@@ -320,12 +369,14 @@ function InteractionGraphInner({
       ctx.fillStyle = "#1e293b"; // slate-800
       ctx.fill();
 
-      // Stroke
-      ctx.lineWidth = isSelected || isHovered ? 2.5 : 1.5;
+      // Stroke — Issue 3: highlight matching nodes with purple-500
+      const isHighlightedSearch = isSearchMatch && !isSelected && !isHovered;
+      ctx.lineWidth = isSelected || isHovered || isHighlightedSearch ? 2.5 : 1.5;
       ctx.strokeStyle =
-        isSelected || isHovered
-          ? "#a855f7" // purple-500 for selected
+        isSelected || isHovered || isHighlightedSearch
+          ? "#a855f7" // purple-500
           : CATEGORY_STROKE[node.category] ?? "#64748b";
+      if (isHighlightedSearch) ctx.lineWidth = 3;
       ctx.stroke();
 
       // Loop indicator: fuchsia glow ring
@@ -334,15 +385,41 @@ function InteractionGraphInner({
         ctx.arc(pos.x, pos.y, r + 3, 0, Math.PI * 2);
         ctx.strokeStyle = "#c026d3"; // fuchsia-600
         ctx.lineWidth = 1;
-        ctx.globalAlpha = isDimmed ? 0.1 : 0.5;
+        ctx.globalAlpha = isDimmedBySearch || isDimmedByHover ? 0.1 : 0.5;
         ctx.stroke();
       }
 
       ctx.restore();
     }
 
+    // Issue 2: Draw node labels at sufficient zoom (>= 1.4x)
+    if (scale >= 1.4) {
+      ctx.save();
+      for (const node of visibleNodes) {
+        const pos = positions.get(node.id);
+        if (!pos) continue;
+        const r = nodeRadius(node);
+        const label = node.id.length > 18 ? node.id.slice(0, 17) + "\u2026" : node.id;
+        const textX = pos.x;
+        const textY = pos.y + r + 12;
+
+        // Background rect for legibility
+        ctx.font = "9px system-ui, sans-serif";
+        const textWidth = ctx.measureText(label).width;
+        ctx.fillStyle = "rgba(15, 23, 42, 0.8)"; // slate-950 at 80%
+        ctx.fillRect(textX - textWidth / 2 - 2, textY - 9, textWidth + 4, 12);
+
+        // Label text
+        ctx.fillStyle = "#94a3b8"; // slate-400
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText(label, textX, textY - 8);
+      }
+      ctx.restore();
+    }
+
     ctx.restore();
-  }, [graphData.nodes, filteredEdges, nodeRadius, selectedNode]);
+  }, [visibleNodes, filteredEdges, nodeRadius, selectedNode, searchMatches]);
 
   // ─── Schedule render ──────────────────────────────────────────────────────
   const scheduleRender = useCallback(() => {
@@ -450,6 +527,8 @@ function InteractionGraphInner({
       width: W,
       height: H,
     });
+    // Note: we pass graphData.nodes (all nodes) to the worker so the force layout
+    // has the full graph, then visibleNodes gates which nodes are drawn on canvas.
 
     return () => worker.terminate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -489,7 +568,7 @@ function InteractionGraphInner({
       const wx = (canvasX - tx) / scale;
       const wy = (canvasY - ty) / scale;
 
-      for (const node of graphData.nodes) {
+      for (const node of visibleNodes) {
         const pos = positionsRef.current.get(node.id);
         if (!pos) continue;
         const r = nodeRadius(node);
@@ -499,7 +578,7 @@ function InteractionGraphInner({
       }
       return null;
     },
-    [graphData.nodes, nodeRadius]
+    [visibleNodes, nodeRadius]
   );
 
   // ─── Mouse event handlers ──────────────────────────────────────────────────
@@ -614,26 +693,26 @@ function InteractionGraphInner({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLCanvasElement>) => {
-      if (graphData.nodes.length === 0) return;
+      if (visibleNodes.length === 0) return;
 
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault();
-        setFocusedNodeIndex((i) => (i + 1) % graphData.nodes.length);
+        setFocusedNodeIndex((i) => (i + 1) % visibleNodes.length);
       } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
         e.preventDefault();
         setFocusedNodeIndex(
-          (i) => (i - 1 + graphData.nodes.length) % graphData.nodes.length
+          (i) => (i - 1 + visibleNodes.length) % visibleNodes.length
         );
       } else if (e.key === "Enter") {
         e.preventDefault();
-        const node = graphData.nodes[focusedNodeIndex];
+        const node = visibleNodes[focusedNodeIndex];
         if (node) setSelectedNode((prev) => (prev?.id === node.id ? null : node));
       } else if (e.key === "Escape") {
         e.preventDefault();
         setSelectedNode(null);
       }
     },
-    [graphData.nodes, focusedNodeIndex]
+    [visibleNodes, focusedNodeIndex]
   );
 
   // ─── Reset view ────────────────────────────────────────────────────────────
@@ -641,6 +720,71 @@ function InteractionGraphInner({
     transformRef.current = { scale: 1, tx: 0, ty: 0 };
     scheduleRender();
   }, [scheduleRender]);
+
+  // ─── Issue 1: Button zoom (centered on canvas center) ─────────────────────
+  const handleZoom = useCallback(
+    (factor: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const cx = canvas.offsetWidth / 2;
+      const cy = canvas.offsetHeight / 2;
+      const current = transformRef.current;
+      const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, current.scale * factor));
+      const ratio = newScale / current.scale;
+      transformRef.current = {
+        scale: newScale,
+        tx: cx - ratio * (cx - current.tx),
+        ty: cy - ratio * (cy - current.ty),
+      };
+      scheduleRender();
+    },
+    [scheduleRender]
+  );
+
+  // ─── Issue 3: Pan to first search match ────────────────────────────────────
+  useEffect(() => {
+    if (!cardSearch || !layoutReady || !searchMatches) return;
+    const firstMatch = visibleNodes.find((n) =>
+      n.id.toLowerCase().includes(cardSearch.toLowerCase())
+    );
+    if (!firstMatch) return;
+    const pos = positionsRef.current.get(firstMatch.id);
+    if (!pos) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const cw = canvas.offsetWidth;
+    const ch = canvas.offsetHeight;
+    const { scale } = transformRef.current;
+    const targetTx = cw / 2 - pos.x * scale;
+    const targetTy = ch / 2 - pos.y * scale;
+
+    if (prefersReducedMotion) {
+      transformRef.current = { ...transformRef.current, tx: targetTx, ty: targetTy };
+      scheduleRender();
+      return;
+    }
+
+    // Animate over 300ms
+    const startTx = transformRef.current.tx;
+    const startTy = transformRef.current.ty;
+    const startTime = performance.now();
+    const duration = 300;
+
+    const animate = (now: number) => {
+      const t = Math.min(1, (now - startTime) / duration);
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - t, 3);
+      transformRef.current = {
+        ...transformRef.current,
+        tx: startTx + (targetTx - startTx) * eased,
+        ty: startTy + (targetTy - startTy) * eased,
+      };
+      scheduleRender();
+      if (t < 1) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }, [cardSearch, layoutReady, searchMatches, visibleNodes, prefersReducedMotion, scheduleRender]);
 
   // ─── Clean up ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -652,10 +796,10 @@ function InteractionGraphInner({
 
   // ─── Accessible table (sr-only) ───────────────────────────────────────────
   const srTable = useMemo(() => {
-    if (graphData.nodes.length === 0) return null;
+    if (visibleNodes.length === 0) return null;
     // Build adjacency: cardName → list of {partner, type, strength}
     const adj = new Map<string, { partner: string; type: string; strength: number }[]>();
-    for (const node of graphData.nodes) adj.set(node.id, []);
+    for (const node of visibleNodes) adj.set(node.id, []);
     for (const edge of filteredEdges) {
       adj.get(edge.source)?.push({ partner: edge.target, type: edge.type, strength: edge.strength });
       adj.get(edge.target)?.push({ partner: edge.source, type: edge.type, strength: edge.strength });
@@ -671,7 +815,7 @@ function InteractionGraphInner({
           </tr>
         </thead>
         <tbody>
-          {graphData.nodes.map((node) => {
+          {visibleNodes.map((node) => {
             const connections = adj.get(node.id) ?? [];
             return (
               <tr key={node.id}>
@@ -691,7 +835,7 @@ function InteractionGraphInner({
         </tbody>
       </table>
     );
-  }, [graphData.nodes, filteredEdges]);
+  }, [visibleNodes, filteredEdges]);
 
   // ─── Empty state ───────────────────────────────────────────────────────────
   if (graphData.nodes.length === 0) {
@@ -704,6 +848,13 @@ function InteractionGraphInner({
       </div>
     );
   }
+
+  // Search label text for the "Focused on" indicator
+  const searchLabel = cardSearch
+    ? searchMatches && searchMatches.matching.size > 0
+      ? Array.from(searchMatches.matching)[0]
+      : null
+    : null;
 
   return (
     <div ref={containerRef} className="relative w-full" style={{ height }}>
@@ -743,19 +894,51 @@ function InteractionGraphInner({
         </div>
       )}
 
-      {/* Reset view button */}
-      <button
-        type="button"
-        onClick={resetView}
-        className="absolute bottom-2 left-2 rounded-full border border-slate-600 bg-slate-800/80 px-3 py-1 text-xs text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-400"
-        aria-label="Reset graph view"
-      >
-        Reset view
-      </button>
+      {/* Issue 1: Zoom in/out/reset buttons */}
+      <div className="absolute bottom-3 right-3 flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={() => handleZoom(1.3)}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-600 bg-slate-800/90 text-sm text-slate-300 hover:bg-slate-700 hover:text-white focus-visible:ring-2 focus-visible:ring-purple-400"
+          aria-label="Zoom in"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={() => handleZoom(0.77)}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-600 bg-slate-800/90 text-sm text-slate-300 hover:bg-slate-700 hover:text-white focus-visible:ring-2 focus-visible:ring-purple-400"
+          aria-label="Zoom out"
+        >
+          &minus;
+        </button>
+        <button
+          type="button"
+          onClick={resetView}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-600 bg-slate-800/90 text-[9px] text-slate-400 hover:bg-slate-700 hover:text-white focus-visible:ring-2 focus-visible:ring-purple-400"
+          aria-label="Reset view"
+        >
+          {"\u27F3"}
+        </button>
+      </div>
 
-      {/* Node count badge */}
-      <div className="absolute bottom-2 right-2 rounded-full border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-[10px] text-slate-500 tabular-nums pointer-events-none">
-        {graphData.nodes.length} cards · {filteredEdges.length} edges
+      {/* Issue 5: Card / edge count + Issue 4: isolated badge (bottom-left) */}
+      <div className="absolute bottom-3 left-3 flex flex-col items-start gap-1 pointer-events-none">
+        <div className="text-[11px] text-slate-500 tabular-nums">
+          {visibleNodes.length} cards · {filteredEdges.length} connections
+        </div>
+        {/* Issue 4: isolated nodes badge */}
+        {hiddenCount > 0 && (
+          <div className="rounded-md border border-slate-600 bg-slate-800/90 px-2.5 py-1.5 text-[11px] text-slate-400">
+            {hiddenCount} isolated cards hidden
+          </div>
+        )}
+        {/* Issue 3: search focus indicator */}
+        {searchLabel && (
+          <div className="rounded-md border border-purple-700/50 bg-slate-800/90 px-2.5 py-1.5 text-[11px] text-purple-300 pointer-events-auto">
+            Focused on: {searchLabel}
+          </div>
+        )}
       </div>
 
       {/* Detail panel */}

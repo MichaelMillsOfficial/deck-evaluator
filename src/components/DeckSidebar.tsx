@@ -531,7 +531,8 @@ function SidebarContent({
       await generateAndDownloadPng(data);
       setImageStatus("success");
       setTimeout(() => setImageStatus("idle"), 2000);
-    } catch {
+    } catch (err) {
+      console.error("[Save as Image] Failed:", err);
       setImageStatus("error");
       setTimeout(() => setImageStatus("idle"), 3000);
     }
