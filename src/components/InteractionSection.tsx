@@ -305,6 +305,14 @@ function InteractionItem({
   const badgeColors =
     INTERACTION_TYPE_COLORS[interaction.type] ?? "bg-slate-600/60 text-slate-100";
 
+  // Detect command zone interactions (eminence)
+  const isCommandZoneInteraction = profiles != null && interaction.cards.some(
+    (cardName) => {
+      const profile = profiles[cardName];
+      return profile?.commander?.eminence != null && profile.commander.eminence.length > 0;
+    }
+  );
+
   return (
     <div
       data-testid={`interaction-${type}-${index}`}
@@ -320,6 +328,14 @@ function InteractionItem({
           </span>
           {conditions.length > 0 && (
             <ConditionBadge conditions={conditions} />
+          )}
+          {isCommandZoneInteraction && (
+            <span
+              data-testid="command-zone-badge"
+              className="inline-flex items-center rounded-full border border-amber-700/50 bg-amber-900/40 px-1.5 py-0.5 text-[9px] font-medium text-amber-300"
+            >
+              Command Zone
+            </span>
           )}
         </div>
         <StrengthBar strength={interaction.strength} />
@@ -1565,6 +1581,7 @@ function InteractionSectionInner({
                     scores={centralityResult.scores}
                     selectedCard={selectedCard}
                     onSelectCard={setSelectedCard}
+                    profiles={analysis.profiles}
                   />
                 </div>
               </CollapsiblePanel>
