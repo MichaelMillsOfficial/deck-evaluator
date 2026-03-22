@@ -577,7 +577,7 @@ export default function InteractionHeatmap({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 min-w-0 overflow-hidden">
       {/* Controls row */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Sort mode */}
@@ -643,28 +643,23 @@ export default function InteractionHeatmap({
         {statusText}
       </p>
 
-      {/* Canvas container — fixed-size viewport with internal scrollbars */}
+      {/* Canvas container — scrollable viewport contained within parent width */}
       <div
-        className="overflow-hidden rounded-lg border border-slate-700"
-        style={{ width: "100%" }}
+        ref={containerRef}
+        className="relative overflow-auto rounded-lg border border-slate-700"
+        style={{ maxHeight: containerMaxHeight }}
+        tabIndex={0}
+        role="region"
+        aria-label={`Interaction heatmap: ${N} cards. Scroll to explore.`}
       >
-        <div
-          ref={containerRef}
-          className="relative overflow-auto"
-          style={{ maxHeight: containerMaxHeight }}
-          tabIndex={0}
-          role="region"
-          aria-label={`Interaction heatmap: ${N} cards. Scroll to explore.`}
-        >
-          <canvas
-            ref={canvasRef}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            style={{ display: "block", minWidth: canvasW, minHeight: canvasH }}
-            aria-label={`Interaction heatmap: ${N} cards`}
-          />
-          {tooltip && <HeatmapTooltip info={tooltip} />}
-        </div>
+        <canvas
+          ref={canvasRef}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          style={{ display: "block", minWidth: canvasW, minHeight: canvasH }}
+          aria-label={`Interaction heatmap: ${N} cards`}
+        />
+        {tooltip && <HeatmapTooltip info={tooltip} />}
       </div>
 
       {/* Scroll hint when canvas overflows the container */}

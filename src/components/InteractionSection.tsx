@@ -1653,7 +1653,7 @@ function InteractionSectionInner({
 
             {/* ─── Heatmap view ─────────────────────────────────────────────── */}
             {viewMode === "heatmap" && (
-              <div data-testid="interaction-heatmap-view">
+              <div data-testid="interaction-heatmap-view" className="overflow-hidden min-w-0">
                 <Suspense
                   fallback={
                     <div
