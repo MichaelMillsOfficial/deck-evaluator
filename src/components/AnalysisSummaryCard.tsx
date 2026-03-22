@@ -111,6 +111,7 @@ const styles = {
     flex: 1,
   },
   statLabel: {
+    display: "flex" as const,
     fontSize: 10,
     color: "#64748b",
     fontWeight: 600,
@@ -119,12 +120,14 @@ const styles = {
     marginBottom: 2,
   },
   statValue: {
+    display: "flex" as const,
     fontSize: 20,
     fontWeight: 700,
     color: "#f1f5f9",
     lineHeight: 1,
   },
   statSub: {
+    display: "flex" as const,
     fontSize: 11,
     color: "#94a3b8",
     marginTop: 2,
@@ -146,6 +149,7 @@ const styles = {
     gap: 2,
   },
   curveLabel: {
+    display: "flex" as const,
     fontSize: 9,
     color: "#64748b",
     textAlign: "center" as const,
@@ -179,6 +183,7 @@ const styles = {
     gap: 4,
   },
   comboDot: {
+    display: "flex" as const,
     width: 4,
     height: 4,
     borderRadius: 2,
@@ -195,6 +200,7 @@ const styles = {
     paddingTop: 8,
   },
   footerText: {
+    display: "flex" as const,
     fontSize: 10,
     color: "#475569",
   },
@@ -278,6 +284,7 @@ export function AnalysisSummaryCard({
                 <div key={bucket.cmc} style={styles.curveBarWrapper}>
                   <div
                     style={{
+                      display: "flex" as const,
                       width: "100%",
                       height: barHeight,
                       backgroundColor: "#9333ea",
@@ -315,7 +322,7 @@ export function AnalysisSummaryCard({
             {displayCombos.map((combo, i) => (
               <div key={i} style={styles.comboItem}>
                 <div style={styles.comboDot} />
-                <div>{combo.cards.slice(0, 3).join(" + ")}</div>
+                <div style={{ display: "flex" as const }}>{combo.cards.slice(0, 3).join(" + ")}</div>
               </div>
             ))}
           </div>
