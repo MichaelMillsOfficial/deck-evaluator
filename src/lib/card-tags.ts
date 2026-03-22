@@ -140,9 +140,11 @@ const SNOW_MANA_RE = /\{S\}/;
 // Targeted Discard — requires "target" word (1-for-1 disruption)
 const TARGETED_DISCARD_RE = /\btarget (?:player|opponent) discards/i;
 // Multi-sentence pattern: "Target player reveals ... That player discards"
-// Uses /s (dot-all) flag because the reveal and discard are in separate sentences
+// Uses [\s\S] instead of . to match across sentence boundaries (newlines)
+// because the reveal and discard clauses are in separate sentences.
+// (Cannot use /s dot-all flag — tsconfig target is ES2017, /s requires ES2018.)
 const TARGETED_DISCARD_CHOOSE_RE =
-  /\btarget (?:player|opponent) reveals.+?(?:that player |they )discard/is;
+  /\btarget (?:player|opponent) reveals[\s\S]+?(?:that player |they )discard/i;
 
 // Mass Discard — affects multiple players, no targeting
 const MASS_DISCARD_EACH_RE =
