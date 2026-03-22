@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import type { DeckData, EnrichedCard } from "./types";
+import type { ShareAnalysisSummary } from "./share-analysis-summary";
 
 interface DeckPayload {
   t: string;       // decklist text
@@ -23,6 +24,19 @@ export interface CompactDeckPayload {
 }
 
 // ---------------------------------------------------------------------------
+// v3 compact payload types (extends v2 with optional analysis summary)
+// ---------------------------------------------------------------------------
+
+export interface CompactDeckPayloadV3 {
+  v: 3;
+  n: string;                          // deck name
+  c: [string, string, number][];      // commanders: [set, collectorNum, qty]
+  m: [string, string, number][];      // mainboard
+  s?: [string, string, number][];     // sideboard (omitted if empty)
+  a?: ShareAnalysisSummary;           // optional analysis summary
+}
+
+// ---------------------------------------------------------------------------
 // Discriminated union for decoded payloads
 // ---------------------------------------------------------------------------
 
@@ -34,6 +48,14 @@ export type DecodedPayload =
       commanders: [string, string, number][];
       mainboard: [string, string, number][];
       sideboard: [string, string, number][];
+    }
+  | {
+      version: 3;
+      name: string;
+      commanders: [string, string, number][];
+      mainboard: [string, string, number][];
+      sideboard: [string, string, number][];
+      summary?: ShareAnalysisSummary;
     };
 
 // ---------------------------------------------------------------------------
@@ -61,6 +83,18 @@ export function deserializePayload(json: string): DecodedPayload {
   }
 
   const obj = parsed as Record<string, unknown>;
+
+  // v3 detection
+  if (obj.v === 3) {
+    return {
+      version: 3,
+      name: (obj.n as string) ?? "",
+      commanders: (obj.c as [string, string, number][]) ?? [],
+      mainboard: (obj.m as [string, string, number][]) ?? [],
+      sideboard: (obj.s as [string, string, number][]) ?? [],
+      summary: obj.a as ShareAnalysisSummary | undefined,
+    };
+  }
 
   // v2 detection
   if (obj.v === 2) {
@@ -119,6 +153,69 @@ export function buildCompactPayload(
 
 export function serializeCompactPayload(payload: CompactDeckPayload): string {
   return JSON.stringify(payload);
+}
+
+// ---------------------------------------------------------------------------
+// v3 compact payload builders
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a v3 compact payload that extends v2 with an optional analysis summary.
+ * If summary is not provided, the `a` field is omitted.
+ */
+export function buildCompactPayloadV3(
+  deck: DeckData,
+  cardMap: Record<string, EnrichedCard>,
+  summary?: ShareAnalysisSummary
+): CompactDeckPayloadV3 {
+  const payload: CompactDeckPayloadV3 = {
+    v: 3,
+    n: deck.name,
+    c: deck.commanders.map((c) => cardToTuple(c, cardMap)),
+    m: deck.mainboard.map((c) => cardToTuple(c, cardMap)),
+  };
+  if (deck.sideboard.length > 0) {
+    payload.s = deck.sideboard.map((c) => cardToTuple(c, cardMap));
+  }
+  if (summary !== undefined) {
+    payload.a = summary;
+  }
+  return payload;
+}
+
+export function serializePayloadV3(payload: CompactDeckPayloadV3): string {
+  return JSON.stringify(payload);
+}
+
+/**
+ * Encode a v3 payload to a base64url-encoded gzip string.
+ * If the resulting encoded string would exceed 1800 chars, falls back to
+ * encoding without the summary to keep the URL under 2000 chars.
+ */
+export async function encodeCompactDeckPayloadV3(
+  deck: DeckData,
+  cardMap: Record<string, EnrichedCard>,
+  summary?: ShareAnalysisSummary
+): Promise<string> {
+  // First try with summary
+  if (summary) {
+    const payload = buildCompactPayloadV3(deck, cardMap, summary);
+    const json = serializePayloadV3(payload);
+    const encoded = new TextEncoder().encode(json);
+    const compressed = await compressGzip(encoded);
+    const result = toBase64Url(compressed);
+    if (result.length <= 1800) {
+      return result;
+    }
+    // Summary makes URL too long — fall back to without summary
+  }
+
+  // Encode without summary (compatible with v2 format but using v3 version field)
+  const payload = buildCompactPayloadV3(deck, cardMap);
+  const json = serializePayloadV3(payload);
+  const encoded = new TextEncoder().encode(json);
+  const compressed = await compressGzip(encoded);
+  return toBase64Url(compressed);
 }
 
 // ---------------------------------------------------------------------------
@@ -292,7 +389,9 @@ function buildSetNumberIndex(
 }
 
 export function buildDeckFromCompactPayload(
-  payload: Extract<DecodedPayload, { version: 2 }>,
+  payload:
+    | Extract<DecodedPayload, { version: 2 }>
+    | Extract<DecodedPayload, { version: 3 }>,
   cardMap: Record<string, EnrichedCard>
 ): DeckData {
   const index = buildSetNumberIndex(cardMap);
