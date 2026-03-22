@@ -111,9 +111,6 @@ export class ComboAssemblyTracker {
     const zoneMap = buildZoneMap(state);
 
     for (const combo of this.combos) {
-      // Skip if already assembled (don't re-stamp assembledOnTurn)
-      let allAssembled = combo.assembledOnTurn !== null;
-
       for (const piece of combo.pieces) {
         const zone = zoneMap.get(piece.cardName) ?? "library";
         piece.currentZone = zone;
@@ -123,10 +120,6 @@ export class ComboAssemblyTracker {
 
         if (isAvailable && piece.turnFirstAvailable === null) {
           piece.turnFirstAvailable = turn;
-        }
-
-        if (!allAssembled && !isAvailable) {
-          allAssembled = false;
         }
       }
 

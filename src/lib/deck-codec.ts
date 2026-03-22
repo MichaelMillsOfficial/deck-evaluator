@@ -86,6 +86,12 @@ export function deserializePayload(json: string): DecodedPayload {
 
   // v3 detection
   if (obj.v === 3) {
+    if (!Array.isArray(obj.c) || !Array.isArray(obj.m)) {
+      throw new Error('Invalid compact payload: missing required arrays');
+    }
+    if (obj.a !== undefined && (typeof obj.a !== 'object' || obj.a === null)) {
+      throw new Error('Invalid v3 payload: malformed analysis summary');
+    }
     return {
       version: 3,
       name: (obj.n as string) ?? "",
@@ -98,6 +104,9 @@ export function deserializePayload(json: string): DecodedPayload {
 
   // v2 detection
   if (obj.v === 2) {
+    if (!Array.isArray(obj.c) || !Array.isArray(obj.m)) {
+      throw new Error('Invalid compact payload: missing required arrays');
+    }
     return {
       version: 2,
       name: (obj.n as string) ?? "",

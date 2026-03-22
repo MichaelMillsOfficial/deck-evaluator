@@ -472,7 +472,10 @@ function InteractionGraphInner({
       canvas.style.width = `${container.offsetWidth}px`;
       canvas.style.height = `${height}px`;
       const ctx = canvas.getContext("2d");
-      if (ctx) ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      if (ctx) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0); // reset to identity before scaling
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      }
       if (layoutReady) scheduleRender();
     });
     ro.observe(container);
@@ -500,14 +503,18 @@ function InteractionGraphInner({
   );
 
   // ─── Mouse event handlers ──────────────────────────────────────────────────
-  const getLocalXY = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current!.getBoundingClientRect();
+  const getLocalXY = (e: React.MouseEvent<HTMLCanvasElement>): { x: number; y: number } | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const { x, y } = getLocalXY(e);
+      const pos = getLocalXY(e);
+      if (!pos) return;
+      const { x, y } = pos;
 
       if (isDraggingRef.current) {
         const dx = x - dragStartRef.current.x;
@@ -536,7 +543,9 @@ function InteractionGraphInner({
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const { x, y } = getLocalXY(e);
+      const pos = getLocalXY(e);
+      if (!pos) return;
+      const { x, y } = pos;
       isDraggingRef.current = true;
       dragStartRef.current = {
         x,
@@ -551,7 +560,9 @@ function InteractionGraphInner({
 
   const handleMouseUp = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const { x, y } = getLocalXY(e);
+      const pos = getLocalXY(e);
+      if (!pos) return;
+      const { x, y } = pos;
       const wasDragging = isDraggingRef.current;
       isDraggingRef.current = false;
       if (canvasRef.current) canvasRef.current.style.cursor = "grab";
@@ -572,7 +583,9 @@ function InteractionGraphInner({
   const handleWheel = useCallback(
     (e: React.WheelEvent<HTMLCanvasElement>) => {
       e.preventDefault();
-      const { x, y } = getLocalXY(e as unknown as React.MouseEvent<HTMLCanvasElement>);
+      const pos = getLocalXY(e as unknown as React.MouseEvent<HTMLCanvasElement>);
+      if (!pos) return;
+      const { x, y } = pos;
       const delta = -e.deltaY * ZOOM_SPEED;
       const newScale = Math.max(
         MIN_ZOOM,

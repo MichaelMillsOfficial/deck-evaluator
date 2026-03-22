@@ -280,7 +280,10 @@ export default function InteractionHeatmap({
     }
 
     return { cardNames: filteredCards, matrix, typeMatrix: typeMap, maxStrength };
-  }, [baseHeatmap, showAll, sortMode, selectedTypes, analysis.interactions, centrality.scores, interactionCounts]);
+  // Note: interactionCounts is intentionally omitted — it is derived from analysis.interactions
+  // which is already in the dependency array.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseHeatmap, showAll, sortMode, selectedTypes, analysis.interactions, centrality.scores]);
 
   const { cardNames, matrix, typeMatrix, maxStrength } = displayHeatmap;
   const N = cardNames.length;

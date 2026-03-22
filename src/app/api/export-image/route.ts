@@ -6,17 +6,24 @@
 // WASM is initialized once at module scope to avoid re-initialization overhead.
 // ---------------------------------------------------------------------------
 
+import type React from "react";
 import { NextResponse } from "next/server";
 import type { AnalysisSummaryCardProps } from "@/components/AnalysisSummaryCard";
 
-// Module-scope WASM initialization flag
-let wasmInitialized = false;
-
 // Lazy-loaded modules to avoid pulling satori/resvg into the client bundle
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let satoriModule: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let resvgModule: any = null;
+interface SatoriModule {
+  default: (element: React.ReactElement, options: Record<string, unknown>) => Promise<string>;
+}
+
+interface ResvgModule {
+  initWasm: (wasm: ArrayBuffer) => Promise<void>;
+  Resvg: new (svg: string, options: Record<string, unknown>) => {
+    render: () => { asPng: () => Uint8Array };
+  };
+}
+
+let satoriModule: SatoriModule | null = null;
+let resvgModule: ResvgModule | null = null;
 
 async function ensureModules() {
   if (!satoriModule) {
@@ -27,19 +34,24 @@ async function ensureModules() {
   }
 }
 
-async function ensureWasm() {
-  if (wasmInitialized) return;
+// Promise-based singleton to prevent WASM init race conditions
+let wasmPromise: Promise<void> | null = null;
 
-  const { initWasm } = resvgModule;
-  // resvg-wasm needs the WASM binary — fetch it from the bundled location
-  const wasmUrl = new URL(
-    "@resvg/resvg-wasm/index_bg.wasm",
-    import.meta.url
-  );
-  const wasmResponse = await fetch(wasmUrl.toString());
-  const wasmBuffer = await wasmResponse.arrayBuffer();
-  await initWasm(wasmBuffer);
-  wasmInitialized = true;
+async function ensureWasm() {
+  if (!wasmPromise) {
+    wasmPromise = (async () => {
+      const { initWasm } = resvgModule;
+      // resvg-wasm needs the WASM binary — fetch it from the bundled location
+      const wasmUrl = new URL(
+        "@resvg/resvg-wasm/index_bg.wasm",
+        import.meta.url
+      );
+      const wasmResponse = await fetch(wasmUrl.toString());
+      const wasmBuffer = await wasmResponse.arrayBuffer();
+      await initWasm(wasmBuffer);
+    })();
+  }
+  return wasmPromise;
 }
 
 async function loadInterFont(): Promise<ArrayBuffer> {
@@ -69,13 +81,13 @@ function buildCardProps(data: Record<string, unknown>): AnalysisSummaryCardProps
   return {
     deckName: (data.deckName as string) ?? "Unknown Deck",
     commanders: (data.commanders as string[]) ?? [],
-    cardCount: (data.cardCount as number) ?? 0,
-    powerLevel: (data.powerLevel as number) ?? 0,
-    bracket: (data.bracket as number) ?? 1,
+    cardCount: Number(data.cardCount) || 0,
+    powerLevel: Number(data.powerLevel) || 0,
+    bracket: Number(data.bracket) || 1,
     bracketName: (data.bracketName as string) ?? "",
-    averageCmc: (data.averageCmc as number) ?? 0,
-    keepableRate: (data.keepableRate as number) ?? 0,
-    landEfficiencyScore: (data.landEfficiencyScore as number) ?? 0,
+    averageCmc: Number(data.averageCmc) || 0,
+    keepableRate: Number(data.keepableRate) || 0,
+    landEfficiencyScore: Number(data.landEfficiencyScore) || 0,
     themes: (data.themes as string[]) ?? [],
     combos: (data.combos as { cards: string[]; description: string }[]) ?? [],
     manaCurve: (data.manaCurve as { cmc: string; count: number }[]) ?? [],
@@ -99,8 +111,8 @@ export async function POST(request: Request) {
     await ensureModules();
     await ensureWasm();
 
-    const satori = satoriModule.default ?? satoriModule;
-    const { Resvg } = resvgModule;
+    const satori = satoriModule!.default ?? satoriModule;
+    const { Resvg } = resvgModule!;
 
     // Load font
     const fontBuffer = await loadInterFont();

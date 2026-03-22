@@ -119,14 +119,14 @@ function computeAdvantages(
   ];
 
   return METRICS.map(({ key, label, higherIsBetter }) => {
-    const valA = statsA[key] as number | null;
-    const valB = statsB[key] as number | null;
+    const valA = statsA[key];
+    const valB = statsB[key];
 
-    if (valA === null || valB === null) {
+    if (typeof valA !== "number" || typeof valB !== "number") {
       return { metric: label, winner: "tie" as const, magnitude: 0 };
     }
 
-    const diff = (valB as number) - (valA as number);
+    const diff = valB - valA;
     const magnitude = Math.round(Math.abs(diff) * 1000) / 1000;
 
     const EPSILON = 0.0001;

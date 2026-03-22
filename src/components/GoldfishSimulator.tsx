@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
-import type { GoldfishConfig, RampSource, GoldfishGameLog } from "@/lib/goldfish-simulator";
+import type { GoldfishCard, GoldfishConfig, RampSource, GoldfishGameLog } from "@/lib/goldfish-simulator";
 import { DEFAULT_GOLDFISH_CONFIG, replayGoldfishGame, runGoldfishGame } from "@/lib/goldfish-simulator";
 import { useGoldfishSimulation } from "@/hooks/useGoldfishSimulation";
 import { randomSeed } from "@/lib/prng";
@@ -19,6 +19,16 @@ import BoardMilestones from "@/components/BoardMilestones";
 interface GoldfishSimulatorProps {
   deck: DeckData;
   cardMap: Record<string, EnrichedCard>;
+}
+
+/** Build a minimal GoldfishCard stub for combo assembly tracking.
+ *  The tracker only reads `.name` from cards, so a partial enriched stub suffices. */
+function minimalGoldfishCard(name: string): GoldfishCard {
+  return {
+    name,
+    enriched: { name } as EnrichedCard,
+    tags: [],
+  };
 }
 
 interface StatCardProps {
@@ -213,23 +223,18 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
       // Update tracker from each turn's hand/graveyard data
       // Note: we use simplified zone detection from turn logs
       for (const turnLog of game.turnLogs) {
-        const handSet = new Set(turnLog.hand);
-        const graveyardSet = new Set(turnLog.graveyard);
-        const permanentSet = new Set(
-          turnLog.permanents.map((p) => p.name)
-        );
         const fakeState = {
-          hand: turnLog.hand.map((name) => ({ name, enriched: {} as never, tags: [] })),
+          hand: turnLog.hand.map((n) => minimalGoldfishCard(n)),
           battlefield: turnLog.permanents.map((p) => ({
-            card: { name: p.name, enriched: {} as never, tags: [] },
+            card: minimalGoldfishCard(p.name),
             tapped: p.tapped,
             summoningSick: false,
             producedMana: [],
             enteredTurn: p.enteredTurn,
           })),
           library: [],
-          graveyard: turnLog.graveyard.map((name) => ({ name, enriched: {} as never, tags: [] })),
-          exile: turnLog.exile.map((name) => ({ name, enriched: {} as never, tags: [] })),
+          graveyard: turnLog.graveyard.map((n) => minimalGoldfishCard(n)),
+          exile: turnLog.exile.map((n) => minimalGoldfishCard(n)),
           commandZone: [],
           manaPool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
           landsPlayedThisTurn: 0,
@@ -239,10 +244,6 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
           rampLandsSearched: 0,
           random: Math.random,
         };
-        // Suppress unused variable warnings
-        void handSet;
-        void graveyardSet;
-        void permanentSet;
         tracker.update(fakeState, turnLog.turn);
       }
       return tracker;
