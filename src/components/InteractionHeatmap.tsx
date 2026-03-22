@@ -199,11 +199,26 @@ export default function InteractionHeatmap({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
 
   /** 0 = show all */
   const [cardLimit, setCardLimit] = useState<number>(30);
   const [sortMode, setSortMode] = useState<SortMode>("centrality");
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
+  const [availableWidth, setAvailableWidth] = useState<number>(0);
+
+  // Measure available width from the root div so we can constrain the scroll container
+  useEffect(() => {
+    const el = measureRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setAvailableWidth(entry.contentRect.width);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Build full heatmap data (all eligible cards, up to 30 by default)
   const baseHeatmap = useMemo(
@@ -577,7 +592,7 @@ export default function InteractionHeatmap({
   }
 
   return (
-    <div className="space-y-3 min-w-0 overflow-hidden">
+    <div ref={measureRef} className="space-y-3 min-w-0 overflow-hidden">
       {/* Controls row */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Sort mode */}
@@ -643,11 +658,14 @@ export default function InteractionHeatmap({
         {statusText}
       </p>
 
-      {/* Canvas container — scrollable viewport contained within parent width */}
+      {/* Canvas container — scrollable viewport with explicit pixel width from parent */}
       <div
         ref={containerRef}
         className="relative overflow-auto rounded-lg border border-slate-700"
-        style={{ maxHeight: containerMaxHeight }}
+        style={{
+          maxHeight: containerMaxHeight,
+          ...(availableWidth > 0 ? { width: availableWidth } : {}),
+        }}
         tabIndex={0}
         role="region"
         aria-label={`Interaction heatmap: ${N} cards. Scroll to explore.`}
