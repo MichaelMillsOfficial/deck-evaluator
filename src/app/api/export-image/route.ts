@@ -11,16 +11,8 @@ import { NextResponse } from "next/server";
 import type { AnalysisSummaryCardProps } from "@/components/AnalysisSummaryCard";
 
 // Lazy-loaded modules to avoid pulling satori/resvg into the client bundle
-interface SatoriModule {
-  default: (element: React.ReactElement, options: Record<string, unknown>) => Promise<string>;
-}
-
-interface ResvgModule {
-  initWasm: (wasm: ArrayBuffer) => Promise<void>;
-  Resvg: new (svg: string, options: Record<string, unknown>) => {
-    render: () => { asPng: () => Uint8Array };
-  };
-}
+type SatoriModule = typeof import("satori");
+type ResvgModule = typeof import("@resvg/resvg-wasm");
 
 let satoriModule: SatoriModule | null = null;
 let resvgModule: ResvgModule | null = null;
@@ -40,7 +32,7 @@ let wasmPromise: Promise<void> | null = null;
 async function ensureWasm() {
   if (!wasmPromise) {
     wasmPromise = (async () => {
-      const { initWasm } = resvgModule;
+      const { initWasm } = resvgModule!;
       // resvg-wasm needs the WASM binary — fetch it from the bundled location
       const wasmUrl = new URL(
         "@resvg/resvg-wasm/index_bg.wasm",
@@ -154,7 +146,7 @@ export async function POST(request: Request) {
     const pngData = resvgInstance.render();
     const pngBuffer = pngData.asPng();
 
-    return new Response(pngBuffer, {
+    return new Response(pngBuffer.buffer as ArrayBuffer, {
       headers: {
         "Content-Type": "image/png",
         "Content-Disposition": 'attachment; filename="deck-analysis.png"',
