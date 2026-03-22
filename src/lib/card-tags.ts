@@ -140,6 +140,7 @@ const SNOW_MANA_RE = /\{S\}/;
 // Targeted Discard — requires "target" word (1-for-1 disruption)
 const TARGETED_DISCARD_RE = /\btarget (?:player|opponent) discards/i;
 // Multi-sentence pattern: "Target player reveals ... That player discards"
+// Uses /s (dot-all) flag because the reveal and discard are in separate sentences
 const TARGETED_DISCARD_CHOOSE_RE =
   /\btarget (?:player|opponent) reveals.+?(?:that player |they )discard/is;
 
@@ -441,13 +442,15 @@ export function generateTags(card: EnrichedCard): string[] {
     tags.add("Self-Discard");
   }
 
-  // Discard Payoff — whenever triggers on discard, or conditional checks
+  // Discard Payoff — whenever triggers on discard, or conditional checks.
+  // Two-pass approach: the trigger regex is broad (/whenever[^.]*discards/)
+  // which would false-positive on "unless...discards" (Painful Quandary).
+  // We check per-line to exclude lines where the "discard" is inside an
+  // "unless" clause, while still allowing genuine payoff triggers on other lines.
   if (DISCARD_PAYOFF_CONDITION_RE.test(text)) {
     tags.add("Discard Payoff");
   }
   if (DISCARD_PAYOFF_TRIGGER_RE.test(text)) {
-    // Check per-line: only count as payoff if at least one line has
-    // "whenever...discards" WITHOUT "unless...discards" in the same line
     const lines = text.split("\n");
     for (const line of lines) {
       if (

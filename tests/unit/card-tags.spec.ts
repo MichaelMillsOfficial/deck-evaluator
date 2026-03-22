@@ -1862,6 +1862,16 @@ test.describe("generateTags — Self-Discard", () => {
     expect(generateTags(card)).toContain("Self-Discard");
   });
 
+  test("Lightning Axe (as an additional cost, discard) → Self-Discard", () => {
+    const card = makeCard({
+      name: "Lightning Axe",
+      typeLine: "Instant",
+      oracleText:
+        "As an additional cost to cast this spell, discard a card or pay {5}.\nLightning Axe deals 5 damage to target creature.",
+    });
+    expect(generateTags(card)).toContain("Self-Discard");
+  });
+
   test("Faithless Looting (period-terminated effect) → NOT Self-Discard", () => {
     const card = makeCard({
       name: "Faithless Looting",
@@ -1902,6 +1912,19 @@ test.describe("generateTags — Discard Payoff", () => {
         "Flying\nWhenever a creature an opponent controls dies, you may gain 3 life.\nWhenever an opponent discards a card, you may gain 3 life.",
     });
     expect(generateTags(card)).toContain("Discard Payoff");
+  });
+
+  test("Archfiend of Ifnir → both Self-Discard (Cycling) AND Discard Payoff (whenever discard trigger)", () => {
+    const card = makeCard({
+      name: "Archfiend of Ifnir",
+      typeLine: "Creature — Demon",
+      keywords: ["Cycling"],
+      oracleText:
+        "Flying\nWhenever you cycle or discard another card, put a -1/-1 counter on each creature your opponents control.\nCycling {2}",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Self-Discard");
+    expect(tags).toContain("Discard Payoff");
   });
 
   test("The Raven Man → both Discard Payoff AND Mass Discard (dual-tag)", () => {

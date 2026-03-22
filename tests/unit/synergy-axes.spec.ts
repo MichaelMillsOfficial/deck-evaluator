@@ -1069,4 +1069,14 @@ test.describe("Discard axis", () => {
     });
     expect(axis.detect(card)).toBe(0);
   });
+
+  test("Painful Quandary (unless...discards) scores > 0 on discard axis", () => {
+    const axis = getAxisById("discard")!;
+    const card = mockCard({
+      name: "Painful Quandary",
+      oracleText:
+        "Whenever an opponent casts a spell, that player loses 5 life unless that player discards a card.",
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
 });

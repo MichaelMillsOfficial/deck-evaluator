@@ -122,7 +122,7 @@ const DISCARD_PAYOFF_COND_RE = /\bif a player discarded a card this turn\b/i;
 const DISCARD_MASS_RE =
   /\beach (?:player|opponent|other player)[^.]*discards?\b/i;
 const DISCARD_TARGETED_RE = /\btarget (?:player|opponent) discards/i;
-const DISCARD_COST_RE = /[Dd]iscard (?:a|two|three|your) (?:cards?|hand)\s*:/;
+const DISCARD_COST_RE = /[Dd]iscard (?:a|two|three|x|your) (?:cards?|hand)\s*:/;
 const DISCARD_UNLESS_RE =
   /\bunless (?:that player|they|he or she) discards?\b/i;
 const DISCARD_KEYWORDS = new Set(["Madness", "Connive", "Cycling"]);
