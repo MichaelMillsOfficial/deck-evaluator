@@ -575,7 +575,7 @@ export default function InteractionHeatmap({
   }
 
   return (
-    <div className="space-y-3 min-w-0 overflow-hidden">
+    <div className="space-y-3" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)" }}>
       {/* Controls row */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Sort mode */}
@@ -641,17 +641,12 @@ export default function InteractionHeatmap({
         {statusText}
       </p>
 
-      {/* Scroll container: width:0 + min-width:100% prevents the canvas from
-           inflating flex parents while still filling available space. overflow-auto
-           then creates scrollbars inside the component boundary. */}
+      {/* Scroll container: grid parent with minmax(0,1fr) constrains this div's
+           width to the available space. overflow-auto creates internal scrollbars. */}
       <div
         ref={containerRef}
         className="relative overflow-auto rounded-lg border border-slate-700"
-        style={{
-          maxHeight: containerMaxHeight,
-          width: 0,
-          minWidth: "100%",
-        }}
+        style={{ maxHeight: containerMaxHeight }}
         tabIndex={0}
         role="region"
         aria-label={`Interaction heatmap: ${N} cards. Scroll to explore.`}
