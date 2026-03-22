@@ -363,11 +363,9 @@ export default function InteractionHeatmap({
     const W = LABEL_WIDTH + N * CELL_SIZE;
     const H = HEADER_HEIGHT + N * CELL_SIZE;
 
-    // Resize canvas
+    // Set canvas buffer size (style dimensions are set via JSX props)
     canvas.width = W;
     canvas.height = H;
-    canvas.style.width = `${W}px`;
-    canvas.style.height = `${H}px`;
 
     // Use OffscreenCanvas when available for perf
     let offscreen: OffscreenCanvas | null = null;
@@ -547,8 +545,13 @@ export default function InteractionHeatmap({
 
   const handleMouseLeave = useCallback(() => setTooltip(null), []);
 
-  // ─── Dynamic container height (Issue 1) ────────────────────────────────────
-  const containerMaxHeight = Math.min(HEADER_HEIGHT + N * CELL_SIZE + 16, 750);
+  // ─── Dynamic container sizing ────────────────────────────────────────────────
+  // The canvas can be wider/taller than the viewport (e.g. 100 cards at 14px = 1480px).
+  // Cap the container to a sensible viewport and let the user scroll WITHIN it.
+  const canvasW = LABEL_WIDTH + N * CELL_SIZE;
+  const canvasH = HEADER_HEIGHT + N * CELL_SIZE;
+  const containerMaxHeight = Math.min(canvasH + 16, 600);
+  const containerMaxWidth = "100%"; // fill parent; canvas scrolls inside
 
   // ─── Status line text ───────────────────────────────────────────────────────
   const statusText = useMemo(() => {
@@ -640,21 +643,32 @@ export default function InteractionHeatmap({
         {statusText}
       </p>
 
-      {/* Canvas container — horizontally scrollable, dynamic height */}
+      {/* Canvas container — scrollable viewport for large matrices */}
       <div
         ref={containerRef}
         className="relative overflow-auto rounded-lg border border-slate-700"
-        style={{ maxHeight: containerMaxHeight }}
+        style={{ maxHeight: containerMaxHeight, maxWidth: containerMaxWidth }}
+        tabIndex={0}
+        role="region"
+        aria-label={`Interaction heatmap: ${N} cards. Scroll to explore.`}
       >
         <canvas
           ref={canvasRef}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
           className="block"
+          style={{ width: canvasW, height: canvasH }}
           aria-label={`Interaction heatmap: ${N} cards`}
         />
         {tooltip && <HeatmapTooltip info={tooltip} />}
       </div>
+
+      {/* Scroll hint when canvas overflows the container */}
+      {(canvasW > 700 || canvasH > 600) && (
+        <p className="text-[10px] text-slate-500 italic">
+          Scroll within the heatmap to see all {N} cards
+        </p>
+      )}
 
       {/* Colour legend */}
       <ColorLegend />
