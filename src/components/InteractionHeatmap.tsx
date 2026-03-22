@@ -655,6 +655,7 @@ export default function InteractionHeatmap({
           ref={canvasRef}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
+          style={{ display: "block", width: canvasW, height: canvasH }}
           aria-label={`Interaction heatmap: ${N} cards`}
         />
         {tooltip && <HeatmapTooltip info={tooltip} />}
