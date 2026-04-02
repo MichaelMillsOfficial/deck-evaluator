@@ -38,18 +38,45 @@ import {
 } from "@/lib/interaction-graph-data";
 
 // ─── Interaction type → canvas hex colour ────────────────────────────────────
-// These match the Tailwind palette used in InteractionSection for consistency.
+// Revised for deuteranopia/protanopia safety: avoids red-green pairs.
 const TYPE_HEX: Record<InteractionType, string> = {
-  enables: "#16a34a",    // green-600
+  enables: "#0e7490",    // cyan-700 (was green — shifted to avoid red/green confusion)
   triggers: "#2563eb",   // blue-600
   amplifies: "#d97706",  // amber-600
-  protects: "#0891b2",   // cyan-600
-  recurs: "#059669",     // emerald-600
+  protects: "#06b6d4",   // cyan-500
+  recurs: "#0284c7",     // sky-600 (was emerald — shifted toward blue)
   reduces_cost: "#65a30d", // lime-600
   tutors_for: "#4f46e5", // indigo-600
-  blocks: "#dc2626",     // red-600
-  conflicts: "#ea580c",  // orange-600
+  blocks: "#7c3aed",     // violet-600 (was red — shifted to avoid red/green confusion)
+  conflicts: "#db2777",  // pink-600 (was orange — now distinct from amber)
   loops_with: "#c026d3", // fuchsia-600
+};
+
+// ─── Edge dash patterns (secondary encoding for colorblind users) ────────────
+const TYPE_DASH: Record<InteractionType, number[]> = {
+  enables: [],              // solid
+  triggers: [4, 4],         // short dash
+  amplifies: [],            // solid
+  protects: [8, 4],         // long dash
+  recurs: [2, 3],           // dotted
+  reduces_cost: [6, 3, 2, 3], // dash-dot
+  tutors_for: [],           // solid
+  blocks: [3, 3],           // short even dash
+  conflicts: [8, 3, 2, 3], // dash-dot (longer)
+  loops_with: [2, 2],       // tight dot
+};
+
+const TYPE_LABELS: Record<InteractionType, string> = {
+  enables: "Enables",
+  triggers: "Triggers",
+  amplifies: "Amplifies",
+  protects: "Protects",
+  recurs: "Recurs",
+  reduces_cost: "Cost Reduce",
+  tutors_for: "Tutors",
+  blocks: "Blocks",
+  conflicts: "Conflicts",
+  loops_with: "Loops",
 };
 
 const CATEGORY_STROKE: Record<string, string> = {
@@ -93,10 +120,12 @@ function NodeDetailPanel({
   node,
   edges,
   onClose,
+  returnFocusRef,
 }: {
   node: GraphNode;
   edges: GraphEdge[];
   onClose: () => void;
+  returnFocusRef?: React.RefObject<HTMLCanvasElement | null>;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -105,13 +134,18 @@ function NodeDetailPanel({
     return () => cancelAnimationFrame(frame);
   }, []);
 
+  const handleClose = useCallback(() => {
+    onClose();
+    requestAnimationFrame(() => returnFocusRef?.current?.focus());
+  }, [onClose, returnFocusRef]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") handleClose();
     };
     document.addEventListener("keydown", handler, { capture: true });
     return () => document.removeEventListener("keydown", handler, { capture: true });
-  }, [onClose]);
+  }, [handleClose]);
 
   const connectedEdges = edges.filter(
     (e) => e.source === node.id || e.target === node.id
@@ -131,7 +165,7 @@ function NodeDetailPanel({
         <button
           ref={closeRef}
           type="button"
-          onClick={onClose}
+          onClick={handleClose}
           aria-label="Close detail panel"
           className="ml-2 shrink-0 rounded p-1 text-slate-500 hover:text-slate-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-400"
         >
@@ -179,7 +213,8 @@ function NodeDetailPanel({
                     style={{ background: TYPE_HEX[e.type] }}
                     aria-hidden="true"
                   />
-                  <span className="text-slate-300 truncate">{partner}</span>
+                  <span className="text-slate-300 truncate flex-1">{partner}</span>
+                  <span className="text-slate-500 shrink-0">{TYPE_LABELS[e.type]}</span>
                 </li>
               );
             })}
@@ -275,6 +310,11 @@ function InteractionGraphInner({
     [centrality.maxScore]
   );
 
+  // ─── Keyboard focus state (declared before render so ref is available) ─────
+  const [focusedNodeIndex, setFocusedNodeIndex] = useState(0);
+  const focusedNodeIndexRef = useRef(focusedNodeIndex);
+  focusedNodeIndexRef.current = focusedNodeIndex;
+
   // ─── Canvas render ──────────────────────────────────────────────────────────
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -327,11 +367,8 @@ function InteractionGraphInner({
       ctx.strokeStyle = TYPE_HEX[edge.type] ?? "#64748b";
       ctx.lineWidth = EDGE_WIDTH_BASE + edge.strength * EDGE_WIDTH_SCALE;
 
-      if (edge.isConditional) {
-        ctx.setLineDash([4, 4]);
-      } else {
-        ctx.setLineDash([]);
-      }
+      // Dash pattern per type (secondary encoding for colorblind users)
+      ctx.setLineDash(TYPE_DASH[edge.type] ?? []);
 
       ctx.beginPath();
       ctx.moveTo(src.x, src.y);
@@ -392,30 +429,49 @@ function InteractionGraphInner({
       ctx.restore();
     }
 
-    // Issue 2: Draw node labels at sufficient zoom (>= 1.4x)
-    if (scale >= 1.4) {
-      ctx.save();
-      for (const node of visibleNodes) {
-        const pos = positions.get(node.id);
-        if (!pos) continue;
-        const r = nodeRadius(node);
-        const label = node.id.length > 18 ? node.id.slice(0, 17) + "\u2026" : node.id;
-        const textX = pos.x;
-        const textY = pos.y + r + 12;
+    // ── Node labels ─────────────────────────────────────────────────────────
+    // At any zoom: show truncated labels for top centrality nodes (engine/contributor)
+    // At zoom >= 1.4x: show labels for all nodes
+    ctx.save();
+    for (const node of visibleNodes) {
+      const showAtAnyZoom = node.category === "engine" || node.category === "contributor";
+      if (!showAtAnyZoom && scale < 1.4) continue;
 
-        // Background rect for legibility
-        ctx.font = "9px system-ui, sans-serif";
-        const textWidth = ctx.measureText(label).width;
-        ctx.fillStyle = "rgba(15, 23, 42, 0.8)"; // slate-950 at 80%
-        ctx.fillRect(textX - textWidth / 2 - 2, textY - 9, textWidth + 4, 12);
+      const pos = positions.get(node.id);
+      if (!pos) continue;
+      const r = nodeRadius(node);
+      const maxLen = scale >= 1.4 ? 18 : 8;
+      const label = node.id.length > maxLen ? node.id.slice(0, maxLen - 1) + "\u2026" : node.id;
+      const textX = pos.x;
+      const textY = pos.y + r + 12;
 
-        // Label text
-        ctx.fillStyle = "#94a3b8"; // slate-400
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillText(label, textX, textY - 8);
+      ctx.font = `${scale >= 1.4 ? 9 : 8}px system-ui, sans-serif`;
+      const textWidth = ctx.measureText(label).width;
+      ctx.fillStyle = "rgba(15, 23, 42, 0.8)";
+      ctx.fillRect(textX - textWidth / 2 - 2, textY - 9, textWidth + 4, 12);
+
+      ctx.fillStyle = "#94a3b8";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(label, textX, textY - 8);
+    }
+    ctx.restore();
+
+    // ── Keyboard focus ring ──────────────────────────────────────────────────
+    const focusIdx = focusedNodeIndexRef.current;
+    if (focusIdx >= 0 && focusIdx < visibleNodes.length) {
+      const focusNode = visibleNodes[focusIdx];
+      const focusPos = positions.get(focusNode.id);
+      if (focusPos) {
+        const fr = nodeRadius(focusNode) + 5;
+        ctx.beginPath();
+        ctx.arc(focusPos.x, focusPos.y, fr, 0, Math.PI * 2);
+        ctx.strokeStyle = "#facc15"; // yellow-400
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([4, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
       }
-      ctx.restore();
     }
 
     ctx.restore();
@@ -534,10 +590,10 @@ function InteractionGraphInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analysis, centrality, height, prefersReducedMotion]);
 
-  // ─── Render whenever layout or selection changes ───────────────────────────
+  // ─── Render whenever layout, selection, or focus changes ────────────────────
   useEffect(() => {
     if (layoutReady) scheduleRender();
-  }, [layoutReady, scheduleRender, selectedNode, filteredEdges]);
+  }, [layoutReady, scheduleRender, selectedNode, filteredEdges, focusedNodeIndex]);
 
   // ─── Resize observer: set canvas dimensions ───────────────────────────────
   useEffect(() => {
@@ -688,9 +744,98 @@ function InteractionGraphInner({
     scheduleRender();
   }, [scheduleRender]);
 
-  // ─── Keyboard navigation ───────────────────────────────────────────────────
-  const [focusedNodeIndex, setFocusedNodeIndex] = useState(0);
+  // ─── Touch handlers ────────────────────────────────────────────────────────
+  const touchStartRef = useRef<{ x: number; y: number; tx: number; ty: number; dist?: number } | null>(null);
 
+  const getTouchXY = (touch: React.Touch): { x: number; y: number } | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+  };
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent<HTMLCanvasElement>) => {
+      if (e.touches.length === 1) {
+        const pos = getTouchXY(e.touches[0]);
+        if (!pos) return;
+        touchStartRef.current = { x: pos.x, y: pos.y, tx: transformRef.current.tx, ty: transformRef.current.ty };
+      } else if (e.touches.length === 2) {
+        // Pinch zoom start
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx, dy);
+        const pos = getTouchXY(e.touches[0]);
+        if (!pos) return;
+        touchStartRef.current = { x: pos.x, y: pos.y, tx: transformRef.current.tx, ty: transformRef.current.ty, dist };
+      }
+    },
+    []
+  );
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLCanvasElement>) => {
+      e.preventDefault();
+      if (!touchStartRef.current) return;
+
+      if (e.touches.length === 1 && !touchStartRef.current.dist) {
+        // Pan
+        const pos = getTouchXY(e.touches[0]);
+        if (!pos) return;
+        const dx = pos.x - touchStartRef.current.x;
+        const dy = pos.y - touchStartRef.current.y;
+        transformRef.current = {
+          ...transformRef.current,
+          tx: touchStartRef.current.tx + dx,
+          ty: touchStartRef.current.ty + dy,
+        };
+        scheduleRender();
+      } else if (e.touches.length === 2 && touchStartRef.current.dist) {
+        // Pinch zoom
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx, dy);
+        const ratio = dist / touchStartRef.current.dist;
+        const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, transformRef.current.scale * ratio));
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const cx = canvas.offsetWidth / 2;
+          const cy = canvas.offsetHeight / 2;
+          const scaleRatio = newScale / transformRef.current.scale;
+          transformRef.current = {
+            scale: newScale,
+            tx: cx - scaleRatio * (cx - transformRef.current.tx),
+            ty: cy - scaleRatio * (cy - transformRef.current.ty),
+          };
+        }
+        touchStartRef.current.dist = dist;
+        scheduleRender();
+      }
+    },
+    [scheduleRender]
+  );
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent<HTMLCanvasElement>) => {
+      if (!touchStartRef.current) return;
+      // Detect tap (no significant movement)
+      if (e.changedTouches.length === 1 && !touchStartRef.current.dist) {
+        const pos = getTouchXY(e.changedTouches[0]);
+        if (pos) {
+          const dx = Math.abs(pos.x - touchStartRef.current.x);
+          const dy = Math.abs(pos.y - touchStartRef.current.y);
+          if (dx < 8 && dy < 8) {
+            const hit = hitTest(pos.x, pos.y);
+            setSelectedNode((prev) => (prev?.id === hit?.id ? null : hit));
+          }
+        }
+      }
+      touchStartRef.current = null;
+    },
+    [hitTest]
+  );
+
+  // ─── Keyboard navigation ───────────────────────────────────────────────────
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLCanvasElement>) => {
       if (visibleNodes.length === 0) return;
@@ -805,29 +950,41 @@ function InteractionGraphInner({
       adj.get(edge.target)?.push({ partner: edge.source, type: edge.type, strength: edge.strength });
     }
 
+    // Sort by interaction count descending for screen reader navigation
+    const sortedNodes = [...visibleNodes].sort((a, b) => b.interactionCount - a.interactionCount);
+
     return (
-      <table className="sr-only" aria-label="Interaction graph data">
+      <table className="sr-only" aria-label="Interaction graph data — sorted by interaction count">
+        <caption>
+          {visibleNodes.length} cards with {filteredEdges.length} connections
+        </caption>
         <thead>
           <tr>
             <th scope="col">Card</th>
             <th scope="col">Category</th>
-            <th scope="col">Interactions</th>
+            <th scope="col">Count</th>
+            <th scope="col">Connections</th>
           </tr>
         </thead>
         <tbody>
-          {visibleNodes.map((node) => {
+          {sortedNodes.map((node) => {
             const connections = adj.get(node.id) ?? [];
             return (
               <tr key={node.id}>
                 <th scope="row">{node.id}</th>
                 <td>{node.category}</td>
+                <td>{connections.length}</td>
                 <td>
-                  {connections.map((c, i) => (
-                    <span key={i}>
-                      {c.partner} ({c.type}, {Math.round(c.strength * 100)}%)
-                      {i < connections.length - 1 ? "; " : ""}
-                    </span>
-                  ))}
+                  <ul>
+                    {connections.slice(0, 15).map((c, i) => (
+                      <li key={i}>
+                        {c.partner} — {TYPE_LABELS[c.type as InteractionType] ?? c.type}, {Math.round(c.strength * 100)}%
+                      </li>
+                    ))}
+                    {connections.length > 15 && (
+                      <li>and {connections.length - 15} more</li>
+                    )}
+                  </ul>
                 </td>
               </tr>
             );
@@ -872,6 +1029,9 @@ function InteractionGraphInner({
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
         onKeyDown={handleKeyDown}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       />
 
       {/* Loading overlay */}
@@ -947,6 +1107,7 @@ function InteractionGraphInner({
           node={selectedNode}
           edges={filteredEdges}
           onClose={() => setSelectedNode(null)}
+          returnFocusRef={canvasRef}
         />
       )}
 

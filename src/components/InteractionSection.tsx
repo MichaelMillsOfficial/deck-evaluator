@@ -1635,7 +1635,8 @@ function InteractionSectionInner({
                   fallback={
                     <div
                       aria-live="polite"
-                      className="flex items-center justify-center rounded-lg border border-slate-700 bg-slate-800/30 py-16 text-xs text-slate-500"
+                      className="flex items-center justify-center rounded-lg border border-slate-700 bg-slate-800/30 text-xs text-slate-500"
+                      style={{ height: 680 }}
                     >
                       <span className="animate-pulse">Loading graph…</span>
                     </div>
