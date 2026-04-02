@@ -220,7 +220,7 @@ function getMedianEntry<T extends { turn: number }>(
 
 /**
  * Compute the most common permanents at a given turn across all game logs.
- * Returns top 5 by frequency.
+ * Returns top 10 by frequency.
  */
 function computeTopPermanents(
   gameLogs: GoldfishGameLog[],
@@ -249,5 +249,5 @@ function computeTopPermanents(
       frequency: Math.round((count / totalGames) * 1000) / 1000,
     }))
     .sort((a, b) => b.frequency - a.frequency)
-    .slice(0, 5);
+    .slice(0, 10);
 }
