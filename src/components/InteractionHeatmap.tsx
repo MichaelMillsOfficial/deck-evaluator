@@ -197,8 +197,8 @@ export default function InteractionHeatmap({
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  /** 0 = show all */
-  const [cardLimit, setCardLimit] = useState<number>(30);
+  /** 0 = show all (default) */
+  const [cardLimit, setCardLimit] = useState<number>(0);
   const [sortMode, setSortMode] = useState<SortMode>("centrality");
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
 
@@ -561,7 +561,7 @@ export default function InteractionHeatmap({
   }
 
   return (
-    <div className="space-y-3 min-w-0" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)" }}>
+    <div className="w-full space-y-3 overflow-hidden">
       {/* Controls row */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Sort mode */}
@@ -589,37 +589,35 @@ export default function InteractionHeatmap({
           )}
         </div>
 
-        {/* Card count selector — only shown when total > 30 */}
-        {totalParticipatingCards > 30 && (
-          <div className="ml-auto flex items-center gap-1.5">
-            <span className="text-[10px] text-slate-500 shrink-0">Show:</span>
-            {CARD_LIMIT_OPTIONS.map((limit) => (
-              <button
-                key={limit}
-                type="button"
-                onClick={() => setCardLimit(limit)}
-                className={`rounded-md border px-2 py-0.5 text-[10px] transition-colors cursor-pointer ${
-                  cardLimit === limit
-                    ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
-                    : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
-                }`}
-              >
-                {limit}
-              </button>
-            ))}
+        {/* Card count selector */}
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="text-[10px] text-slate-500 shrink-0">Show:</span>
+          {CARD_LIMIT_OPTIONS.filter((limit) => limit < totalParticipatingCards).map((limit) => (
             <button
+              key={limit}
               type="button"
-              onClick={() => setCardLimit(0)}
+              onClick={() => setCardLimit(limit)}
               className={`rounded-md border px-2 py-0.5 text-[10px] transition-colors cursor-pointer ${
-                cardLimit === 0
+                cardLimit === limit
                   ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
                   : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
               }`}
             >
-              All {totalParticipatingCards}
+              {limit}
             </button>
-          </div>
-        )}
+          ))}
+          <button
+            type="button"
+            onClick={() => setCardLimit(0)}
+            className={`rounded-md border px-2 py-0.5 text-[10px] transition-colors cursor-pointer ${
+              cardLimit === 0
+                ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
+                : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
+            }`}
+          >
+            All {totalParticipatingCards}
+          </button>
+        </div>
       </div>
 
       {/* Status line */}
@@ -631,7 +629,7 @@ export default function InteractionHeatmap({
            width to the available space. overflow-auto creates internal scrollbars. */}
       <div
         ref={containerRef}
-        className="relative overflow-auto rounded-lg border border-slate-700 min-w-0"
+        className="relative w-full overflow-auto rounded-lg border border-slate-700"
         style={{ maxHeight: `min(${containerMaxHeight}px, 80vh)` }}
         tabIndex={0}
         role="region"

@@ -1653,7 +1653,7 @@ function InteractionSectionInner({
 
             {/* ─── Heatmap view ─────────────────────────────────────────────── */}
             {viewMode === "heatmap" && (
-              <div data-testid="interaction-heatmap-view" className="min-w-0" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)" }}>
+              <div data-testid="interaction-heatmap-view" className="w-full overflow-hidden">
                 <Suspense
                   fallback={
                     <div
