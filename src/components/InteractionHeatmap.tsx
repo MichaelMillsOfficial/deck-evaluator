@@ -27,10 +27,7 @@ import React, {
 } from "react";
 import type { InteractionAnalysis, InteractionType } from "@/lib/interaction-engine/types";
 import type { CentralityResult } from "@/lib/interaction-centrality";
-import {
-  buildHeatmapData,
-  type HeatmapData,
-} from "@/lib/interaction-graph-data";
+import type { HeatmapData } from "@/lib/interaction-graph-data";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface InteractionHeatmapProps {
@@ -205,12 +202,6 @@ export default function InteractionHeatmap({
   const [sortMode, setSortMode] = useState<SortMode>("centrality");
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
 
-  // Build full heatmap data (all eligible cards, up to 30 by default)
-  const baseHeatmap = useMemo(
-    () => buildHeatmapData(analysis, centrality),
-    [analysis, centrality]
-  );
-
   // Interaction counts per card (for sort-by-interactions mode)
   const interactionCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -221,30 +212,22 @@ export default function InteractionHeatmap({
     return counts;
   }, [analysis.interactions]);
 
-  // Total participating cards across the whole analysis (for selector + "All N" label)
-  const totalParticipatingCards = useMemo(() => {
+  // Full set of participating cards (not capped) — used for any cardLimit
+  const allParticipatingCards = useMemo(() => {
     const s = new Set<string>();
     for (const interaction of analysis.interactions) {
       s.add(interaction.cards[0]);
       s.add(interaction.cards[1]);
     }
-    return s.size;
+    return [...s];
   }, [analysis.interactions]);
 
-  // Sorted + limited card list
-  const displayHeatmap = useMemo((): HeatmapData => {
-    // Start from the baseHeatmap's card list (already sorted by centrality, capped at 30)
-    let cards = [...baseHeatmap.cardNames];
+  // Total participating cards across the whole analysis (for selector + "All N" label)
+  const totalParticipatingCards = allParticipatingCards.length;
 
-    if (cardLimit === 0) {
-      // Include all cards that appear in interactions
-      const all = new Set<string>();
-      for (const interaction of analysis.interactions) {
-        all.add(interaction.cards[0]);
-        all.add(interaction.cards[1]);
-      }
-      cards = [...all];
-    }
+  const displayHeatmap = useMemo((): HeatmapData => {
+    // Always start from the full card list so limits above 30 work correctly
+    let cards = [...allParticipatingCards];
 
     // Apply sort
     if (sortMode === "alphabetical") {
@@ -331,7 +314,7 @@ export default function InteractionHeatmap({
   // Note: interactionCounts is intentionally omitted — it is derived from analysis.interactions
   // which is already in the dependency array.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseHeatmap, cardLimit, sortMode, selectedTypes, analysis.interactions, centrality.scores]);
+  }, [allParticipatingCards, cardLimit, sortMode, selectedTypes, analysis.interactions, centrality.scores]);
 
   const { cardNames, matrix, typeMatrix, maxStrength } = displayHeatmap;
   const N = cardNames.length;
@@ -569,7 +552,7 @@ export default function InteractionHeatmap({
   }, [N, totalParticipatingCards, sortMode]);
 
   // ─── Empty state ───────────────────────────────────────────────────────────
-  if (baseHeatmap.cardNames.length === 0) {
+  if (allParticipatingCards.length === 0) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-slate-700 bg-slate-800/30 py-12 text-xs text-slate-500 italic">
         No interactions to display — try removing type filters.
