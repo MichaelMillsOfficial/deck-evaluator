@@ -3,19 +3,17 @@
 /**
  * InteractionHeatmap
  *
- * Canvas 2D NxN heatmap of card interaction strengths.
+ * NxN heatmap of card interaction strengths with:
  *
- * - Card count selector: 10 / 20 / 30 / 50 / All N (hidden when total ≤ 30)
+ * - Paginated view (default 30 cards/page) with prev/next cycling + "All" mode
+ * - Sticky DOM row labels and column headers (stay visible while scrolling)
+ * - Canvas 2D cell grid (only the NxN cells, no labels)
  * - Sort modes: Centrality (default), Alphabetical, Interaction count
- * - Adaptive cell size based on card count (36px → 14px)
- * - Colour ramp: #1e293b (none) → #4c1d95 (weak) → #7e22ce (mod) → #a855f7 (strong) → #e879f9 (max)
+ * - Colour ramp with clear zero/nonzero distinction
  * - cardSearch prop: dims non-matching cells, highlights matching rows/columns
- * - "Showing X of Y" status line above canvas
- * - Hover tooltip: card pair + interaction count + strongest type
- * - Color legend bar below matrix
- * - Offscreen canvas for rendering; drawImage() to visible canvas
- * - Accessible: native <table> sr-only mirrors the data with aria-labels
- * - Respects prefers-reduced-motion (heatmap is static, so no change needed)
+ * - Hover tooltip with card pair + interaction count + type
+ * - Color legend with tick marks
+ * - Accessible: native <table> sr-only mirrors the data
  */
 
 import React, {
@@ -41,50 +39,30 @@ interface InteractionHeatmapProps {
 // ─── Sort modes ───────────────────────────────────────────────────────────────
 type SortMode = "centrality" | "alphabetical" | "interactions";
 
-// ─── Adaptive sizing helpers ───────────────────────────────────────────────────
+// ─── Adaptive sizing ─────────────────────────────────────────────────────────
 function getCellSize(n: number): number {
   if (n <= 10) return 36;
   if (n <= 20) return 28;
-  if (n <= 30) return 22;
-  if (n <= 50) return 18;
-  return 14;
+  if (n <= 30) return 24;
+  if (n <= 50) return 20;
+  return 16;
 }
 
-function getTruncateLen(n: number): number {
-  if (n <= 10) return 22;
-  if (n <= 20) return 17;
-  if (n <= 30) return 14;
-  if (n <= 50) return 11;
-  return 9;
-}
+const LABEL_WIDTH = 140;
+const HEADER_HEIGHT = 130;
+const LABEL_FONT_SIZE = 11;
 
-function getHeaderHeight(n: number): number {
-  if (n <= 20) return 110;
-  if (n <= 30) return 100;
-  return 90;
-}
+// ─── Colour ramp (clearer zero/nonzero distinction) ─────────────────────────
+function strengthToColor(normalised: number): string {
+  if (normalised === 0) return "#1e293b"; // slate-800 — no interaction
 
-function getLabelWidth(n: number): number {
-  if (n <= 20) return 110;
-  if (n <= 30) return 100;
-  return 80;
-}
-
-// ─── Colour ramp (5 stops, dark slate → vivid fuchsia) ───────────────────────
-function strengthToColor(
-  normalised: number // 0–1
-): string {
-  // 0   → #1e293b (slate-800 — zero)
-  // 0.2 → #4c1d95 (violet-900 — weak)
-  // 0.5 → #7e22ce (purple-800 — moderate)
-  // 0.8 → #a855f7 (purple-500 — strong)
-  // 1.0 → #e879f9 (fuchsia-400 — max)
+  // Nonzero: start at a clearly visible violet, ramp up to fuchsia
   const stops: [number, [number, number, number]][] = [
-    [0,   [30,  41,  59]],   // #1e293b
-    [0.2, [76,  29,  149]],  // #4c1d95
-    [0.5, [126, 34,  206]],  // #7e22ce
-    [0.8, [168, 85,  247]],  // #a855f7
-    [1.0, [232, 121, 249]],  // #e879f9
+    [0.01, [59,  42, 120]],   // visible violet (clearly distinct from zero)
+    [0.25, [88,  28, 163]],   // violet-800
+    [0.5,  [126, 34, 206]],   // purple-700
+    [0.75, [168, 85, 247]],   // purple-500
+    [1.0,  [232, 121, 249]],  // fuchsia-400
   ];
 
   for (let i = 0; i < stops.length - 1; i++) {
@@ -98,7 +76,7 @@ function strengthToColor(
       return `rgb(${r},${g},${b})`;
     }
   }
-  return `rgb(232,121,249)`;
+  return "rgb(232,121,249)";
 }
 
 const INTERACTION_TYPE_LABELS: Partial<Record<InteractionType, string>> = {
@@ -114,15 +92,10 @@ const INTERACTION_TYPE_LABELS: Partial<Record<InteractionType, string>> = {
   loops_with: "Loops With",
 };
 
-function truncateName(name: string, maxLen: number): string {
-  if (name.length <= maxLen) return name;
-  return name.slice(0, maxLen - 1) + "…";
-}
-
 // ─── Tooltip ──────────────────────────────────────────────────────────────────
 interface TooltipInfo {
-  x: number;
-  y: number;
+  clientX: number;
+  clientY: number;
   cardA: string;
   cardB: string;
   strength: number;
@@ -133,8 +106,14 @@ function HeatmapTooltip({ info }: { info: TooltipInfo }) {
   return (
     <div
       role="tooltip"
-      style={{ left: info.x + 10, top: info.y - 40 }}
-      className="pointer-events-none absolute z-20 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm shadow-lg max-w-[180px]"
+      style={{
+        position: "fixed",
+        left: info.clientX + 12,
+        top: info.clientY - 44,
+        pointerEvents: "none",
+        zIndex: 50,
+      }}
+      className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm shadow-lg max-w-[220px]"
     >
       <p className="text-xs font-semibold text-slate-200 truncate">{info.cardA}</p>
       <p className="text-xs font-semibold text-slate-200 truncate">{info.cardB}</p>
@@ -148,7 +127,7 @@ function HeatmapTooltip({ info }: { info: TooltipInfo }) {
   );
 }
 
-// ─── Legend ───────────────────────────────────────────────────────────────────
+// ─── Legend (with tick marks) ─────────────────────────────────────────────────
 function ColorLegend() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -161,30 +140,47 @@ function ColorLegend() {
     const W = canvas.width;
     const H = canvas.height;
     const grad = ctx.createLinearGradient(0, 0, W, 0);
-    const stops = [0, 0.2, 0.5, 0.8, 1.0];
-    stops.forEach((t) => grad.addColorStop(t, strengthToColor(t)));
+    // Discrete jump from zero to nonzero
+    grad.addColorStop(0, strengthToColor(0));
+    grad.addColorStop(0.02, strengthToColor(0));
+    grad.addColorStop(0.03, strengthToColor(0.01));
+    grad.addColorStop(0.25, strengthToColor(0.25));
+    grad.addColorStop(0.5, strengthToColor(0.5));
+    grad.addColorStop(0.75, strengthToColor(0.75));
+    grad.addColorStop(1.0, strengthToColor(1.0));
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
   }, []);
 
   return (
-    <div className="mt-3 flex items-center gap-2">
-      <span className="text-[10px] text-slate-500 shrink-0">None</span>
-      <canvas
-        ref={canvasRef}
-        width={200}
-        height={12}
-        className="rounded"
-        aria-label="Colour legend: none to strong"
-      />
-      <span className="text-[10px] text-slate-500 shrink-0">Strong</span>
+    <div className="mt-3 space-y-0.5">
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] text-slate-400 shrink-0 w-8 text-right">None</span>
+        <canvas
+          ref={canvasRef}
+          width={240}
+          height={14}
+          className="rounded"
+          aria-label="Colour legend: none to strong"
+        />
+        <span className="text-[11px] text-slate-400 shrink-0">Strong</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-8" />
+        <div className="flex justify-between text-[9px] text-slate-500" style={{ width: 240 }}>
+          <span>0%</span>
+          <span>25%</span>
+          <span>50%</span>
+          <span>75%</span>
+          <span>100%</span>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ─── Card limit options ───────────────────────────────────────────────────────
-/** 0 is the sentinel value meaning "show all" */
-const CARD_LIMIT_OPTIONS = [10, 20, 30, 50] as const;
+// ─── Page size options ───────────────────────────────────────────────────────
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 50] as const;
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function InteractionHeatmap({
@@ -194,11 +190,10 @@ export default function InteractionHeatmap({
   cardSearch,
 }: InteractionHeatmapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const offscreenRef = useRef<OffscreenCanvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  /** 0 = show all (default) */
-  const [cardLimit, setCardLimit] = useState<number>(0);
+  const [pageSize, setPageSize] = useState<number>(30);
+  const [page, setPage] = useState(0);
   const [sortMode, setSortMode] = useState<SortMode>("centrality");
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
 
@@ -212,50 +207,16 @@ export default function InteractionHeatmap({
     return counts;
   }, [analysis.interactions]);
 
-  // Full set of participating cards (not capped) — used for any cardLimit
-  const allParticipatingCards = useMemo(() => {
+  // Full sorted card list
+  const sortedCards = useMemo(() => {
     const s = new Set<string>();
     for (const interaction of analysis.interactions) {
       s.add(interaction.cards[0]);
       s.add(interaction.cards[1]);
     }
-    return [...s];
-  }, [analysis.interactions]);
+    let cards = [...s];
 
-  // Total participating cards across the whole analysis (for selector + "All N" label)
-  const totalParticipatingCards = allParticipatingCards.length;
-
-  const displayHeatmap = useMemo((): HeatmapData => {
-    // Always start from the full card list so limits above 30 work correctly
-    let cards = [...allParticipatingCards];
-
-    // Apply sort
-    if (sortMode === "alphabetical") {
-      cards = [...cards].sort((a, b) => a.localeCompare(b));
-    } else if (sortMode === "interactions") {
-      cards = [...cards].sort((a, b) =>
-        (interactionCounts.get(b) ?? 0) - (interactionCounts.get(a) ?? 0)
-      );
-    } else {
-      // centrality — rank-ordered, expand if showing all
-      const centralityRankMap = new Map(
-        centrality.scores.map((s) => [s.cardName, s.rank])
-      );
-      cards = [...cards].sort((a, b) => {
-        const rankA = centralityRankMap.get(a) ?? Number.MAX_SAFE_INTEGER;
-        const rankB = centralityRankMap.get(b) ?? Number.MAX_SAFE_INTEGER;
-        if (rankA !== rankB) return rankA - rankB;
-        return a.localeCompare(b);
-      });
-    }
-
-    // Apply card count limit (when not "show all")
-    if (cardLimit > 0) {
-      cards = cards.slice(0, cardLimit);
-    }
-
-    // Apply type filter — keep card if it has at least one interaction of a selected type
-    let filteredCards = cards;
+    // Apply type filter first
     if (selectedTypes && selectedTypes.size > 0) {
       const keep = new Set<string>();
       for (const interaction of analysis.interactions) {
@@ -264,14 +225,50 @@ export default function InteractionHeatmap({
           keep.add(interaction.cards[1]);
         }
       }
-      filteredCards = cards.filter((c) => keep.has(c));
+      cards = cards.filter((c) => keep.has(c));
     }
 
-    // Rebuild matrix for the final card list
-    const N = filteredCards.length;
+    // Sort
+    if (sortMode === "alphabetical") {
+      cards.sort((a, b) => a.localeCompare(b));
+    } else if (sortMode === "interactions") {
+      cards.sort((a, b) =>
+        (interactionCounts.get(b) ?? 0) - (interactionCounts.get(a) ?? 0)
+      );
+    } else {
+      const centralityRankMap = new Map(
+        centrality.scores.map((s) => [s.cardName, s.rank])
+      );
+      cards.sort((a, b) => {
+        const rankA = centralityRankMap.get(a) ?? Number.MAX_SAFE_INTEGER;
+        const rankB = centralityRankMap.get(b) ?? Number.MAX_SAFE_INTEGER;
+        if (rankA !== rankB) return rankA - rankB;
+        return a.localeCompare(b);
+      });
+    }
+
+    return cards;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysis.interactions, selectedTypes, sortMode, centrality.scores]);
+
+  const totalCards = sortedCards.length;
+
+  // Pagination
+  const totalPages = pageSize > 0 ? Math.ceil(totalCards / pageSize) : 1;
+  const clampedPage = Math.min(page, totalPages - 1);
+  const displayCards = pageSize > 0
+    ? sortedCards.slice(clampedPage * pageSize, (clampedPage + 1) * pageSize)
+    : sortedCards;
+
+  // Reset page when sort/filter/pageSize changes
+  useEffect(() => { setPage(0); }, [sortMode, selectedTypes, pageSize]);
+
+  // Build matrix for the displayed cards
+  const displayHeatmap = useMemo((): HeatmapData => {
+    const N = displayCards.length;
     if (N === 0) return { cardNames: [], matrix: [], typeMatrix: [], maxStrength: 0 };
 
-    const indexMap = new Map(filteredCards.map((c, i) => [c, i]));
+    const indexMap = new Map(displayCards.map((c, i) => [c, i]));
     const matrix: number[][] = Array.from({ length: N }, () => new Array(N).fill(0));
     const typeMap: (InteractionType | null)[][] = Array.from({ length: N }, () => new Array(N).fill(null));
     const typeStrength: Map<string, Map<InteractionType, number>> = new Map();
@@ -310,20 +307,12 @@ export default function InteractionHeatmap({
       }
     }
 
-    return { cardNames: filteredCards, matrix, typeMatrix: typeMap, maxStrength };
-  // Note: interactionCounts is intentionally omitted — it is derived from analysis.interactions
-  // which is already in the dependency array.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allParticipatingCards, cardLimit, sortMode, selectedTypes, analysis.interactions, centrality.scores]);
+    return { cardNames: displayCards, matrix, typeMatrix: typeMap, maxStrength };
+  }, [displayCards, selectedTypes, analysis.interactions]);
 
   const { cardNames, matrix, typeMatrix, maxStrength } = displayHeatmap;
   const N = cardNames.length;
-
-  // ─── Adaptive sizing (recalculated whenever N changes) ──────────────────────
-  const CELL_SIZE    = getCellSize(N);
-  const TRUNCATE_LEN = getTruncateLen(N);
-  const HEADER_HEIGHT = getHeaderHeight(N);
-  const LABEL_WIDTH   = getLabelWidth(N);
+  const CELL_SIZE = getCellSize(N);
 
   // ─── Search matching indices ─────────────────────────────────────────────────
   const matchingIndices = useMemo(() => {
@@ -338,55 +327,40 @@ export default function InteractionHeatmap({
 
   const hasSearch = matchingIndices.size > 0 || (cardSearch !== undefined && cardSearch.trim().length > 0);
 
-  // ─── Canvas render ──────────────────────────────────────────────────────────
+  // ─── Canvas render (cells only — no labels) ────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || N === 0) return;
 
-    const W = LABEL_WIDTH + N * CELL_SIZE;
-    const H = HEADER_HEIGHT + N * CELL_SIZE;
+    const W = N * CELL_SIZE;
+    const H = N * CELL_SIZE;
 
-    // Set canvas buffer size (style dimensions are set via JSX props)
     canvas.width = W;
     canvas.height = H;
 
-    // Use OffscreenCanvas when available for perf
-    let offscreen: OffscreenCanvas | null = null;
-    let renderCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
-    try {
-      offscreen = new OffscreenCanvas(W, H);
-      offscreenRef.current = offscreen;
-      renderCtx = offscreen.getContext("2d") as OffscreenCanvasRenderingContext2D;
-    } catch {
-      renderCtx = canvas.getContext("2d");
-    }
-
-    if (!renderCtx) return;
-    const ctx = renderCtx;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
     // Background
     ctx.fillStyle = "#0f172a";
     ctx.fillRect(0, 0, W, H);
 
-    // ── Search highlight: full row/column sweeps for matching cards ────────────
+    // Search highlight sweeps
     if (hasSearch) {
-      ctx.fillStyle = "rgba(168, 85, 247, 0.12)"; // purple-500 @12%
+      ctx.fillStyle = "rgba(168, 85, 247, 0.12)";
       for (const idx of matchingIndices) {
-        // Highlight full row (across entire grid width)
-        ctx.fillRect(LABEL_WIDTH, HEADER_HEIGHT + idx * CELL_SIZE, N * CELL_SIZE, CELL_SIZE);
-        // Highlight full column (across entire grid height)
-        ctx.fillRect(LABEL_WIDTH + idx * CELL_SIZE, HEADER_HEIGHT, CELL_SIZE, N * CELL_SIZE);
+        ctx.fillRect(0, idx * CELL_SIZE, W, CELL_SIZE);
+        ctx.fillRect(idx * CELL_SIZE, 0, CELL_SIZE, H);
       }
     }
 
-    // ── Cells ──────────────────────────────────────────────────────────────────
+    // Cells
     for (let i = 0; i < N; i++) {
       for (let j = 0; j < N; j++) {
-        const x = LABEL_WIDTH + j * CELL_SIZE;
-        const y = HEADER_HEIGHT + i * CELL_SIZE;
+        const x = j * CELL_SIZE;
+        const y = i * CELL_SIZE;
 
         if (i === j) {
-          // Diagonal — dark crosshatch
           ctx.fillStyle = "#1e293b";
           ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
           ctx.strokeStyle = "#0f172a";
@@ -398,7 +372,6 @@ export default function InteractionHeatmap({
         const strength = matrix[i][j];
         const normalised = maxStrength > 0 ? Math.min(1, strength / maxStrength) : 0;
 
-        // When searching, dim non-matching cells to 30% opacity
         if (hasSearch && !matchingIndices.has(i) && !matchingIndices.has(j)) {
           ctx.globalAlpha = 0.3;
         }
@@ -406,7 +379,6 @@ export default function InteractionHeatmap({
         ctx.fillStyle = strengthToColor(normalised);
         ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
 
-        // Cell border
         ctx.strokeStyle = "rgba(15,23,42,0.6)";
         ctx.lineWidth = 0.5;
         ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
@@ -415,81 +387,18 @@ export default function InteractionHeatmap({
       }
     }
 
-    // ── Column headers (rotated 45°) ──────────────────────────────────────────
-    const fontSize = Math.max(8, Math.min(10, CELL_SIZE - 10));
-    ctx.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-    ctx.textBaseline = "bottom";
-
-    for (let j = 0; j < N; j++) {
-      const isMatch = matchingIndices.has(j);
-      ctx.fillStyle = hasSearch && !isMatch ? "#475569" : "#94a3b8"; // dim if no match
-      const x = LABEL_WIDTH + j * CELL_SIZE + CELL_SIZE / 2;
-      const y = HEADER_HEIGHT - 4;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(-Math.PI / 4);
-      ctx.fillText(truncateName(cardNames[j], TRUNCATE_LEN), 0, 0);
-      ctx.restore();
-
-      // 2px purple-400 border for matching column labels
-      if (isMatch) {
-        ctx.strokeStyle = "#c084fc"; // purple-400
+    // Search highlight borders
+    if (hasSearch) {
+      for (const idx of matchingIndices) {
+        ctx.strokeStyle = "#c084fc";
         ctx.lineWidth = 2;
-        ctx.strokeRect(
-          LABEL_WIDTH + j * CELL_SIZE,
-          HEADER_HEIGHT,
-          CELL_SIZE,
-          N * CELL_SIZE
-        );
+        // Row highlight
+        ctx.strokeRect(0, idx * CELL_SIZE, W, CELL_SIZE);
+        // Column highlight
+        ctx.strokeRect(idx * CELL_SIZE, 0, CELL_SIZE, H);
       }
     }
-
-    // ── Row labels ─────────────────────────────────────────────────────────────
-    ctx.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-    ctx.textBaseline = "middle";
-    ctx.textAlign = "right";
-
-    for (let i = 0; i < N; i++) {
-      const isMatch = matchingIndices.has(i);
-      ctx.fillStyle = hasSearch && !isMatch ? "#475569" : "#94a3b8";
-      const y = HEADER_HEIGHT + i * CELL_SIZE + CELL_SIZE / 2;
-      ctx.fillText(truncateName(cardNames[i], TRUNCATE_LEN), LABEL_WIDTH - 4, y);
-
-      // 2px purple-400 border for matching row labels
-      if (isMatch) {
-        ctx.strokeStyle = "#c084fc"; // purple-400
-        ctx.lineWidth = 2;
-        ctx.strokeRect(
-          LABEL_WIDTH,
-          HEADER_HEIGHT + i * CELL_SIZE,
-          N * CELL_SIZE,
-          CELL_SIZE
-        );
-      }
-    }
-
-    ctx.textAlign = "left";
-
-    // ── Copy offscreen to visible canvas ──────────────────────────────────────
-    if (offscreen) {
-      const onscreen = canvas.getContext("2d");
-      if (onscreen) {
-        onscreen.clearRect(0, 0, W, H);
-        onscreen.drawImage(offscreen, 0, 0);
-      }
-    }
-  }, [
-    cardNames,
-    matrix,
-    maxStrength,
-    N,
-    CELL_SIZE,
-    TRUNCATE_LEN,
-    HEADER_HEIGHT,
-    LABEL_WIDTH,
-    matchingIndices,
-    hasSearch,
-  ]);
+  }, [cardNames, matrix, maxStrength, N, CELL_SIZE, matchingIndices, hasSearch]);
 
   // ─── Hover tooltip ─────────────────────────────────────────────────────────
   const handleMouseMove = useCallback(
@@ -500,8 +409,8 @@ export default function InteractionHeatmap({
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
 
-      const j = Math.floor((mx - LABEL_WIDTH) / CELL_SIZE);
-      const i = Math.floor((my - HEADER_HEIGHT) / CELL_SIZE);
+      const j = Math.floor(mx / CELL_SIZE);
+      const i = Math.floor(my / CELL_SIZE);
 
       if (i < 0 || i >= N || j < 0 || j >= N || i === j) {
         setTooltip(null);
@@ -515,44 +424,39 @@ export default function InteractionHeatmap({
       }
 
       setTooltip({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        clientX: e.clientX,
+        clientY: e.clientY,
         cardA: cardNames[i],
         cardB: cardNames[j],
         strength,
         type: typeMatrix[i]?.[j] ?? null,
       });
     },
-    [N, matrix, cardNames, typeMatrix, LABEL_WIDTH, CELL_SIZE, HEADER_HEIGHT]
+    [N, matrix, cardNames, typeMatrix, CELL_SIZE]
   );
 
   const handleMouseLeave = useCallback(() => setTooltip(null), []);
 
-  // ─── Dynamic container sizing ────────────────────────────────────────────────
-  // The canvas can be wider/taller than the viewport (e.g. 100 cards at 14px = 1480px).
-  // Cap the container to a sensible viewport and let the user scroll WITHIN it.
-  const canvasW = LABEL_WIDTH + N * CELL_SIZE;
-  const canvasH = HEADER_HEIGHT + N * CELL_SIZE;
-  // Let the container grow taller for large matrices — cap at 80vh so
-  // it never pushes the page controls off-screen, but still shows much
-  // more of the grid than the old 600px hard cap.
-  const containerMaxHeight = canvasH + 16;
-  // ─── Status line text ───────────────────────────────────────────────────────
+  // ─── Dimensions ────────────────────────────────────────────────────────────
+  const gridW = N * CELL_SIZE;
+  const gridH = N * CELL_SIZE;
+
+  // ─── Status line ───────────────────────────────────────────────────────────
   const statusText = useMemo(() => {
     const sortLabel =
-      sortMode === "centrality"
-        ? "centrality"
-        : sortMode === "alphabetical"
-        ? "A–Z"
+      sortMode === "centrality" ? "centrality"
+        : sortMode === "alphabetical" ? "A–Z"
         : "interaction count";
-    if (N === totalParticipatingCards) {
-      return `Showing all ${N} cards`;
+    if (pageSize === 0) {
+      return `Showing all ${totalCards} cards, sorted by ${sortLabel}`;
     }
-    return `Showing top ${N} of ${totalParticipatingCards} cards, sorted by ${sortLabel}`;
-  }, [N, totalParticipatingCards, sortMode]);
+    const start = clampedPage * pageSize + 1;
+    const end = Math.min((clampedPage + 1) * pageSize, totalCards);
+    return `Showing cards ${start}–${end} of ${totalCards}, sorted by ${sortLabel}`;
+  }, [sortMode, pageSize, totalCards, clampedPage]);
 
   // ─── Empty state ───────────────────────────────────────────────────────────
-  if (allParticipatingCards.length === 0) {
+  if (totalCards === 0) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-slate-700 bg-slate-800/30 py-12 text-xs text-slate-500 italic">
         No interactions to display — try removing type filters.
@@ -563,61 +467,86 @@ export default function InteractionHeatmap({
   return (
     <div className="w-full space-y-3 overflow-hidden">
       {/* Controls row */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {/* Sort mode */}
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-slate-500 shrink-0">Sort:</span>
+          <span className="text-[11px] text-slate-500 shrink-0">Sort:</span>
           {(["centrality", "alphabetical", "interactions"] as SortMode[]).map(
             (mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => setSortMode(mode)}
-                className={`rounded-md border px-2 py-0.5 text-[10px] transition-colors cursor-pointer ${
+                className={`rounded-md border px-2 py-0.5 text-[11px] transition-colors cursor-pointer ${
                   sortMode === mode
                     ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
                     : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
                 }`}
               >
-                {mode === "centrality"
-                  ? "Centrality"
-                  : mode === "alphabetical"
-                  ? "A–Z"
+                {mode === "centrality" ? "Centrality"
+                  : mode === "alphabetical" ? "A–Z"
                   : "Interactions"}
               </button>
             )
           )}
         </div>
 
-        {/* Card count selector */}
-        <div className="ml-auto flex items-center gap-1.5">
-          <span className="text-[10px] text-slate-500 shrink-0">Show:</span>
-          {CARD_LIMIT_OPTIONS.filter((limit) => limit < totalParticipatingCards).map((limit) => (
+        {/* Page size selector */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-slate-500 shrink-0">Per page:</span>
+          {PAGE_SIZE_OPTIONS.filter((s) => s < totalCards).map((size) => (
             <button
-              key={limit}
+              key={size}
               type="button"
-              onClick={() => setCardLimit(limit)}
-              className={`rounded-md border px-2 py-0.5 text-[10px] transition-colors cursor-pointer ${
-                cardLimit === limit
+              onClick={() => setPageSize(size)}
+              className={`rounded-md border px-2 py-0.5 text-[11px] transition-colors cursor-pointer ${
+                pageSize === size
                   ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
                   : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
               }`}
             >
-              {limit}
+              {size}
             </button>
           ))}
           <button
             type="button"
-            onClick={() => setCardLimit(0)}
-            className={`rounded-md border px-2 py-0.5 text-[10px] transition-colors cursor-pointer ${
-              cardLimit === 0
+            onClick={() => setPageSize(0)}
+            className={`rounded-md border px-2 py-0.5 text-[11px] transition-colors cursor-pointer ${
+              pageSize === 0
                 ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
                 : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
             }`}
           >
-            All {totalParticipatingCards}
+            All {totalCards}
           </button>
         </div>
+
+        {/* Pagination controls (hidden when showing all) */}
+        {pageSize > 0 && totalPages > 1 && (
+          <div className="flex items-center gap-1.5 ml-auto">
+            <button
+              type="button"
+              disabled={clampedPage === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              className="rounded-md border border-slate-700 bg-slate-800/50 px-2 py-0.5 text-[11px] text-slate-400 hover:border-slate-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              aria-label="Previous page"
+            >
+              ‹ Prev
+            </button>
+            <span className="text-[11px] text-slate-400 tabular-nums">
+              {clampedPage + 1} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={clampedPage >= totalPages - 1}
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              className="rounded-md border border-slate-700 bg-slate-800/50 px-2 py-0.5 text-[11px] text-slate-400 hover:border-slate-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              aria-label="Next page"
+            >
+              Next ›
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Status line */}
@@ -625,32 +554,147 @@ export default function InteractionHeatmap({
         {statusText}
       </p>
 
-      {/* Scroll container: grid parent with minmax(0,1fr) constrains this div's
-           width to the available space. overflow-auto creates internal scrollbars. */}
+      {/* Scroll container with sticky headers via CSS Grid */}
       <div
         ref={containerRef}
-        className="relative w-full overflow-auto rounded-lg border border-slate-700"
-        style={{ maxHeight: `min(${containerMaxHeight}px, 80vh)` }}
+        className="w-full overflow-auto rounded-lg border border-slate-700"
+        style={{ maxHeight: "80vh" }}
         tabIndex={0}
         role="region"
         aria-label={`Interaction heatmap: ${N} cards. Scroll to explore.`}
       >
-        <canvas
-          ref={canvasRef}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          style={{ display: "block", width: canvasW, height: canvasH, minWidth: canvasW, minHeight: canvasH }}
-          aria-label={`Interaction heatmap: ${N} cards`}
-        />
-        {tooltip && <HeatmapTooltip info={tooltip} />}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `${LABEL_WIDTH}px ${gridW}px`,
+            gridTemplateRows: `${HEADER_HEIGHT}px ${gridH}px`,
+            width: LABEL_WIDTH + gridW,
+          }}
+        >
+          {/* ── Corner cell (sticky top + left) ─────────────────────────── */}
+          <div
+            style={{
+              position: "sticky",
+              top: 0,
+              left: 0,
+              zIndex: 3,
+              background: "#0f172a",
+              borderBottom: "1px solid #334155",
+              borderRight: "1px solid #334155",
+            }}
+          />
+
+          {/* ── Column headers (sticky top) ─────────────────────────────── */}
+          <div
+            style={{
+              position: "sticky",
+              top: 0,
+              zIndex: 2,
+              background: "#0f172a",
+              borderBottom: "1px solid #334155",
+              height: HEADER_HEIGHT,
+              width: gridW,
+            }}
+          >
+            <div style={{ position: "relative", width: "100%", height: "100%" }}>
+              {cardNames.map((name, j) => {
+                const isMatch = matchingIndices.has(j);
+                const dimmed = hasSearch && !isMatch;
+                return (
+                  <div
+                    key={name}
+                    title={name}
+                    style={{
+                      position: "absolute",
+                      left: j * CELL_SIZE,
+                      bottom: 0,
+                      width: CELL_SIZE,
+                      height: HEADER_HEIGHT,
+                      display: "flex",
+                      alignItems: "flex-end",
+                      justifyContent: "flex-start",
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: "block",
+                        transformOrigin: "bottom left",
+                        transform: "rotate(-55deg) translateX(2px)",
+                        fontSize: LABEL_FONT_SIZE,
+                        lineHeight: 1,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        maxWidth: HEADER_HEIGHT - 10,
+                        color: dimmed ? "#475569" : isMatch ? "#c084fc" : "#94a3b8",
+                        fontWeight: isMatch ? 600 : 400,
+                      }}
+                    >
+                      {name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Row labels (sticky left) ────────────────────────────────── */}
+          <div
+            style={{
+              position: "sticky",
+              left: 0,
+              zIndex: 1,
+              background: "#0f172a",
+              borderRight: "1px solid #334155",
+              width: LABEL_WIDTH,
+            }}
+          >
+            {cardNames.map((name, i) => {
+              const isMatch = matchingIndices.has(i);
+              const dimmed = hasSearch && !isMatch;
+              return (
+                <div
+                  key={name}
+                  title={name}
+                  style={{
+                    height: CELL_SIZE,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    paddingRight: 6,
+                    fontSize: LABEL_FONT_SIZE,
+                    color: dimmed ? "#475569" : isMatch ? "#c084fc" : "#94a3b8",
+                    fontWeight: isMatch ? 600 : 400,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {name}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Cell canvas ─────────────────────────────────────────────── */}
+          <canvas
+            ref={canvasRef}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            style={{
+              display: "block",
+              width: gridW,
+              height: gridH,
+              minWidth: gridW,
+              minHeight: gridH,
+            }}
+            aria-label={`Interaction heatmap cells: ${N} cards`}
+          />
+        </div>
       </div>
 
-      {/* Scroll hint when canvas is large enough that scrolling may be needed */}
-      {N > 30 && (
-        <p className="text-[10px] text-slate-500 italic">
-          Scroll within the heatmap to see all {N} cards
-        </p>
-      )}
+      {/* Tooltip (fixed position — follows cursor) */}
+      {tooltip && <HeatmapTooltip info={tooltip} />}
 
       {/* Colour legend */}
       <ColorLegend />
@@ -659,6 +703,7 @@ export default function InteractionHeatmap({
       <table className="sr-only" aria-label="Interaction heatmap data">
         <caption>
           Interaction strength matrix — {N} cards
+          {pageSize > 0 && ` (page ${clampedPage + 1} of ${totalPages})`}
         </caption>
         <thead>
           <tr>
