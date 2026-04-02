@@ -1597,7 +1597,7 @@ function InteractionSectionInner({
           )}
 
           {/* Sections */}
-          <div className="space-y-3">
+          <div className="space-y-3 min-w-0">
             {/* Card Centrality & Removal Impact — always shown regardless of view mode */}
             {centralityResult && centralityResult.scores.length > 0 && (
               <CollapsiblePanel
@@ -1653,7 +1653,7 @@ function InteractionSectionInner({
 
             {/* ─── Heatmap view ─────────────────────────────────────────────── */}
             {viewMode === "heatmap" && (
-              <div data-testid="interaction-heatmap-view" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)" }}>
+              <div data-testid="interaction-heatmap-view" className="min-w-0" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)" }}>
                 <Suspense
                   fallback={
                     <div

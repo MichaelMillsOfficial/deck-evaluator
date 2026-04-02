@@ -77,7 +77,7 @@ interface InteractionGraphProps {
   selectedTypes?: Set<InteractionType>;
   /** If provided, highlight matching nodes and pan to first match */
   cardSearch?: string;
-  /** Height in pixels (default 480) */
+  /** Height in pixels (default 680) */
   height?: number;
 }
 
@@ -201,7 +201,7 @@ function InteractionGraphInner({
   centrality,
   selectedTypes,
   cardSearch,
-  height = 480,
+  height = 680,
 }: InteractionGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);

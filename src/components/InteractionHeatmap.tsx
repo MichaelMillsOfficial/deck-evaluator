@@ -550,7 +550,10 @@ export default function InteractionHeatmap({
   // Cap the container to a sensible viewport and let the user scroll WITHIN it.
   const canvasW = LABEL_WIDTH + N * CELL_SIZE;
   const canvasH = HEADER_HEIGHT + N * CELL_SIZE;
-  const containerMaxHeight = Math.min(canvasH + 16, 600);
+  // Let the container grow taller for large matrices — cap at 80vh so
+  // it never pushes the page controls off-screen, but still shows much
+  // more of the grid than the old 600px hard cap.
+  const containerMaxHeight = canvasH + 16;
   // ─── Status line text ───────────────────────────────────────────────────────
   const statusText = useMemo(() => {
     const sortLabel =
@@ -575,7 +578,7 @@ export default function InteractionHeatmap({
   }
 
   return (
-    <div className="space-y-3" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)" }}>
+    <div className="space-y-3 min-w-0" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)" }}>
       {/* Controls row */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Sort mode */}
@@ -645,8 +648,8 @@ export default function InteractionHeatmap({
            width to the available space. overflow-auto creates internal scrollbars. */}
       <div
         ref={containerRef}
-        className="relative overflow-auto rounded-lg border border-slate-700"
-        style={{ maxHeight: containerMaxHeight }}
+        className="relative overflow-auto rounded-lg border border-slate-700 min-w-0"
+        style={{ maxHeight: `min(${containerMaxHeight}px, 80vh)` }}
         tabIndex={0}
         role="region"
         aria-label={`Interaction heatmap: ${N} cards. Scroll to explore.`}
@@ -655,14 +658,14 @@ export default function InteractionHeatmap({
           ref={canvasRef}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
-          style={{ display: "block", width: canvasW, height: canvasH }}
+          style={{ display: "block", width: canvasW, height: canvasH, minWidth: canvasW, minHeight: canvasH }}
           aria-label={`Interaction heatmap: ${N} cards`}
         />
         {tooltip && <HeatmapTooltip info={tooltip} />}
       </div>
 
-      {/* Scroll hint when canvas overflows the container */}
-      {(canvasW > 700 || canvasH > 600) && (
+      {/* Scroll hint when canvas is large enough that scrolling may be needed */}
+      {N > 30 && (
         <p className="text-[10px] text-slate-500 italic">
           Scroll within the heatmap to see all {N} cards
         </p>
