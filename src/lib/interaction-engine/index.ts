@@ -130,6 +130,7 @@ export type {
 
   // Card Profile
   CardProfile,
+  PartnerType,
 
   // Lexer
   TokenType,
@@ -181,6 +182,13 @@ export {
   canSatisfyRequirements,
   detectLoopsFromChains,
 } from "./loop-chain-solver";
+
+// Eminence extractor
+export {
+  extractEminenceAbilities,
+  parsePartnerInfo,
+  parseCompanionRestriction,
+} from "./eminence-extractor";
 
 // Keyword database
 export {

@@ -457,14 +457,55 @@ export function formatMarkdownReport(
 }
 
 // ---------------------------------------------------------------------------
+// JSON Formatter extended types
+// ---------------------------------------------------------------------------
+
+export interface InteractionExportData {
+  totalCount: number;
+  byType: Record<string, number>;
+  chains: { cards: string[]; description: string }[];
+  loops: { cards: string[]; description: string; isInfinite: boolean }[];
+  topCards: { name: string; centrality: number; category: string }[];
+}
+
+export interface GoldfishExportData {
+  avgManaByTurn: number[];
+  commanderCastRate: number;
+  avgCommanderTurn: number | null;
+  rampAcceleration: number;
+}
+
+export interface JsonReportOptions {
+  interactions?: InteractionExportData;
+  goldfish?: GoldfishExportData;
+  /** When true, omit mostExpensive price data from budgetAnalysis (share-safe) */
+  excludePrices?: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // JSON Formatter
 // ---------------------------------------------------------------------------
 
 export function formatJsonReport(
   results: DeckAnalysisResults,
-  deck: DeckData
+  deck: DeckData,
+  options?: JsonReportOptions
 ): string {
-  const obj = {
+  const { interactions, goldfish, excludePrices } = options ?? {};
+
+  const budgetAnalysis: Record<string, unknown> = {
+    totalCost: results.budgetAnalysis.totalCost,
+    averagePricePerCard: results.budgetAnalysis.averagePricePerCard,
+    medianPricePerCard: results.budgetAnalysis.medianPricePerCard,
+  };
+
+  if (!excludePrices) {
+    budgetAnalysis.mostExpensive = results.budgetAnalysis.mostExpensive
+      .slice(0, 10)
+      .map((c) => ({ name: c.name, price: c.unitPrice }));
+  }
+
+  const obj: Record<string, unknown> = {
     deckName: deck.name,
     commanders: deck.commanders.map((c) => c.name),
     source: deck.source,
@@ -504,14 +545,7 @@ export function formatJsonReport(
         weight: f.weight,
       })),
     },
-    budgetAnalysis: {
-      totalCost: results.budgetAnalysis.totalCost,
-      averagePricePerCard: results.budgetAnalysis.averagePricePerCard,
-      medianPricePerCard: results.budgetAnalysis.medianPricePerCard,
-      mostExpensive: results.budgetAnalysis.mostExpensive.slice(0, 10).map(
-        (c) => ({ name: c.name, price: c.unitPrice })
-      ),
-    },
+    budgetAnalysis,
     openingHands: {
       keepableRate: results.simulationStats.keepableRate,
       avgLandsInOpener: results.simulationStats.avgLandsInOpener,
@@ -549,6 +583,14 @@ export function formatJsonReport(
       })
     ),
   };
+
+  // Append optional extended sections
+  if (interactions) {
+    obj.interactions = interactions;
+  }
+  if (goldfish) {
+    obj.goldfish = goldfish;
+  }
 
   return JSON.stringify(obj, null, 2);
 }

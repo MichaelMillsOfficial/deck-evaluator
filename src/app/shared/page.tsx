@@ -4,12 +4,14 @@ import { useEffect, useState, useMemo, useCallback, useRef, Suspense } from "rea
 import { useSearchParams } from "next/navigation";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { SpellbookCombo } from "@/lib/commander-spellbook";
+import Link from "next/link";
 import { decodeDeckPayload, buildDeckFromCompactPayload } from "@/lib/deck-codec";
 import { parseDecklist } from "@/lib/decklist-parser";
 import {
   computeAllAnalyses,
   type DeckAnalysisResults,
 } from "@/lib/deck-analysis-aggregate";
+import type { ShareAnalysisSummary } from "@/lib/share-analysis-summary";
 import { DeckSidebar } from "@/components/DeckSidebar";
 import DeckViewTabs from "@/components/DeckViewTabs";
 import type { ViewTab } from "@/lib/view-tabs";
@@ -32,6 +34,8 @@ function SharedDeckContent() {
   } | null>(null);
   const [spellbookLoading, setSpellbookLoading] = useState(false);
   const enrichAbortRef = useRef<AbortController | null>(null);
+  // v3: instant summary shown before full analysis is computed
+  const [instantSummary, setInstantSummary] = useState<ShareAnalysisSummary | null>(null);
 
   const analysisResults: DeckAnalysisResults | null = useMemo(
     () =>
@@ -95,8 +99,13 @@ function SharedDeckContent() {
       try {
         const payload = await decodeDeckPayload(d);
 
-        if (payload.version === 2) {
-          // v2 compact: enrich by set+collector_number
+        if (payload.version === 3 || payload.version === 2) {
+          // v3/v2 compact: enrich by set+collector_number
+          // For v3, extract instant summary if present
+          if (payload.version === 3 && payload.summary) {
+            setInstantSummary(payload.summary);
+          }
+
           const allTuples = [
             ...payload.commanders,
             ...payload.mainboard,
@@ -176,12 +185,12 @@ function SharedDeckContent() {
             Unable to Load Deck
           </h1>
           <p className="text-sm text-red-400 mb-4">{decodeError}</p>
-          <a
+          <Link
             href="/"
             className="inline-block rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
           >
             Import Your Own Deck
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -190,6 +199,48 @@ function SharedDeckContent() {
   if (!deckData) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-12 text-center">
+        {/* v3 instant summary shown before full analysis loads */}
+        {instantSummary && (
+          <div
+            data-testid="instant-summary"
+            className="mb-6 rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-left"
+          >
+            <h2 className="text-sm font-semibold text-slate-300 mb-3">
+              Viewing a shared deck analysis
+            </h2>
+            <div className="flex flex-wrap gap-3 mb-3">
+              <span className="rounded border border-slate-600 bg-slate-700/50 px-2 py-0.5 text-xs text-slate-300">
+                PL {instantSummary.pl}
+              </span>
+              <span className="rounded border border-slate-600 bg-slate-700/50 px-2 py-0.5 text-xs text-slate-300">
+                Bracket {instantSummary.br}
+              </span>
+              <span className="rounded border border-slate-600 bg-slate-700/50 px-2 py-0.5 text-xs text-slate-300">
+                Avg CMC {instantSummary.avg}
+              </span>
+              <span className="rounded border border-slate-600 bg-slate-700/50 px-2 py-0.5 text-xs text-slate-300">
+                {instantSummary.kr}% keep rate
+              </span>
+              {instantSummary.combos > 0 && (
+                <span className="rounded border border-purple-600/40 bg-purple-600/10 px-2 py-0.5 text-xs text-purple-300">
+                  {instantSummary.combos} combo{instantSummary.combos !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            {instantSummary.themes.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {instantSummary.themes.map((theme) => (
+                  <span
+                    key={theme}
+                    className="rounded-full bg-purple-600/20 px-2 py-0.5 text-xs text-purple-300"
+                  >
+                    {theme}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <p className="text-sm text-slate-400 animate-pulse">
           Loading shared deck...
         </p>
@@ -204,13 +255,13 @@ function SharedDeckContent() {
         data-testid="shared-banner"
         className="mb-6 rounded-lg border border-purple-500/20 bg-purple-500/10 px-4 py-3 text-sm text-purple-300 flex items-center justify-between max-w-3xl mx-auto"
       >
-        <span>Shared deck</span>
-        <a
+        <span>Viewing a shared deck analysis</span>
+        <Link
           href="/"
           className="text-purple-400 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-400 rounded-sm"
         >
           Import your own deck
-        </a>
+        </Link>
       </div>
 
       <div className="flex min-h-0">

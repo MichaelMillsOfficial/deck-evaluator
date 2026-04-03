@@ -2,18 +2,33 @@
 
 import { useState, useMemo, useCallback } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
-import type { GoldfishConfig, RampSource, GoldfishGameLog } from "@/lib/goldfish-simulator";
+import type { GoldfishCard, GoldfishConfig, RampSource, GoldfishGameLog } from "@/lib/goldfish-simulator";
 import { DEFAULT_GOLDFISH_CONFIG, replayGoldfishGame, runGoldfishGame } from "@/lib/goldfish-simulator";
 import { useGoldfishSimulation } from "@/hooks/useGoldfishSimulation";
 import { randomSeed } from "@/lib/prng";
+import { detectMilestones, captureSnapshotsAtTurns } from "@/lib/goldfish-milestones";
+import { findCombosInDeck } from "@/lib/known-combos";
+import { ComboAssemblyTracker } from "@/lib/combo-assembly-tracker";
 import GoldfishManaChart from "@/components/GoldfishManaChart";
 import GoldfishTurnTimeline from "@/components/GoldfishTurnTimeline";
 import GoldfishGameSelector from "@/components/GoldfishGameSelector";
 import type { GameSelection } from "@/components/GoldfishGameSelector";
+import ComboAssemblyChart from "@/components/ComboAssemblyChart";
+import BoardMilestones from "@/components/BoardMilestones";
 
 interface GoldfishSimulatorProps {
   deck: DeckData;
   cardMap: Record<string, EnrichedCard>;
+}
+
+/** Build a minimal GoldfishCard stub for combo assembly tracking.
+ *  The tracker only reads `.name` from cards, so a partial enriched stub suffices. */
+function minimalGoldfishCard(name: string): GoldfishCard {
+  return {
+    name,
+    enriched: { name } as EnrichedCard,
+    tags: [],
+  };
 }
 
 interface StatCardProps {
@@ -156,6 +171,107 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
   const avgSpells = stats ? stats.avgTotalSpellsCast.toFixed(1) : "—";
   const rampAccel = stats ? `+${stats.rampAcceleration.toFixed(2)}` : "—";
 
+  // Advanced stats
+  const avgBoardT5 = result
+    ? (() => {
+        const t5Logs = result.games.map((g) => g.turnLogs.find((l) => l.turn === 5)).filter(Boolean);
+        if (t5Logs.length === 0) return "—";
+        const avg = t5Logs.reduce((s, l) => s + (l?.permanentCount ?? 0), 0) / t5Logs.length;
+        return avg.toFixed(1);
+      })()
+    : "—";
+
+  const stallRate = result
+    ? (() => {
+        const stalled = result.games.filter((g) => {
+          const t5Spells = g.turnLogs
+            .filter((l) => l.turn <= 5)
+            .reduce((s, l) => s + l.spellsCast.length, 0);
+          return t5Spells < 3;
+        }).length;
+        return `${((stalled / result.games.length) * 100).toFixed(0)}%`;
+      })()
+    : "—";
+
+  // Combo assembly stats
+  const deckCardNames = useMemo(() => {
+    if (!deck) return [];
+    return [
+      ...deck.commanders.map((c) => c.name),
+      ...deck.mainboard.map((c) => c.name),
+    ];
+  }, [deck]);
+
+  const detectedCombos = useMemo(
+    () => findCombosInDeck(deckCardNames),
+    [deckCardNames]
+  );
+
+  const comboStats = useMemo(() => {
+    if (!result || detectedCombos.length === 0) return null;
+    // Build trackers from the stored game state snapshots
+    // (We compute combo stats as a post-processing pass over game logs)
+    const trackers = result.games.map((game) => {
+      const tracker = new ComboAssemblyTracker(
+        detectedCombos.map((c) => ({
+          id: c.id,
+          name: c.id,
+          cards: c.cards,
+          zoneRequirements: c.zoneRequirements,
+        }))
+      );
+      // Update tracker from each turn's hand/graveyard data
+      // Note: we use simplified zone detection from turn logs
+      for (const turnLog of game.turnLogs) {
+        const fakeState = {
+          hand: turnLog.hand.map((n) => minimalGoldfishCard(n)),
+          battlefield: turnLog.permanents.map((p) => ({
+            card: minimalGoldfishCard(p.name),
+            tapped: p.tapped,
+            summoningSick: false,
+            producedMana: [],
+            enteredTurn: p.enteredTurn,
+          })),
+          library: [],
+          graveyard: turnLog.graveyard.map((n) => minimalGoldfishCard(n)),
+          exile: turnLog.exile.map((n) => minimalGoldfishCard(n)),
+          commandZone: [],
+          manaPool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+          landsPlayedThisTurn: 0,
+          commanderTaxPaid: 0,
+          turn: turnLog.turn,
+          treasureCount: 0,
+          rampLandsSearched: 0,
+          random: Math.random,
+        };
+        tracker.update(fakeState, turnLog.turn);
+      }
+      return tracker;
+    });
+    return ComboAssemblyTracker.aggregateStats(trackers, result.games[0]?.turnLogs.length ?? 10);
+  }, [result, detectedCombos]);
+
+  const bestComboAssemblyRate = comboStats
+    ? (() => {
+        if (comboStats.perCombo.length === 0) return null;
+        const best = comboStats.perCombo.reduce((max, c) =>
+          c.assemblyRate > max.assemblyRate ? c : max
+        );
+        return best.assemblyRate > 0
+          ? `${(best.assemblyRate * 100).toFixed(0)}%`
+          : null;
+      })()
+    : null;
+
+  // Board state milestones
+  const milestones = useMemo(() => {
+    if (!result) return [];
+    return [
+      ...detectMilestones(result.games),
+      ...captureSnapshotsAtTurns(result.games, [3, 5, 8]),
+    ].sort((a, b) => a.turn - b.turn);
+  }, [result]);
+
   function handleIterationsChange(e: React.ChangeEvent<HTMLInputElement>) {
     setConfig((prev) => ({ ...prev, iterations: parseInt(e.target.value, 10) }));
   }
@@ -297,6 +413,9 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
             >
               Aggregate Statistics
             </h4>
+            <p className="mb-3 text-xs text-slate-500 italic">
+              Assumes optimal solitaire play with no interaction.
+            </p>
             <div
               className="grid grid-cols-2 gap-3 sm:grid-cols-4"
               data-testid="goldfish-stat-cards"
@@ -328,6 +447,41 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
                 value={rampAccel}
                 sub="mana vs baseline at T4"
                 accent="amber"
+              />
+            </div>
+
+            {/* Advanced stat cards */}
+            <div
+              className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4"
+              data-testid="goldfish-advanced-stat-cards"
+            >
+              <StatCard
+                label="Combo Assembly"
+                value={bestComboAssemblyRate ?? "—"}
+                sub={bestComboAssemblyRate ? "best combo rate" : "no combos detected"}
+                accent="purple"
+              />
+              <StatCard
+                label="Avg Board T5"
+                value={avgBoardT5}
+                sub="permanents in play"
+                accent="blue"
+              />
+              <StatCard
+                label="Stall Rate"
+                value={stallRate}
+                sub="< 3 spells by T5"
+                accent="amber"
+              />
+              <StatCard
+                label="Commander Tax"
+                value={stats.avgCommanderTaxTotal > 0
+                  ? `+${stats.avgCommanderTaxTotal.toFixed(1)}`
+                  : "0"}
+                sub={stats.avgCommanderRecasts > 0
+                  ? `${stats.avgCommanderRecasts.toFixed(2)} avg recasts`
+                  : "no recasts"}
+                accent="green"
               />
             </div>
           </section>
@@ -382,6 +536,35 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
                   </tbody>
                 </table>
               </div>
+            </section>
+          )}
+
+          {/* Combo assembly tracking */}
+          {comboStats && comboStats.perCombo.length > 0 && (
+            <section
+              aria-labelledby="goldfish-combo-heading"
+              className="rounded-xl border border-slate-700 bg-slate-800/50 p-4"
+            >
+              <h4
+                id="goldfish-combo-heading"
+                className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300"
+              >
+                Combo Assembly
+              </h4>
+              <ComboAssemblyChart comboStats={comboStats} />
+            </section>
+          )}
+
+          {/* Board state milestones */}
+          {milestones.length > 0 && (
+            <section
+              aria-labelledby="goldfish-milestones-outer-heading"
+              className="rounded-xl border border-slate-700 bg-slate-800/50 p-4"
+            >
+              <span id="goldfish-milestones-outer-heading" className="sr-only">
+                Board State Milestones
+              </span>
+              <BoardMilestones milestones={milestones} />
             </section>
           )}
 
