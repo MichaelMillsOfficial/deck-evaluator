@@ -172,7 +172,7 @@ const TYPE_CONTEXT_RE = new RegExp(
 );
 
 /** "non-TYPE creatures" pattern for asymmetric wipes */
-const NON_TYPE_RE = new RegExp(
+export const NON_TYPE_RE = new RegExp(
   `\\bnon-(?:${CREATURE_TYPE_PATTERN})\\b`,
   "gi"
 );

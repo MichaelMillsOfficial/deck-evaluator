@@ -1060,3 +1060,132 @@ test.describe("analyzeDeckSynergy", () => {
     expect(discardTheme).toBeDefined();
   });
 });
+
+test.describe("board wipe anti-synergy — asymmetric exemption", () => {
+  function tokenProducer() {
+    return mockCard({
+      name: "Bitterblossom",
+      typeLine: "Tribal Enchantment — Faerie",
+      oracleText:
+        "At the beginning of your upkeep, you lose 1 life and create a 1/1 black Faerie Rogue creature token with flying.",
+    });
+  }
+
+  test("Wrath of God + tokens → anti-synergy pair present (regression guard)", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Wrath of God": mockCard({
+        name: "Wrath of God",
+        typeLine: "Sorcery",
+        oracleText: "Destroy all creatures. They can't be regenerated.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Wrath of God") &&
+        p.cards.includes("Bitterblossom")
+    );
+    expect(pair).toBeDefined();
+  });
+
+  test("In Garruk's Wake + tokens (no tribal theme) → no anti-synergy pair (one-sided always exempt)", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "In Garruk's Wake": mockCard({
+        name: "In Garruk's Wake",
+        typeLine: "Sorcery",
+        oracleText:
+          "Destroy all creatures you don't control and all planeswalkers you don't control.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("In Garruk's Wake")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Kindred Dominance in Elf tribal deck → no anti-synergy pair", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Elvish Archdruid": mockCard({
+        name: "Elvish Archdruid",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText:
+          "Other Elf creatures you control get +1/+1.\n{T}: Add {G} for each Elf you control.",
+      }),
+      "Llanowar Elves": mockCard({
+        name: "Llanowar Elves",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      "Elvish Mystic": mockCard({
+        name: "Elvish Mystic",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      "Priest of Titania": mockCard({
+        name: "Priest of Titania",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G} for each Elf on the battlefield.",
+      }),
+      "Kindred Dominance": mockCard({
+        name: "Kindred Dominance",
+        typeLine: "Kindred Sorcery",
+        oracleText:
+          "Choose a creature type. Destroy all creatures that aren't of the chosen type.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(
+      [
+        "Llanowar Elves",
+        "Elvish Mystic",
+        "Priest of Titania",
+        "Kindred Dominance",
+        "Bitterblossom",
+      ],
+      ["Elvish Archdruid"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Kindred Dominance")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Kindred Dominance in non-tribal deck → anti-synergy pair present", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Kindred Dominance": mockCard({
+        name: "Kindred Dominance",
+        typeLine: "Kindred Sorcery",
+        oracleText:
+          "Choose a creature type. Destroy all creatures that aren't of the chosen type.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Kindred Dominance")
+    );
+    expect(pair).toBeDefined();
+  });
+});

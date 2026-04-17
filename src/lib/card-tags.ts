@@ -1,6 +1,6 @@
 import type { EnrichedCard } from "./types";
 import { CONDITIONAL_PATTERNS } from "./land-base-efficiency";
-import { CREATURE_TYPE_PATTERN } from "./creature-types";
+import { CREATURE_TYPE_PATTERN, NON_TYPE_RE } from "./creature-types";
 
 export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   Ramp: { bg: "bg-emerald-500/20", text: "text-emerald-300" },
@@ -8,6 +8,7 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   "Card Advantage": { bg: "bg-sky-500/20", text: "text-sky-300" },
   Removal: { bg: "bg-red-500/20", text: "text-red-300" },
   "Board Wipe": { bg: "bg-orange-500/20", text: "text-orange-300" },
+  "Asymmetric Wipe": { bg: "bg-amber-500/20", text: "text-amber-300" },
   Counterspell: { bg: "bg-cyan-500/20", text: "text-cyan-300" },
   Tutor: { bg: "bg-yellow-500/20", text: "text-yellow-300" },
   "Cost Reduction": { bg: "bg-amber-500/20", text: "text-amber-300" },
@@ -62,6 +63,40 @@ const BOARD_WIPE_RE =
   /\b(?:destroy|exile)\s+all\b/i;
 const BOARD_WIPE_BOUNCE_RE = /\breturn all\b.+?\bto their owners' hands\b/i;
 const BOARD_WIPE_MINUS_RE = /\ball creatures get -\d+\/-\d+/i;
+// --- Asymmetric (one-sided) wipe patterns ---
+// Universal: "creatures you don't control", "permanents an opponent controls", etc.
+const ASYMMETRIC_OPPONENT_RE =
+  /\b(?:creatures?|permanents?|planeswalkers?)\s+(?:you don't control|an opponent controls|your opponents control)\b/i;
+// Tribal: "that aren't of the chosen type" (Kindred Dominance)
+const ASYMMETRIC_CHOSEN_TYPE_RE = /\bthat aren't of the chosen (?:type|creature type)\b/i;
+// Tribal: "that don't share a creature type with" (Patriarch's Bidding-style)
+const ASYMMETRIC_SHARED_TYPE_RE = /\bthat don't share a (?:creature )?type with\b/i;
+// Note: NON_TYPE_RE (imported from creature-types) catches "non-Elf creatures" etc.
+// It has the /g flag; callers must reset lastIndex before .test().
+
+/**
+ * Sub-classification of an asymmetric wipe so callers can decide exemption context:
+ * - `opponentSided`: always one-sided regardless of deck (In Garruk's Wake, Plague Wind).
+ * - `chosenType`: references a creature type chosen at resolution (Kindred Dominance); asymmetric
+ *   only when the deck has any tribal anchor the caster can name.
+ * - `specificType`: references a fixed creature type (e.g. "non-Elf"); asymmetric only when that
+ *   type matches a deck anchor (caller uses `extractReferencedTypes` to get the type names).
+ * Returns `null` for wipes that have no asymmetric pattern.
+ */
+export type AsymmetricWipeKind = "opponentSided" | "chosenType" | "specificType";
+
+export function classifyAsymmetricWipe(oracleText: string): AsymmetricWipeKind | null {
+  if (ASYMMETRIC_OPPONENT_RE.test(oracleText)) return "opponentSided";
+  if (
+    ASYMMETRIC_CHOSEN_TYPE_RE.test(oracleText) ||
+    ASYMMETRIC_SHARED_TYPE_RE.test(oracleText)
+  ) {
+    return "chosenType";
+  }
+  NON_TYPE_RE.lastIndex = 0;
+  if (NON_TYPE_RE.test(oracleText)) return "specificType";
+  return null;
+}
 const COUNTER_RE = /\bcounter target\b.+?\bspell\b/i;
 const TUTOR_RE = /\bsearch your library\b/i;
 const TUTOR_LAND_EXCLUSION_RE = /search your library for.+?(?:land|Forest|Plains|Island|Swamp|Mountain)\b/i;
@@ -241,6 +276,12 @@ export function generateTags(card: EnrichedCard): string[] {
   ) {
     tags.add("Board Wipe");
     tags.add("Removal");
+
+    // Asymmetric (one-sided) wipes: In Garruk's Wake, Plague Wind, Kindred Dominance, etc.
+    // Only applied when the card already matched a board-wipe pattern above.
+    if (classifyAsymmetricWipe(text) !== null) {
+      tags.add("Asymmetric Wipe");
+    }
   }
 
   // Single-target Removal

@@ -9,12 +9,13 @@ import type {
 } from "./types";
 import { SYNERGY_AXES, extractReferencedKeywords } from "./synergy-axes";
 import { findCombosInDeck } from "./known-combos";
-import { getTagsCached } from "./card-tags";
+import { getTagsCached, classifyAsymmetricWipe } from "./card-tags";
 import {
   identifyTribalAnchors,
   getCreatureSubtypes,
   getCommanderTypes,
   isChangeling,
+  extractReferencedTypes,
 } from "./creature-types";
 import {
   identifySupertypeAnchors,
@@ -220,6 +221,7 @@ function generateAntiSynergyPairs(
   cardNames: string[],
   axisScores: Map<string, CardAxisScore[]>,
   cardMap: Record<string, EnrichedCard>,
+  tribalAnchorTypes: Set<string>,
   tagCache?: Map<string, string[]>
 ): SynergyPair[] {
   const pairs: SynergyPair[] = [];
@@ -266,28 +268,56 @@ function generateAntiSynergyPairs(
   }
 
   // Board wipe vs tokens anti-synergy (tag-based)
+  // Asymmetric (one-sided) wipes are exempt according to their sub-classification:
+  //   - opponentSided (In Garruk's Wake): always exempt.
+  //   - chosenType (Kindred Dominance): exempt when the deck has any tribal anchor to name.
+  //   - specificType ("non-Elf" wipes): exempt when the referenced type matches a deck anchor.
   const tokenCardNames: string[] = [];
-  const boardWipeCardNames: string[] = [];
+  type WipeInfo = {
+    name: string;
+    kind: ReturnType<typeof classifyAsymmetricWipe>;
+    referencedTypes: string[];
+  };
+  const boardWipes: WipeInfo[] = [];
 
   for (const name of cardNames) {
     const card = cardMap[name];
     if (!card) continue;
     const tags = getTagsCached(card, tagCache);
-    if (tags.includes("Board Wipe")) boardWipeCardNames.push(name);
+    if (tags.includes("Board Wipe")) {
+      const kind = tags.includes("Asymmetric Wipe")
+        ? classifyAsymmetricWipe(card.oracleText)
+        : null;
+      const referencedTypes =
+        kind === "specificType" ? extractReferencedTypes(card.oracleText) : [];
+      boardWipes.push({ name, kind, referencedTypes });
+    }
     const tokenAxes = axisScores.get(name) ?? [];
     if (tokenAxes.some((a) => a.axisId === "tokens" && a.relevance >= AXIS_RELEVANCE_THRESHOLD)) {
       tokenCardNames.push(name);
     }
   }
 
-  for (const wipeName of boardWipeCardNames) {
+  for (const wipe of boardWipes) {
+    // Opponent-sided wipes are always exempt (favor the caster regardless of deck).
+    if (wipe.kind === "opponentSided") continue;
+    // Chosen-type wipes are exempt whenever the deck has any tribal anchor the caster can name.
+    if (wipe.kind === "chosenType" && tribalAnchorTypes.size > 0) continue;
+    // Specific-type wipes ("non-Elf") are exempt only if the named type matches an anchor.
+    if (
+      wipe.kind === "specificType" &&
+      wipe.referencedTypes.some((t) => tribalAnchorTypes.has(t))
+    ) {
+      continue;
+    }
+
     for (const tokenName of tokenCardNames) {
-      const key = `anti:${[wipeName, tokenName].sort().join("|")}:boardwipe-tokens`;
+      const key = `anti:${[wipe.name, tokenName].sort().join("|")}:boardwipe-tokens`;
       if (seen.has(key)) continue;
       seen.add(key);
 
       pairs.push({
-        cards: [wipeName, tokenName],
+        cards: [wipe.name, tokenName],
         axisId: "tokens",
         type: "anti-synergy",
         strength: 0.6,
@@ -696,8 +726,23 @@ export function analyzeDeckSynergy(
   // Step 4: Generate heuristic synergy pairs (with optional intent filtering)
   const synergyPairs = generateSynergyPairs(cardNames, axisScores, intentSummaries);
 
-  // Step 5: Generate anti-synergy pairs
-  const antiSynergyPairs = generateAntiSynergyPairs(cardNames, axisScores, cardMap, tagCache);
+  // Step 5a: Resolve commanders and tribal anchors (needed by anti-synergy and theme detection)
+  const commanders: EnrichedCard[] = [];
+  for (const cmd of deck.commanders) {
+    const card = cardMap[cmd.name];
+    if (card) commanders.push(card);
+  }
+  const tribalAnchors = identifyTribalAnchors(commanders, cardNames, cardMap);
+  const tribalAnchorTypes = new Set(tribalAnchors);
+
+  // Step 5b: Generate anti-synergy pairs (asymmetric wipes exempt when they protect the tribal theme)
+  const antiSynergyPairs = generateAntiSynergyPairs(
+    cardNames,
+    axisScores,
+    cardMap,
+    tribalAnchorTypes,
+    tagCache
+  );
 
   // Step 6: Compute per-card scores
   const cardScores = computeCardScores(
@@ -709,13 +754,7 @@ export function analyzeDeckSynergy(
     comboPairs
   );
 
-  // Step 7: Identify deck themes (pass tribal anchors for labeling)
-  const commanders: EnrichedCard[] = [];
-  for (const cmd of deck.commanders) {
-    const card = cardMap[cmd.name];
-    if (card) commanders.push(card);
-  }
-  const tribalAnchors = identifyTribalAnchors(commanders, cardNames, cardMap);
+  // Step 7: Identify deck themes (reuses tribal anchors resolved above)
   const deckThemes = identifyDeckThemes(axisScores, tribalAnchors, supertypeAnchors, keywordAnchors);
 
   // Step 8: Sort and return

@@ -113,6 +113,109 @@ test.describe("generateTags — Board Wipe", () => {
   });
 });
 
+test.describe("generateTags — Asymmetric Wipe", () => {
+  test("Kindred Dominance (chosen-type exclusion) → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Kindred Dominance",
+      typeLine: "Kindred Sorcery",
+      oracleText:
+        "Choose a creature type. Destroy all creatures that aren't of the chosen type.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("In Garruk's Wake (you don't control) → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "In Garruk's Wake",
+      typeLine: "Sorcery",
+      oracleText:
+        "Destroy all creatures you don't control and all planeswalkers you don't control.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("Plague Wind (you don't control) → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Plague Wind",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all creatures you don't control. They can't be regenerated.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("non-creature-type wipe → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Hypothetical Elf Purge",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all non-Elf creatures.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("Cyclonic Rift overload (opponents control) → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Cyclonic Rift",
+      typeLine: "Instant",
+      oracleText:
+        "Return target nonland permanent you don't control to its owner's hand.\nOverload {6}{U} (You may cast this spell for its overload cost. If you do, change its text by replacing all instances of \"target\" with \"each.\")\nReturn all nonland permanents your opponents control to their owners' hands.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("Wrath of God → Board Wipe but NOT Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Wrath of God",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all creatures. They can't be regenerated.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+
+  test("Damnation → Board Wipe but NOT Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Damnation",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all creatures. They can't be regenerated.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+
+  test("symmetric -N/-N wipe (e.g. Black Sun's Zenith) → Board Wipe but NOT Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Black Sun's Zenith",
+      typeLine: "Sorcery",
+      oracleText: "All creatures get -3/-3 until end of turn.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+
+  test("non-Board-Wipe reference to 'non-Elf' → no Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Hypothetical Lord",
+      typeLine: "Creature",
+      oracleText: "Non-Elf creatures you control get +1/+0.",
+    });
+    const tags = generateTags(card);
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+});
+
 test.describe("generateTags — Counterspell", () => {
   test("'Counter target spell.' → Counterspell", () => {
     const card = makeCard({ oracleText: "Counter target spell." });
