@@ -220,10 +220,23 @@ function getCardAxisIntent(
 // Patterns identifying token producers whose tokens would SURVIVE a wipe that spares a given card type.
 // Used for per-pair exemption: only the token producer whose tokens match the spared category is
 // exempt — unrelated token producers in the same deck still trigger the anti-synergy.
+// Only consulted for cards already classified on the tokens axis, so patterns don't need to
+// separately prove the card creates tokens.
 const TOKEN_SURVIVES_PATTERNS: Record<string, RegExp> = {
-  // Explicit "artifact creature token" phrasing plus common artifact-creature token subtype names.
-  artifact:
-    /\bartifact creature tokens?\b|\b(?:Thopter|Servo|Construct|Myr|Golem|Scion|Powerstone|Drone|Assembly-Worker)\b/i,
+  artifact: new RegExp(
+    [
+      // Explicit "artifact creature token" phrasing (Breya, Thopter Spy Network, Pia and Kiran Nalaar).
+      String.raw`\bartifact creature tokens?\b`,
+      // Known artifact-token subtype names (creatures and non-creature artifact tokens).
+      String.raw`\b(?:Thopter|Servo|Construct|Myr|Golem|Scion|Powerstone|Drone|Assembly-Worker|Treasure|Clue|Food|Blood|Gold|Junk|Map)\b`,
+      // "Token that's a copy of ... artifact" (Mirrorworks, Saheeli's Artistry's artifact mode).
+      String.raw`\bcop(?:y|ies) of (?:that |the |an? )?(?:nontoken )?artifact\b`,
+      // Imprint restricted to an artifact card — any resulting token copy is always an artifact
+      // (Prototype Portal, Soul Foundry when imprinted with an artifact creature).
+      String.raw`\bexile an? artifact card\b`,
+    ].join("|"),
+    "i"
+  ),
   enchantment: /\benchantment (?:creature )?tokens?\b/i,
   legendary: /\blegendary (?:creature )?tokens?\b/i,
 };

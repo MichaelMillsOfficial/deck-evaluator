@@ -1238,6 +1238,91 @@ test.describe("board wipe anti-synergy — asymmetric exemption", () => {
     expect(pair).toBeDefined();
   });
 
+  test("Organic Extinction + Mirrorworks (copy-of-artifact tokens) → no anti-synergy pair", () => {
+    // Mirrorworks creates a token that's a copy of a nontoken artifact — the tokens are
+    // artifacts and survive "Destroy all nonartifact creatures".
+    const cards: Record<string, EnrichedCard> = {
+      "Organic Extinction": mockCard({
+        name: "Organic Extinction",
+        typeLine: "Sorcery",
+        oracleText: "Improvise\nDestroy all nonartifact creatures.",
+      }),
+      Mirrorworks: mockCard({
+        name: "Mirrorworks",
+        typeLine: "Artifact",
+        oracleText:
+          "Whenever another nontoken artifact enters the battlefield under your control, you may pay {2}. If you do, create a token that's a copy of that artifact.",
+      }),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction") &&
+        p.cards.includes("Mirrorworks")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Organic Extinction + Prototype Portal (imprint-artifact + token copy) → no anti-synergy pair", () => {
+    // Prototype Portal's imprint is restricted to artifact cards, so any token it creates
+    // is always a copy of an artifact and survives "Destroy all nonartifact creatures".
+    const cards: Record<string, EnrichedCard> = {
+      "Organic Extinction": mockCard({
+        name: "Organic Extinction",
+        typeLine: "Sorcery",
+        oracleText: "Improvise\nDestroy all nonartifact creatures.",
+      }),
+      "Prototype Portal": mockCard({
+        name: "Prototype Portal",
+        typeLine: "Artifact",
+        oracleText:
+          "Imprint — When Prototype Portal enters the battlefield, you may exile an artifact card from your hand.\n{X}, {T}: Create a token that's a copy of the exiled card. X is the mana value of that card.",
+      }),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction") &&
+        p.cards.includes("Prototype Portal")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Organic Extinction + Breya as commander (Thopter artifact creature tokens) → no anti-synergy pair", () => {
+    // Regression: Breya's ETB explicitly creates "Thopter artifact creature tokens";
+    // she should be exempt as a commander too.
+    const cards: Record<string, EnrichedCard> = {
+      "Organic Extinction": mockCard({
+        name: "Organic Extinction",
+        typeLine: "Sorcery",
+        oracleText: "Improvise\nDestroy all nonartifact creatures.",
+      }),
+      "Breya, Etherium Shaper": mockCard({
+        name: "Breya, Etherium Shaper",
+        typeLine: "Legendary Artifact Creature — Human Artificer",
+        subtypes: ["Human", "Artificer"],
+        oracleText:
+          "When Breya, Etherium Shaper enters the battlefield, create two 1/1 blue Thopter artifact creature tokens with flying.\n{2}, Sacrifice two artifacts: Choose one —\n• Breya, Etherium Shaper deals 3 damage to any target.\n• Target creature gets -4/-4 until end of turn.\n• You gain 5 life.",
+      }),
+    };
+    const deck = mockDeck(["Organic Extinction"], ["Breya, Etherium Shaper"]);
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction") &&
+        p.cards.includes("Breya, Etherium Shaper")
+    );
+    expect(pair).toBeUndefined();
+  });
+
   test("Organic Extinction + mixed token producers → exempt vs Thopter, pair vs Bitterblossom", () => {
     // Per-pair exemption: one producer in the same deck can be exempt while another
     // producing non-artifact tokens still triggers the penalty.
