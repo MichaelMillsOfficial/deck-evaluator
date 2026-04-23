@@ -217,48 +217,26 @@ function getCardAxisIntent(
   return undefined;
 }
 
-/** Count deck cards whose type line includes the given MTG type token (case-insensitive, word-boundary). */
-function countCardsByType(
-  cardNames: string[],
-  cardMap: Record<string, EnrichedCard>,
-  typeName: string
-): number {
-  const re = new RegExp(`\\b${typeName}\\b`, "i");
-  let count = 0;
-  for (const name of cardNames) {
-    const card = cardMap[name];
-    if (card && re.test(card.typeLine)) count++;
-  }
-  return count;
-}
-
-// Thresholds for treating a deck as "themed" around a spared card type. A nonartifact wipe
-// (Organic Extinction) is asymmetric when the caster is playing ≥10 artifacts; same bar for
-// enchantments; planeswalkers use a lower bar since superfriends decks run fewer walkers.
-const CARD_TYPE_THEME_THRESHOLD: Record<string, number> = {
-  artifact: 10,
-  enchantment: 10,
-  planeswalker: 4,
+// Patterns identifying token producers whose tokens would SURVIVE a wipe that spares a given card type.
+// Used for per-pair exemption: only the token producer whose tokens match the spared category is
+// exempt — unrelated token producers in the same deck still trigger the anti-synergy.
+const TOKEN_SURVIVES_PATTERNS: Record<string, RegExp> = {
+  // Explicit "artifact creature token" phrasing plus common artifact-creature token subtype names.
+  artifact:
+    /\bartifact creature tokens?\b|\b(?:Thopter|Servo|Construct|Myr|Golem|Scion|Powerstone|Drone|Assembly-Worker)\b/i,
+  enchantment: /\benchantment (?:creature )?tokens?\b/i,
+  legendary: /\blegendary (?:creature )?tokens?\b/i,
 };
 
-/** Whether the deck aligns with any of the spared categories of a cardTypeRestricted wipe. */
-function deckMatchesSparedCardType(
-  excludedTypes: string[],
-  cardNames: string[],
-  cardMap: Record<string, EnrichedCard>,
-  supertypeAnchors: string[]
+/** Whether this token producer's tokens survive a wipe that spares the given card-type categories. */
+function tokensSurviveCardTypeWipe(
+  producer: EnrichedCard,
+  sparedTypes: string[]
 ): boolean {
-  for (const type of excludedTypes) {
-    // Supertypes ("legendary", "snow", "basic") route through the existing supertype anchor detector.
-    if (type === "legendary" || type === "snow" || type === "basic") {
-      if (supertypeAnchors.includes(type)) return true;
-      continue;
-    }
-    // Card types (artifact, enchantment, planeswalker) — count cards by type line.
-    const threshold = CARD_TYPE_THEME_THRESHOLD[type];
-    if (threshold === undefined) continue;
-    const typeTitle = type[0].toUpperCase() + type.slice(1);
-    if (countCardsByType(cardNames, cardMap, typeTitle) >= threshold) return true;
+  const text = producer.oracleText;
+  for (const spared of sparedTypes) {
+    const pattern = TOKEN_SURVIVES_PATTERNS[spared];
+    if (pattern?.test(text)) return true;
   }
   return false;
 }
@@ -269,7 +247,6 @@ function generateAntiSynergyPairs(
   axisScores: Map<string, CardAxisScore[]>,
   cardMap: Record<string, EnrichedCard>,
   tribalAnchorTypes: Set<string>,
-  supertypeAnchors: string[],
   tagCache?: Map<string, string[]>
 ): SynergyPair[] {
   const pairs: SynergyPair[] = [];
@@ -317,11 +294,12 @@ function generateAntiSynergyPairs(
 
   // Board wipe vs tokens anti-synergy (tag-based)
   // Asymmetric (one-sided) wipes are exempt according to their sub-classification:
-  //   - opponentSided (In Garruk's Wake): always exempt.
+  //   - opponentSided (In Garruk's Wake): always exempt — the wipe never hits the caster's board.
   //   - chosenType (Kindred Dominance): exempt when the deck has any tribal anchor to name.
   //   - specificType ("non-Elf" wipes): exempt when the referenced subtype matches a deck anchor.
-  //   - cardTypeRestricted ("nonartifact", "nonlegendary"): exempt when the deck is themed
-  //     around the spared card type / supertype (Organic Extinction in an artifact deck, etc.).
+  //   - cardTypeRestricted (Organic Extinction's "nonartifact creatures"): exempt PER PAIR —
+  //     only when the specific token producer's tokens match the spared card type. An artifact
+  //     deck with Bitterblossom still loses its Faerie tokens to Organic Extinction.
   const tokenCardNames: string[] = [];
   type WipeInfo = {
     name: string;
@@ -352,7 +330,7 @@ function generateAntiSynergyPairs(
 
   for (const wipe of boardWipes) {
     const c = wipe.classification;
-    // Opponent-sided wipes are always exempt (favor the caster regardless of deck).
+    // Opponent-sided wipes never pair with tokens.
     if (c?.kind === "opponentSided") continue;
     // Chosen-type wipes are exempt whenever the deck has any tribal anchor the caster can name.
     if (c?.kind === "chosenType" && tribalAnchorTypes.size > 0) continue;
@@ -363,15 +341,18 @@ function generateAntiSynergyPairs(
     ) {
       continue;
     }
-    // Card-type-restricted wipes are exempt when the deck's composition aligns with the spared category.
-    if (
-      c?.kind === "cardTypeRestricted" &&
-      deckMatchesSparedCardType(c.excludedTypes, cardNames, cardMap, supertypeAnchors)
-    ) {
-      continue;
-    }
 
     for (const tokenName of tokenCardNames) {
+      // Card-type-restricted wipes: exempt this pair only if the specific token producer's
+      // tokens survive the wipe (e.g. Thopter Spy Network makes artifact creature tokens,
+      // which survive Organic Extinction).
+      if (c?.kind === "cardTypeRestricted") {
+        const producer = cardMap[tokenName];
+        if (producer && tokensSurviveCardTypeWipe(producer, c.excludedTypes)) {
+          continue;
+        }
+      }
+
       const key = `anti:${[wipe.name, tokenName].sort().join("|")}:boardwipe-tokens`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -801,7 +782,6 @@ export function analyzeDeckSynergy(
     axisScores,
     cardMap,
     tribalAnchorTypes,
-    supertypeAnchors,
     tagCache
   );
 

@@ -64,9 +64,11 @@ const BOARD_WIPE_RE =
 const BOARD_WIPE_BOUNCE_RE = /\breturn all\b.+?\bto their owners' hands\b/i;
 const BOARD_WIPE_MINUS_RE = /\ball creatures get -\d+\/-\d+/i;
 // --- Asymmetric (one-sided) wipe patterns ---
-// Universal: "creatures you don't control", "permanents an opponent controls", etc.
+// Universal: "all <modifier?> creatures/permanents/planeswalkers you don't control" etc.
+// Anchored to "all" so single-target clauses ("target creature you don't control") on modal
+// cards don't falsely flag a symmetric wipe mode as asymmetric.
 const ASYMMETRIC_OPPONENT_RE =
-  /\b(?:creatures?|permanents?|planeswalkers?)\s+(?:you don't control|an opponent controls|your opponents control)\b/i;
+  /\ball\s+(?:\S+\s+){0,3}?(?:creatures?|permanents?|planeswalkers?)\s+(?:you don't control|an opponent controls|your opponents control)\b/i;
 // Tribal: "that aren't of the chosen type" (Kindred Dominance)
 const ASYMMETRIC_CHOSEN_TYPE_RE = /\bthat aren't of the chosen (?:type|creature type)\b/i;
 // Tribal: "that don't share a creature type with" (Patriarch's Bidding-style)

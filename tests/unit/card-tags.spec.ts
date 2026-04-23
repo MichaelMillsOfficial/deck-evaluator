@@ -217,6 +217,33 @@ test.describe("generateTags — Asymmetric Wipe", () => {
     expect(tags).toContain("Asymmetric Wipe");
   });
 
+  test("Hour of Reckoning (nontoken) → Board Wipe but NOT Asymmetric Wipe", () => {
+    // 'nontoken' sweeps *token* creatures — this wipe KILLS token strategies, not spares them.
+    // Regression guard: must not be lumped into cardTypeRestricted exemption.
+    const card = makeCard({
+      name: "Hour of Reckoning",
+      typeLine: "Sorcery",
+      oracleText: "Convoke (Your creatures can help cast this spell.)\nDestroy all nontoken creatures.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+
+  test("modal card with single-target 'you don't control' + symmetric wipe → not Asymmetric Wipe", () => {
+    // False-positive regression: a card with "target creature you don't control" in a non-wipe
+    // clause alongside a symmetric "destroy all creatures" must not be tagged asymmetric.
+    const card = makeCard({
+      name: "Hypothetical Modal Wipe",
+      typeLine: "Sorcery",
+      oracleText:
+        "Choose one —\n• Destroy target creature you don't control.\n• Destroy all creatures.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+
   test("symmetric artifact destruction (Shatterstorm) → Board Wipe but NOT Asymmetric Wipe", () => {
     const card = makeCard({
       name: "Shatterstorm",

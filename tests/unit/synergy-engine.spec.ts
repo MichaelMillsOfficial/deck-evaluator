@@ -1189,29 +1189,21 @@ test.describe("board wipe anti-synergy — asymmetric exemption", () => {
     expect(pair).toBeDefined();
   });
 
-  function artifactCreature(name: string) {
-    return mockCard({
-      name,
-      typeLine: "Artifact Creature — Construct",
-      subtypes: ["Construct"],
-      oracleText: "",
-    });
-  }
-
-  test("Organic Extinction in artifact-heavy deck → no anti-synergy pair", () => {
-    const artifacts: Record<string, EnrichedCard> = {};
-    for (let i = 0; i < 12; i++) {
-      artifacts[`Construct ${i}`] = artifactCreature(`Construct ${i}`);
-    }
+  test("Organic Extinction + Thopter Spy Network (artifact tokens) → no anti-synergy pair", () => {
+    // Thopter Spy Network creates Thopter artifact creature tokens, which survive
+    // "Destroy all nonartifact creatures". The anti-synergy should be suppressed.
     const cards: Record<string, EnrichedCard> = {
-      ...artifacts,
       "Organic Extinction": mockCard({
         name: "Organic Extinction",
         typeLine: "Sorcery",
-        oracleText:
-          "Improvise\nDestroy all nonartifact creatures.",
+        oracleText: "Improvise\nDestroy all nonartifact creatures.",
       }),
-      Bitterblossom: tokenProducer(),
+      "Thopter Spy Network": mockCard({
+        name: "Thopter Spy Network",
+        typeLine: "Enchantment",
+        oracleText:
+          "At the beginning of combat on your turn, if you controlled an artifact this turn, create a 1/1 colorless Thopter artifact creature token with flying.\nWhenever one or more artifact creatures you control deal combat damage to a player, draw a card.",
+      }),
     };
     const deck = mockDeck(Object.keys(cards));
     const result = analyzeDeckSynergy(deck, cards);
@@ -1224,13 +1216,14 @@ test.describe("board wipe anti-synergy — asymmetric exemption", () => {
     expect(pair).toBeUndefined();
   });
 
-  test("Organic Extinction in non-artifact deck → anti-synergy pair present", () => {
+  test("Organic Extinction + Bitterblossom (Faerie tokens are creatures but NOT artifacts) → anti-synergy pair present", () => {
+    // Faerie tokens are non-artifact creatures — they die to Organic Extinction.
+    // The penalty must still fire even though the wipe is tagged Asymmetric.
     const cards: Record<string, EnrichedCard> = {
       "Organic Extinction": mockCard({
         name: "Organic Extinction",
         typeLine: "Sorcery",
-        oracleText:
-          "Improvise\nDestroy all nonartifact creatures.",
+        oracleText: "Improvise\nDestroy all nonartifact creatures.",
       }),
       Bitterblossom: tokenProducer(),
     };
@@ -1243,5 +1236,41 @@ test.describe("board wipe anti-synergy — asymmetric exemption", () => {
         p.cards.includes("Organic Extinction")
     );
     expect(pair).toBeDefined();
+  });
+
+  test("Organic Extinction + mixed token producers → exempt vs Thopter, pair vs Bitterblossom", () => {
+    // Per-pair exemption: one producer in the same deck can be exempt while another
+    // producing non-artifact tokens still triggers the penalty.
+    const cards: Record<string, EnrichedCard> = {
+      "Organic Extinction": mockCard({
+        name: "Organic Extinction",
+        typeLine: "Sorcery",
+        oracleText: "Improvise\nDestroy all nonartifact creatures.",
+      }),
+      "Thopter Spy Network": mockCard({
+        name: "Thopter Spy Network",
+        typeLine: "Enchantment",
+        oracleText:
+          "At the beginning of combat on your turn, if you controlled an artifact this turn, create a 1/1 colorless Thopter artifact creature token with flying.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const thopterPair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction") &&
+        p.cards.includes("Thopter Spy Network")
+    );
+    const faeriePair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction") &&
+        p.cards.includes("Bitterblossom")
+    );
+    expect(thopterPair).toBeUndefined();
+    expect(faeriePair).toBeDefined();
   });
 });
