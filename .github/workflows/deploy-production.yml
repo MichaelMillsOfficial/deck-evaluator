@@ -26,3 +26,37 @@ jobs:
             exit 1
           fi
           echo "Vercel production deploy triggered (HTTP $RESPONSE)"
+
+      - name: Post release notes to Discord
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "DISCORD_RELEASE_WEBHOOK_URL not set — skipping"
+            exit 0
+          fi
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          VERSION="${BRANCH#chore/bump-version-}"
+          TAG="v$VERSION"
+
+          RELEASE_JSON=$(gh release view "$TAG" --repo "${{ github.repository }}" --json body,url)
+          BODY=$(echo "$RELEASE_JSON" | jq -r '.body // ""')
+          URL=$(echo "$RELEASE_JSON" | jq -r '.url')
+          [ -z "$BODY" ] && BODY="See the release page for details."
+          if [ ${#BODY} -gt 4000 ]; then BODY="${BODY:0:3997}..."; fi
+
+          PAYLOAD=$(jq -n \
+            --arg title "Deck Evaluator $TAG released" \
+            --arg url   "$URL" \
+            --arg desc  "$BODY" \
+            --arg ts    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{embeds:[{title:$title, url:$url, description:$desc, color:9647338, timestamp:$ts}]}')
+
+          HTTP=$(curl -s -o /tmp/resp -w "%{http_code}" \
+            -H "Content-Type: application/json" \
+            -X POST -d "$PAYLOAD" "$DISCORD_WEBHOOK")
+          if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
+            echo "::error::Discord webhook returned HTTP $HTTP"; cat /tmp/resp; exit 1
+          fi
+          echo "Discord notified (HTTP $HTTP)"
