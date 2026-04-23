@@ -78,8 +78,13 @@ const ASYMMETRIC_SHARED_TYPE_RE = /\bthat don't share a (?:creature )?type with\
 // creature subtypes are handled by NON_TYPE_RE from creature-types.
 const ASYMMETRIC_NON_CARDTYPE_RE =
   /\bnon-?(artifact|enchantment|planeswalker|legendary|snow|basic)\b/gi;
-// Note: NON_TYPE_RE (imported from creature-types) catches "non-Elf creatures" etc.
-// Both NON_TYPE_RE and ASYMMETRIC_NON_CARDTYPE_RE have /g flag — reset lastIndex before use.
+// "destroy all permanents except for <list>" / "other than <list>" (Scourglass, Cataclysmic
+// Gearhulk-style clauses). Captures the list; a second pass pulls spared card types out of it.
+const ASYMMETRIC_EXCEPT_FOR_RE = /\b(?:except for|other than)\s+([^.]*)/i;
+const SPARED_TYPE_TOKENS_RE =
+  /\b(artifact|enchantment|planeswalker|land|legendary|snow|basic)s?\b/gi;
+// Note: NON_TYPE_RE (imported from creature-types), ASYMMETRIC_NON_CARDTYPE_RE, and
+// SPARED_TYPE_TOKENS_RE all have /g flag — reset lastIndex before use.
 
 /**
  * Sub-classification of an asymmetric wipe so callers can decide exemption context:
@@ -123,6 +128,15 @@ export function classifyAsymmetricWipe(
   let m: RegExpExecArray | null;
   while ((m = ASYMMETRIC_NON_CARDTYPE_RE.exec(oracleText)) !== null) {
     cardTypeMatches.add(m[1].toLowerCase());
+  }
+  // Also check "except for <list>" syntax (Scourglass: "except for artifacts and lands").
+  const exceptMatch = ASYMMETRIC_EXCEPT_FOR_RE.exec(oracleText);
+  if (exceptMatch) {
+    SPARED_TYPE_TOKENS_RE.lastIndex = 0;
+    let t: RegExpExecArray | null;
+    while ((t = SPARED_TYPE_TOKENS_RE.exec(exceptMatch[1])) !== null) {
+      cardTypeMatches.add(t[1].toLowerCase());
+    }
   }
   if (cardTypeMatches.size > 0) {
     return { kind: "cardTypeRestricted", excludedTypes: [...cardTypeMatches] };

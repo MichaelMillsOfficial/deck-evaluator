@@ -217,6 +217,18 @@ test.describe("generateTags — Asymmetric Wipe", () => {
     expect(tags).toContain("Asymmetric Wipe");
   });
 
+  test("Scourglass (except for artifacts and lands) → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Scourglass",
+      typeLine: "Artifact",
+      oracleText:
+        "{T}, Sacrifice Scourglass: Destroy all permanents except for artifacts and lands. Activate only during your upkeep.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
   test("Hour of Reckoning (nontoken) → Board Wipe but NOT Asymmetric Wipe", () => {
     // 'nontoken' sweeps *token* creatures — this wipe KILLS token strategies, not spares them.
     // Regression guard: must not be lumped into cardTypeRestricted exemption.

@@ -1323,6 +1323,57 @@ test.describe("board wipe anti-synergy — asymmetric exemption", () => {
     expect(pair).toBeUndefined();
   });
 
+  test("Scourglass + Thopter Spy Network (artifact tokens spared) → no anti-synergy pair", () => {
+    // Scourglass destroys all permanents except artifacts and lands. Artifact creature
+    // tokens (Thopters) survive, so the pair is exempt.
+    const cards: Record<string, EnrichedCard> = {
+      Scourglass: mockCard({
+        name: "Scourglass",
+        typeLine: "Artifact",
+        oracleText:
+          "{T}, Sacrifice Scourglass: Destroy all permanents except for artifacts and lands. Activate only during your upkeep.",
+      }),
+      "Thopter Spy Network": mockCard({
+        name: "Thopter Spy Network",
+        typeLine: "Enchantment",
+        oracleText:
+          "At the beginning of combat on your turn, if you controlled an artifact this turn, create a 1/1 colorless Thopter artifact creature token with flying.",
+      }),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Scourglass") &&
+        p.cards.includes("Thopter Spy Network")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Scourglass + Bitterblossom (Faerie tokens die) → anti-synergy pair present", () => {
+    const cards: Record<string, EnrichedCard> = {
+      Scourglass: mockCard({
+        name: "Scourglass",
+        typeLine: "Artifact",
+        oracleText:
+          "{T}, Sacrifice Scourglass: Destroy all permanents except for artifacts and lands. Activate only during your upkeep.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Scourglass") &&
+        p.cards.includes("Bitterblossom")
+    );
+    expect(pair).toBeDefined();
+  });
+
   test("Organic Extinction + mixed token producers → exempt vs Thopter, pair vs Bitterblossom", () => {
     // Per-pair exemption: one producer in the same deck can be exempt while another
     // producing non-artifact tokens still triggers the penalty.
