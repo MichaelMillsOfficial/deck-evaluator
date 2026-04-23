@@ -194,6 +194,40 @@ test.describe("generateTags — Asymmetric Wipe", () => {
     expect(tags).not.toContain("Asymmetric Wipe");
   });
 
+  test("Organic Extinction (nonartifact creatures) → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Organic Extinction",
+      typeLine: "Sorcery",
+      oracleText:
+        "Improvise (Your artifacts can help cast this spell. Each artifact you tap after you're done activating mana abilities pays for {1}.)\nDestroy all nonartifact creatures.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("hypothetical nonlegendary wipe → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Hypothetical Legendary Purge",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all nonlegendary creatures.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("symmetric artifact destruction (Shatterstorm) → Board Wipe but NOT Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Shatterstorm",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all artifacts. They can't be regenerated.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+
   test("symmetric -N/-N wipe (e.g. Black Sun's Zenith) → Board Wipe but NOT Asymmetric Wipe", () => {
     const card = makeCard({
       name: "Black Sun's Zenith",

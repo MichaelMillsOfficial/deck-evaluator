@@ -1188,4 +1188,60 @@ test.describe("board wipe anti-synergy — asymmetric exemption", () => {
     );
     expect(pair).toBeDefined();
   });
+
+  function artifactCreature(name: string) {
+    return mockCard({
+      name,
+      typeLine: "Artifact Creature — Construct",
+      subtypes: ["Construct"],
+      oracleText: "",
+    });
+  }
+
+  test("Organic Extinction in artifact-heavy deck → no anti-synergy pair", () => {
+    const artifacts: Record<string, EnrichedCard> = {};
+    for (let i = 0; i < 12; i++) {
+      artifacts[`Construct ${i}`] = artifactCreature(`Construct ${i}`);
+    }
+    const cards: Record<string, EnrichedCard> = {
+      ...artifacts,
+      "Organic Extinction": mockCard({
+        name: "Organic Extinction",
+        typeLine: "Sorcery",
+        oracleText:
+          "Improvise\nDestroy all nonartifact creatures.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Organic Extinction in non-artifact deck → anti-synergy pair present", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Organic Extinction": mockCard({
+        name: "Organic Extinction",
+        typeLine: "Sorcery",
+        oracleText:
+          "Improvise\nDestroy all nonartifact creatures.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction")
+    );
+    expect(pair).toBeDefined();
+  });
 });

@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import { SYNERGY_AXES, extractReferencedKeywords } from "./synergy-axes";
 import { findCombosInDeck } from "./known-combos";
+import type { AsymmetricWipeClassification } from "./card-tags";
 import { getTagsCached, classifyAsymmetricWipe } from "./card-tags";
 import {
   identifyTribalAnchors,
@@ -216,12 +217,59 @@ function getCardAxisIntent(
   return undefined;
 }
 
+/** Count deck cards whose type line includes the given MTG type token (case-insensitive, word-boundary). */
+function countCardsByType(
+  cardNames: string[],
+  cardMap: Record<string, EnrichedCard>,
+  typeName: string
+): number {
+  const re = new RegExp(`\\b${typeName}\\b`, "i");
+  let count = 0;
+  for (const name of cardNames) {
+    const card = cardMap[name];
+    if (card && re.test(card.typeLine)) count++;
+  }
+  return count;
+}
+
+// Thresholds for treating a deck as "themed" around a spared card type. A nonartifact wipe
+// (Organic Extinction) is asymmetric when the caster is playing ≥10 artifacts; same bar for
+// enchantments; planeswalkers use a lower bar since superfriends decks run fewer walkers.
+const CARD_TYPE_THEME_THRESHOLD: Record<string, number> = {
+  artifact: 10,
+  enchantment: 10,
+  planeswalker: 4,
+};
+
+/** Whether the deck aligns with any of the spared categories of a cardTypeRestricted wipe. */
+function deckMatchesSparedCardType(
+  excludedTypes: string[],
+  cardNames: string[],
+  cardMap: Record<string, EnrichedCard>,
+  supertypeAnchors: string[]
+): boolean {
+  for (const type of excludedTypes) {
+    // Supertypes ("legendary", "snow", "basic") route through the existing supertype anchor detector.
+    if (type === "legendary" || type === "snow" || type === "basic") {
+      if (supertypeAnchors.includes(type)) return true;
+      continue;
+    }
+    // Card types (artifact, enchantment, planeswalker) — count cards by type line.
+    const threshold = CARD_TYPE_THEME_THRESHOLD[type];
+    if (threshold === undefined) continue;
+    const typeTitle = type[0].toUpperCase() + type.slice(1);
+    if (countCardsByType(cardNames, cardMap, typeTitle) >= threshold) return true;
+  }
+  return false;
+}
+
 /** Generate anti-synergy pairs between cards on conflicting axes */
 function generateAntiSynergyPairs(
   cardNames: string[],
   axisScores: Map<string, CardAxisScore[]>,
   cardMap: Record<string, EnrichedCard>,
   tribalAnchorTypes: Set<string>,
+  supertypeAnchors: string[],
   tagCache?: Map<string, string[]>
 ): SynergyPair[] {
   const pairs: SynergyPair[] = [];
@@ -271,11 +319,13 @@ function generateAntiSynergyPairs(
   // Asymmetric (one-sided) wipes are exempt according to their sub-classification:
   //   - opponentSided (In Garruk's Wake): always exempt.
   //   - chosenType (Kindred Dominance): exempt when the deck has any tribal anchor to name.
-  //   - specificType ("non-Elf" wipes): exempt when the referenced type matches a deck anchor.
+  //   - specificType ("non-Elf" wipes): exempt when the referenced subtype matches a deck anchor.
+  //   - cardTypeRestricted ("nonartifact", "nonlegendary"): exempt when the deck is themed
+  //     around the spared card type / supertype (Organic Extinction in an artifact deck, etc.).
   const tokenCardNames: string[] = [];
   type WipeInfo = {
     name: string;
-    kind: ReturnType<typeof classifyAsymmetricWipe>;
+    classification: AsymmetricWipeClassification | null;
     referencedTypes: string[];
   };
   const boardWipes: WipeInfo[] = [];
@@ -285,12 +335,14 @@ function generateAntiSynergyPairs(
     if (!card) continue;
     const tags = getTagsCached(card, tagCache);
     if (tags.includes("Board Wipe")) {
-      const kind = tags.includes("Asymmetric Wipe")
+      const classification = tags.includes("Asymmetric Wipe")
         ? classifyAsymmetricWipe(card.oracleText)
         : null;
       const referencedTypes =
-        kind === "specificType" ? extractReferencedTypes(card.oracleText) : [];
-      boardWipes.push({ name, kind, referencedTypes });
+        classification?.kind === "specificType"
+          ? extractReferencedTypes(card.oracleText)
+          : [];
+      boardWipes.push({ name, classification, referencedTypes });
     }
     const tokenAxes = axisScores.get(name) ?? [];
     if (tokenAxes.some((a) => a.axisId === "tokens" && a.relevance >= AXIS_RELEVANCE_THRESHOLD)) {
@@ -299,14 +351,22 @@ function generateAntiSynergyPairs(
   }
 
   for (const wipe of boardWipes) {
+    const c = wipe.classification;
     // Opponent-sided wipes are always exempt (favor the caster regardless of deck).
-    if (wipe.kind === "opponentSided") continue;
+    if (c?.kind === "opponentSided") continue;
     // Chosen-type wipes are exempt whenever the deck has any tribal anchor the caster can name.
-    if (wipe.kind === "chosenType" && tribalAnchorTypes.size > 0) continue;
-    // Specific-type wipes ("non-Elf") are exempt only if the named type matches an anchor.
+    if (c?.kind === "chosenType" && tribalAnchorTypes.size > 0) continue;
+    // Specific-type wipes ("non-Elf") are exempt only if the named subtype matches an anchor.
     if (
-      wipe.kind === "specificType" &&
+      c?.kind === "specificType" &&
       wipe.referencedTypes.some((t) => tribalAnchorTypes.has(t))
+    ) {
+      continue;
+    }
+    // Card-type-restricted wipes are exempt when the deck's composition aligns with the spared category.
+    if (
+      c?.kind === "cardTypeRestricted" &&
+      deckMatchesSparedCardType(c.excludedTypes, cardNames, cardMap, supertypeAnchors)
     ) {
       continue;
     }
@@ -735,12 +795,13 @@ export function analyzeDeckSynergy(
   const tribalAnchors = identifyTribalAnchors(commanders, cardNames, cardMap);
   const tribalAnchorTypes = new Set(tribalAnchors);
 
-  // Step 5b: Generate anti-synergy pairs (asymmetric wipes exempt when they protect the tribal theme)
+  // Step 5b: Generate anti-synergy pairs (asymmetric wipes exempt when they protect the deck's theme)
   const antiSynergyPairs = generateAntiSynergyPairs(
     cardNames,
     axisScores,
     cardMap,
     tribalAnchorTypes,
+    supertypeAnchors,
     tagCache
   );
 

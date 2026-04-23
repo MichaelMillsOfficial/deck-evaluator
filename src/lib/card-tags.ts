@@ -71,30 +71,64 @@ const ASYMMETRIC_OPPONENT_RE =
 const ASYMMETRIC_CHOSEN_TYPE_RE = /\bthat aren't of the chosen (?:type|creature type)\b/i;
 // Tribal: "that don't share a creature type with" (Patriarch's Bidding-style)
 const ASYMMETRIC_SHARED_TYPE_RE = /\bthat don't share a (?:creature )?type with\b/i;
+// "non-<cardtype-or-supertype>" — broad exclusion patterns like "nonartifact creatures"
+// (Organic Extinction), "nonlegendary creatures", etc. Card types and supertypes only;
+// creature subtypes are handled by NON_TYPE_RE from creature-types.
+const ASYMMETRIC_NON_CARDTYPE_RE =
+  /\bnon-?(artifact|enchantment|planeswalker|legendary|snow|basic)\b/gi;
 // Note: NON_TYPE_RE (imported from creature-types) catches "non-Elf creatures" etc.
-// It has the /g flag; callers must reset lastIndex before .test().
+// Both NON_TYPE_RE and ASYMMETRIC_NON_CARDTYPE_RE have /g flag — reset lastIndex before use.
 
 /**
  * Sub-classification of an asymmetric wipe so callers can decide exemption context:
  * - `opponentSided`: always one-sided regardless of deck (In Garruk's Wake, Plague Wind).
  * - `chosenType`: references a creature type chosen at resolution (Kindred Dominance); asymmetric
  *   only when the deck has any tribal anchor the caster can name.
- * - `specificType`: references a fixed creature type (e.g. "non-Elf"); asymmetric only when that
- *   type matches a deck anchor (caller uses `extractReferencedTypes` to get the type names).
+ * - `specificType`: references a fixed creature subtype (e.g. "non-Elf"); asymmetric only when
+ *   that subtype matches a deck anchor. `excludedTypes` is empty because creature subtypes are
+ *   recovered by callers via `extractReferencedTypes`.
+ * - `cardTypeRestricted`: spares a card type or supertype (e.g. "nonartifact", "nonlegendary");
+ *   `excludedTypes` holds the lowercased spared names (e.g. `["artifact"]`). Asymmetric only
+ *   when the deck's composition aligns with the spared category.
  * Returns `null` for wipes that have no asymmetric pattern.
  */
-export type AsymmetricWipeKind = "opponentSided" | "chosenType" | "specificType";
+export type AsymmetricWipeKind =
+  | "opponentSided"
+  | "chosenType"
+  | "specificType"
+  | "cardTypeRestricted";
 
-export function classifyAsymmetricWipe(oracleText: string): AsymmetricWipeKind | null {
-  if (ASYMMETRIC_OPPONENT_RE.test(oracleText)) return "opponentSided";
+export interface AsymmetricWipeClassification {
+  kind: AsymmetricWipeKind;
+  excludedTypes: string[];
+}
+
+export function classifyAsymmetricWipe(
+  oracleText: string
+): AsymmetricWipeClassification | null {
+  if (ASYMMETRIC_OPPONENT_RE.test(oracleText)) {
+    return { kind: "opponentSided", excludedTypes: [] };
+  }
   if (
     ASYMMETRIC_CHOSEN_TYPE_RE.test(oracleText) ||
     ASYMMETRIC_SHARED_TYPE_RE.test(oracleText)
   ) {
-    return "chosenType";
+    return { kind: "chosenType", excludedTypes: [] };
+  }
+  // Collect all non-<cardtype> matches (a single wipe could reference multiple).
+  ASYMMETRIC_NON_CARDTYPE_RE.lastIndex = 0;
+  const cardTypeMatches = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = ASYMMETRIC_NON_CARDTYPE_RE.exec(oracleText)) !== null) {
+    cardTypeMatches.add(m[1].toLowerCase());
+  }
+  if (cardTypeMatches.size > 0) {
+    return { kind: "cardTypeRestricted", excludedTypes: [...cardTypeMatches] };
   }
   NON_TYPE_RE.lastIndex = 0;
-  if (NON_TYPE_RE.test(oracleText)) return "specificType";
+  if (NON_TYPE_RE.test(oracleText)) {
+    return { kind: "specificType", excludedTypes: [] };
+  }
   return null;
 }
 const COUNTER_RE = /\bcounter target\b.+?\bspell\b/i;
