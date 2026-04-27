@@ -113,6 +113,182 @@ test.describe("generateTags — Board Wipe", () => {
   });
 });
 
+test.describe("generateTags — Asymmetric Wipe", () => {
+  test("Kindred Dominance (chosen-type exclusion) → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Kindred Dominance",
+      typeLine: "Kindred Sorcery",
+      oracleText:
+        "Choose a creature type. Destroy all creatures that aren't of the chosen type.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("In Garruk's Wake (you don't control) → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "In Garruk's Wake",
+      typeLine: "Sorcery",
+      oracleText:
+        "Destroy all creatures you don't control and all planeswalkers you don't control.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("Plague Wind (you don't control) → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Plague Wind",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all creatures you don't control. They can't be regenerated.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("non-creature-type wipe → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Hypothetical Elf Purge",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all non-Elf creatures.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("Cyclonic Rift overload (opponents control) → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Cyclonic Rift",
+      typeLine: "Instant",
+      oracleText:
+        "Return target nonland permanent you don't control to its owner's hand.\nOverload {6}{U} (You may cast this spell for its overload cost. If you do, change its text by replacing all instances of \"target\" with \"each.\")\nReturn all nonland permanents your opponents control to their owners' hands.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("Wrath of God → Board Wipe but NOT Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Wrath of God",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all creatures. They can't be regenerated.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+
+  test("Damnation → Board Wipe but NOT Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Damnation",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all creatures. They can't be regenerated.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+
+  test("Organic Extinction (nonartifact creatures) → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Organic Extinction",
+      typeLine: "Sorcery",
+      oracleText:
+        "Improvise (Your artifacts can help cast this spell. Each artifact you tap after you're done activating mana abilities pays for {1}.)\nDestroy all nonartifact creatures.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("hypothetical nonlegendary wipe → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Hypothetical Legendary Purge",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all nonlegendary creatures.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("Scourglass (except for artifacts and lands) → Board Wipe + Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Scourglass",
+      typeLine: "Artifact",
+      oracleText:
+        "{T}, Sacrifice Scourglass: Destroy all permanents except for artifacts and lands. Activate only during your upkeep.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).toContain("Asymmetric Wipe");
+  });
+
+  test("Hour of Reckoning (nontoken) → Board Wipe but NOT Asymmetric Wipe", () => {
+    // 'nontoken' sweeps *token* creatures — this wipe KILLS token strategies, not spares them.
+    // Regression guard: must not be lumped into cardTypeRestricted exemption.
+    const card = makeCard({
+      name: "Hour of Reckoning",
+      typeLine: "Sorcery",
+      oracleText: "Convoke (Your creatures can help cast this spell.)\nDestroy all nontoken creatures.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+
+  test("modal card with single-target 'you don't control' + symmetric wipe → not Asymmetric Wipe", () => {
+    // False-positive regression: a card with "target creature you don't control" in a non-wipe
+    // clause alongside a symmetric "destroy all creatures" must not be tagged asymmetric.
+    const card = makeCard({
+      name: "Hypothetical Modal Wipe",
+      typeLine: "Sorcery",
+      oracleText:
+        "Choose one —\n• Destroy target creature you don't control.\n• Destroy all creatures.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+
+  test("symmetric artifact destruction (Shatterstorm) → Board Wipe but NOT Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Shatterstorm",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all artifacts. They can't be regenerated.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+
+  test("symmetric -N/-N wipe (e.g. Black Sun's Zenith) → Board Wipe but NOT Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Black Sun's Zenith",
+      typeLine: "Sorcery",
+      oracleText: "All creatures get -3/-3 until end of turn.",
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Board Wipe");
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+
+  test("non-Board-Wipe reference to 'non-Elf' → no Asymmetric Wipe", () => {
+    const card = makeCard({
+      name: "Hypothetical Lord",
+      typeLine: "Creature",
+      oracleText: "Non-Elf creatures you control get +1/+0.",
+    });
+    const tags = generateTags(card);
+    expect(tags).not.toContain("Asymmetric Wipe");
+  });
+});
+
 test.describe("generateTags — Counterspell", () => {
   test("'Counter target spell.' → Counterspell", () => {
     const card = makeCard({ oracleText: "Counter target spell." });
@@ -1966,5 +2142,153 @@ test.describe("generateTags — Discard negative cases", () => {
     expect(tags).not.toContain("Mass Discard");
     expect(tags).not.toContain("Self-Discard");
     expect(tags).not.toContain("Discard Payoff");
+  });
+});
+
+test.describe("generateTags — Secrets of Strixhaven mechanics", () => {
+  test("Lesson subtype → Lesson tag", () => {
+    const card = makeCard({
+      name: "Decorum Dissertation",
+      typeLine: "Sorcery — Lesson",
+      subtypes: ["Lesson"],
+      oracleText: "Target player draws two cards and loses 2 life.",
+    });
+    expect(generateTags(card)).toContain("Lesson");
+  });
+
+  test("Paradigm keyword → Paradigm tag", () => {
+    const card = makeCard({
+      name: "Restoration Seminar",
+      typeLine: "Sorcery — Lesson",
+      subtypes: ["Lesson"],
+      oracleText:
+        "Return target nonland permanent card from your graveyard to the battlefield.\nParadigm (Then exile this spell. After you first resolve a spell with this name, you may cast a copy of it from exile without paying its mana cost at the beginning of each of your first main phases.)",
+      keywords: ["Paradigm"],
+    });
+    const tags = generateTags(card);
+    expect(tags).toContain("Paradigm");
+    expect(tags).toContain("Lesson");
+  });
+
+  test("Paradigm via oracle text only (no keyword) → Paradigm tag", () => {
+    const card = makeCard({
+      typeLine: "Sorcery",
+      oracleText: "Draw two cards.\nParadigm (...)",
+    });
+    expect(generateTags(card)).toContain("Paradigm");
+  });
+
+  test("Opus ability word → Opus tag", () => {
+    const card = makeCard({
+      name: "Expressive Firedancer",
+      typeLine: "Creature — Human Wizard",
+      oracleText:
+        "Opus — Whenever you cast an instant or sorcery spell, this creature gets +1/+1 until end of turn. If five or more mana was spent to cast that spell, this creature also gains double strike until end of turn.",
+      keywords: ["Opus"],
+    });
+    expect(generateTags(card)).toContain("Opus");
+  });
+
+  test("Opus via em-dash without keyword array → Opus tag", () => {
+    const card = makeCard({
+      typeLine: "Creature",
+      oracleText: "Opus — Whenever you cast an instant or sorcery spell, draw a card.",
+    });
+    expect(generateTags(card)).toContain("Opus");
+  });
+
+  test("Repartee ability word → Repartee tag", () => {
+    const card = makeCard({
+      name: "Silverquill Duelist",
+      typeLine: "Creature — Human Wizard",
+      oracleText:
+        "Repartee — Whenever you cast an instant or sorcery spell that targets a creature, put a +1/+1 counter on this creature.",
+      keywords: ["Repartee"],
+    });
+    expect(generateTags(card)).toContain("Repartee");
+  });
+
+  test("Infusion ability word → Infusion tag", () => {
+    const card = makeCard({
+      name: "Old-Growth Educator",
+      typeLine: "Creature — Treefolk Druid",
+      oracleText:
+        "Infusion — When this creature enters, put two +1/+1 counters on it if you gained life this turn.",
+      keywords: ["Infusion"],
+    });
+    expect(generateTags(card)).toContain("Infusion");
+  });
+
+  test("Increment keyword → Increment tag", () => {
+    const card = makeCard({
+      name: "Ambitious Augmenter",
+      typeLine: "Creature — Fractal",
+      oracleText:
+        "Increment (Whenever you cast a spell, if the amount of mana you spent is greater than this creature's power or toughness, put a +1/+1 counter on this creature.)",
+      keywords: ["Increment"],
+    });
+    expect(generateTags(card)).toContain("Increment");
+  });
+
+  test("Prepare two-frame card → Prepare tag", () => {
+    const card = makeCard({
+      name: "Diligent Apprentice",
+      typeLine: "Creature — Human Student",
+      oracleText:
+        "When this creature enters, it becomes prepared.\nWhile this creature is prepared, you may cast a copy of its prepare spell from exile.",
+    });
+    expect(generateTags(card)).toContain("Prepare");
+  });
+
+  test("Book artifact subtype → Book tag", () => {
+    const card = makeCard({
+      name: "Codex of Forgotten Lore",
+      typeLine: "Artifact — Book",
+      subtypes: ["Book"],
+      oracleText: "{2}, {T}: Draw a card.",
+    });
+    expect(generateTags(card)).toContain("Book");
+  });
+
+  test("Converge keyword → Converge tag", () => {
+    const card = makeCard({
+      name: "Strixhaven Convergence",
+      typeLine: "Sorcery",
+      oracleText:
+        "Converge — Draw X cards, where X is the number of colors of mana spent to cast this spell.",
+      keywords: ["Converge"],
+    });
+    expect(generateTags(card)).toContain("Converge");
+  });
+
+  test("vanilla creature → no SOS tags", () => {
+    const card = makeCard({
+      name: "Grizzly Bears",
+      typeLine: "Creature — Bear",
+      oracleText: "",
+    });
+    const tags = generateTags(card);
+    expect(tags).not.toContain("Lesson");
+    expect(tags).not.toContain("Paradigm");
+    expect(tags).not.toContain("Opus");
+    expect(tags).not.toContain("Repartee");
+    expect(tags).not.toContain("Infusion");
+    expect(tags).not.toContain("Increment");
+    expect(tags).not.toContain("Prepare");
+    expect(tags).not.toContain("Book");
+    expect(tags).not.toContain("Converge");
+  });
+
+  test("Lightning Bolt (instant, no SOS keyword) → no SOS tags", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    const tags = generateTags(card);
+    expect(tags).not.toContain("Opus");
+    expect(tags).not.toContain("Repartee");
+    expect(tags).not.toContain("Infusion");
+    expect(tags).not.toContain("Increment");
   });
 });

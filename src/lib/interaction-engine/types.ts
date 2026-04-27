@@ -30,6 +30,17 @@ export type {
 } from "./game-model";
 
 // ═══════════════════════════════════════════════════════════════════
+// PARTNER TYPE — Command zone partner variants
+// ═══════════════════════════════════════════════════════════════════
+
+export type PartnerType =
+  | "generic"
+  | "named"
+  | "friends_forever"
+  | "choose_background"
+  | "doctors_companion";
+
+// ═══════════════════════════════════════════════════════════════════
 // EVENTS — Primitive event types built from zone transitions and
 // state changes. All higher-level game events derive from these.
 // ═══════════════════════════════════════════════════════════════════
@@ -916,6 +927,8 @@ export interface CardProfile {
     hasBackground?: boolean;
     eminence?: AbilityNode[];
     companionRestriction?: string;
+    partnerWith?: string;
+    partnerType?: PartnerType;
   };
 }
 

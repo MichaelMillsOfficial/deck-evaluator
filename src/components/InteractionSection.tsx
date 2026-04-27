@@ -13,7 +13,7 @@ import type {
 } from "@/lib/interaction-engine";
 import { analyzeSatisfiability } from "@/lib/interaction-engine/satisfiability-analyzer";
 import type { AnalysisStep } from "@/hooks/useInteractionAnalysis";
-import { useEffect, useMemo, useState, Component, type ReactNode } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense, Component, type ReactNode } from "react";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import CentralityRanking from "@/components/CentralityRanking";
 import RemovalImpactFloatingPanel from "@/components/RemovalImpactFloatingPanel";
@@ -27,6 +27,10 @@ import {
 import { computeCentrality } from "@/lib/interaction-centrality";
 import { computeAllRemovalImpacts } from "@/lib/interaction-removal-impact";
 import { extractCitations } from "@/lib/interaction-citations";
+
+// ─── Lazy-loaded visualisation components (d3-force not in initial bundle) ────
+const InteractionGraph = lazy(() => import("@/components/InteractionGraph"));
+const InteractionHeatmap = lazy(() => import("@/components/InteractionHeatmap"));
 
 const PAGE_SIZE = 20;
 
@@ -93,6 +97,7 @@ const INTERACTION_GROUP_COLORS: Record<InteractionType, string> = {
 };
 
 type GroupMode = "type" | "card" | "strength";
+type ViewMode = "list" | "graph" | "heatmap";
 
 function strengthPercent(strength: number): number {
   return Math.round(strength * 100);
@@ -305,6 +310,14 @@ function InteractionItem({
   const badgeColors =
     INTERACTION_TYPE_COLORS[interaction.type] ?? "bg-slate-600/60 text-slate-100";
 
+  // Detect command zone interactions (eminence)
+  const isCommandZoneInteraction = profiles != null && interaction.cards.some(
+    (cardName) => {
+      const profile = profiles[cardName];
+      return profile?.commander?.eminence != null && profile.commander.eminence.length > 0;
+    }
+  );
+
   return (
     <div
       data-testid={`interaction-${type}-${index}`}
@@ -320,6 +333,14 @@ function InteractionItem({
           </span>
           {conditions.length > 0 && (
             <ConditionBadge conditions={conditions} />
+          )}
+          {isCommandZoneInteraction && (
+            <span
+              data-testid="command-zone-badge"
+              className="inline-flex items-center rounded-full border border-amber-700/50 bg-amber-900/40 px-1.5 py-0.5 text-[9px] font-medium text-amber-300"
+            >
+              Command Zone
+            </span>
           )}
         </div>
         <StrengthBar strength={interaction.strength} />
@@ -1084,6 +1105,8 @@ function FilterControls({
   onMinStrength,
   groupMode,
   onGroupMode,
+  viewMode,
+  onViewMode,
 }: {
   interactions: Interaction[];
   activeTypes: Set<InteractionType>;
@@ -1094,6 +1117,8 @@ function FilterControls({
   onMinStrength: (s: number) => void;
   groupMode: GroupMode;
   onGroupMode: (m: GroupMode) => void;
+  viewMode: ViewMode;
+  onViewMode: (m: ViewMode) => void;
 }) {
   // Count by type for badges
   const typeCounts = useMemo(() => {
@@ -1212,23 +1237,46 @@ function FilterControls({
         </div>
       </div>
 
-      {/* Grouping toggle */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-slate-500">Group by:</span>
-        {(["type", "card", "strength"] as GroupMode[]).map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => onGroupMode(mode)}
-            className={`rounded-md border px-2.5 py-1 text-xs transition-colors cursor-pointer ${
-              groupMode === mode
-                ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
-                : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
-            }`}
-          >
-            {mode === "type" ? "Type" : mode === "card" ? "Card" : "Strength"}
-          </button>
-        ))}
+      {/* Grouping toggle + View mode toggle on the same row */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {/* Group-by (only relevant in list mode) */}
+        <div className={`flex items-center gap-1.5 transition-opacity ${viewMode !== "list" ? "opacity-40 pointer-events-none" : ""}`}>
+          <span className="text-xs text-slate-500">Group by:</span>
+          {(["type", "card", "strength"] as GroupMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => onGroupMode(mode)}
+              aria-pressed={groupMode === mode}
+              className={`rounded-md border px-2.5 py-1 text-xs transition-colors cursor-pointer ${
+                groupMode === mode
+                  ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
+                  : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
+              }`}
+            >
+              {mode === "type" ? "Type" : mode === "card" ? "Card" : "Strength"}
+            </button>
+          ))}
+        </div>
+
+        {/* View mode: List | Graph | Heatmap */}
+        <div className="flex items-center gap-1" role="group" aria-label="View mode">
+          {(["list", "graph", "heatmap"] as ViewMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => onViewMode(mode)}
+              aria-pressed={viewMode === mode}
+              className={`rounded-md border px-2.5 py-1 text-xs transition-colors cursor-pointer ${
+                viewMode === mode
+                  ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
+                  : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
+              }`}
+            >
+              {mode === "list" ? "List" : mode === "graph" ? "Graph" : "Heatmap"}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -1377,6 +1425,7 @@ function InteractionSectionInner({
   const [cardSearch, setCardSearch] = useState("");
   const [minStrength, setMinStrength] = useState(0);
   const [groupMode, setGroupMode] = useState<GroupMode>("type");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   // Centrality + removal impact state
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
@@ -1523,6 +1572,8 @@ function InteractionSectionInner({
             onMinStrength={setMinStrength}
             groupMode={groupMode}
             onGroupMode={setGroupMode}
+            viewMode={viewMode}
+            onViewMode={setViewMode}
           />
 
           {/* Filter active summary */}
@@ -1546,8 +1597,8 @@ function InteractionSectionInner({
           )}
 
           {/* Sections */}
-          <div className="space-y-3">
-            {/* Card Centrality & Removal Impact */}
+          <div className="space-y-3 min-w-0">
+            {/* Card Centrality & Removal Impact — always shown regardless of view mode */}
             {centralityResult && centralityResult.scores.length > 0 && (
               <CollapsiblePanel
                 id="ie-centrality"
@@ -1565,6 +1616,7 @@ function InteractionSectionInner({
                     scores={centralityResult.scores}
                     selectedCard={selectedCard}
                     onSelectCard={setSelectedCard}
+                    profiles={analysis.profiles}
                   />
                 </div>
               </CollapsiblePanel>
@@ -1576,167 +1628,219 @@ function InteractionSectionInner({
               onClose={() => setSelectedCard(null)}
             />
 
-            {/* Loops first if any exist */}
-            {analysis.loops.length > 0 && (
-              <CollapsiblePanel
-                id="ie-loops"
-                title="Loops"
-                summary={`${analysis.loops.length} detected${analysis.loops.filter((l) => l.isInfinite).length > 0 ? ` (${analysis.loops.filter((l) => l.isInfinite).length} infinite)` : ""}`}
-                expanded={expandedSections.has("ie-loops")}
-                onToggle={() => onToggleSection("ie-loops")}
-              >
-                <div className="space-y-2">
-                  {analysis.loops.map((loop, i) => (
-                    <LoopItem key={loop.cards.join("-")} loop={loop} index={i} />
-                  ))}
-                </div>
-              </CollapsiblePanel>
-            )}
-
-            {/* Enablers */}
-            {analysis.enablers.length > 0 && (
-              <CollapsiblePanel
-                id="ie-enablers"
-                title="Key Enablers"
-                summary={`${analysis.enablers.length} cards`}
-                expanded={expandedSections.has("ie-enablers")}
-                onToggle={() => onToggleSection("ie-enablers")}
-              >
-                <div className="space-y-2">
-                  {analysis.enablers.slice(0, enablerPage).map((enabler, i) => (
-                    <EnablerItem key={enabler.enabler} enabler={enabler} index={i} />
-                  ))}
-                  <ShowMoreButton
-                    shown={Math.min(enablerPage, analysis.enablers.length)}
-                    total={analysis.enablers.length}
-                    onShowMore={() => setEnablerPage((p) => p + PAGE_SIZE)}
-                  />
-                </div>
-              </CollapsiblePanel>
-            )}
-
-            {/* Interactions (filtered + grouped) */}
-            <CollapsiblePanel
-              id="ie-interactions"
-              title="Interactions"
-              summary={
-                hasActiveFilters
-                  ? `${filteredInteractions.length} of ${totalCount}`
-                  : `${totalCount} detected`
-              }
-              expanded={expandedSections.has("ie-interactions")}
-              onToggle={() => onToggleSection("ie-interactions")}
-            >
-              {filteredInteractions.length === 0 ? (
-                <EmptyState
-                  message={
-                    hasActiveFilters
-                      ? "No interactions match the current filters."
-                      : "No mechanical interactions detected."
+            {/* ─── Graph view ──────────────────────────────────────────────── */}
+            {viewMode === "graph" && (
+              <div data-testid="interaction-graph-view">
+                <Suspense
+                  fallback={
+                    <div
+                      aria-live="polite"
+                      className="flex items-center justify-center rounded-lg border border-slate-700 bg-slate-800/30 text-xs text-slate-500"
+                      style={{ height: 680 }}
+                    >
+                      <span className="animate-pulse">Loading graph…</span>
+                    </div>
                   }
-                />
-              ) : (
-                <div className="space-y-4">
-                  {groups.map((group) => {
-                    const limit = getGroupLimit(group.id);
-                    const visible = group.displayItems.slice(0, limit);
-                    return (
-                      <div key={group.id}>
-                        <h4
-                          className={`mb-2 text-[10px] font-bold uppercase tracking-widest ${group.accentColor}`}
-                        >
-                          {group.label}{" "}
-                          <span className="text-slate-500 font-normal">
-                            ({group.interactions.length})
-                          </span>
-                        </h4>
-                        <div className="space-y-2">
-                          {visible.map((item, i) =>
-                            item.kind === "rollup" ? (
-                              <RolledUpInteractionItem
-                                key={`rollup-${item.anchorCard}-${item.type}-${i}`}
-                                group={item}
-                                index={i}
-                                type={group.id}
-                              />
-                            ) : (
-                              <InteractionItem
-                                key={`${item.interaction.cards[0]}-${item.interaction.cards[1]}-${item.interaction.type}`}
-                                interaction={item.interaction}
-                                index={i}
-                                type={group.id}
-                                profiles={analysis?.profiles}
-                              />
-                            )
-                          )}
-                          <ShowMoreButton
-                            shown={visible.length}
-                            total={group.displayItems.length}
-                            onShowMore={() => showMoreGroup(group.id)}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CollapsiblePanel>
-
-            {/* Chains */}
-            {analysis.chains.length > 0 && (
-              <CollapsiblePanel
-                id="ie-chains"
-                title="Chains"
-                summary={`${analysis.chains.length} detected`}
-                expanded={expandedSections.has("ie-chains")}
-                onToggle={() => onToggleSection("ie-chains")}
-              >
-                <div className="space-y-2">
-                  {analysis.chains.slice(0, chainPage).map((chain, i) => (
-                    <ChainItem key={chain.cards.join("-")} chain={chain} index={i} />
-                  ))}
-                  <ShowMoreButton
-                    shown={Math.min(chainPage, analysis.chains.length)}
-                    total={analysis.chains.length}
-                    onShowMore={() => setChainPage((p) => p + PAGE_SIZE)}
+                >
+                  <InteractionGraph
+                    analysis={analysis}
+                    centrality={centralityResult ?? { scores: [], maxScore: 0, medianScore: 0 }}
+                    selectedTypes={activeTypes.size > 0 ? activeTypes : undefined}
+                    cardSearch={cardSearch}
                   />
-                </div>
-              </CollapsiblePanel>
+                </Suspense>
+              </div>
             )}
 
-            {/* Blockers */}
-            {analysis.blockers.length > 0 && (
-              <CollapsiblePanel
-                id="ie-blockers"
-                title="Blockers"
-                summary={`${analysis.blockers.length} detected`}
-                expanded={expandedSections.has("ie-blockers")}
-                onToggle={() => onToggleSection("ie-blockers")}
-              >
-                <div className="space-y-2">
-                  {analysis.blockers.slice(0, blockerPage).map((blocker, i) => (
-                    <BlockerItem key={blocker.blocker} blocker={blocker} index={i} />
-                  ))}
-                  <ShowMoreButton
-                    shown={Math.min(blockerPage, analysis.blockers.length)}
-                    total={analysis.blockers.length}
-                    onShowMore={() => setBlockerPage((p) => p + PAGE_SIZE)}
+            {/* ─── Heatmap view ─────────────────────────────────────────────── */}
+            {viewMode === "heatmap" && (
+              <div data-testid="interaction-heatmap-view" className="w-full overflow-hidden">
+                <Suspense
+                  fallback={
+                    <div
+                      aria-live="polite"
+                      className="flex items-center justify-center rounded-lg border border-slate-700 bg-slate-800/30 py-16 text-xs text-slate-500"
+                    >
+                      <span className="animate-pulse">Loading heatmap…</span>
+                    </div>
+                  }
+                >
+                  <InteractionHeatmap
+                    analysis={analysis}
+                    centrality={centralityResult ?? { scores: [], maxScore: 0, medianScore: 0 }}
+                    selectedTypes={activeTypes.size > 0 ? activeTypes : undefined}
+                    cardSearch={cardSearch}
                   />
-                </div>
-              </CollapsiblePanel>
+                </Suspense>
+              </div>
             )}
 
-            {/* Loops empty state (shown as panel only when none exist) */}
-            {analysis.loops.length === 0 && (
-              <CollapsiblePanel
-                id="ie-loops"
-                title="Loops"
-                summary="0 detected"
-                expanded={expandedSections.has("ie-loops")}
-                onToggle={() => onToggleSection("ie-loops")}
-              >
-                <EmptyState message="No loops detected." />
-              </CollapsiblePanel>
+            {/* ─── List view (default) ─────────────────────────────────────── */}
+            {viewMode === "list" && (
+              <>
+                {/* Loops first if any exist */}
+                {analysis.loops.length > 0 && (
+                  <CollapsiblePanel
+                    id="ie-loops"
+                    title="Loops"
+                    summary={`${analysis.loops.length} detected${analysis.loops.filter((l) => l.isInfinite).length > 0 ? ` (${analysis.loops.filter((l) => l.isInfinite).length} infinite)` : ""}`}
+                    expanded={expandedSections.has("ie-loops")}
+                    onToggle={() => onToggleSection("ie-loops")}
+                  >
+                    <div className="space-y-2">
+                      {analysis.loops.map((loop, i) => (
+                        <LoopItem key={loop.cards.join("-")} loop={loop} index={i} />
+                      ))}
+                    </div>
+                  </CollapsiblePanel>
+                )}
+
+                {/* Enablers */}
+                {analysis.enablers.length > 0 && (
+                  <CollapsiblePanel
+                    id="ie-enablers"
+                    title="Key Enablers"
+                    summary={`${analysis.enablers.length} cards`}
+                    expanded={expandedSections.has("ie-enablers")}
+                    onToggle={() => onToggleSection("ie-enablers")}
+                  >
+                    <div className="space-y-2">
+                      {analysis.enablers.slice(0, enablerPage).map((enabler, i) => (
+                        <EnablerItem key={enabler.enabler} enabler={enabler} index={i} />
+                      ))}
+                      <ShowMoreButton
+                        shown={Math.min(enablerPage, analysis.enablers.length)}
+                        total={analysis.enablers.length}
+                        onShowMore={() => setEnablerPage((p) => p + PAGE_SIZE)}
+                      />
+                    </div>
+                  </CollapsiblePanel>
+                )}
+
+                {/* Interactions (filtered + grouped) */}
+                <CollapsiblePanel
+                  id="ie-interactions"
+                  title="Interactions"
+                  summary={
+                    hasActiveFilters
+                      ? `${filteredInteractions.length} of ${totalCount}`
+                      : `${totalCount} detected`
+                  }
+                  expanded={expandedSections.has("ie-interactions")}
+                  onToggle={() => onToggleSection("ie-interactions")}
+                >
+                  {filteredInteractions.length === 0 ? (
+                    <EmptyState
+                      message={
+                        hasActiveFilters
+                          ? "No interactions match the current filters."
+                          : "No mechanical interactions detected."
+                      }
+                    />
+                  ) : (
+                    <div className="space-y-4">
+                      {groups.map((group) => {
+                        const limit = getGroupLimit(group.id);
+                        const visible = group.displayItems.slice(0, limit);
+                        return (
+                          <div key={group.id}>
+                            <h4
+                              className={`mb-2 text-[10px] font-bold uppercase tracking-widest ${group.accentColor}`}
+                            >
+                              {group.label}{" "}
+                              <span className="text-slate-500 font-normal">
+                                ({group.interactions.length})
+                              </span>
+                            </h4>
+                            <div className="space-y-2">
+                              {visible.map((item, i) =>
+                                item.kind === "rollup" ? (
+                                  <RolledUpInteractionItem
+                                    key={`rollup-${item.anchorCard}-${item.type}-${i}`}
+                                    group={item}
+                                    index={i}
+                                    type={group.id}
+                                  />
+                                ) : (
+                                  <InteractionItem
+                                    key={`${item.interaction.cards[0]}-${item.interaction.cards[1]}-${item.interaction.type}`}
+                                    interaction={item.interaction}
+                                    index={i}
+                                    type={group.id}
+                                    profiles={analysis?.profiles}
+                                  />
+                                )
+                              )}
+                              <ShowMoreButton
+                                shown={visible.length}
+                                total={group.displayItems.length}
+                                onShowMore={() => showMoreGroup(group.id)}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CollapsiblePanel>
+
+                {/* Chains */}
+                {analysis.chains.length > 0 && (
+                  <CollapsiblePanel
+                    id="ie-chains"
+                    title="Chains"
+                    summary={`${analysis.chains.length} detected`}
+                    expanded={expandedSections.has("ie-chains")}
+                    onToggle={() => onToggleSection("ie-chains")}
+                  >
+                    <div className="space-y-2">
+                      {analysis.chains.slice(0, chainPage).map((chain, i) => (
+                        <ChainItem key={chain.cards.join("-")} chain={chain} index={i} />
+                      ))}
+                      <ShowMoreButton
+                        shown={Math.min(chainPage, analysis.chains.length)}
+                        total={analysis.chains.length}
+                        onShowMore={() => setChainPage((p) => p + PAGE_SIZE)}
+                      />
+                    </div>
+                  </CollapsiblePanel>
+                )}
+
+                {/* Blockers */}
+                {analysis.blockers.length > 0 && (
+                  <CollapsiblePanel
+                    id="ie-blockers"
+                    title="Blockers"
+                    summary={`${analysis.blockers.length} detected`}
+                    expanded={expandedSections.has("ie-blockers")}
+                    onToggle={() => onToggleSection("ie-blockers")}
+                  >
+                    <div className="space-y-2">
+                      {analysis.blockers.slice(0, blockerPage).map((blocker, i) => (
+                        <BlockerItem key={blocker.blocker} blocker={blocker} index={i} />
+                      ))}
+                      <ShowMoreButton
+                        shown={Math.min(blockerPage, analysis.blockers.length)}
+                        total={analysis.blockers.length}
+                        onShowMore={() => setBlockerPage((p) => p + PAGE_SIZE)}
+                      />
+                    </div>
+                  </CollapsiblePanel>
+                )}
+
+                {/* Loops empty state (shown as panel only when none exist) */}
+                {analysis.loops.length === 0 && (
+                  <CollapsiblePanel
+                    id="ie-loops"
+                    title="Loops"
+                    summary="0 detected"
+                    expanded={expandedSections.has("ie-loops")}
+                    onToggle={() => onToggleSection("ie-loops")}
+                  >
+                    <EmptyState message="No loops detected." />
+                  </CollapsiblePanel>
+                )}
+              </>
             )}
           </div>
         </div>
