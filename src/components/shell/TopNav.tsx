@@ -6,7 +6,7 @@ import styles from "./TopNav.module.css";
 
 type Tab = { href: string; label: string };
 
-const TABS: Tab[] = [{ href: "/compare", label: "Compare" }];
+const TABS: Tab[] = [{ href: "/compare", label: "Compare Decks" }];
 
 export function TopNav() {
   const pathname = usePathname();
@@ -14,7 +14,7 @@ export function TopNav() {
   return (
     <nav aria-label="Main navigation" className={styles.nav}>
       <div className={styles.inner}>
-        <Link href="/" className={styles.brand} aria-label="Astral · Home">
+        <Link href="/" className={styles.brand} aria-label="MTG Deck Evaluator · Home">
           <svg
             className={styles.brandIcon}
             viewBox="0 0 24 24"
@@ -34,7 +34,7 @@ export function TopNav() {
             />
           </svg>
           <span className={styles.brandWordmark} data-testid="brand-wordmark">
-            Astral
+            MTG Deck Evaluator
           </span>
         </Link>
 
