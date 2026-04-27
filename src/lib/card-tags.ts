@@ -34,6 +34,16 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   "Mass Discard": { bg: "bg-neutral-600/20", text: "text-neutral-200" },
   "Self-Discard": { bg: "bg-gray-600/20", text: "text-gray-300" },
   "Discard Payoff": { bg: "bg-slate-600/20", text: "text-slate-200" },
+  // Secrets of Strixhaven (SOS) mechanics
+  Lesson: { bg: "bg-rose-500/20", text: "text-rose-200" },
+  Paradigm: { bg: "bg-fuchsia-500/20", text: "text-fuchsia-200" },
+  Opus: { bg: "bg-blue-500/20", text: "text-blue-300" },
+  Repartee: { bg: "bg-zinc-400/20", text: "text-zinc-200" },
+  Infusion: { bg: "bg-lime-500/20", text: "text-lime-300" },
+  Increment: { bg: "bg-lime-600/20", text: "text-lime-200" },
+  Prepare: { bg: "bg-cyan-500/20", text: "text-cyan-300" },
+  Book: { bg: "bg-amber-500/20", text: "text-amber-300" },
+  Converge: { bg: "bg-indigo-500/20", text: "text-indigo-300" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -251,6 +261,22 @@ const DISCARD_PAYOFF_CONDITION_RE =
   /\bif a player discarded a card this turn\b/i;
 // "unless ... discards" is NOT a payoff trigger — it's a Mass Discard choice
 const DISCARD_UNLESS_EXCLUSION_RE = /\bunless[^.]*discards?\b/i;
+
+// --- Secrets of Strixhaven (SOS) mechanics ---
+// Ability words use an em-dash on printed cards ("Opus —"); we accept either a
+// real em-dash (U+2014) or a hyphen-minus to be tolerant of paraphrased text.
+const OPUS_RE = /\bopus\s*(?:—|-)/i;
+const REPARTEE_RE = /\brepartee\s*(?:—|-)/i;
+const INFUSION_RE = /\binfusion\s*(?:—|-)/i;
+// Paradigm and Increment are keywords (also surface in card.keywords); we
+// fall back to a word-boundary regex when the keyword array is missing them.
+const PARADIGM_RE = /\bparadigm\b/i;
+const INCREMENT_RE = /\bincrement\b/i;
+// Prepare frames have a mode that says "becomes prepared" or "while ... is prepared".
+const PREPARE_RE = /\b(?:becomes? prepared|is prepared|prepare\s*\{)/i;
+// Converge: keyword from KTK; reminder text references "colors of mana spent".
+const CONVERGE_RE =
+  /\bconverge\b|\bcolors? of mana spent to cast (?:it|this spell)\b/i;
 
 const RESOURCE_DENIAL_NAMES = new Set([
   "Blood Moon",
@@ -554,6 +580,59 @@ export function generateTags(card: EnrichedCard): string[] {
         break;
       }
     }
+  }
+
+  // --- Secrets of Strixhaven mechanics ---
+
+  // Lesson — instant/sorcery subtype attached to the Paradigm cycle.
+  if (card.subtypes.includes("Lesson")) {
+    tags.add("Lesson");
+  }
+
+  // Paradigm — keyword on Lesson sorceries; exiles on first resolve and
+  // copies itself each first main phase.
+  if (card.keywords.includes("Paradigm") || PARADIGM_RE.test(text)) {
+    tags.add("Paradigm");
+  }
+
+  // Opus — Prismari ability word: triggers on instant/sorcery cast, with
+  // a 5+ mana threshold rider.
+  if (card.keywords.includes("Opus") || OPUS_RE.test(text)) {
+    tags.add("Opus");
+  }
+
+  // Repartee — Silverquill ability word: triggers on instant/sorcery cast
+  // that targets a creature.
+  if (card.keywords.includes("Repartee") || REPARTEE_RE.test(text)) {
+    tags.add("Repartee");
+  }
+
+  // Infusion — Witherbloom ability word: triggers care if you gained life
+  // this turn.
+  if (card.keywords.includes("Infusion") || INFUSION_RE.test(text)) {
+    tags.add("Infusion");
+  }
+
+  // Increment — Quandrix keyword on creatures: +1/+1 counter when you cast
+  // a spell with mana value greater than this creature's P or T.
+  if (card.keywords.includes("Increment") || INCREMENT_RE.test(text)) {
+    tags.add("Increment");
+  }
+
+  // Prepare — Adventure-style two-frame mechanic: a creature "becomes
+  // prepared" and you can cast a copy of its prepare-spell from exile.
+  if (PREPARE_RE.test(text)) {
+    tags.add("Prepare");
+  }
+
+  // Book — artifact subtype debuting in SOS.
+  if (card.subtypes.includes("Book")) {
+    tags.add("Book");
+  }
+
+  // Converge — multicolor payoff that scales with colors of mana spent.
+  if (card.keywords.includes("Converge") || CONVERGE_RE.test(text)) {
+    tags.add("Converge");
   }
 
   return Array.from(tags).sort();

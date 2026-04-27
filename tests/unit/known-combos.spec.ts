@@ -180,4 +180,42 @@ test.describe("findCombosInDeck", () => {
     // Panharmonicon+Sharuum, Sharuum+Closet, Skullclamp+KCI, Clock+Unwinding
     expect(found.length).toBeGreaterThanOrEqual(6);
   });
+
+  test("finds Pensive Professor + Lyla, Holographic Assistant infinite-draw combo", () => {
+    const cardNames = ["Pensive Professor", "Lyla, Holographic Assistant"];
+    const found = findCombosInDeck(cardNames);
+    const combo = found.find((c) => c.id === "pensive-professor-lyla");
+    expect(combo).toBeDefined();
+    expect(combo!.type).toBe("infinite");
+  });
+
+  test("does NOT find Pensive Professor + Lyla combo when Lyla is missing", () => {
+    const cardNames = ["Pensive Professor", "Lightning Bolt"];
+    const found = findCombosInDeck(cardNames);
+    const combo = found.find((c) => c.id === "pensive-professor-lyla");
+    expect(combo).toBeUndefined();
+  });
+
+  test("finds Witherbloom, the Balancer + Sprout Swarm infinite-token combo", () => {
+    const cardNames = ["Witherbloom, the Balancer", "Sprout Swarm"];
+    const found = findCombosInDeck(cardNames);
+    const combo = found.find((c) => c.id === "witherbloom-balancer-sprout-swarm");
+    expect(combo).toBeDefined();
+    expect(combo!.type).toBe("infinite");
+  });
+
+  test("finds Rootha, Mastering the Moment + Breath of Fury infinite-combat combo", () => {
+    const cardNames = ["Rootha, Mastering the Moment", "Breath of Fury"];
+    const found = findCombosInDeck(cardNames);
+    const combo = found.find((c) => c.id === "rootha-breath-of-fury");
+    expect(combo).toBeDefined();
+    expect(combo!.type).toBe("infinite");
+  });
+
+  test("does NOT find Rootha + Breath of Fury when Breath of Fury is missing", () => {
+    const cardNames = ["Rootha, Mastering the Moment", "Lightning Bolt"];
+    const found = findCombosInDeck(cardNames);
+    const combo = found.find((c) => c.id === "rootha-breath-of-fury");
+    expect(combo).toBeUndefined();
+  });
 });
