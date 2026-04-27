@@ -1,17 +1,25 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Spectral, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
 import Footer from "@/components/Footer";
 import NavLinks from "@/components/NavLinks";
 import "./globals.css";
+import "../../design-system/tokens.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-sans",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const spectral = Spectral({
+  variable: "--font-serif",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
   subsets: ["latin"],
 });
 
@@ -35,10 +43,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} flex min-h-screen flex-col antialiased`}
-      >
+    <html
+      lang="en"
+      data-theme="dark"
+      className={`${inter.variable} ${spectral.variable} ${jetbrainsMono.variable}`}
+    >
+      <body className="flex min-h-screen flex-col antialiased">
         <nav
           aria-label="Main navigation"
           className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-sm"
