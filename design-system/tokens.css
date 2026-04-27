@@ -1,0 +1,248 @@
+/* ─────────────────────────────────────────────────────────────
+   Astral · Design Tokens (CSS variables)
+   ─────────────────────────────────────────────────────────────
+   Two layers:
+     1. RAW SCALE (--violet-500, --space-4)        — pure values.
+     2. SEMANTIC ALIASES (--accent, --surface-1)   — what UI uses.
+
+   Components should reference SEMANTIC tokens. Raw scales exist
+   so themes (light / brand variants) can be remixed without
+   touching component styles.
+
+   Dark theme is canonical. Light tokens are stubbed (TODO).
+───────────────────────────────────────────────────────────── */
+
+:root {
+  /* ─── RAW · COLOR ──────────────────────────────────────── */
+
+  /* Neutrals — voids & inks */
+  --void-950: #0a0a18;
+  --void-900: #10112a;
+  --void-800: #181a3a;
+  --void-700: #28264f;
+  --void-600: #3a3458;
+
+  --ink-50:  #ffffff;
+  --ink-100: #f0eaff;
+  --ink-200: #c5bce0;
+  --ink-300: #9990b8;
+  --ink-400: #6e6890;
+  --ink-500: #3a3458;
+
+  /* Brand · Cosmic */
+  --violet-300: #c4b5fd;
+  --violet-400: #a78bfa;   /* PRIMARY accent */
+  --violet-500: #8b5cf6;
+  --violet-600: #7c3aed;
+  --violet-700: #5b21b6;
+
+  --aura-300: #f9c4ff;
+  --aura-400: #f0aaff;     /* glow / gradient pair */
+  --aura-500: #d885e8;
+
+  --cyan-400: #88e7ff;
+  --gold-400: #f5d680;
+
+  /* Semantic palette · status */
+  --ok-400:    #86efac;
+  --watch-400: #fde68a;
+  --warn-400:  #ff86a0;
+
+  /* Mana colors (MTG · WUBRG + colorless) */
+  --mana-w: #f8f5d8;
+  --mana-u: #bfd9f0;
+  --mana-b: #bfb5b0;
+  --mana-r: #f4b8a3;
+  --mana-g: #b8d4b3;
+  --mana-c: #d8d2c4;
+
+  /* ─── RAW · TYPOGRAPHY ─────────────────────────────────── */
+  --font-serif: "Spectral", Georgia, "Times New Roman", serif;
+  --font-sans:  "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Type scale (px) — display down to caption */
+  --text-display: 56px;   /* hero score numbers */
+  --text-h1:      40px;   /* page title */
+  --text-h2:      28px;   /* section title */
+  --text-h3:      22px;   /* sub-section */
+  --text-h4:      18px;
+  --text-body:    13px;   /* default body */
+  --text-body-lg: 15px;
+  --text-sm:      12px;
+  --text-xs:      11px;
+  --text-eyebrow: 10px;   /* mono · 0.22em tracked */
+  --text-caption: 9px;
+
+  --leading-tight: 1.15;
+  --leading-snug:  1.3;
+  --leading-body:  1.5;
+  --leading-loose: 1.65;
+
+  --tracking-tight:  -0.025em;
+  --tracking-normal: 0;
+  --tracking-wide:    0.05em;
+  --tracking-eyebrow: 0.22em;
+
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ─── RAW · SPACE ──────────────────────────────────────── */
+  --space-0:  0px;
+  --space-1:  2px;
+  --space-2:  4px;
+  --space-3:  6px;
+  --space-4:  8px;
+  --space-5:  10px;
+  --space-6:  12px;
+  --space-7:  14px;
+  --space-8:  16px;
+  --space-10: 20px;
+  --space-12: 24px;
+  --space-14: 28px;
+  --space-16: 32px;
+  --space-20: 40px;
+  --space-24: 48px;
+  --space-32: 64px;
+
+  /* ─── RAW · RADIUS ─────────────────────────────────────── */
+  --radius-xs:   2px;
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   12px;
+  --radius-2xl:  14px;   /* panels */
+  --radius-3xl:  18px;   /* sheets, hero cards */
+  --radius-pill: 999px;
+
+  /* ─── RAW · SHADOW (elevation + glow) ──────────────────── */
+  --shadow-sm:   0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md:   0 8px 24px rgba(0,0,0,0.35);
+  --shadow-lg:   0 24px 60px rgba(0,0,0,0.4);
+  --shadow-xl:   0 30px 80px rgba(0,0,0,0.5);
+
+  --glow-sm:    0 0 8px  rgba(167,139,250,0.30);
+  --glow-md:    0 0 14px rgba(167,139,250,0.50);
+  --glow-lg:    0 0 24px rgba(167,139,250,0.50);
+  --glow-aura:  0 0 24px rgba(240,170,255,0.40);
+
+  /* ─── RAW · MOTION ─────────────────────────────────────── */
+  --ease-out:    cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --dur-instant: 80ms;
+  --dur-fast:    120ms;
+  --dur-base:    180ms;
+  --dur-slow:    240ms;
+  --dur-slower:  400ms;
+  --dur-reveal:  600ms;
+
+  /* ─── RAW · BLUR ───────────────────────────────────────── */
+  --blur-sm:  8px;
+  --blur-md:  12px;
+  --blur-lg:  20px;
+
+  /* ─── SEMANTIC · SURFACE ───────────────────────────────── */
+  --bg-base:        var(--void-950);   /* page background */
+  --bg-cosmos:      var(--void-950);   /* + radial gradient overlay */
+  --surface-1:      rgba(40, 38, 80, 0.40);    /* default panel */
+  --surface-1-hi:   rgba(60, 58, 110, 0.55);   /* hovered panel */
+  --surface-2:      rgba(255, 255, 255, 0.04); /* subtle fill (buttons, inputs) */
+  --surface-2-hi:   rgba(255, 255, 255, 0.08);
+  --surface-overlay: rgba(28, 22, 58, 0.98);   /* sheets, modals */
+  --surface-scrim:  rgba(0, 0, 0, 0.55);       /* sheet backdrop */
+
+  --border:    rgba(180, 170, 240, 0.16);
+  --border-hi: rgba(180, 170, 240, 0.32);
+  --border-accent: rgba(167, 139, 250, 0.30);
+
+  /* ─── SEMANTIC · TEXT ──────────────────────────────────── */
+  --ink-primary:   var(--ink-100);
+  --ink-secondary: var(--ink-200);
+  --ink-tertiary:  var(--ink-400);
+  --ink-disabled:  var(--ink-500);
+  --ink-on-accent: var(--void-950);    /* text on violet/aura buttons */
+
+  /* ─── SEMANTIC · ACCENT ────────────────────────────────── */
+  --accent:        var(--violet-400);
+  --accent-hi:     var(--aura-400);
+  --accent-soft:   rgba(167, 139, 250, 0.12);
+  --accent-soft-hi:rgba(167, 139, 250, 0.18);
+  --accent-gradient: linear-gradient(135deg, var(--violet-400) 0%, var(--aura-400) 100%);
+
+  /* ─── SEMANTIC · STATUS ────────────────────────────────── */
+  --status-ok:    var(--ok-400);
+  --status-watch: var(--watch-400);
+  --status-warn:  var(--warn-400);
+
+  --status-ok-soft:    rgba(134, 239, 172, 0.10);
+  --status-watch-soft: rgba(253, 230, 138, 0.10);
+  --status-warn-soft:  rgba(255, 134, 160, 0.10);
+
+  /* ─── SEMANTIC · COMPONENT TOKENS ──────────────────────── */
+  /* Buttons */
+  --btn-radius:        var(--radius-lg);
+  --btn-padding-y:     var(--space-5);
+  --btn-padding-x:     var(--space-10);
+  --btn-font-size:     var(--text-body);
+  --btn-font-weight:   var(--weight-semibold);
+
+  /* Inputs */
+  --input-radius:      var(--radius-xl);
+  --input-padding:     var(--space-7);
+  --input-bg:          rgba(0, 0, 0, 0.40);
+  --input-border:      var(--border-accent);
+  --input-font-size:   var(--text-sm);
+
+  /* Cards & panels */
+  --card-radius:       var(--radius-2xl);
+  --card-padding:      var(--space-12);
+  --card-bg:           var(--surface-1);
+  --card-border:       var(--border);
+
+  /* Sheet (mobile bottom drawer) */
+  --sheet-radius:      var(--radius-3xl);
+  --sheet-bg:          var(--surface-overlay);
+  --sheet-border:      var(--border-accent);
+  --sheet-shadow:      0 -20px 60px rgba(0,0,0,0.6);
+
+  /* Tags / chips */
+  --tag-radius:        var(--radius-pill);
+  --tag-padding-y:     var(--space-1);
+  --tag-padding-x:     var(--space-5);
+  --tag-font-size:     var(--text-caption);
+  --tag-tracking:      0.10em;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   LIGHT THEME — TODO
+   These are placeholders. Re-derive once the brand calls for
+   a light surface. Keep semantic names identical so consumers
+   don't need to change.
+───────────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+  :root[data-theme="light"] {
+    /* TODO: --bg-base: #faf8ff; */
+    /* TODO: --surface-1: #ffffff; */
+    /* TODO: --ink-primary: #1a1530; */
+    /* TODO: invert all status soft fills */
+    /* TODO: pick non-glow shadows */
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   REDUCED MOTION
+───────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0ms;
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+    --dur-slower: 0ms;
+    --dur-reveal: 0ms;
+  }
+}
