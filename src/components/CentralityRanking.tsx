@@ -1,6 +1,7 @@
 "use client";
 
 import type { CentralityScore, CentralityCategory } from "@/lib/interaction-centrality";
+import type { CardProfile } from "@/lib/interaction-engine/types";
 
 // ═══════════════════════════════════════════════════════════════
 // BADGE CONFIG
@@ -36,6 +37,7 @@ interface CentralityRankingProps {
   scores: CentralityScore[];
   selectedCard: string | null;
   onSelectCard: (cardName: string | null) => void;
+  profiles?: Record<string, CardProfile>;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -46,6 +48,7 @@ export default function CentralityRanking({
   scores,
   selectedCard,
   onSelectCard,
+  profiles,
 }: CentralityRankingProps) {
   if (scores.length === 0) {
     return (
@@ -73,6 +76,9 @@ export default function CentralityRanking({
           {scores.map((score) => {
             const isSelected = selectedCard === score.cardName;
             const config = CATEGORY_CONFIG[score.category];
+            const hasEminence =
+              profiles?.[score.cardName]?.commander?.eminence != null &&
+              (profiles[score.cardName].commander!.eminence!.length > 0);
             return (
               <tr
                 key={score.cardName}
@@ -109,6 +115,11 @@ export default function CentralityRanking({
                     }`}
                   >
                     {score.cardName}
+                    {hasEminence && (
+                      <span className="text-amber-400 ml-1" aria-label="Has command zone ability">
+                        &#9733;
+                      </span>
+                    )}
                   </span>
                 </td>
 

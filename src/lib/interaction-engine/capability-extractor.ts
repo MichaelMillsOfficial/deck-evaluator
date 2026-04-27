@@ -56,6 +56,11 @@ import type { Speed, Layer } from "./rules/types";
 import { tokenize } from "./lexer";
 import { parseAbilities, parseSagaChapters, parseClassLevels } from "./parser";
 import { expandKeyword, lookupKeyword } from "./keyword-database";
+import {
+  extractEminenceAbilities,
+  parsePartnerInfo,
+  parseCompanionRestriction,
+} from "./eminence-extractor";
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPE PARSING
@@ -1371,6 +1376,34 @@ export function profileCard(card: EnrichedCard): CardProfile {
   // 15. Detect layout
   const layout = mapLayout(card.layout);
 
+  // 16. Populate commander fields (eminence, partner, companion)
+  const { eminenceAbilities, isEminence } = extractEminenceAbilities(card, allAbilities);
+  const partnerInfo = parsePartnerInfo(card);
+  const companionRestriction = parseCompanionRestriction(card);
+
+  let commander: CardProfile["commander"] | undefined;
+  if (isEminence || partnerInfo.hasPartner || partnerInfo.hasBackground || companionRestriction) {
+    commander = {};
+    if (isEminence && eminenceAbilities.length > 0) {
+      commander.eminence = eminenceAbilities;
+    }
+    if (partnerInfo.hasPartner) {
+      commander.hasPartner = true;
+    }
+    if (partnerInfo.hasBackground) {
+      commander.hasBackground = true;
+    }
+    if (partnerInfo.partnerWith) {
+      commander.partnerWith = partnerInfo.partnerWith;
+    }
+    if (partnerInfo.partnerType) {
+      commander.partnerType = partnerInfo.partnerType;
+    }
+    if (companionRestriction) {
+      commander.companionRestriction = companionRestriction;
+    }
+  }
+
   return {
     cardName: card.name,
     cardTypes,
@@ -1401,5 +1434,6 @@ export function profileCard(card: EnrichedCard): CardProfile {
     extraTurns,
     playerControl,
     rawOracleText: oracleText || undefined,
+    commander,
   };
 }

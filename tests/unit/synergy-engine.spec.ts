@@ -1060,3 +1060,353 @@ test.describe("analyzeDeckSynergy", () => {
     expect(discardTheme).toBeDefined();
   });
 });
+
+test.describe("board wipe anti-synergy — asymmetric exemption", () => {
+  function tokenProducer() {
+    return mockCard({
+      name: "Bitterblossom",
+      typeLine: "Tribal Enchantment — Faerie",
+      oracleText:
+        "At the beginning of your upkeep, you lose 1 life and create a 1/1 black Faerie Rogue creature token with flying.",
+    });
+  }
+
+  test("Wrath of God + tokens → anti-synergy pair present (regression guard)", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Wrath of God": mockCard({
+        name: "Wrath of God",
+        typeLine: "Sorcery",
+        oracleText: "Destroy all creatures. They can't be regenerated.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Wrath of God") &&
+        p.cards.includes("Bitterblossom")
+    );
+    expect(pair).toBeDefined();
+  });
+
+  test("In Garruk's Wake + tokens (no tribal theme) → no anti-synergy pair (one-sided always exempt)", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "In Garruk's Wake": mockCard({
+        name: "In Garruk's Wake",
+        typeLine: "Sorcery",
+        oracleText:
+          "Destroy all creatures you don't control and all planeswalkers you don't control.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("In Garruk's Wake")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Kindred Dominance in Elf tribal deck → no anti-synergy pair", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Elvish Archdruid": mockCard({
+        name: "Elvish Archdruid",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText:
+          "Other Elf creatures you control get +1/+1.\n{T}: Add {G} for each Elf you control.",
+      }),
+      "Llanowar Elves": mockCard({
+        name: "Llanowar Elves",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      "Elvish Mystic": mockCard({
+        name: "Elvish Mystic",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G}.",
+      }),
+      "Priest of Titania": mockCard({
+        name: "Priest of Titania",
+        typeLine: "Creature — Elf Druid",
+        subtypes: ["Elf", "Druid"],
+        oracleText: "{T}: Add {G} for each Elf on the battlefield.",
+      }),
+      "Kindred Dominance": mockCard({
+        name: "Kindred Dominance",
+        typeLine: "Kindred Sorcery",
+        oracleText:
+          "Choose a creature type. Destroy all creatures that aren't of the chosen type.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(
+      [
+        "Llanowar Elves",
+        "Elvish Mystic",
+        "Priest of Titania",
+        "Kindred Dominance",
+        "Bitterblossom",
+      ],
+      ["Elvish Archdruid"]
+    );
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Kindred Dominance")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Kindred Dominance in non-tribal deck → anti-synergy pair present", () => {
+    const cards: Record<string, EnrichedCard> = {
+      "Kindred Dominance": mockCard({
+        name: "Kindred Dominance",
+        typeLine: "Kindred Sorcery",
+        oracleText:
+          "Choose a creature type. Destroy all creatures that aren't of the chosen type.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Kindred Dominance")
+    );
+    expect(pair).toBeDefined();
+  });
+
+  test("Organic Extinction + Thopter Spy Network (artifact tokens) → no anti-synergy pair", () => {
+    // Thopter Spy Network creates Thopter artifact creature tokens, which survive
+    // "Destroy all nonartifact creatures". The anti-synergy should be suppressed.
+    const cards: Record<string, EnrichedCard> = {
+      "Organic Extinction": mockCard({
+        name: "Organic Extinction",
+        typeLine: "Sorcery",
+        oracleText: "Improvise\nDestroy all nonartifact creatures.",
+      }),
+      "Thopter Spy Network": mockCard({
+        name: "Thopter Spy Network",
+        typeLine: "Enchantment",
+        oracleText:
+          "At the beginning of combat on your turn, if you controlled an artifact this turn, create a 1/1 colorless Thopter artifact creature token with flying.\nWhenever one or more artifact creatures you control deal combat damage to a player, draw a card.",
+      }),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Organic Extinction + Bitterblossom (Faerie tokens are creatures but NOT artifacts) → anti-synergy pair present", () => {
+    // Faerie tokens are non-artifact creatures — they die to Organic Extinction.
+    // The penalty must still fire even though the wipe is tagged Asymmetric.
+    const cards: Record<string, EnrichedCard> = {
+      "Organic Extinction": mockCard({
+        name: "Organic Extinction",
+        typeLine: "Sorcery",
+        oracleText: "Improvise\nDestroy all nonartifact creatures.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction")
+    );
+    expect(pair).toBeDefined();
+  });
+
+  test("Organic Extinction + Mirrorworks (copy-of-artifact tokens) → no anti-synergy pair", () => {
+    // Mirrorworks creates a token that's a copy of a nontoken artifact — the tokens are
+    // artifacts and survive "Destroy all nonartifact creatures".
+    const cards: Record<string, EnrichedCard> = {
+      "Organic Extinction": mockCard({
+        name: "Organic Extinction",
+        typeLine: "Sorcery",
+        oracleText: "Improvise\nDestroy all nonartifact creatures.",
+      }),
+      Mirrorworks: mockCard({
+        name: "Mirrorworks",
+        typeLine: "Artifact",
+        oracleText:
+          "Whenever another nontoken artifact enters the battlefield under your control, you may pay {2}. If you do, create a token that's a copy of that artifact.",
+      }),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction") &&
+        p.cards.includes("Mirrorworks")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Organic Extinction + Prototype Portal (imprint-artifact + token copy) → no anti-synergy pair", () => {
+    // Prototype Portal's imprint is restricted to artifact cards, so any token it creates
+    // is always a copy of an artifact and survives "Destroy all nonartifact creatures".
+    const cards: Record<string, EnrichedCard> = {
+      "Organic Extinction": mockCard({
+        name: "Organic Extinction",
+        typeLine: "Sorcery",
+        oracleText: "Improvise\nDestroy all nonartifact creatures.",
+      }),
+      "Prototype Portal": mockCard({
+        name: "Prototype Portal",
+        typeLine: "Artifact",
+        oracleText:
+          "Imprint — When Prototype Portal enters the battlefield, you may exile an artifact card from your hand.\n{X}, {T}: Create a token that's a copy of the exiled card. X is the mana value of that card.",
+      }),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction") &&
+        p.cards.includes("Prototype Portal")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Organic Extinction + Breya as commander (Thopter artifact creature tokens) → no anti-synergy pair", () => {
+    // Regression: Breya's ETB explicitly creates "Thopter artifact creature tokens";
+    // she should be exempt as a commander too.
+    const cards: Record<string, EnrichedCard> = {
+      "Organic Extinction": mockCard({
+        name: "Organic Extinction",
+        typeLine: "Sorcery",
+        oracleText: "Improvise\nDestroy all nonartifact creatures.",
+      }),
+      "Breya, Etherium Shaper": mockCard({
+        name: "Breya, Etherium Shaper",
+        typeLine: "Legendary Artifact Creature — Human Artificer",
+        subtypes: ["Human", "Artificer"],
+        oracleText:
+          "When Breya, Etherium Shaper enters the battlefield, create two 1/1 blue Thopter artifact creature tokens with flying.\n{2}, Sacrifice two artifacts: Choose one —\n• Breya, Etherium Shaper deals 3 damage to any target.\n• Target creature gets -4/-4 until end of turn.\n• You gain 5 life.",
+      }),
+    };
+    const deck = mockDeck(["Organic Extinction"], ["Breya, Etherium Shaper"]);
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction") &&
+        p.cards.includes("Breya, Etherium Shaper")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Scourglass + Thopter Spy Network (artifact tokens spared) → no anti-synergy pair", () => {
+    // Scourglass destroys all permanents except artifacts and lands. Artifact creature
+    // tokens (Thopters) survive, so the pair is exempt.
+    const cards: Record<string, EnrichedCard> = {
+      Scourglass: mockCard({
+        name: "Scourglass",
+        typeLine: "Artifact",
+        oracleText:
+          "{T}, Sacrifice Scourglass: Destroy all permanents except for artifacts and lands. Activate only during your upkeep.",
+      }),
+      "Thopter Spy Network": mockCard({
+        name: "Thopter Spy Network",
+        typeLine: "Enchantment",
+        oracleText:
+          "At the beginning of combat on your turn, if you controlled an artifact this turn, create a 1/1 colorless Thopter artifact creature token with flying.",
+      }),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Scourglass") &&
+        p.cards.includes("Thopter Spy Network")
+    );
+    expect(pair).toBeUndefined();
+  });
+
+  test("Scourglass + Bitterblossom (Faerie tokens die) → anti-synergy pair present", () => {
+    const cards: Record<string, EnrichedCard> = {
+      Scourglass: mockCard({
+        name: "Scourglass",
+        typeLine: "Artifact",
+        oracleText:
+          "{T}, Sacrifice Scourglass: Destroy all permanents except for artifacts and lands. Activate only during your upkeep.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const pair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Scourglass") &&
+        p.cards.includes("Bitterblossom")
+    );
+    expect(pair).toBeDefined();
+  });
+
+  test("Organic Extinction + mixed token producers → exempt vs Thopter, pair vs Bitterblossom", () => {
+    // Per-pair exemption: one producer in the same deck can be exempt while another
+    // producing non-artifact tokens still triggers the penalty.
+    const cards: Record<string, EnrichedCard> = {
+      "Organic Extinction": mockCard({
+        name: "Organic Extinction",
+        typeLine: "Sorcery",
+        oracleText: "Improvise\nDestroy all nonartifact creatures.",
+      }),
+      "Thopter Spy Network": mockCard({
+        name: "Thopter Spy Network",
+        typeLine: "Enchantment",
+        oracleText:
+          "At the beginning of combat on your turn, if you controlled an artifact this turn, create a 1/1 colorless Thopter artifact creature token with flying.",
+      }),
+      Bitterblossom: tokenProducer(),
+    };
+    const deck = mockDeck(Object.keys(cards));
+    const result = analyzeDeckSynergy(deck, cards);
+
+    const thopterPair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction") &&
+        p.cards.includes("Thopter Spy Network")
+    );
+    const faeriePair = result.antiSynergies.find(
+      (p) =>
+        p.description === "Board wipe conflicts with token strategy" &&
+        p.cards.includes("Organic Extinction") &&
+        p.cards.includes("Bitterblossom")
+    );
+    expect(thopterPair).toBeUndefined();
+    expect(faeriePair).toBeDefined();
+  });
+});

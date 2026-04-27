@@ -261,6 +261,7 @@ function ShareMenu({
   onCopyJson,
   onDiscord,
   onShareLink,
+  onSaveImage,
   copyFeedback,
   collapsed,
 }: {
@@ -270,6 +271,7 @@ function ShareMenu({
   onCopyJson: () => void;
   onDiscord: () => void;
   onShareLink: () => void;
+  onSaveImage: () => void;
   copyFeedback: string | null;
   collapsed: boolean;
 }) {
@@ -359,6 +361,15 @@ function ShareMenu({
           >
             Export to Discord...
           </button>
+          <button
+            type="button"
+            onClick={() => { onSaveImage(); setOpen(false); }}
+            disabled={!analysisResults}
+            data-testid="save-as-image-button"
+            className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Save as Image
+          </button>
           <div className="border-t border-slate-700 my-1" />
           <button
             type="button"
@@ -388,6 +399,7 @@ interface SidebarContentProps {
   analysisResults: DeckAnalysisResults | null;
   onOpenDiscordModal?: () => void;
   onCopyShareLink?: () => void;
+  onSaveImage?: () => void;
   collapsed: boolean;
   onClose?: () => void;
 }
@@ -402,6 +414,7 @@ function SidebarContent({
   analysisResults,
   onOpenDiscordModal,
   onCopyShareLink,
+  onSaveImage,
   collapsed,
   onClose,
 }: SidebarContentProps) {
@@ -409,6 +422,7 @@ function SidebarContent({
     new Set(["deck", "insights", "tools", "actions"])
   );
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [imageStatus, setImageStatus] = useState<"idle" | "generating" | "success" | "error">("idle");
 
   const analysisDisabled = !cardMap || enrichLoading;
 
@@ -491,6 +505,37 @@ function SidebarContent({
       await navigator.clipboard.writeText(json);
       showFeedback("JSON copied!");
     } catch { /* ignore */ }
+  };
+
+  const handleSaveImage = async () => {
+    if (onSaveImage) {
+      onSaveImage();
+      return;
+    }
+    if (!analysisResults) return;
+    if (imageStatus === "generating") return;
+
+    setImageStatus("generating");
+    try {
+      const { generateAndDownloadPng, buildExportImageData } = await import("@/lib/export-image");
+      const totalCards =
+        deck.commanders.reduce((s, c) => s + c.quantity, 0) +
+        deck.mainboard.reduce((s, c) => s + c.quantity, 0) +
+        deck.sideboard.reduce((s, c) => s + c.quantity, 0);
+      const data = buildExportImageData(
+        deck.name,
+        deck.commanders.map((c) => c.name),
+        totalCards,
+        analysisResults
+      );
+      await generateAndDownloadPng(data);
+      setImageStatus("success");
+      setTimeout(() => setImageStatus("idle"), 2000);
+    } catch (err) {
+      console.error("[Save as Image] Failed:", err);
+      setImageStatus("error");
+      setTimeout(() => setImageStatus("idle"), 3000);
+    }
   };
 
   const handleNavClick = (tab: ViewTab) => {
@@ -664,9 +709,28 @@ function SidebarContent({
           onCopyJson={handleCopyJson}
           onDiscord={() => onOpenDiscordModal?.()}
           onShareLink={() => onCopyShareLink?.()}
-          copyFeedback={copyFeedback}
+          onSaveImage={handleSaveImage}
+          copyFeedback={
+            imageStatus === "generating"
+              ? "Generating..."
+              : imageStatus === "success"
+                ? "Saved!"
+                : imageStatus === "error"
+                  ? "Failed"
+                  : copyFeedback
+          }
           collapsed={collapsed}
         />
+        {/* aria-live region for image export status announcements */}
+        <div
+          aria-live="assertive"
+          aria-atomic="true"
+          className="sr-only"
+        >
+          {imageStatus === "generating" && "Generating image, please wait..."}
+          {imageStatus === "success" && "Image saved successfully."}
+          {imageStatus === "error" && "Image generation failed."}
+        </div>
       </div>
     </div>
   );
@@ -686,6 +750,7 @@ export interface DeckSidebarProps {
   analysisResults: DeckAnalysisResults | null;
   onOpenDiscordModal?: () => void;
   onCopyShareLink?: () => void;
+  onSaveImage?: () => void;
 }
 
 export function DeckSidebar({
@@ -698,6 +763,7 @@ export function DeckSidebar({
   analysisResults,
   onOpenDiscordModal,
   onCopyShareLink,
+  onSaveImage,
 }: DeckSidebarProps) {
   const [collapsed, setCollapsed] = useSidebarCollapsed();
 
@@ -717,6 +783,7 @@ export function DeckSidebar({
         analysisResults={analysisResults}
         onOpenDiscordModal={onOpenDiscordModal}
         onCopyShareLink={onCopyShareLink}
+        onSaveImage={onSaveImage}
         collapsed={collapsed}
       />
 
@@ -755,6 +822,7 @@ export function DeckDrawer({
   analysisResults,
   onOpenDiscordModal,
   onCopyShareLink,
+  onSaveImage,
 }: DeckDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null);
   useFocusTrap(drawerRef, open);
@@ -810,6 +878,7 @@ export function DeckDrawer({
             analysisResults={analysisResults}
             onOpenDiscordModal={onOpenDiscordModal}
             onCopyShareLink={onCopyShareLink}
+            onSaveImage={onSaveImage}
             collapsed={false}
             onClose={onClose}
           />

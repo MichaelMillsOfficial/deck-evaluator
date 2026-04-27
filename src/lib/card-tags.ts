@@ -1,6 +1,6 @@
 import type { EnrichedCard } from "./types";
 import { CONDITIONAL_PATTERNS } from "./land-base-efficiency";
-import { CREATURE_TYPE_PATTERN } from "./creature-types";
+import { CREATURE_TYPE_PATTERN, NON_TYPE_RE } from "./creature-types";
 
 export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   Ramp: { bg: "bg-emerald-500/20", text: "text-emerald-300" },
@@ -8,6 +8,7 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   "Card Advantage": { bg: "bg-sky-500/20", text: "text-sky-300" },
   Removal: { bg: "bg-red-500/20", text: "text-red-300" },
   "Board Wipe": { bg: "bg-orange-500/20", text: "text-orange-300" },
+  "Asymmetric Wipe": { bg: "bg-amber-500/20", text: "text-amber-300" },
   Counterspell: { bg: "bg-cyan-500/20", text: "text-cyan-300" },
   Tutor: { bg: "bg-yellow-500/20", text: "text-yellow-300" },
   "Cost Reduction": { bg: "bg-amber-500/20", text: "text-amber-300" },
@@ -33,6 +34,16 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   "Mass Discard": { bg: "bg-neutral-600/20", text: "text-neutral-200" },
   "Self-Discard": { bg: "bg-gray-600/20", text: "text-gray-300" },
   "Discard Payoff": { bg: "bg-slate-600/20", text: "text-slate-200" },
+  // Secrets of Strixhaven (SOS) mechanics
+  Lesson: { bg: "bg-rose-500/20", text: "text-rose-200" },
+  Paradigm: { bg: "bg-fuchsia-500/20", text: "text-fuchsia-200" },
+  Opus: { bg: "bg-blue-500/20", text: "text-blue-300" },
+  Repartee: { bg: "bg-zinc-400/20", text: "text-zinc-200" },
+  Infusion: { bg: "bg-lime-500/20", text: "text-lime-300" },
+  Increment: { bg: "bg-lime-600/20", text: "text-lime-200" },
+  Prepare: { bg: "bg-cyan-500/20", text: "text-cyan-300" },
+  Book: { bg: "bg-amber-500/20", text: "text-amber-300" },
+  Converge: { bg: "bg-indigo-500/20", text: "text-indigo-300" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -62,6 +73,90 @@ const BOARD_WIPE_RE =
   /\b(?:destroy|exile)\s+all\b/i;
 const BOARD_WIPE_BOUNCE_RE = /\breturn all\b.+?\bto their owners' hands\b/i;
 const BOARD_WIPE_MINUS_RE = /\ball creatures get -\d+\/-\d+/i;
+// --- Asymmetric (one-sided) wipe patterns ---
+// Universal: "all <modifier?> creatures/permanents/planeswalkers you don't control" etc.
+// Anchored to "all" so single-target clauses ("target creature you don't control") on modal
+// cards don't falsely flag a symmetric wipe mode as asymmetric.
+const ASYMMETRIC_OPPONENT_RE =
+  /\ball\s+(?:\S+\s+){0,3}?(?:creatures?|permanents?|planeswalkers?)\s+(?:you don't control|an opponent controls|your opponents control)\b/i;
+// Tribal: "that aren't of the chosen type" (Kindred Dominance)
+const ASYMMETRIC_CHOSEN_TYPE_RE = /\bthat aren't of the chosen (?:type|creature type)\b/i;
+// Tribal: "that don't share a creature type with" (Patriarch's Bidding-style)
+const ASYMMETRIC_SHARED_TYPE_RE = /\bthat don't share a (?:creature )?type with\b/i;
+// "non-<cardtype-or-supertype>" — broad exclusion patterns like "nonartifact creatures"
+// (Organic Extinction), "nonlegendary creatures", etc. Card types and supertypes only;
+// creature subtypes are handled by NON_TYPE_RE from creature-types.
+const ASYMMETRIC_NON_CARDTYPE_RE =
+  /\bnon-?(artifact|enchantment|planeswalker|legendary|snow|basic)\b/gi;
+// "destroy all permanents except for <list>" / "other than <list>" (Scourglass, Cataclysmic
+// Gearhulk-style clauses). Captures the list; a second pass pulls spared card types out of it.
+const ASYMMETRIC_EXCEPT_FOR_RE = /\b(?:except for|other than)\s+([^.]*)/i;
+const SPARED_TYPE_TOKENS_RE =
+  /\b(artifact|enchantment|planeswalker|land|legendary|snow|basic)s?\b/gi;
+// Note: NON_TYPE_RE (imported from creature-types), ASYMMETRIC_NON_CARDTYPE_RE, and
+// SPARED_TYPE_TOKENS_RE all have /g flag — reset lastIndex before use.
+
+/**
+ * Sub-classification of an asymmetric wipe so callers can decide exemption context:
+ * - `opponentSided`: always one-sided regardless of deck (In Garruk's Wake, Plague Wind).
+ * - `chosenType`: references a creature type chosen at resolution (Kindred Dominance); asymmetric
+ *   only when the deck has any tribal anchor the caster can name.
+ * - `specificType`: references a fixed creature subtype (e.g. "non-Elf"); asymmetric only when
+ *   that subtype matches a deck anchor. `excludedTypes` is empty because creature subtypes are
+ *   recovered by callers via `extractReferencedTypes`.
+ * - `cardTypeRestricted`: spares a card type or supertype (e.g. "nonartifact", "nonlegendary");
+ *   `excludedTypes` holds the lowercased spared names (e.g. `["artifact"]`). Asymmetric only
+ *   when the deck's composition aligns with the spared category.
+ * Returns `null` for wipes that have no asymmetric pattern.
+ */
+export type AsymmetricWipeKind =
+  | "opponentSided"
+  | "chosenType"
+  | "specificType"
+  | "cardTypeRestricted";
+
+export interface AsymmetricWipeClassification {
+  kind: AsymmetricWipeKind;
+  excludedTypes: string[];
+}
+
+export function classifyAsymmetricWipe(
+  oracleText: string
+): AsymmetricWipeClassification | null {
+  if (ASYMMETRIC_OPPONENT_RE.test(oracleText)) {
+    return { kind: "opponentSided", excludedTypes: [] };
+  }
+  if (
+    ASYMMETRIC_CHOSEN_TYPE_RE.test(oracleText) ||
+    ASYMMETRIC_SHARED_TYPE_RE.test(oracleText)
+  ) {
+    return { kind: "chosenType", excludedTypes: [] };
+  }
+  // Collect all non-<cardtype> matches (a single wipe could reference multiple).
+  ASYMMETRIC_NON_CARDTYPE_RE.lastIndex = 0;
+  const cardTypeMatches = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = ASYMMETRIC_NON_CARDTYPE_RE.exec(oracleText)) !== null) {
+    cardTypeMatches.add(m[1].toLowerCase());
+  }
+  // Also check "except for <list>" syntax (Scourglass: "except for artifacts and lands").
+  const exceptMatch = ASYMMETRIC_EXCEPT_FOR_RE.exec(oracleText);
+  if (exceptMatch) {
+    SPARED_TYPE_TOKENS_RE.lastIndex = 0;
+    let t: RegExpExecArray | null;
+    while ((t = SPARED_TYPE_TOKENS_RE.exec(exceptMatch[1])) !== null) {
+      cardTypeMatches.add(t[1].toLowerCase());
+    }
+  }
+  if (cardTypeMatches.size > 0) {
+    return { kind: "cardTypeRestricted", excludedTypes: [...cardTypeMatches] };
+  }
+  NON_TYPE_RE.lastIndex = 0;
+  if (NON_TYPE_RE.test(oracleText)) {
+    return { kind: "specificType", excludedTypes: [] };
+  }
+  return null;
+}
 const COUNTER_RE = /\bcounter target\b.+?\bspell\b/i;
 const TUTOR_RE = /\bsearch your library\b/i;
 const TUTOR_LAND_EXCLUSION_RE = /search your library for.+?(?:land|Forest|Plains|Island|Swamp|Mountain)\b/i;
@@ -167,6 +262,22 @@ const DISCARD_PAYOFF_CONDITION_RE =
 // "unless ... discards" is NOT a payoff trigger — it's a Mass Discard choice
 const DISCARD_UNLESS_EXCLUSION_RE = /\bunless[^.]*discards?\b/i;
 
+// --- Secrets of Strixhaven (SOS) mechanics ---
+// Ability words use an em-dash on printed cards ("Opus —"); we accept either a
+// real em-dash (U+2014) or a hyphen-minus to be tolerant of paraphrased text.
+const OPUS_RE = /\bopus\s*(?:—|-)/i;
+const REPARTEE_RE = /\brepartee\s*(?:—|-)/i;
+const INFUSION_RE = /\binfusion\s*(?:—|-)/i;
+// Paradigm and Increment are keywords (also surface in card.keywords); we
+// fall back to a word-boundary regex when the keyword array is missing them.
+const PARADIGM_RE = /\bparadigm\b/i;
+const INCREMENT_RE = /\bincrement\b/i;
+// Prepare frames have a mode that says "becomes prepared" or "while ... is prepared".
+const PREPARE_RE = /\b(?:becomes? prepared|is prepared|prepare\s*\{)/i;
+// Converge: keyword from KTK; reminder text references "colors of mana spent".
+const CONVERGE_RE =
+  /\bconverge\b|\bcolors? of mana spent to cast (?:it|this spell)\b/i;
+
 const RESOURCE_DENIAL_NAMES = new Set([
   "Blood Moon",
   "Back to Basics",
@@ -241,6 +352,12 @@ export function generateTags(card: EnrichedCard): string[] {
   ) {
     tags.add("Board Wipe");
     tags.add("Removal");
+
+    // Asymmetric (one-sided) wipes: In Garruk's Wake, Plague Wind, Kindred Dominance, etc.
+    // Only applied when the card already matched a board-wipe pattern above.
+    if (classifyAsymmetricWipe(text) !== null) {
+      tags.add("Asymmetric Wipe");
+    }
   }
 
   // Single-target Removal
@@ -463,6 +580,59 @@ export function generateTags(card: EnrichedCard): string[] {
         break;
       }
     }
+  }
+
+  // --- Secrets of Strixhaven mechanics ---
+
+  // Lesson — instant/sorcery subtype attached to the Paradigm cycle.
+  if (card.subtypes.includes("Lesson")) {
+    tags.add("Lesson");
+  }
+
+  // Paradigm — keyword on Lesson sorceries; exiles on first resolve and
+  // copies itself each first main phase.
+  if (card.keywords.includes("Paradigm") || PARADIGM_RE.test(text)) {
+    tags.add("Paradigm");
+  }
+
+  // Opus — Prismari ability word: triggers on instant/sorcery cast, with
+  // a 5+ mana threshold rider.
+  if (card.keywords.includes("Opus") || OPUS_RE.test(text)) {
+    tags.add("Opus");
+  }
+
+  // Repartee — Silverquill ability word: triggers on instant/sorcery cast
+  // that targets a creature.
+  if (card.keywords.includes("Repartee") || REPARTEE_RE.test(text)) {
+    tags.add("Repartee");
+  }
+
+  // Infusion — Witherbloom ability word: triggers care if you gained life
+  // this turn.
+  if (card.keywords.includes("Infusion") || INFUSION_RE.test(text)) {
+    tags.add("Infusion");
+  }
+
+  // Increment — Quandrix keyword on creatures: +1/+1 counter when you cast
+  // a spell with mana value greater than this creature's P or T.
+  if (card.keywords.includes("Increment") || INCREMENT_RE.test(text)) {
+    tags.add("Increment");
+  }
+
+  // Prepare — Adventure-style two-frame mechanic: a creature "becomes
+  // prepared" and you can cast a copy of its prepare-spell from exile.
+  if (PREPARE_RE.test(text)) {
+    tags.add("Prepare");
+  }
+
+  // Book — artifact subtype debuting in SOS.
+  if (card.subtypes.includes("Book")) {
+    tags.add("Book");
+  }
+
+  // Converge — multicolor payoff that scales with colors of mana spent.
+  if (card.keywords.includes("Converge") || CONVERGE_RE.test(text)) {
+    tags.add("Converge");
   }
 
   return Array.from(tags).sort();

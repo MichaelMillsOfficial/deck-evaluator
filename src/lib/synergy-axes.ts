@@ -1,5 +1,6 @@
 import type { EnrichedCard } from "./types";
 import { CREATURE_TYPE_PATTERN } from "./creature-types";
+import { extractKeywordParameter } from "./keyword-parameters";
 
 export interface SynergyAxisDefinition {
   id: string;
@@ -16,6 +17,8 @@ const COUNTER_DOUBLER_RE = /twice that many.+?counter/i;
 const COUNTER_PROLIFERATE_RE = /\bproliferate\b/i;
 const COUNTER_CHARGE_RE = /charge counter/i;
 const COUNTER_MODULAR_RE = /\bmodular\b/i;
+// Quandrix keyword — every cast is a potential +1/+1 counter trigger.
+const COUNTER_INCREMENT_RE = /\bincrement\b/i;
 
 // --- Tokens ---
 const TOKEN_CREATE_RE = /\bcreate\b.+?\btoken/i;
@@ -95,6 +98,9 @@ const SPELL_COST_REDUCE_RE =
   /(?:instant|sorcery).+?(?:spells? you cast )?cost.+?less/i;
 const SPELL_COPY_RE = /\bcopy.+?(?:instant|sorcery|spell)\b/i;
 const SPELL_MAGECRAFT_RE = /\bmagecraft\b/i;
+// SOS ability words that trigger on instant/sorcery casts.
+const SPELL_OPUS_RE = /\bopus\s*(?:—|-)/i;
+const SPELL_REPARTEE_RE = /\brepartee\s*(?:—|-)/i;
 
 // --- Artifacts ---
 const ARTIFACT_TRIGGER_RE = /whenever.+?artifact.+?enters the battlefield/i;
@@ -115,6 +121,8 @@ const ENCHANTMENT_KEYWORDS = new Set(["Constellation"]);
 const LIFEGAIN_TRIGGER_RE = /whenever you gain life/i;
 const LIFEGAIN_PAYOFF_RE = /\byou gain.+?\blife\b/i;
 const LIFEGAIN_KEYWORDS = new Set(["Lifelink"]);
+// Witherbloom ability word — triggers care if you gained life this turn.
+const LIFEGAIN_INFUSION_RE = /\binfusion\s*(?:—|-)/i;
 
 // --- Discard ---
 const DISCARD_PAYOFF_RE = /\bwhenever[^.]*discards?\b/i;
@@ -237,6 +245,8 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
       if (COUNTER_CHARGE_RE.test(text)) score += 0.3;
       if (COUNTER_MODULAR_RE.test(text) || card.keywords.includes("Modular"))
         score += 0.4;
+      if (card.keywords.includes("Increment") || COUNTER_INCREMENT_RE.test(text))
+        score += 0.5;
       return Math.min(score, 1);
     },
     conflictsWith: [],
@@ -369,6 +379,11 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
       if (SPELL_COPY_RE.test(text)) score += 0.5;
       if (SPELL_MAGECRAFT_RE.test(text) || card.keywords.includes("Magecraft"))
         score += 0.6;
+      // SOS: Opus and Repartee trigger on instant/sorcery casts (parity with Magecraft).
+      if (SPELL_OPUS_RE.test(text) || card.keywords.includes("Opus"))
+        score += 0.6;
+      if (SPELL_REPARTEE_RE.test(text) || card.keywords.includes("Repartee"))
+        score += 0.6;
       return Math.min(score, 1);
     },
     conflictsWith: [],
@@ -418,6 +433,9 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
       if (LIFEGAIN_TRIGGER_RE.test(text)) score += 0.8;
       if (card.keywords.some((kw) => LIFEGAIN_KEYWORDS.has(kw))) score += 0.4;
       if (LIFEGAIN_PAYOFF_RE.test(text)) score += 0.3;
+      // SOS: Infusion ability word — abilities that care if you gained life this turn.
+      if (LIFEGAIN_INFUSION_RE.test(text) || card.keywords.includes("Infusion"))
+        score += 0.5;
       return Math.min(score, 1);
     },
     conflictsWith: [],
@@ -467,7 +485,11 @@ export const SYNERGY_AXES: SynergyAxisDefinition[] = [
       if (DISCARD_COST_RE.test(text)) score += 0.3;
       if (DISCARD_UNLESS_RE.test(text)) score += 0.6;
       if (card.keywords.includes("Madness")) score += 0.4;
-      if (card.keywords.includes("Connive")) score += 0.3;
+      if (card.keywords.includes("Connive")) {
+        // Scale by N: Connive 1 → 0.3, Connive 2 → 0.4, Connive 3+ → 0.5.
+        const n = extractKeywordParameter(text, "connive") ?? 1;
+        score += 0.3 + Math.min(Math.max(n - 1, 0), 2) * 0.1;
+      }
       if (card.keywords.includes("Cycling")) score += 0.3;
       return Math.min(score, 1);
     },

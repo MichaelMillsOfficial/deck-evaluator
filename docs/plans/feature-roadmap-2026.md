@@ -264,9 +264,9 @@ Based on review of `types.ts` and the codebase:
 
 ---
 
-### Phase 2: Core Engine Expansion (2-4 sprints)
+### ~~Phase 2: Core Engine Expansion (2-4 sprints)~~ ✅ COMPLETE
 
-#### Epic 2.1: Goldfish Simulator
+#### ~~Epic 2.1: Goldfish Simulator~~ ✅ SHIPPED
 > *Simulate solitaire games to answer "how consistently does this deck develop its mana and cast spells?"*
 
 **Business Value:** Addresses the biggest feature gap vs. Archidekt (playtester logs) and fills a niche no tool serves well for Commander: statistical analysis of mana development and curve-out probability over 1,000+ simulated games. DeckCheck estimates "win turn" but doesn't show the journey. MTG-Mana-Simulator is a standalone Python tool, not integrated into a deck analysis workflow.
@@ -288,7 +288,7 @@ Based on review of `types.ts` and the codebase:
 
 ---
 
-#### Epic 2.2: Interaction Engine Lexicon Expansion
+#### ~~Epic 2.2: Interaction Engine Lexicon Expansion~~ ✅ SHIPPED
 > *Handle nuanced card mechanics that the current lexer/parser miss.*
 
 **Business Value:** The interaction engine is the primary technical differentiator. Expanding the lexicon to handle Sagas, Class enchantments, Rooms, and recent keyword abilities (connive, discover, bargain, craft) increases the percentage of cards that produce accurate interaction analysis. Each new set introduces 2-3 new mechanics; the engine needs to keep pace.
@@ -312,7 +312,7 @@ Based on review of `types.ts` and the codebase:
 
 ---
 
-#### Epic 2.3: Condition Satisfiability Analysis
+#### ~~Epic 2.3: Condition Satisfiability Analysis~~ ✅ SHIPPED
 > *Move from "these cards interact" to "these cards interact AND the conditions are met by this deck."*
 
 **Business Value:** Current interaction detection identifies that Card A triggers Card B but doesn't verify whether the deck meets the conditions (e.g., "if you control 5+ creatures"). This produces false-positive interactions for decks that can't realistically satisfy the conditions. Addressing this improves interaction quality from "theoretically possible" to "likely in practice."
@@ -466,9 +466,9 @@ Phase 1 (Quick Wins, 1-2 sprints):
   Epic 1.3: Interaction Presentation ── (independent)
 
 Phase 2 (Core Engine, 2-4 sprints):
-  Epic 2.1: Goldfish Simulator ──────── depends on opening-hand.ts (shipped)
-  Epic 2.2: Lexicon Expansion ──────── (independent)
-  Epic 2.3: Condition Satisfiability ── depends on interaction engine (shipped)
+  Epic 2.1: Goldfish Simulator ──────── ✅ SHIPPED
+  Epic 2.2: Lexicon Expansion ──────── ✅ SHIPPED
+  Epic 2.3: Condition Satisfiability ── ✅ SHIPPED
 
 Phase 3 (Advanced, 4-8 sprints):
   Epic 3.1: Interaction Visualization ── depends on Epic 1.3 (centrality scores)
@@ -488,9 +488,11 @@ Phase 4 (Ecosystem, ongoing):
 1. ~~**Card Swap Suggestions** (Epic 1.1)~~ ✅ Shipped with deck-context-aware filtering and land swap recommendations.
 2. ~~**Interaction Presentation** (Epic 1.3)~~ ✅ Shipped with centrality scores, floating removal impact panel, and citation links.
 3. ~~**Deck Comparison** (Epic 1.2)~~ ✅ Shipped with editable deck names and back navigation.
-4. **Goldfish Simulator** (Epic 2.1) -- Next priority. Fills the biggest feature gap vs. competitors. High technical complexity.
-5. **Lexicon Expansion** (Epic 2.2) -- Improves the primary differentiator. Ongoing value per keyword added.
-6. **Remaining epics** follow dependency ordering.
+4. ~~**Goldfish Simulator** (Epic 2.1)~~ ✅ Shipped with Monte Carlo simulation, mana development stats, opening hand evaluation, and turn-by-turn timeline.
+5. ~~**Lexicon Expansion** (Epic 2.2)~~ ✅ Shipped with Saga, Class, Room parsing, and connive/discover/bargain/incubate/craft/daybound keywords.
+6. ~~**Condition Satisfiability** (Epic 2.3)~~ ✅ Shipped with condition AST parser and deck-aware satisfaction scoring.
+7. **Interaction Visualization** (Epic 3.1) -- Next priority. Graph and heatmap views of card interactions.
+8. **Remaining epics** follow dependency ordering.
 
 *Note: Moxfield Direct Import deferred due to API constraints.*
 

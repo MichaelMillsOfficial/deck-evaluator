@@ -9,12 +9,14 @@ import type {
 } from "./types";
 import { SYNERGY_AXES, extractReferencedKeywords } from "./synergy-axes";
 import { findCombosInDeck } from "./known-combos";
-import { getTagsCached } from "./card-tags";
+import type { AsymmetricWipeClassification } from "./card-tags";
+import { getTagsCached, classifyAsymmetricWipe } from "./card-tags";
 import {
   identifyTribalAnchors,
   getCreatureSubtypes,
   getCommanderTypes,
   isChangeling,
+  extractReferencedTypes,
 } from "./creature-types";
 import {
   identifySupertypeAnchors,
@@ -215,11 +217,49 @@ function getCardAxisIntent(
   return undefined;
 }
 
+// Patterns identifying token producers whose tokens would SURVIVE a wipe that spares a given card type.
+// Used for per-pair exemption: only the token producer whose tokens match the spared category is
+// exempt — unrelated token producers in the same deck still trigger the anti-synergy.
+// Only consulted for cards already classified on the tokens axis, so patterns don't need to
+// separately prove the card creates tokens.
+const TOKEN_SURVIVES_PATTERNS: Record<string, RegExp> = {
+  artifact: new RegExp(
+    [
+      // Explicit "artifact creature token" phrasing (Breya, Thopter Spy Network, Pia and Kiran Nalaar).
+      String.raw`\bartifact creature tokens?\b`,
+      // Known artifact-token subtype names (creatures and non-creature artifact tokens).
+      String.raw`\b(?:Thopter|Servo|Construct|Myr|Golem|Scion|Powerstone|Drone|Assembly-Worker|Treasure|Clue|Food|Blood|Gold|Junk|Map)\b`,
+      // "Token that's a copy of ... artifact" (Mirrorworks, Saheeli's Artistry's artifact mode).
+      String.raw`\bcop(?:y|ies) of (?:that |the |an? )?(?:nontoken )?artifact\b`,
+      // Imprint restricted to an artifact card — any resulting token copy is always an artifact
+      // (Prototype Portal, Soul Foundry when imprinted with an artifact creature).
+      String.raw`\bexile an? artifact card\b`,
+    ].join("|"),
+    "i"
+  ),
+  enchantment: /\benchantment (?:creature )?tokens?\b/i,
+  legendary: /\blegendary (?:creature )?tokens?\b/i,
+};
+
+/** Whether this token producer's tokens survive a wipe that spares the given card-type categories. */
+function tokensSurviveCardTypeWipe(
+  producer: EnrichedCard,
+  sparedTypes: string[]
+): boolean {
+  const text = producer.oracleText;
+  for (const spared of sparedTypes) {
+    const pattern = TOKEN_SURVIVES_PATTERNS[spared];
+    if (pattern?.test(text)) return true;
+  }
+  return false;
+}
+
 /** Generate anti-synergy pairs between cards on conflicting axes */
 function generateAntiSynergyPairs(
   cardNames: string[],
   axisScores: Map<string, CardAxisScore[]>,
   cardMap: Record<string, EnrichedCard>,
+  tribalAnchorTypes: Set<string>,
   tagCache?: Map<string, string[]>
 ): SynergyPair[] {
   const pairs: SynergyPair[] = [];
@@ -266,28 +306,72 @@ function generateAntiSynergyPairs(
   }
 
   // Board wipe vs tokens anti-synergy (tag-based)
+  // Asymmetric (one-sided) wipes are exempt according to their sub-classification:
+  //   - opponentSided (In Garruk's Wake): always exempt — the wipe never hits the caster's board.
+  //   - chosenType (Kindred Dominance): exempt when the deck has any tribal anchor to name.
+  //   - specificType ("non-Elf" wipes): exempt when the referenced subtype matches a deck anchor.
+  //   - cardTypeRestricted (Organic Extinction's "nonartifact creatures"): exempt PER PAIR —
+  //     only when the specific token producer's tokens match the spared card type. An artifact
+  //     deck with Bitterblossom still loses its Faerie tokens to Organic Extinction.
   const tokenCardNames: string[] = [];
-  const boardWipeCardNames: string[] = [];
+  type WipeInfo = {
+    name: string;
+    classification: AsymmetricWipeClassification | null;
+    referencedTypes: string[];
+  };
+  const boardWipes: WipeInfo[] = [];
 
   for (const name of cardNames) {
     const card = cardMap[name];
     if (!card) continue;
     const tags = getTagsCached(card, tagCache);
-    if (tags.includes("Board Wipe")) boardWipeCardNames.push(name);
+    if (tags.includes("Board Wipe")) {
+      const classification = tags.includes("Asymmetric Wipe")
+        ? classifyAsymmetricWipe(card.oracleText)
+        : null;
+      const referencedTypes =
+        classification?.kind === "specificType"
+          ? extractReferencedTypes(card.oracleText)
+          : [];
+      boardWipes.push({ name, classification, referencedTypes });
+    }
     const tokenAxes = axisScores.get(name) ?? [];
     if (tokenAxes.some((a) => a.axisId === "tokens" && a.relevance >= AXIS_RELEVANCE_THRESHOLD)) {
       tokenCardNames.push(name);
     }
   }
 
-  for (const wipeName of boardWipeCardNames) {
+  for (const wipe of boardWipes) {
+    const c = wipe.classification;
+    // Opponent-sided wipes never pair with tokens.
+    if (c?.kind === "opponentSided") continue;
+    // Chosen-type wipes are exempt whenever the deck has any tribal anchor the caster can name.
+    if (c?.kind === "chosenType" && tribalAnchorTypes.size > 0) continue;
+    // Specific-type wipes ("non-Elf") are exempt only if the named subtype matches an anchor.
+    if (
+      c?.kind === "specificType" &&
+      wipe.referencedTypes.some((t) => tribalAnchorTypes.has(t))
+    ) {
+      continue;
+    }
+
     for (const tokenName of tokenCardNames) {
-      const key = `anti:${[wipeName, tokenName].sort().join("|")}:boardwipe-tokens`;
+      // Card-type-restricted wipes: exempt this pair only if the specific token producer's
+      // tokens survive the wipe (e.g. Thopter Spy Network makes artifact creature tokens,
+      // which survive Organic Extinction).
+      if (c?.kind === "cardTypeRestricted") {
+        const producer = cardMap[tokenName];
+        if (producer && tokensSurviveCardTypeWipe(producer, c.excludedTypes)) {
+          continue;
+        }
+      }
+
+      const key = `anti:${[wipe.name, tokenName].sort().join("|")}:boardwipe-tokens`;
       if (seen.has(key)) continue;
       seen.add(key);
 
       pairs.push({
-        cards: [wipeName, tokenName],
+        cards: [wipe.name, tokenName],
         axisId: "tokens",
         type: "anti-synergy",
         strength: 0.6,
@@ -696,8 +780,23 @@ export function analyzeDeckSynergy(
   // Step 4: Generate heuristic synergy pairs (with optional intent filtering)
   const synergyPairs = generateSynergyPairs(cardNames, axisScores, intentSummaries);
 
-  // Step 5: Generate anti-synergy pairs
-  const antiSynergyPairs = generateAntiSynergyPairs(cardNames, axisScores, cardMap, tagCache);
+  // Step 5a: Resolve commanders and tribal anchors (needed by anti-synergy and theme detection)
+  const commanders: EnrichedCard[] = [];
+  for (const cmd of deck.commanders) {
+    const card = cardMap[cmd.name];
+    if (card) commanders.push(card);
+  }
+  const tribalAnchors = identifyTribalAnchors(commanders, cardNames, cardMap);
+  const tribalAnchorTypes = new Set(tribalAnchors);
+
+  // Step 5b: Generate anti-synergy pairs (asymmetric wipes exempt when they protect the deck's theme)
+  const antiSynergyPairs = generateAntiSynergyPairs(
+    cardNames,
+    axisScores,
+    cardMap,
+    tribalAnchorTypes,
+    tagCache
+  );
 
   // Step 6: Compute per-card scores
   const cardScores = computeCardScores(
@@ -709,13 +808,7 @@ export function analyzeDeckSynergy(
     comboPairs
   );
 
-  // Step 7: Identify deck themes (pass tribal anchors for labeling)
-  const commanders: EnrichedCard[] = [];
-  for (const cmd of deck.commanders) {
-    const card = cardMap[cmd.name];
-    if (card) commanders.push(card);
-  }
-  const tribalAnchors = identifyTribalAnchors(commanders, cardNames, cardMap);
+  // Step 7: Identify deck themes (reuses tribal anchors resolved above)
   const deckThemes = identifyDeckThemes(axisScores, tribalAnchors, supertypeAnchors, keywordAnchors);
 
   // Step 8: Sort and return
