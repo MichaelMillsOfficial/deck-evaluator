@@ -105,6 +105,26 @@ export const KNOWN_COMBOS: KnownCombo[] = [
     type: "value",
   },
 
+  // --- Secrets of Strixhaven (SOS) Combos ---
+  {
+    id: "pensive-professor-lyla",
+    cards: ["Pensive Professor", "Lyla, Holographic Assistant"],
+    description: "Infinite draw: cast a 2+ mana spell to put a +1/+1 counter on Pensive Professor (Increment), Pensive's draw trigger fires, Lyla puts another counter on Pensive when you draw, loop with any further draw or counter source",
+    type: "infinite",
+  },
+  {
+    id: "witherbloom-balancer-sprout-swarm",
+    cards: ["Witherbloom, the Balancer", "Sprout Swarm"],
+    description: "Infinite saproling tokens: Sprout Swarm's convoke pays for itself with the saproling tokens it creates; Witherbloom's affinity-for-creatures discount on instants/sorceries makes the loop net-positive",
+    type: "infinite",
+  },
+  {
+    id: "rootha-breath-of-fury",
+    cards: ["Rootha, Mastering the Moment", "Breath of Fury"],
+    description: "Infinite combats and damage: with a third creature, cast an instant/sorcery to make Rootha's flying Elemental token, attach Breath of Fury, deal damage and take additional combat steps repeatedly",
+    type: "infinite",
+  },
+
   // --- Artifact Combos ---
   {
     id: "basalt-rings",

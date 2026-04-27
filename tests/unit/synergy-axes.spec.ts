@@ -1080,3 +1080,85 @@ test.describe("Discard axis", () => {
     expect(axis.detect(card)).toBeGreaterThan(0);
   });
 });
+
+test.describe("Secrets of Strixhaven axis updates", () => {
+  test("Opus ability word boosts Spellslinger axis", () => {
+    const axis = getAxisById("spellslinger")!;
+    const card = mockCard({
+      name: "Expressive Firedancer",
+      oracleText:
+        "Opus — Whenever you cast an instant or sorcery spell, this creature gets +1/+1 until end of turn.",
+      keywords: ["Opus"],
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0.4);
+  });
+
+  test("Repartee ability word boosts Spellslinger axis", () => {
+    const axis = getAxisById("spellslinger")!;
+    const card = mockCard({
+      name: "Silverquill Duelist",
+      oracleText:
+        "Repartee — Whenever you cast an instant or sorcery spell that targets a creature, put a +1/+1 counter on this creature.",
+      keywords: ["Repartee"],
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0.4);
+  });
+
+  test("Infusion ability word boosts Lifegain axis", () => {
+    const axis = getAxisById("lifegain")!;
+    const card = mockCard({
+      name: "Old-Growth Educator",
+      oracleText:
+        "Infusion — When this creature enters, put two +1/+1 counters on it if you gained life this turn.",
+      keywords: ["Infusion"],
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0.4);
+  });
+
+  test("Increment keyword boosts Counters axis", () => {
+    const axis = getAxisById("counters")!;
+    const card = mockCard({
+      name: "Ambitious Augmenter",
+      oracleText:
+        "Increment (Whenever you cast a spell, if the amount of mana you spent is greater than this creature's power or toughness, put a +1/+1 counter on this creature.)",
+      keywords: ["Increment"],
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0.4);
+  });
+
+  test("Connive 3 yields a higher Discard score than Connive 1", () => {
+    const axis = getAxisById("discard")!;
+    const conniveOne = mockCard({
+      name: "Cheap Conniver",
+      oracleText: "When this creature enters, connive 1.",
+      keywords: ["Connive"],
+    });
+    const conniveThree = mockCard({
+      name: "Mighty Conniver",
+      oracleText: "When this creature enters, connive 3.",
+      keywords: ["Connive"],
+    });
+    expect(axis.detect(conniveThree)).toBeGreaterThan(axis.detect(conniveOne));
+  });
+
+  test("Connive without numeric parameter still scores baseline", () => {
+    const axis = getAxisById("discard")!;
+    const card = mockCard({
+      name: "Vintage Conniver",
+      oracleText: "Connive.",
+      keywords: ["Connive"],
+    });
+    expect(axis.detect(card)).toBeGreaterThan(0);
+  });
+
+  test("Vanilla creature still scores 0 on Spellslinger / Lifegain / Counters", () => {
+    const vanilla = mockCard({
+      name: "Grizzly Bears",
+      typeLine: "Creature — Bear",
+      oracleText: "",
+    });
+    expect(getAxisById("spellslinger")!.detect(vanilla)).toBe(0);
+    expect(getAxisById("lifegain")!.detect(vanilla)).toBe(0);
+    expect(getAxisById("counters")!.detect(vanilla)).toBe(0);
+  });
+});
