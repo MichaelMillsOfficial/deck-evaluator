@@ -7,6 +7,16 @@
 
 set -euo pipefail
 
+# Always build production deploys. Release pipeline triggers prod via
+# deploy hook; Vercel doesn't set VERCEL_GIT_PREVIOUS_SHA for hook-driven
+# deploys, so the diff fallback below would compare master..master, see
+# zero changed files, and skip the release. Skipping production releases
+# is never the right call.
+if [ "${VERCEL_ENV:-}" = "production" ]; then
+  echo "✓ Production deploy — always proceeding with build"
+  exit 1
+fi
+
 echo "→ Checking if app code changed..."
 
 # Paths that should trigger a build
