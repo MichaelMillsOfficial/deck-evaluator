@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Spectral, JetBrains_Mono } from "next/font/google";
 import Footer from "@/components/Footer";
 import { CosmosBackground, TopNav } from "@/components/shell";
+import { DeckSessionProvider } from "@/contexts/DeckSessionContext";
 import "./globals.css";
 import "../../design-system/tokens.css";
 
@@ -48,10 +49,12 @@ export default function RootLayout({
       className={`${inter.variable} ${spectral.variable} ${jetbrainsMono.variable}`}
     >
       <body className="flex min-h-screen flex-col antialiased">
-        <CosmosBackground />
-        <TopNav />
-        <div className="relative z-10 flex-1">{children}</div>
-        <Footer />
+        <DeckSessionProvider>
+          <CosmosBackground />
+          <TopNav />
+          <div className="relative z-10 flex-1">{children}</div>
+          <Footer />
+        </DeckSessionProvider>
       </body>
     </html>
   );

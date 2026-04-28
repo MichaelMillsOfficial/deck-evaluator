@@ -479,12 +479,14 @@ test.describe("Spellbook Graceful Fallback", () => {
       })
     );
 
-    // Hold the spellbook request in flight
+    // Hold the spellbook request in flight until we explicitly release it.
+    // (Earlier this had a 500ms safety-net auto-resolve, but the test now
+    // races through /ritual fast enough that the spellbook would auto-
+    // resolve before the loading-shimmer assertion ran.)
     let releaseSpellbook: (() => void) | null = null;
     await page.route("**/api/deck-combos", async (route) => {
       await new Promise<void>((resolve) => {
         releaseSpellbook = resolve;
-        setTimeout(resolve, 500);
       });
       await route.fulfill({
         status: 200,

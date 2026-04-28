@@ -104,33 +104,10 @@ test.describe("Deck Header", () => {
     ).not.toHaveAttribute("hidden");
   });
 
-  test("Analysis/Synergy/Hands tabs disabled during enrichment", async ({
-    deckPage,
-  }) => {
-    await deckPage.goto();
-
-    // Intercept enrichment to keep it loading — use fulfill to avoid hanging
-    await deckPage.page.route("**/api/deck-enrich", (route) => {
-      // Simply don't respond — Playwright will abort when the page navigates or test ends
-      // The route stays pending, keeping enrichLoading=true
-    });
-
-    await deckPage.fillDecklist(SAMPLE_DECKLIST);
-    await deckPage.submitImport();
-    await deckPage.waitForDeckDisplay();
-
-    const header = deckPage.page.getByTestId("deck-header");
-    await expect(
-      header.getByRole("tab", { name: "Analysis" })
-    ).toBeDisabled();
-    await expect(
-      header.getByRole("tab", { name: "Synergy" })
-    ).toBeDisabled();
-    await expect(header.getByRole("tab", { name: "Hands" })).toBeDisabled();
-    await expect(
-      header.getByRole("tab", { name: "Deck List" })
-    ).toBeEnabled();
-  });
+  // Removed: "Analysis/Synergy/Hands tabs disabled during enrichment"
+  // Phase 2 redesign: users no longer reach /reading until enrichment is
+  // complete. The "tabs disabled while loading" UI is gone; /ritual is the
+  // loading state.
 
   test("header is sticky when scrolling", async ({ deckPage }) => {
     await deckPage.goto();
@@ -230,23 +207,6 @@ test.describe("Deck Header", () => {
     await expect(handStats).toContainText("lands");
   });
 
-  test("share button exists, disabled during enrichment", async ({
-    deckPage,
-  }) => {
-    await deckPage.goto();
-
-    // Intercept enrichment — don't respond to keep loading state
-    await deckPage.page.route("**/api/deck-enrich", (route) => {
-      // Don't respond — keeps enrichment pending
-    });
-
-    await deckPage.fillDecklist(SAMPLE_DECKLIST);
-    await deckPage.submitImport();
-    await deckPage.waitForDeckDisplay();
-
-    const header = deckPage.page.getByTestId("deck-header");
-    const shareBtn = header.getByTestId("share-button");
-    await expect(shareBtn).toBeVisible();
-    await expect(shareBtn).toBeDisabled();
-  });
+  // Removed: "share button exists, disabled during enrichment"
+  // Same reason — /reading is no longer reached mid-enrichment.
 });

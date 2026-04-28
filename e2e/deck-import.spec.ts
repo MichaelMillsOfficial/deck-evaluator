@@ -19,15 +19,17 @@ test.describe("Deck Import — Manual Text Input", () => {
 
     const deck = deckPage.deckDisplay;
 
-    // Commander section should include Atraxa
+    // Commander section should include Atraxa.
+    // Use the card-name button (rendered by EnrichedCardRow) to avoid
+    // strict-mode collisions with auto-generated tag pills (e.g.
+    // "Counterspell" appears both as a card name and a tag).
     await expect(
-      deck.getByText("Atraxa, Praetors' Voice")
+      deck.getByRole("button", { name: "Atraxa, Praetors' Voice" })
     ).toBeVisible();
 
-    // Mainboard cards should be present
-    await expect(deck.getByText("Sol Ring")).toBeVisible();
-    await expect(deck.getByText("Command Tower")).toBeVisible();
-    await expect(deck.getByText("Counterspell")).toBeVisible();
+    await expect(deck.getByRole("button", { name: "Sol Ring" })).toBeVisible();
+    await expect(deck.getByRole("button", { name: "Command Tower" })).toBeVisible();
+    await expect(deck.getByRole("button", { name: "Counterspell" })).toBeVisible();
   });
 
   test("shows card counts after import", async ({ deckPage }) => {

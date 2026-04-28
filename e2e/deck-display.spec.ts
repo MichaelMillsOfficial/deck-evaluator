@@ -43,8 +43,11 @@ test.describe("Deck Display", () => {
       "Swords to Plowshares",
       "Counterspell",
     ];
+    // Scope to the card-name button to avoid strict-mode collisions with
+    // auto-generated tag pills (e.g. "Counterspell" tag matches the same
+    // text as the card name).
     for (const card of expectedCards) {
-      await expect(deck.getByText(card)).toBeVisible();
+      await expect(deck.getByRole("button", { name: card })).toBeVisible();
     }
   });
 

@@ -148,6 +148,10 @@ interface DeckSessionContextValue {
   spellbookLoading: boolean;
   commanderWarning: string | null;
   analysisResults: DeckAnalysisResults | null;
+  /** Set or replace the active deck session. Persists to sessionStorage and
+   * triggers enrichment + combo fetches in the background. Used by the
+   * import form to seed a fresh reading before navigating to /ritual. */
+  setPayload: (payload: DeckSessionPayload) => void;
   retryEnrichment: () => void;
   dismissEnrichError: () => void;
   dismissNotFound: () => void;
@@ -332,6 +336,15 @@ export function DeckSessionProvider({ children }: { children: ReactNode }) {
     });
   }, [state.payload]);
 
+  const setPayload = useCallback((next: DeckSessionPayload) => {
+    enrichAbortRef.current?.abort();
+    spellbookAbortRef.current?.abort();
+    enrichedDeckIdRef.current = null;
+    combosDeckIdRef.current = null;
+    saveDeckSession(next);
+    dispatch({ type: "SET_PAYLOAD", payload: next });
+  }, []);
+
   const retryEnrichment = useCallback(() => {
     if (state.payload) {
       enrichedDeckIdRef.current = null;
@@ -369,6 +382,7 @@ export function DeckSessionProvider({ children }: { children: ReactNode }) {
       spellbookLoading: state.spellbookLoading,
       commanderWarning: state.commanderWarning,
       analysisResults,
+      setPayload,
       retryEnrichment,
       dismissEnrichError,
       dismissNotFound,
@@ -383,6 +397,7 @@ export function DeckSessionProvider({ children }: { children: ReactNode }) {
       state.spellbookLoading,
       state.commanderWarning,
       analysisResults,
+      setPayload,
       retryEnrichment,
       dismissEnrichError,
       dismissNotFound,
