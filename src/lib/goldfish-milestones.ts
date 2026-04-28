@@ -8,7 +8,8 @@ export type MilestoneType =
   | "first_spell"
   | "commander_cast"
   | "combo_assembled"
-  | "critical_mass";
+  | "critical_mass"
+  | "snapshot";
 
 export interface BoardMilestone {
   turn: number;
@@ -183,7 +184,7 @@ export function captureSnapshotsAtTurns(
 
     snapshots.push({
       turn: targetTurn,
-      type: "critical_mass",
+      type: "snapshot",
       description: `Turn ${targetTurn} snapshot across ${matchingLogs.length} games`,
       permanentCount: avgPermanentCount,
       landCount: avgLandCount,
