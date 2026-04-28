@@ -1,5 +1,7 @@
 import Link from "next/link";
 import DeckImportSection from "@/components/DeckImportSection";
+import { Card, Eyebrow } from "@/components/ui";
+import styles from "./home.module.css";
 
 const features = [
   "Mana curve and color distribution analysis",
@@ -12,70 +14,57 @@ const features = [
 
 export default function HomePage() {
   return (
-    <main className="flex min-h-screen flex-col items-center px-4 py-16">
-      {/* Hero + import form — centered at readable width */}
-      <div className="w-full max-w-4xl">
-        <div className="mb-10 text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-tight">
-            <span className="block">Magic: The Gathering</span>
-            <span className="block">Deck Evaluator</span>
-          </h1>
-          <p className="mt-4 text-xl text-slate-300">
-            Import your deck and analyze its performance, mana base efficiency,
-            and test it under various scenarios
-          </p>
-        </div>
-      </div>
+    <main className={styles.main}>
+      <header className={styles.hero}>
+        <Eyebrow>DECK EVALUATION · BEGIN A READING</Eyebrow>
+        <h1 className={styles.title}>
+          <span>Magic: The Gathering</span>
+          <br />
+          <span className={styles.titleAccent}>Deck Evaluator</span>
+        </h1>
+        <p className={styles.tagline}>
+          Import your deck and analyze its performance, mana base efficiency,
+          and synergy structure under simulated play.
+        </p>
+      </header>
 
-      {/* Deck import + results — wider to accommodate sidebar + content */}
-      <div className="w-full max-w-7xl">
+      <div className={styles.shell}>
         <DeckImportSection />
 
-        {/* Compare Decks callout */}
-        <div className="mx-auto mt-8 max-w-4xl rounded-xl border border-purple-500/20 bg-purple-500/5 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Card
+          variant="accent"
+          eyebrow="SIDE BY SIDE"
+          aria-labelledby="compare-callout-title"
+        >
+          <div className={styles.compareCard}>
             <div>
-              <h2 className="text-base font-semibold text-white">Compare Decks</h2>
-              <p className="mt-0.5 text-sm text-slate-400">
-                Import two decklists side by side to see card overlap, mana curve differences,
-                and tag composition.
+              <h2 id="compare-callout-title" className={styles.compareTitle}>
+                Compare Decks
+              </h2>
+              <p className={styles.compareCopy}>
+                Import two decklists side by side to see card overlap, mana
+                curve differences, and tag composition.
               </p>
             </div>
-            <Link
-              href="/compare"
-              className="shrink-0 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 motion-reduce:transition-none"
-            >
+            <Link href="/compare" className={styles.compareCta}>
               Compare Decks
             </Link>
           </div>
-        </div>
+        </Card>
 
-        {/* Features section */}
-        <section
-          aria-labelledby="features-heading"
-          className="mx-auto mt-8 max-w-4xl rounded-xl border border-slate-700 bg-slate-800/50 p-6"
-        >
-          <h2
-            id="features-heading"
-            className="mb-4 text-lg font-semibold text-white"
-          >
+        <Card eyebrow="WHAT YOU GET" aria-labelledby="features-heading">
+          <h2 id="features-heading" className={styles.compareTitle}>
             Features
           </h2>
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className={styles.featuresList}>
             {features.map((feature) => (
-              <li
-                key={feature}
-                className="flex items-start gap-2 text-sm text-slate-300"
-              >
-                <span
-                  aria-hidden="true"
-                  className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-purple-500"
-                />
+              <li key={feature} className={styles.featureItem}>
+                <span aria-hidden="true" className={styles.featureBullet} />
                 {feature}
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       </div>
     </main>
   );
