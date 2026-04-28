@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback, type FormEvent } from "react";
 import CommanderInput from "@/components/CommanderInput";
 import CardLookupInput from "@/components/CardLookupInput";
+import { Button, Textarea } from "@/components/ui";
+import styles from "./DeckInput.module.css";
 
 type ImportTab = "manual" | "moxfield" | "archidekt";
 
@@ -154,16 +156,9 @@ export default function DeckInput({
   };
 
   return (
-    <section
-      aria-label="Deck import"
-      className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-6"
-    >
+    <section aria-label="Deck import" className={styles.panel}>
       {/* Tab bar */}
-      <div
-        role="tablist"
-        aria-label="Deck import method"
-        className="mb-6 flex rounded-lg bg-slate-900 p-1"
-      >
+      <div role="tablist" aria-label="Deck import method" className={styles.tabBar}>
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -178,11 +173,7 @@ export default function DeckInput({
               setCommanders([]);
             }}
             onKeyDown={handleTabKeyDown}
-            className={`flex-1 min-h-[44px] rounded-md px-3 py-2.5 sm:px-4 sm:py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 ${
-              activeTab === tab.key
-                ? "bg-slate-600 text-white"
-                : "text-slate-300 hover:text-white"
-            }`}
+            className={styles.tab}
             disabled={loading}
           >
             {tab.label}
@@ -198,25 +189,20 @@ export default function DeckInput({
         <form
           onSubmit={handleSubmit}
           aria-busy={loading}
-          className="flex flex-col gap-4"
+          className={styles.form}
         >
           {/* Moxfield export instructions */}
           {activeTab === "moxfield" && (
-            <div
-              data-testid="moxfield-export-guide"
-              className="rounded-lg border border-slate-600 bg-slate-900/50 px-4 py-3 text-sm text-slate-300"
-            >
-              <p className="mb-2 font-medium text-white">
-                How to import from Moxfield:
-              </p>
-              <ol className="list-inside list-decimal space-y-1 text-slate-400">
+            <div data-testid="moxfield-export-guide" className={styles.guide}>
+              <p className={styles.guideTitle}>How to import from Moxfield</p>
+              <ol className={styles.guideList}>
                 <li>
                   Open your deck on{" "}
-                  <span className="text-purple-400">moxfield.com</span>
+                  <span className={styles.guideAccent}>moxfield.com</span>
                 </li>
                 <li>
-                  Click <strong className="text-slate-300">Export</strong> →{" "}
-                  <strong className="text-slate-300">Copy for MTGO</strong>
+                  Click <strong>Export</strong> →{" "}
+                  <strong>Copy for MTGO</strong>
                 </li>
                 <li>Paste the copied text below</li>
               </ol>
@@ -242,43 +228,36 @@ export default function DeckInput({
 
           {/* Zone format guide (manual tab only) */}
           {activeTab === "manual" && (
-            <details
-              data-testid="zone-format-guide"
-              className="rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-2 text-sm text-slate-400"
-            >
-              <summary className="cursor-pointer select-none font-medium text-slate-300 hover:text-white">
+            <details data-testid="zone-format-guide" className={styles.zoneGuide}>
+              <summary className={styles.zoneSummary}>
                 Zone headers &amp; decklist format
               </summary>
-              <div className="mt-2 space-y-2">
+              <div className={styles.zoneBody}>
                 <p>
                   You can optionally organize your decklist into zones using
                   headers. Each header marks the start of a section — all cards
                   below it belong to that zone until the next header.
                 </p>
-                <ul className="list-inside list-disc space-y-1 text-slate-400">
+                <ul>
                   <li>
-                    <code className="text-purple-400">COMMANDER:</code> — your
-                    commander(s), max 2
+                    <code>COMMANDER:</code> — your commander(s), max 2
                   </li>
                   <li>
-                    <code className="text-purple-400">MAINBOARD:</code> — the
-                    main deck (default if no header)
+                    <code>MAINBOARD:</code> — the main deck (default if no
+                    header)
                   </li>
                   <li>
-                    <code className="text-purple-400">SIDEBOARD:</code> — sideboard
-                    cards
+                    <code>SIDEBOARD:</code> — sideboard cards
                   </li>
                   <li>
-                    <code className="text-purple-400">COMPANION:</code> — treated
-                    as sideboard
+                    <code>COMPANION:</code> — treated as sideboard
                   </li>
                 </ul>
                 <p>
-                  Cards added via search are always placed in the mainboard.
-                  If no headers are used, all cards default to mainboard.
-                  You can also select your commander using the input above
-                  instead of a <code className="text-purple-400">COMMANDER:</code>{" "}
-                  header.
+                  Cards added via search are always placed in the mainboard. If
+                  no headers are used, all cards default to mainboard. You can
+                  also select your commander using the input above instead of a{" "}
+                  <code>COMMANDER:</code> header.
                 </p>
               </div>
             </details>
@@ -286,46 +265,43 @@ export default function DeckInput({
 
           {/* Decklist textarea */}
           <div>
-            <label
-              htmlFor="decklist"
-              className="mb-1 block text-sm font-medium text-slate-300"
-            >
+            <label htmlFor="decklist" className={styles.label}>
               Decklist
             </label>
-            <textarea
+            <Textarea
               ref={textareaRef}
               id="decklist"
               value={textValue}
               onChange={(e) => setTextValue(e.target.value)}
               placeholder={placeholders[activeTab]}
               rows={10}
-              className="w-full rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 font-mono text-sm text-white placeholder-slate-400 focus:border-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 disabled:cursor-not-allowed disabled:opacity-50"
+              mono
               disabled={loading}
               required
             />
           </div>
 
           {/* Actions */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
+          <div className={styles.actions}>
+            <div className={styles.actionsLeft}>
               {activeTab === "manual" && (
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
                   onClick={loadExample}
                   disabled={loading}
-                  className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Load Example
-                </button>
+                </Button>
               )}
             </div>
-            <button
+            <Button
               type="submit"
+              variant="primary"
               disabled={loading || !textValue.trim()}
-              className="rounded-lg bg-purple-600 px-6 py-2 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Loading..." : "Import Deck"}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
