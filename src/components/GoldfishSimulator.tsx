@@ -15,6 +15,7 @@ import GoldfishGameSelector from "@/components/GoldfishGameSelector";
 import type { GameSelection } from "@/components/GoldfishGameSelector";
 import ComboAssemblyChart from "@/components/ComboAssemblyChart";
 import BoardMilestones from "@/components/BoardMilestones";
+import styles from "./GoldfishSimulator.module.css";
 
 interface GoldfishSimulatorProps {
   deck: DeckData;
@@ -39,20 +40,20 @@ interface StatCardProps {
 }
 
 function StatCard({ label, value, sub, accent = "purple" }: StatCardProps) {
-  const accentClass =
+  const valueClass =
     accent === "blue"
-      ? "text-blue-300"
+      ? styles.statTileValueBlue
       : accent === "green"
-        ? "text-green-300"
+        ? styles.statTileValueGreen
         : accent === "amber"
-          ? "text-amber-300"
-          : "text-purple-300";
+          ? styles.statTileValueAmber
+          : styles.statTileValuePurple;
 
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className={`text-xl font-bold ${accentClass}`}>{value}</p>
-      {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+    <div className={styles.statTile}>
+      <p className={styles.statTileLabel}>{label}</p>
+      <p className={`${styles.statTileValue} ${valueClass}`}>{value}</p>
+      {sub && <p className={styles.statTileSub}>{sub}</p>}
     </div>
   );
 }
@@ -65,10 +66,10 @@ function ProgressSteps({
   progress: number;
 }) {
   return (
-    <div className="space-y-3">
-      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-700">
+    <div>
+      <div className={styles.progressTrack}>
         <div
-          className="h-2 rounded-full bg-purple-500 transition-all duration-300"
+          className={styles.progressFill}
           style={{ width: `${progress}%` }}
           role="progressbar"
           aria-valuenow={progress}
@@ -77,29 +78,29 @@ function ProgressSteps({
           aria-label={`Simulation progress: ${progress}%`}
         />
       </div>
-      <ul className="space-y-1.5">
+      <ul className={styles.stepsList}>
         {steps.map((step) => (
-          <li key={step.id} className="flex items-center gap-2 text-sm">
+          <li key={step.id} className={styles.stepItem}>
             {step.status === "done" ? (
-              <span className="text-green-400" aria-hidden="true">
+              <span className={styles.stepIconDone} aria-hidden="true">
                 ✓
               </span>
             ) : step.status === "active" ? (
-              <span className="animate-spin text-purple-400" aria-hidden="true">
+              <span className={styles.stepIconActive} aria-hidden="true">
                 ◌
               </span>
             ) : (
-              <span className="text-slate-600" aria-hidden="true">
+              <span className={styles.stepIconPending} aria-hidden="true">
                 ○
               </span>
             )}
             <span
               className={
                 step.status === "done"
-                  ? "text-slate-300"
+                  ? styles.stepLabelDone
                   : step.status === "active"
-                    ? "text-purple-300"
-                    : "text-slate-500"
+                    ? styles.stepLabelActive
+                    : styles.stepLabelPending
               }
             >
               {step.label}
@@ -285,27 +286,27 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
   }
 
   return (
-    <div data-testid="goldfish-simulator" className="space-y-6">
+    <div data-testid="goldfish-simulator" className={styles.simulator}>
       {/* Config controls */}
       <section
         aria-labelledby="goldfish-config-heading"
-        className="rounded-xl border border-slate-700 bg-slate-800/50 p-4"
+        className={styles.panel}
       >
         <h4
           id="goldfish-config-heading"
-          className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300"
+          className={styles.sectionHeadingSmall}
         >
           Simulation Settings
         </h4>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className={styles.controlsGrid}>
           {/* Turns slider */}
-          <div>
+          <div className={styles.controlGroup}>
             <label
               htmlFor="goldfish-turns"
-              className="mb-1 flex justify-between text-xs text-slate-400"
+              className={styles.sliderLabel}
             >
               <span>Turns</span>
-              <span className="font-semibold text-slate-300">{config.turns}</span>
+              <span className={styles.sliderLabelValue}>{config.turns}</span>
             </label>
             <input
               id="goldfish-turns"
@@ -315,23 +316,23 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
               step={1}
               value={config.turns}
               onChange={handleTurnsChange}
-              className="w-full accent-purple-500"
+              className={styles.slider}
               data-testid="goldfish-turns-slider"
             />
-            <div className="flex justify-between text-xs text-slate-600">
+            <div className={styles.sliderRange}>
               <span>5</span>
               <span>15</span>
             </div>
           </div>
 
           {/* Iterations slider */}
-          <div>
+          <div className={styles.controlGroup}>
             <label
               htmlFor="goldfish-iterations"
-              className="mb-1 flex justify-between text-xs text-slate-400"
+              className={styles.sliderLabel}
             >
               <span>Iterations</span>
-              <span className="font-semibold text-slate-300">
+              <span className={styles.sliderLabelValue}>
                 {config.iterations.toLocaleString()}
               </span>
             </label>
@@ -343,42 +344,42 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
               step={100}
               value={config.iterations}
               onChange={handleIterationsChange}
-              className="w-full accent-purple-500"
+              className={styles.slider}
               data-testid="goldfish-iterations-slider"
             />
-            <div className="flex justify-between text-xs text-slate-600">
+            <div className={styles.sliderRange}>
               <span>100</span>
               <span>5,000</span>
             </div>
           </div>
 
           {/* Play/Draw toggle */}
-          <div>
-            <p className="mb-1 text-xs text-slate-400">Position</p>
-            <div className="flex gap-3">
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <div className={styles.controlGroup}>
+            <p className={styles.positionLabel}>Position</p>
+            <div className={styles.radioGroup}>
+              <label className={styles.radioLabel}>
                 <input
                   type="radio"
                   name="goldfish-position"
                   value="play"
                   checked={config.onThePlay}
                   onChange={handleOnThePlayChange}
-                  className="accent-purple-500"
+                  className={styles.radioInput}
                   data-testid="goldfish-on-the-play"
                 />
-                <span className="text-slate-300">On the play</span>
+                <span>On the play</span>
               </label>
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <label className={styles.radioLabel}>
                 <input
                   type="radio"
                   name="goldfish-position"
                   value="draw"
                   checked={!config.onThePlay}
                   onChange={handleOnThePlayChange}
-                  className="accent-purple-500"
+                  className={styles.radioInput}
                   data-testid="goldfish-on-the-draw"
                 />
-                <span className="text-slate-300">On the draw</span>
+                <span>On the draw</span>
               </label>
             </div>
           </div>
@@ -387,8 +388,8 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
 
       {/* Loading state */}
       {loading && (
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
-          <h4 className="mb-3 text-sm font-semibold text-slate-300">
+        <div className={styles.panel}>
+          <h4 className={styles.loadingHeading}>
             Running {config.iterations.toLocaleString()} games...
           </h4>
           <ProgressSteps steps={steps} progress={progress} />
@@ -397,7 +398,7 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
 
       {/* Error state */}
       {error && (
-        <div className="rounded-xl border border-red-800/50 bg-red-900/20 p-4 text-sm text-red-300">
+        <div className={styles.errorPanel}>
           Simulation error: {error}
         </div>
       )}
@@ -409,15 +410,15 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
           <section aria-labelledby="goldfish-stats-heading">
             <h4
               id="goldfish-stats-heading"
-              className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300"
+              className={styles.sectionHeading}
             >
               Aggregate Statistics
             </h4>
-            <p className="mb-3 text-xs text-slate-500 italic">
+            <p className={styles.statsTagline}>
               Assumes optimal solitaire play with no interaction.
             </p>
             <div
-              className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+              className={styles.statGrid}
               data-testid="goldfish-stat-cards"
             >
               <StatCard
@@ -452,7 +453,7 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
 
             {/* Advanced stat cards */}
             <div
-              className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4"
+              className={styles.statGridSecondary}
               data-testid="goldfish-advanced-stat-cards"
             >
               <StatCard
@@ -491,44 +492,44 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
             <section aria-labelledby="goldfish-ramp-heading">
               <h4
                 id="goldfish-ramp-heading"
-                className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300"
+                className={styles.sectionHeading}
               >
                 Ramp Sources ({stats.rampSources.length})
               </h4>
-              <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-700 text-xs text-slate-500">
-                      <th className="px-3 py-2 text-left font-semibold">Card</th>
-                      <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">Type</th>
-                      <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">CMC</th>
-                      <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Cast Rate</th>
-                      <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Avg Turn</th>
+              <div className={styles.tablePanel}>
+                <table className={styles.table}>
+                  <thead className={styles.tableHead}>
+                    <tr>
+                      <th>Card</th>
+                      <th>Type</th>
+                      <th>CMC</th>
+                      <th>Cast Rate</th>
+                      <th>Avg Turn</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stats.rampSources.map((src: RampSource) => (
                       <tr
                         key={src.name}
-                        className="border-b border-slate-700/50 last:border-0"
+                        className={styles.tableRow}
                       >
-                        <td className="px-3 py-1.5 text-slate-300">{src.name}</td>
-                        <td className="px-3 py-1.5">
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        <td className={styles.tdName}>{src.name}</td>
+                        <td className={styles.tdType}>
+                          <span className={`${styles.badge} ${
                             src.type === "rock"
-                              ? "bg-amber-500/20 text-amber-300"
+                              ? styles.badgeRock
                               : src.type === "dork"
-                                ? "bg-green-500/20 text-green-300"
+                                ? styles.badgeDork
                                 : src.type === "land-search"
-                                  ? "bg-emerald-500/20 text-emerald-300"
-                                  : "bg-red-500/20 text-red-300"
+                                  ? styles.badgeLandSearch
+                                  : styles.badgeRitual
                           }`}>
                             {src.type === "rock" ? "Rock" : src.type === "dork" ? "Dork" : src.type === "land-search" ? "Land Search" : "Ritual"}
                           </span>
                         </td>
-                        <td className="px-3 py-1.5 text-right text-slate-400">{src.cmc}</td>
-                        <td className="px-3 py-1.5 text-right text-slate-300">{src.castRate}%</td>
-                        <td className="px-3 py-1.5 text-right text-slate-400">
+                        <td className={styles.tdNum}>{src.cmc}</td>
+                        <td className={`${styles.tdNum} ${styles.tdNumPrimary}`}>{src.castRate}%</td>
+                        <td className={styles.tdNum}>
                           {src.avgCastTurn !== null ? `T${src.avgCastTurn}` : "—"}
                         </td>
                       </tr>
@@ -543,11 +544,11 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
           {comboStats && comboStats.perCombo.length > 0 && (
             <section
               aria-labelledby="goldfish-combo-heading"
-              className="rounded-xl border border-slate-700 bg-slate-800/50 p-4"
+              className={styles.panel}
             >
               <h4
                 id="goldfish-combo-heading"
-                className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300"
+                className={styles.sectionHeading}
               >
                 Combo Assembly
               </h4>
@@ -559,7 +560,7 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
           {milestones.length > 0 && (
             <section
               aria-labelledby="goldfish-milestones-outer-heading"
-              className="rounded-xl border border-slate-700 bg-slate-800/50 p-4"
+              className={styles.panel}
             >
               <span id="goldfish-milestones-outer-heading" className="sr-only">
                 Board State Milestones
@@ -572,11 +573,11 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
           <section aria-labelledby="goldfish-chart-heading">
             <h4
               id="goldfish-chart-heading"
-              className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-300"
+              className={styles.sectionHeading}
             >
               Mana Development
             </h4>
-            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-3">
+            <div className={styles.chartWrapper}>
               <GoldfishManaChart stats={stats} turns={config.turns} />
             </div>
           </section>
@@ -591,7 +592,7 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
               />
 
               {displayedGame && (
-                <div className="mt-4">
+                <div className={styles.timelineWrapper}>
                   <GoldfishTurnTimeline game={displayedGame} />
                 </div>
               )}
@@ -602,8 +603,8 @@ export default function GoldfishSimulator({ deck, cardMap }: GoldfishSimulatorPr
 
       {/* Empty state */}
       {!loading && !error && !stats && (
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-8 text-center">
-          <p className="text-slate-400">
+        <div className={styles.emptyPanel}>
+          <p className={styles.emptyText}>
             Simulation starting...
           </p>
         </div>

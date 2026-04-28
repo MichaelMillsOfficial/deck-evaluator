@@ -1,0 +1,454 @@
+/* ─────────────────────────────────────────────────────────────
+   GoldfishSimulator — Astral token-driven styles
+   Replaces inline Tailwind utilities with semantic CSS tokens.
+───────────────────────────────────────────────────────────── */
+
+/* Root wrapper */
+.simulator {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* ─── Section panel (generic card chrome) ─────────────────── */
+.panel {
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  padding: var(--space-12) var(--card-padding);
+}
+
+.panelCompact {
+  padding: var(--space-8) var(--space-12);
+}
+
+/* ─── Section eyebrow headings ─────────────────────────────── */
+.sectionHeading {
+  margin: 0 0 var(--space-8);
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: var(--weight-medium);
+}
+
+.sectionHeadingSmall {
+  margin: 0 0 var(--space-8);
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ink-secondary);
+  font-weight: var(--weight-medium);
+}
+
+/* ─── Config controls grid ─────────────────────────────────── */
+.controlsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-12);
+}
+
+@media (min-width: 640px) {
+  .controlsGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.controlGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sliderLabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: 0.04em;
+  color: var(--ink-tertiary);
+  margin-bottom: var(--space-2);
+}
+
+.sliderLabelValue {
+  font-weight: var(--weight-semibold);
+  color: var(--ink-secondary);
+}
+
+.slider {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.sliderRange {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: 0.04em;
+  color: var(--ink-disabled);
+  margin-top: var(--space-1);
+}
+
+.positionLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: 0.04em;
+  color: var(--ink-tertiary);
+  margin-bottom: var(--space-5);
+}
+
+.radioGroup {
+  display: flex;
+  gap: var(--space-10);
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--ink-secondary);
+  cursor: pointer;
+}
+
+.radioInput {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ─── Loading state ────────────────────────────────────────── */
+.loadingHeading {
+  margin: 0 0 var(--space-8);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink-secondary);
+}
+
+.progressTrack {
+  height: 6px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2-hi);
+  margin-bottom: var(--space-8);
+}
+
+.progressFill {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-gradient);
+  transition: width var(--dur-base) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    transition: none;
+  }
+}
+
+.stepsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.stepItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.stepIconDone {
+  color: var(--status-ok);
+  flex-shrink: 0;
+}
+
+.stepIconActive {
+  color: var(--accent);
+  flex-shrink: 0;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepIconActive {
+    animation: none;
+  }
+}
+
+.stepIconPending {
+  color: var(--ink-disabled);
+  flex-shrink: 0;
+}
+
+.stepLabelDone {
+  color: var(--ink-secondary);
+}
+
+.stepLabelActive {
+  color: var(--accent);
+}
+
+.stepLabelPending {
+  color: var(--ink-tertiary);
+}
+
+/* ─── Error state ──────────────────────────────────────────── */
+.errorPanel {
+  border-radius: var(--card-radius);
+  border: 1px solid rgba(255, 134, 160, 0.30);
+  background: var(--status-warn-soft);
+  padding: var(--space-12) var(--card-padding);
+  font-size: var(--text-sm);
+  color: var(--status-warn);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+}
+
+/* ─── Empty / starting state ───────────────────────────────── */
+.emptyPanel {
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  padding: var(--space-32) var(--card-padding);
+  text-align: center;
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+}
+
+.emptyText {
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+}
+
+/* ─── Stats tagline ────────────────────────────────────────── */
+.statsTagline {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--text-sm);
+  color: var(--ink-tertiary);
+  margin: 0 0 var(--space-8);
+  line-height: var(--leading-snug);
+}
+
+/* ─── Stat cards grid ──────────────────────────────────────── */
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-8);
+}
+
+@media (min-width: 640px) {
+  .statGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.statGridSecondary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+
+@media (min-width: 640px) {
+  .statGridSecondary {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ─── Stat tile (StatCard sub-component) ───────────────────── */
+.statTile {
+  padding: var(--space-7) var(--space-8);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.statTileLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-eyebrow);
+  color: var(--ink-tertiary);
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.statTileValue {
+  font-family: var(--font-serif);
+  font-size: var(--text-h3);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  letter-spacing: var(--tracking-tight);
+}
+
+.statTileValuePurple {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.statTileValueBlue {
+  color: var(--cyan-400);
+}
+
+.statTileValueGreen {
+  color: var(--status-ok);
+}
+
+.statTileValueAmber {
+  color: var(--status-watch);
+}
+
+.statTileSub {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  color: var(--ink-tertiary);
+  letter-spacing: 0.04em;
+}
+
+/* ─── Ramp sources table ───────────────────────────────────── */
+.tablePanel {
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  overflow: hidden;
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+}
+
+.table {
+  width: 100%;
+  font-size: var(--text-sm);
+  border-collapse: collapse;
+}
+
+.tableHead th {
+  padding: var(--space-5) var(--space-8);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.tableHead th:not(:first-child) {
+  text-align: right;
+}
+
+.tableRow {
+  border-bottom: 1px solid var(--border);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.tableRow:last-child {
+  border-bottom: none;
+}
+
+.tableRow:hover {
+  background: var(--accent-soft);
+}
+
+.tdName {
+  padding: var(--space-5) var(--space-8);
+  color: var(--ink-secondary);
+}
+
+.tdType {
+  padding: var(--space-5) var(--space-8);
+  white-space: nowrap;
+}
+
+.tdNum {
+  padding: var(--space-5) var(--space-8);
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--ink-tertiary);
+  white-space: nowrap;
+}
+
+.tdNumPrimary {
+  color: var(--ink-secondary);
+}
+
+/* ─── Ramp type badge ──────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-5);
+  font-size: var(--text-caption);
+  font-family: var(--font-mono);
+  letter-spacing: var(--tag-tracking);
+  font-weight: var(--weight-medium);
+}
+
+.badgeRock {
+  background: var(--status-watch-soft);
+  color: var(--status-watch);
+}
+
+.badgeDork {
+  background: rgba(134, 239, 172, 0.12);
+  color: var(--status-ok);
+}
+
+.badgeLandSearch {
+  background: rgba(134, 239, 172, 0.08);
+  color: var(--ok-400);
+}
+
+.badgeRitual {
+  background: var(--status-warn-soft);
+  color: var(--status-warn);
+}
+
+/* ─── Chart wrapper ────────────────────────────────────────── */
+.chartWrapper {
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  padding: var(--space-8) var(--space-12);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+}
+
+/* ─── Timeline wrapper ─────────────────────────────────────── */
+.timelineWrapper {
+  margin-top: var(--space-12);
+}
+
+/* ─── Focus ring (interactive elements) ────────────────────── */
+.slider:focus-visible,
+.radioInput:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--accent);
+  border-radius: var(--radius-sm);
+}
