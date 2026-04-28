@@ -3,6 +3,7 @@
 import { useDeckSession } from "@/contexts/DeckSessionContext";
 import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 import GoldfishSimulator from "@/components/GoldfishSimulator";
 
 export default function GoldfishPage() {
@@ -26,6 +27,7 @@ export default function GoldfishPage() {
         Goldfish Simulator
       </h2>
       <GoldfishSimulator deck={payload.deck} cardMap={payload.cardMap} />
+      <ChapterFooter current="goldfish" />
     </section>
   );
 }

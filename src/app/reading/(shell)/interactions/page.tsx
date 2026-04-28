@@ -7,6 +7,7 @@ import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader, {
   type SectionStat,
 } from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 import InteractionSection from "@/components/InteractionSection";
 
 export default function InteractionsPage() {
@@ -89,6 +90,7 @@ export default function InteractionsPage() {
         expandedSections={expandedSections}
         onToggleSection={toggle}
       />
+      <ChapterFooter current="interactions" />
     </section>
   );
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
 import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 
 export default function ComparePage() {
   const { payload } = useDeckSession();
@@ -63,6 +64,7 @@ export default function ComparePage() {
           Open Compare
         </Link>
       </div>
+      <ChapterFooter current="compare" />
     </div>
   );
 }

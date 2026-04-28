@@ -9,6 +9,7 @@ import {
 } from "@/lib/export-report";
 import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 import DiscordExportModal from "@/components/DiscordExportModal";
 import styles from "./share.module.css";
 
@@ -251,6 +252,7 @@ export default function SharePage() {
             {secondary.map((tile) => renderTile(tile, "secondary"))}
           </div>
         </div>
+        <ChapterFooter current="share" />
       </div>
 
       <DiscordExportModal

@@ -10,6 +10,7 @@ import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader, {
   type SectionStat,
 } from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 import SuggestionsPanel from "@/components/SuggestionsPanel";
 
 const HEALTH_LABEL: Record<string, string> = {
@@ -86,6 +87,7 @@ export default function SuggestionsPage() {
         synergyAnalysis={analysisResults.synergyAnalysis}
         scorecard={scorecard}
       />
+      <ChapterFooter current="suggestions" />
     </div>
   );
 }

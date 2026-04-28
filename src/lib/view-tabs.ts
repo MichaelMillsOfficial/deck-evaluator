@@ -90,3 +90,51 @@ export function tabFromPathname(pathname: string): ViewTab | null {
   }
   return null;
 }
+
+/**
+ * Editorial reading order for the chapter-footer prev/next links.
+ * Walks the user through: see the cards → understand the shape →
+ * study the mechanics → simulate play → tune → share.
+ */
+export const READING_ORDER: ViewTab[] = [
+  "list",
+  "analysis",
+  "synergy",
+  "interactions",
+  "hands",
+  "goldfish",
+  "additions",
+  "suggestions",
+  "compare",
+  "share",
+];
+
+export interface ReadingNeighbor {
+  tab: ViewTab;
+  label: string;
+  route: string;
+}
+
+/**
+ * Resolve the previous and next chapters for a given tab in editorial
+ * reading order. Returns null at the boundaries.
+ */
+export function readingNeighbors(tab: ViewTab): {
+  prev: ReadingNeighbor | null;
+  next: ReadingNeighbor | null;
+} {
+  const idx = READING_ORDER.indexOf(tab);
+  const prevTab = idx > 0 ? READING_ORDER[idx - 1] : null;
+  const nextTab =
+    idx >= 0 && idx < READING_ORDER.length - 1
+      ? READING_ORDER[idx + 1]
+      : null;
+  const toNeighbor = (t: ViewTab): ReadingNeighbor => {
+    const def = ALL_TABS.find((x) => x.key === t)!;
+    return { tab: t, label: def.label, route: TAB_ROUTES[t] };
+  };
+  return {
+    prev: prevTab ? toNeighbor(prevTab) : null,
+    next: nextTab ? toNeighbor(nextTab) : null,
+  };
+}

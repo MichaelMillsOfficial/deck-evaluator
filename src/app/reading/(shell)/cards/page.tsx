@@ -6,6 +6,7 @@ import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader, {
   type SectionStat,
 } from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 import DeckList from "@/components/DeckList";
 
 export default function CardsPage() {
@@ -71,6 +72,7 @@ export default function CardsPage() {
         cardMap={cardMap}
         enrichLoading={enrichLoading}
       />
+      <ChapterFooter current="list" />
     </div>
   );
 }

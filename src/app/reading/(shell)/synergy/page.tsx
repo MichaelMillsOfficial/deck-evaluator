@@ -6,6 +6,7 @@ import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader, {
   type SectionStat,
 } from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 import SynergySection from "@/components/SynergySection";
 
 export default function SynergyPage() {
@@ -79,6 +80,7 @@ export default function SynergyPage() {
         spellbookCombos={payload.spellbookCombos}
         spellbookLoading={spellbookLoading}
       />
+      <ChapterFooter current="synergy" />
     </section>
   );
 }

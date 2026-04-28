@@ -6,6 +6,7 @@ import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader, {
   type SectionStat,
 } from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 import DeckAnalysis from "@/components/DeckAnalysis";
 
 type ColorKey = "W" | "U" | "B" | "R" | "G";
@@ -105,6 +106,7 @@ export default function CompositionPage() {
         spellbookCombos={payload.spellbookCombos}
         analysisResults={analysisResults ?? undefined}
       />
+      <ChapterFooter current="analysis" />
     </div>
   );
 }

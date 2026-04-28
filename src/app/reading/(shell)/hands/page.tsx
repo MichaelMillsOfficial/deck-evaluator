@@ -6,6 +6,7 @@ import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader, {
   type SectionStat,
 } from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 import HandSimulator from "@/components/HandSimulator";
 
 export default function HandsPage() {
@@ -72,6 +73,7 @@ export default function HandsPage() {
         expandedSections={expandedSections}
         onToggleSection={toggle}
       />
+      <ChapterFooter current="hands" />
     </section>
   );
 }

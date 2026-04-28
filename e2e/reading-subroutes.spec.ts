@@ -53,4 +53,28 @@ test.describe("/reading/* sub-route fan-out", () => {
       sidebar.getByRole("tab", { name: "Synergy" })
     ).toHaveAttribute("aria-selected", "true");
   });
+
+  test("chapter footer renders prev/next/index links per editorial order", async ({
+    deckPage,
+  }) => {
+    // First chapter: no prev, next is Composition (the second item).
+    await deckPage.page.goto("/reading/cards");
+    const firstFooter = deckPage.page.getByTestId("chapter-footer-list");
+    await expect(firstFooter).toBeVisible({ timeout: 15_000 });
+    await expect(firstFooter.getByRole("link", { name: /all sections/i })).toBeVisible();
+    await expect(firstFooter.getByRole("link", { name: /analysis/i })).toBeVisible();
+
+    // Middle chapter: both prev (Synergy) and next (Hands) wired.
+    await deckPage.page.goto("/reading/interactions");
+    const midFooter = deckPage.page.getByTestId("chapter-footer-interactions");
+    await expect(midFooter).toBeVisible({ timeout: 15_000 });
+    await expect(midFooter.getByRole("link", { name: /synergy/i })).toBeVisible();
+    await expect(midFooter.getByRole("link", { name: /hands/i })).toBeVisible();
+
+    // Last chapter: prev is Compare, no next.
+    await deckPage.page.goto("/reading/share");
+    const lastFooter = deckPage.page.getByTestId("chapter-footer-share");
+    await expect(lastFooter).toBeVisible({ timeout: 15_000 });
+    await expect(lastFooter.getByRole("link", { name: /compare/i })).toBeVisible();
+  });
 });

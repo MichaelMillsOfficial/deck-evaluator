@@ -9,6 +9,7 @@ import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader, {
   type SectionStat,
 } from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 import AdditionsPanel from "@/components/AdditionsPanel";
 
 export default function AddPage() {
@@ -190,6 +191,7 @@ export default function AddPage() {
         onRetryCard={handleRetry}
         deckCardNames={deckCardNames}
       />
+      <ChapterFooter current="additions" />
     </div>
   );
 }
