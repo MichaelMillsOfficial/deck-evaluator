@@ -1,0 +1,78 @@
+.panel {
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  overflow: hidden;
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+}
+
+.toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-8);
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease-out);
+}
+
+.toggle:hover {
+  background: var(--accent-soft);
+}
+
+.toggle:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--ink-tertiary);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+
+.title {
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ink-secondary);
+  font-weight: var(--weight-medium);
+}
+
+.toggle:hover .title,
+.toggle[aria-expanded="true"] .title {
+  color: var(--accent);
+}
+
+.summary {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+}
+
+.content {
+  padding: 0 var(--space-8) var(--space-10);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-7);
+}

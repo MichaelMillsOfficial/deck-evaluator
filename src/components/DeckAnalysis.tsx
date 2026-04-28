@@ -39,6 +39,7 @@ import TopExpensiveCardsTable from "@/components/TopExpensiveCardsTable";
 import PriceByCategoryChart from "@/components/PriceByCategoryChart";
 import CreatureTypeBreakdown from "@/components/CreatureTypeBreakdown";
 import SupertypeBreakdown from "@/components/SupertypeBreakdown";
+import styles from "./DeckAnalysis.module.css";
 
 const ANALYSIS_SECTIONS = [
   { id: "commander", label: "Commander" },
@@ -182,7 +183,7 @@ export default function DeckAnalysis({
   );
 
   return (
-    <div className="space-y-3">
+    <div className={styles.list}>
       <SectionNav
         sections={ANALYSIS_SECTIONS}
         expandedSections={expandedSections}
@@ -233,7 +234,7 @@ export default function DeckAnalysis({
         summary={
           <span
             data-testid="classification-summary-badge"
-            className="rounded border px-1.5 py-0.5 text-xs font-semibold bg-slate-700/50 border-slate-600 text-slate-300"
+            className={styles.classificationBadge}
           >
             B{bracketResult.bracket} | PL{powerLevel.powerLevel}
           </span>
@@ -255,12 +256,12 @@ export default function DeckAnalysis({
           >
             Mana Curve
           </h3>
-          <p className="mb-4 text-xs text-slate-400" data-testid="curve-subtitle">
+          <p className={styles.tagline} data-testid="curve-subtitle">
             {allEnabled
               ? `${totalAllSpells} non-land spells by converted mana cost`
               : `${filteredSpells} of ${totalAllSpells} non-land spells by converted mana cost`}
           </p>
-          <div className="mb-4">
+          <div className={styles.filterWrap}>
             <TypeFilterBar
               enabledTypes={enabledTypes}
               onToggle={handleToggle}
@@ -284,7 +285,7 @@ export default function DeckAnalysis({
           >
             Color Distribution
           </h3>
-          <p className="mb-4 text-xs text-slate-400">
+          <p className={styles.tagline}>
             Mana sources versus pip demand by color
           </p>
           <ManaBaseStats metrics={metrics} />
@@ -322,7 +323,7 @@ export default function DeckAnalysis({
         expanded={expandedSections.has("budget")}
         onToggle={() => onToggleSection("budget")}
       >
-        <div className="space-y-6">
+        <div className={styles.budgetStack}>
           <BudgetStats result={budgetAnalysis} />
           <PriceDistributionChart data={budgetAnalysis.distribution} />
           <TopExpensiveCardsTable cards={budgetAnalysis.mostExpensive} />
