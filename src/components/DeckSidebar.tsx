@@ -570,11 +570,17 @@ export function DeckSidebar({
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className={styles.collapseToggle}
+        className={[
+          styles.collapseToggle,
+          collapsed && styles.collapseToggleCollapsed,
+        ]
+          .filter(Boolean)
+          .join(" ")}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
         {collapsed ? <IconChevronRight /> : <IconChevronLeft />}
+        {!collapsed && <span className={styles.collapseLabel}>Collapse</span>}
       </button>
     </div>
   );
