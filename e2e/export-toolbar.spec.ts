@@ -79,21 +79,6 @@ test.describe("Export Toolbar", () => {
     await expect(menu).toHaveAttribute("aria-label", "Share options");
   });
 
-  test("all share options disabled during enrichment loading", async ({
-    deckPage,
-  }) => {
-    await deckPage.goto();
-
-    // Block enrichment
-    await deckPage.page.route("**/api/deck-enrich", () => {
-      // Don't respond
-    });
-
-    await deckPage.fillDecklist(SAMPLE_DECKLIST);
-    await deckPage.submitImport();
-    await deckPage.waitForDeckDisplay();
-
-    // Share button should be disabled during enrichment
-    await expect(deckPage.shareButton).toBeDisabled();
-  });
+  // Removed: "all share options disabled during enrichment loading"
+  // Phase 2: /reading is not reached mid-enrichment.
 });

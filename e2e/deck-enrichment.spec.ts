@@ -112,40 +112,10 @@ test.describe("Deck Enrichment", () => {
     ).toBeVisible();
   });
 
-  test("basic decklist renders immediately before enrichment", async ({
-    deckPage,
-  }) => {
-    const { page } = deckPage;
-
-    // Hold enrichment until we assert the loading indicator.
-    // This avoids timing flakiness from a fixed delay.
-    let releaseEnrichment: (() => void) | null = null;
-    await page.route("**/api/deck-enrich", async (route) => {
-      await new Promise<void>((resolve) => {
-        releaseEnrichment = resolve;
-        setTimeout(resolve, 500);
-      });
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(MOCK_ENRICH_RESPONSE),
-      });
-    });
-
-    await deckPage.goto();
-    await deckPage.fillDecklist("1 Sol Ring\n1 Command Tower");
-    await deckPage.submitImport();
-
-    // Basic decklist should appear immediately
-    await deckPage.waitForDeckDisplay();
-    await expect(deckPage.deckDisplay.getByText("Sol Ring")).toBeVisible();
-
-    // Loading card details indicator should be shown
-    await expect(page.getByText("Enriching card data...")).toBeVisible();
-
-    // Release so the test completes cleanly
-    releaseEnrichment?.();
-  });
+  // Removed: "basic decklist renders immediately before enrichment"
+  // Phase 2 holds the user on /ritual until enrichment terminates, so the
+  // deck no longer renders "before" enrichment. The fast-path UX now lives
+  // in /ritual (covered by e2e/loading-ritual.spec.ts).
 
   test("import flow does not block on enrichment", async ({
     deckPage,
@@ -739,39 +709,11 @@ test.describe("Deck Enrichment — Accessibility", () => {
     await expect(pip).toHaveCount(1);
   });
 
-  test("loading card details element has role=status", async ({
-    deckPage,
-  }) => {
-    const { page } = deckPage;
-
-    // Hold enrichment until we assert the loading element
-    let releaseEnrichment: (() => void) | null = null;
-    await page.route("**/api/deck-enrich", async (route) => {
-      await new Promise<void>((resolve) => {
-        releaseEnrichment = resolve;
-        setTimeout(resolve, 500);
-      });
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(MOCK_ENRICH_RESPONSE),
-      });
-    });
-
-    await deckPage.goto();
-    await deckPage.fillDecklist("1 Sol Ring");
-    await deckPage.submitImport();
-    await deckPage.waitForDeckDisplay();
-
-    const loadingStatus = page.locator(
-      'text="Enriching card data..."'
-    );
-    await expect(loadingStatus).toBeVisible();
-    await expect(loadingStatus).toHaveAttribute("role", "status");
-
-    // Release so the test completes cleanly
-    releaseEnrichment?.();
-  });
+  // Removed: "loading card details element has role=status"
+  // The inline "Enriching card data..." status element no longer exists on
+  // /reading after Phase 2 — users don't see /reading until enrichment is
+  // done. The /ritual loader carries role=status now (verified in
+  // e2e/loading-ritual.spec.ts).
 
   test("enrichment error warning has role=alert", async ({ deckPage }) => {
     const { page } = deckPage;

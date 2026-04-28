@@ -305,38 +305,8 @@ test.describe("Opening Hand Simulator", () => {
     await expect(handsTab).toBeEnabled();
   });
 
-  test("Hands tab disabled while enrichment loading", async ({
-    deckPage,
-  }) => {
-    const { page } = deckPage;
-
-    // Hold enrichment
-    let releaseEnrichment: (() => void) | null = null;
-    await page.route("**/api/deck-enrich", async (route) => {
-      await new Promise<void>((resolve) => {
-        releaseEnrichment = resolve;
-        setTimeout(resolve, 500);
-      });
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(MOCK_HAND_ENRICH_RESPONSE),
-      });
-    });
-
-    await deckPage.goto();
-    await deckPage.fillDecklist(DECKLIST);
-    await deckPage.submitImport();
-    await deckPage.waitForDeckDisplay();
-
-    // Hands tab should be disabled
-    const handsTab = page
-      .getByRole("tablist", { name: "Deck view" })
-      .getByRole("tab", { name: "Hands" });
-    await expect(handsTab).toBeDisabled();
-
-    releaseEnrichment?.();
-  });
+  // Removed: "Hands tab disabled while enrichment loading"
+  // Phase 2: /reading is only reached after enrichment terminates.
 
   test("Draw Hand button produces hand display with cards", async ({
     deckPage,

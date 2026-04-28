@@ -63,19 +63,11 @@ test.describe("Goldfish Simulator Tab", () => {
     await expect(deckHeader.getByText("BETA").first()).toBeVisible();
   });
 
-  test("Goldfish tab is disabled without enrichment", async ({ deckPage }) => {
-    await deckPage.fillDecklist(SAMPLE_DECKLIST);
-    await deckPage.submitImport();
-    await deckPage.waitForDeckDisplay();
-
-    // Before enrichment, the Goldfish tab should be disabled
-    // Enrichment-required tabs are typically aria-disabled or have a specific state
-    const goldfishTab = deckPage.page.getByRole("tab", { name: /Goldfish/i });
-    // Check it's not clickable / is disabled
-    const ariaDisabled = await goldfishTab.getAttribute("aria-disabled");
-    const isDisabled = await goldfishTab.isDisabled();
-    expect(ariaDisabled === "true" || isDisabled).toBe(true);
-  });
+  // Removed: "Goldfish tab is disabled without enrichment"
+  // Phase 2: /reading is only reached after enrichment terminates, so the
+  // unenriched Goldfish-disabled state is unobservable. Coverage of the
+  // enabled state remains in "Goldfish simulator renders when tab activated
+  // after enrichment".
 
   test("Goldfish simulator renders when tab activated after enrichment", async ({
     deckPage,

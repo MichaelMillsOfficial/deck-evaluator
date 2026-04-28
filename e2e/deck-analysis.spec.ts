@@ -467,49 +467,11 @@ test.describe("Deck Analysis — Tab Navigation", () => {
   });
 });
 
-test.describe("Deck Analysis — Tab Availability", () => {
-  test("Analysis tab disabled while enrichment loads, enabled after completion", async ({
-    deckPage,
-  }) => {
-    const { page } = deckPage;
-
-    // Delay enrichment to observe disabled state.
-    // Use a generous delay so the disabled assertion runs before the response
-    // arrives, even on slow CI machines.
-    let fulfillEnrichment: (() => void) | null = null;
-    await page.route("**/api/deck-enrich", async (route) => {
-      await new Promise<void>((resolve) => {
-        fulfillEnrichment = resolve;
-        // Auto-resolve after 500ms as safety net
-        setTimeout(resolve, 500);
-      });
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(MOCK_ANALYSIS_RESPONSE),
-      });
-    });
-
-    await deckPage.goto();
-    await deckPage.fillDecklist(
-      "1 Sol Ring\n1 Counterspell\n1 Cultivate\n1 Command Tower"
-    );
-    await deckPage.submitImport();
-    await deckPage.waitForDeckDisplay();
-
-    const tablist = page.getByRole("tablist", { name: "Deck view" });
-    const analysisTab = tablist.getByRole("tab", { name: "Analysis" });
-
-    // Should be disabled while loading
-    await expect(analysisTab).toBeDisabled();
-
-    // Release the enrichment response
-    fulfillEnrichment?.();
-
-    // Wait for enrichment to complete, then it should be enabled
-    await expect(analysisTab).toBeEnabled({ timeout: 10_000 });
-  });
-});
+// Removed: "Analysis tab disabled while enrichment loads, enabled after completion"
+// Phase 2 redesign moved the loading state from inline-on-/reading to the
+// /ritual route. Users no longer reach /reading until enrichment terminates,
+// so the "tab disabled while loading" UI no longer exists. Loading-state
+// coverage now lives in e2e/loading-ritual.spec.ts.
 
 test.describe("Deck Analysis — Mana Curve Content", () => {
   test.beforeEach(async ({ deckPage }) => {
