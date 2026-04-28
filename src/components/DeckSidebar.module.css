@@ -29,6 +29,7 @@
 }
 
 .collapseToggle {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -46,6 +47,14 @@
   text-transform: uppercase;
   cursor: pointer;
   transition: color var(--dur-fast) var(--ease-out);
+}
+
+/* Right-size the chevron so it visually balances with the 10px mono
+   uppercase label rather than reading like an outsized arrow. */
+.collapseToggle > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .collapseToggleCollapsed {
