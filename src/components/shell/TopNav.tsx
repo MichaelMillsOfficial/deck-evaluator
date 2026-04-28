@@ -28,10 +28,41 @@ export function TopNav() {
                 <stop offset="100%" stopColor="var(--aura-400)" />
               </linearGradient>
             </defs>
-            <path
-              d="M12 2l2.09 6.26L20.18 9.27l-5.09 3.9L16.18 19.27 12 15.77l-4.18 3.5 1.09-6.1-5.09-3.9 6.09-1.01z"
-              fill="url(#brand-grad)"
+            {/* Outer tilted orbit */}
+            <ellipse
+              cx="12"
+              cy="12"
+              rx="9.5"
+              ry="4.4"
+              transform="rotate(18 12 12)"
+              fill="none"
+              stroke="url(#brand-grad)"
+              strokeWidth="0.7"
+              opacity="0.55"
             />
+            {/* Inner counter-tilted orbit */}
+            <ellipse
+              cx="12"
+              cy="12"
+              rx="6"
+              ry="2.8"
+              transform="rotate(-25 12 12)"
+              fill="none"
+              stroke="url(#brand-grad)"
+              strokeWidth="0.85"
+              opacity="0.75"
+            />
+            {/* Central star outline (5-pointed) */}
+            <path
+              d="M12 8 L12.94 10.71 L15.80 10.76 L13.52 12.49 L14.35 15.24 L12 13.6 L9.65 15.24 L10.48 12.49 L8.20 10.76 L11.06 10.71 Z"
+              fill="none"
+              stroke="url(#brand-grad)"
+              strokeWidth="1.1"
+              strokeLinejoin="round"
+            />
+            {/* Planets — one per orbit */}
+            <circle cx="17" cy="11.5" r="1.0" fill="url(#brand-grad)" />
+            <circle cx="6" cy="7" r="0.85" fill="url(#brand-grad)" />
           </svg>
           <span className={styles.brandWordmark} data-testid="brand-wordmark">
             MTG Deck Evaluator

@@ -180,3 +180,16 @@
   text-transform: uppercase;
   color: var(--status-ok);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .button {
+    transition: none;
+  }
+  .button:active:not(:disabled) {
+    transform: none;
+  }
+  .buttonPrimary:hover:not(:disabled) {
+    filter: none;
+  }
+}
