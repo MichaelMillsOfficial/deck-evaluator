@@ -14,10 +14,6 @@ import {
   tabFromPathname,
 } from "@/lib/view-tabs";
 import { SYNERGY_AXES } from "@/lib/synergy-axes";
-import {
-  formatMarkdownReport,
-  formatJsonReport,
-} from "@/lib/export-report";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import styles from "./DeckSidebar.module.css";
@@ -122,14 +118,6 @@ function IconChevronDown({ rotated }: { rotated?: boolean }) {
       }}
     >
       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-    </svg>
-  );
-}
-
-function IconShare() {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true">
-      <path d="M13 4.5a2.5 2.5 0 11.702 1.737L6.97 9.604a2.518 2.518 0 010 .792l6.733 3.367a2.5 2.5 0 11-.671 1.341l-6.733-3.367a2.5 2.5 0 110-3.474l6.733-3.367A2.52 2.52 0 0113 4.5z" />
     </svg>
   );
 }
@@ -325,141 +313,6 @@ function NavButton({
 }
 
 // ---------------------------------------------------------------------------
-// Share menu
-// ---------------------------------------------------------------------------
-
-function ShareMenu({
-  analysisResults,
-  enrichLoading,
-  onCopyMarkdown,
-  onCopyJson,
-  onDiscord,
-  onShareLink,
-  onSaveImage,
-  copyFeedback,
-  collapsed,
-}: {
-  analysisResults: DeckAnalysisResults | null;
-  enrichLoading: boolean;
-  onCopyMarkdown: () => void;
-  onCopyJson: () => void;
-  onDiscord: () => void;
-  onShareLink: () => void;
-  onSaveImage: () => void;
-  copyFeedback: string | null;
-  collapsed: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (
-        menuRef.current && !menuRef.current.contains(e.target as Node) &&
-        buttonRef.current && !buttonRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  // Close on Escape (stopPropagation prevents drawer from also closing)
-  useEffect(() => {
-    if (!open) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        setOpen(false);
-        buttonRef.current?.focus();
-      }
-    };
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [open]);
-
-  const disabled = !analysisResults || enrichLoading;
-
-  return (
-    <div className={styles.shareWrap}>
-      {copyFeedback && <span className={styles.copyFeedback}>{copyFeedback}</span>}
-      <button
-        ref={buttonRef}
-        type="button"
-        data-testid="share-button"
-        disabled={disabled}
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-haspopup="true"
-        title={disabled ? "Waiting for card enrichment..." : "Share deck analysis"}
-        className={[styles.shareButton, collapsed && styles.shareButtonCollapsed]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        <IconShare />
-        {!collapsed && "Share"}
-      </button>
-
-      {open && (
-        <div
-          ref={menuRef}
-          data-testid="share-menu"
-          aria-label="Share options"
-          className={styles.shareMenu}
-        >
-          <button
-            type="button"
-            onClick={() => { onCopyMarkdown(); setOpen(false); }}
-            disabled={!analysisResults}
-            className={styles.shareMenuItem}
-          >
-            Copy as Markdown
-          </button>
-          <button
-            type="button"
-            onClick={() => { onCopyJson(); setOpen(false); }}
-            disabled={!analysisResults}
-            className={styles.shareMenuItem}
-          >
-            Copy as JSON
-          </button>
-          <button
-            type="button"
-            onClick={() => { onDiscord(); setOpen(false); }}
-            disabled={!analysisResults}
-            className={styles.shareMenuItem}
-          >
-            Export to Discord...
-          </button>
-          <button
-            type="button"
-            onClick={() => { onSaveImage(); setOpen(false); }}
-            disabled={!analysisResults}
-            data-testid="save-as-image-button"
-            className={styles.shareMenuItem}
-          >
-            Save as Image
-          </button>
-          <hr className={styles.shareMenuDivider} />
-          <button
-            type="button"
-            onClick={() => { onShareLink(); setOpen(false); }}
-            disabled={disabled}
-            className={styles.shareMenuItem}
-          >
-            Copy Share Link
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Sidebar inner content (shared between desktop and drawer)
 // ---------------------------------------------------------------------------
 
@@ -469,9 +322,6 @@ interface SidebarContentProps {
   enrichLoading: boolean;
   enrichError: string | null;
   analysisResults: DeckAnalysisResults | null;
-  onOpenDiscordModal?: () => void;
-  onCopyShareLink?: () => void;
-  onSaveImage?: () => void;
   onNewReading?: () => void;
   collapsed: boolean;
   onClose?: () => void;
@@ -483,9 +333,6 @@ function SidebarContent({
   enrichLoading,
   enrichError,
   analysisResults,
-  onOpenDiscordModal,
-  onCopyShareLink,
-  onSaveImage,
   onNewReading,
   collapsed,
   onClose,
@@ -497,8 +344,6 @@ function SidebarContent({
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(["deck", "insights", "tools", "actions"])
   );
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
-  const [imageStatus, setImageStatus] = useState<"idle" | "generating" | "success" | "error">("idle");
 
   const analysisDisabled = !cardMap || enrichLoading;
 
@@ -559,60 +404,6 @@ function SidebarContent({
       else next.add(id);
       return next;
     });
-  };
-
-  const showFeedback = (msg: string) => {
-    setCopyFeedback(msg);
-    setTimeout(() => setCopyFeedback(null), 2000);
-  };
-
-  const handleCopyMarkdown = async () => {
-    if (!analysisResults) return;
-    try {
-      const md = formatMarkdownReport(analysisResults, deck);
-      await navigator.clipboard.writeText(md);
-      showFeedback("Markdown copied!");
-    } catch { /* ignore */ }
-  };
-
-  const handleCopyJson = async () => {
-    if (!analysisResults) return;
-    try {
-      const json = formatJsonReport(analysisResults, deck);
-      await navigator.clipboard.writeText(json);
-      showFeedback("JSON copied!");
-    } catch { /* ignore */ }
-  };
-
-  const handleSaveImage = async () => {
-    if (onSaveImage) {
-      onSaveImage();
-      return;
-    }
-    if (!analysisResults) return;
-    if (imageStatus === "generating") return;
-
-    setImageStatus("generating");
-    try {
-      const { generateAndDownloadPng, buildExportImageData } = await import("@/lib/export-image");
-      const totalCards =
-        deck.commanders.reduce((s, c) => s + c.quantity, 0) +
-        deck.mainboard.reduce((s, c) => s + c.quantity, 0) +
-        deck.sideboard.reduce((s, c) => s + c.quantity, 0);
-      const data = buildExportImageData(
-        deck.name,
-        deck.commanders.map((c) => c.name),
-        totalCards,
-        analysisResults
-      );
-      await generateAndDownloadPng(data);
-      setImageStatus("success");
-      setTimeout(() => setImageStatus("idle"), 2000);
-    } catch (err) {
-      console.error("[Save as Image] Failed:", err);
-      setImageStatus("error");
-      setTimeout(() => setImageStatus("idle"), 3000);
-    }
   };
 
   // Tab clicks are now Link navigations; only fire onClose to dismiss the
@@ -782,35 +573,6 @@ function SidebarContent({
         })}
       </nav>
 
-      {/* Share button */}
-      <div className={styles.shareSection}>
-        <ShareMenu
-          analysisResults={analysisResults}
-          enrichLoading={enrichLoading}
-          onCopyMarkdown={handleCopyMarkdown}
-          onCopyJson={handleCopyJson}
-          onDiscord={() => onOpenDiscordModal?.()}
-          onShareLink={() => onCopyShareLink?.()}
-          onSaveImage={handleSaveImage}
-          copyFeedback={
-            imageStatus === "generating"
-              ? "Generating..."
-              : imageStatus === "success"
-                ? "Saved!"
-                : imageStatus === "error"
-                  ? "Failed"
-                  : copyFeedback
-          }
-          collapsed={collapsed}
-        />
-        {/* aria-live region for image export status announcements */}
-        <div aria-live="assertive" aria-atomic="true" className="sr-only">
-          {imageStatus === "generating" && "Generating image, please wait..."}
-          {imageStatus === "success" && "Image saved successfully."}
-          {imageStatus === "error" && "Image generation failed."}
-        </div>
-      </div>
-
       {onNewReading && (
         <div className={styles.newReadingSection}>
           <button
@@ -854,9 +616,6 @@ export interface DeckSidebarProps {
   enrichLoading: boolean;
   enrichError: string | null;
   analysisResults: DeckAnalysisResults | null;
-  onOpenDiscordModal?: () => void;
-  onCopyShareLink?: () => void;
-  onSaveImage?: () => void;
   onNewReading?: () => void;
 }
 
@@ -866,9 +625,6 @@ export function DeckSidebar({
   enrichLoading,
   enrichError,
   analysisResults,
-  onOpenDiscordModal,
-  onCopyShareLink,
-  onSaveImage,
   onNewReading,
 }: DeckSidebarProps) {
   const [collapsed, setCollapsed] = useSidebarCollapsed();
@@ -885,9 +641,6 @@ export function DeckSidebar({
         enrichLoading={enrichLoading}
         enrichError={enrichError}
         analysisResults={analysisResults}
-        onOpenDiscordModal={onOpenDiscordModal}
-        onCopyShareLink={onCopyShareLink}
-        onSaveImage={onSaveImage}
         onNewReading={onNewReading}
         collapsed={collapsed}
       />
@@ -923,9 +676,6 @@ export function DeckDrawer({
   enrichLoading,
   enrichError,
   analysisResults,
-  onOpenDiscordModal,
-  onCopyShareLink,
-  onSaveImage,
   onNewReading,
 }: DeckDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -976,9 +726,6 @@ export function DeckDrawer({
             enrichLoading={enrichLoading}
             enrichError={enrichError}
             analysisResults={analysisResults}
-            onOpenDiscordModal={onOpenDiscordModal}
-            onCopyShareLink={onCopyShareLink}
-            onSaveImage={onSaveImage}
             onNewReading={onNewReading}
             collapsed={false}
             onClose={onClose}

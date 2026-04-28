@@ -128,7 +128,7 @@ export default function SharePage() {
     }
   };
 
-  const tiles: Array<{
+  type Tile = {
     channel: Channel;
     eyebrow: string;
     title: string;
@@ -137,13 +137,15 @@ export default function SharePage() {
     onClick: () => void;
     primary?: boolean;
     disabled?: boolean;
-  }> = [
+  };
+
+  const featured: Tile[] = [
     {
       channel: "link",
       eyebrow: "Link",
       title: "Copy Share URL",
       description:
-        "A self-contained URL that decodes the deck list — no server needed.",
+        "A self-contained URL that decodes the deck list right in the browser. No server, no account — paste it anywhere.",
       button: shareUrl ? "Copy Link" : "Generating...",
       onClick: handleCopyLink,
       disabled: !shareUrl,
@@ -154,25 +156,29 @@ export default function SharePage() {
       eyebrow: "Image",
       title: "Save as PNG",
       description:
-        "A shareable image card with the deck verdict, mana curve, and key tags.",
+        "A self-contained card with the verdict, mana curve, and standout themes — perfect for chats and social.",
       button: imageStatus === "working" ? "Generating..." : "Save Image",
       onClick: handleSaveImage,
       disabled: imageStatus === "working",
     },
+  ];
+
+  const secondary: Tile[] = [
     {
       channel: "discord",
       eyebrow: "Discord",
       title: "Export to Discord",
-      description: "Build a markdown post optimized for Discord channels.",
+      description:
+        "Tailor a markdown post that fits Discord's character limits.",
       button: "Open Exporter",
       onClick: () => setDiscordOpen(true),
     },
     {
       channel: "markdown",
       eyebrow: "Markdown",
-      title: "Copy Markdown Report",
+      title: "Copy Markdown",
       description:
-        "Full analysis as a markdown document — paste anywhere that renders MD.",
+        "Full analysis as markdown — paste anywhere that renders MD.",
       button: "Copy Markdown",
       onClick: handleCopyMarkdown,
     },
@@ -185,6 +191,42 @@ export default function SharePage() {
       onClick: handleCopyJson,
     },
   ];
+
+  const renderTile = (tile: Tile, variant: "featured" | "secondary") => (
+    <article
+      key={tile.channel}
+      className={[
+        styles.card,
+        tile.primary && styles.cardPrimary,
+        variant === "secondary" && styles.cardSecondary,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <span className={styles.cardEyebrow}>{tile.eyebrow}</span>
+      <h2 className={styles.cardTitle}>{tile.title}</h2>
+      <p className={styles.cardDesc}>{tile.description}</p>
+      <div className={styles.cardAction}>
+        <button
+          type="button"
+          data-testid={`share-${tile.channel}-button`}
+          onClick={tile.onClick}
+          disabled={tile.disabled}
+          className={[
+            styles.button,
+            tile.primary && styles.buttonPrimary,
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {tile.button}
+        </button>
+        {feedback[tile.channel] && (
+          <p className={styles.feedback}>{feedback[tile.channel]}</p>
+        )}
+      </div>
+    </article>
+  );
 
   return (
     <>
@@ -199,33 +241,13 @@ export default function SharePage() {
           title="Take It Elsewhere"
           tagline="Hand the reading off as a link, image, Discord post, markdown, or raw JSON."
         />
-        <div className={styles.grid}>
-          {tiles.map((tile) => (
-            <article key={tile.channel} className={styles.card}>
-              <span className={styles.cardEyebrow}>{tile.eyebrow}</span>
-              <h2 className={styles.cardTitle}>{tile.title}</h2>
-              <p className={styles.cardDesc}>{tile.description}</p>
-              <div className={styles.cardAction}>
-                <button
-                  type="button"
-                  data-testid={`share-${tile.channel}-button`}
-                  onClick={tile.onClick}
-                  disabled={tile.disabled}
-                  className={[
-                    styles.button,
-                    tile.primary && styles.buttonPrimary,
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                >
-                  {tile.button}
-                </button>
-                {feedback[tile.channel] && (
-                  <p className={styles.feedback}>{feedback[tile.channel]}</p>
-                )}
-              </div>
-            </article>
-          ))}
+        <div className={styles.layout}>
+          <div className={styles.featuredRow}>
+            {featured.map((tile) => renderTile(tile, "featured"))}
+          </div>
+          <div className={styles.secondaryRow}>
+            {secondary.map((tile) => renderTile(tile, "secondary"))}
+          </div>
         </div>
       </div>
 

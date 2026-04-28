@@ -1,26 +1,25 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import type { EnrichedCard } from "@/lib/types";
-import type { CandidateAnalysis } from "@/lib/candidate-analysis";
 import { analyzeCandidateCard } from "@/lib/candidate-analysis";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
+import { useCandidates } from "@/contexts/CandidatesContext";
 import SectionHeader from "@/components/reading/SectionHeader";
 import AdditionsPanel from "@/components/AdditionsPanel";
 
 export default function AddPage() {
   const { payload, analysisResults } = useDeckSession();
-
-  const [candidates, setCandidates] = useState<string[]>([]);
-  const [candidateCardMap, setCandidateCardMap] = useState<
-    Record<string, EnrichedCard>
-  >({});
-  const [candidateAnalyses, setCandidateAnalyses] = useState<
-    Record<string, CandidateAnalysis>
-  >({});
-  const [candidateErrors, setCandidateErrors] = useState<
-    Record<string, string>
-  >({});
+  const {
+    candidates,
+    setCandidates,
+    candidateCardMap,
+    setCandidateCardMap,
+    candidateAnalyses,
+    setCandidateAnalyses,
+    candidateErrors,
+    setCandidateErrors,
+  } = useCandidates();
 
   const deck = payload?.deck;
   const cardMap = payload?.cardMap;

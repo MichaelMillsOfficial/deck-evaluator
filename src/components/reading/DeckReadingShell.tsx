@@ -2,17 +2,14 @@
 
 import {
   useCallback,
-  useEffect,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
-import { encodeCompactDeckPayload } from "@/lib/deck-codec";
 import { DeckSidebar, DeckDrawer } from "@/components/DeckSidebar";
 import DeckMobileTopBar from "@/components/DeckMobileTopBar";
-import DiscordExportModal from "@/components/DiscordExportModal";
 import styles from "./DeckReadingShell.module.css";
 
 function AlertIcon() {
@@ -64,46 +61,13 @@ export default function DeckReadingShell({ children }: { children: ReactNode }) 
   } = useDeckSession();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [discordModalOpen, setDiscordModalOpen] = useState(false);
   const [parseWarningsDismissed, setParseWarningsDismissed] = useState(false);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const deck = payload?.deck ?? null;
   const cardMap = payload?.cardMap ?? null;
   const parseWarnings = payload?.parseWarnings ?? [];
   const notFoundCount = payload?.notFoundCount ?? 0;
-
-  // Generate the share URL once cardMap is available.
-  useEffect(() => {
-    if (!deck || !cardMap) {
-      setShareUrl(null);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const encoded = await encodeCompactDeckPayload(deck, cardMap);
-        if (!cancelled) {
-          setShareUrl(`${window.location.origin}/shared?d=${encoded}`);
-        }
-      } catch {
-        // Encoding error — leave shareUrl null.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [deck, cardMap]);
-
-  const handleCopyShareLink = useCallback(async () => {
-    if (!shareUrl) return;
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-    } catch {
-      // Clipboard error — silently fail.
-    }
-  }, [shareUrl]);
 
   const handleNewReading = useCallback(() => {
     clearSession();
@@ -125,9 +89,7 @@ export default function DeckReadingShell({ children }: { children: ReactNode }) 
           enrichLoading={enrichLoading}
           cardMap={cardMap}
           enrichError={enrichError}
-          hasAnalysis={!!analysisResults}
           onOpenDrawer={() => setDrawerOpen(true)}
-          onShare={handleCopyShareLink}
         />
 
         <DeckDrawer
@@ -138,8 +100,6 @@ export default function DeckReadingShell({ children }: { children: ReactNode }) 
           enrichLoading={enrichLoading}
           enrichError={enrichError}
           analysisResults={analysisResults}
-          onOpenDiscordModal={() => setDiscordModalOpen(true)}
-          onCopyShareLink={handleCopyShareLink}
           onNewReading={handleNewReading}
         />
 
@@ -150,8 +110,6 @@ export default function DeckReadingShell({ children }: { children: ReactNode }) 
             enrichLoading={enrichLoading}
             enrichError={enrichError}
             analysisResults={analysisResults}
-            onOpenDiscordModal={() => setDiscordModalOpen(true)}
-            onCopyShareLink={handleCopyShareLink}
             onNewReading={handleNewReading}
           />
 
@@ -277,16 +235,6 @@ export default function DeckReadingShell({ children }: { children: ReactNode }) 
           {cardMap && !enrichLoading ? "Card details loaded" : ""}
         </p>
       </div>
-
-      {analysisResults && (
-        <DiscordExportModal
-          open={discordModalOpen}
-          onClose={() => setDiscordModalOpen(false)}
-          analysisResults={analysisResults}
-          deck={deck}
-          shareUrl={shareUrl ?? undefined}
-        />
-      )}
     </>
   );
 }
