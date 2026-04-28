@@ -1,4 +1,8 @@
 import { test as base, expect, type Page } from "@playwright/test";
+import {
+  getEnrichedFixture,
+  isFixtured,
+} from "./fixtures/enriched-cards";
 
 // ---------------------------------------------------------------------------
 // Sample decklists used across test files
@@ -266,6 +270,23 @@ export class DeckPage {
   }
 
   /**
+   * Opt out of the default /api/deck-enrich mock and route the request to
+   * the live API instead. Use this in tests that genuinely need real
+   * Scryfall data (rare; most tests should use the fixture bank).
+   */
+  async useLiveEnrichment() {
+    await this.page.unroute("**/api/deck-enrich");
+  }
+
+  /**
+   * Opt out of the default /api/deck-combos mock and route the request to
+   * the live Commander Spellbook API instead.
+   */
+  async useLiveCombos() {
+    await this.page.unroute("**/api/deck-combos");
+  }
+
+  /**
    * Type a card name into the card lookup input, wait for the autocomplete
    * dropdown to appear, and click the matching suggestion.
    * NOTE: Callers must mock /api/card-autocomplete via page.route() first.
@@ -324,6 +345,57 @@ export const test = base.extend<{ deckPage: DeckPage }>({
     await page.addInitScript(() => {
       (window as Window).__SKIP_RITUAL_FLOOR__ = true;
     });
+
+    // Default mock for /api/deck-enrich. Reads the requested cardNames from
+    // the request body, looks each up in the static fixture bank, and
+    // returns the same shape as the real route handler. Unknown cards are
+    // synthesized with sensible defaults so the suite degrades gracefully.
+    // Tests that need real Scryfall data call deckPage.useLiveEnrichment().
+    await page.route("**/api/deck-enrich", async (route) => {
+      const request = route.request();
+      let cardNames: string[] = [];
+      try {
+        const body = JSON.parse(request.postData() ?? "{}");
+        if (Array.isArray(body.cardNames)) cardNames = body.cardNames;
+      } catch {
+        // Malformed body — let the real route handler reject it.
+        await route.continue();
+        return;
+      }
+
+      const cards: Record<string, ReturnType<typeof getEnrichedFixture>> = {};
+      const notFound: string[] = [];
+      for (const name of cardNames) {
+        // Synthesize unknown cards rather than 404ing — keeps existing tests
+        // green when they happen to use a card not yet in the fixture bank.
+        cards[name] = getEnrichedFixture(name);
+        if (!isFixtured(name)) {
+          // Surface this in test output so missing fixtures are easy to
+          // notice and add. Tests aren't failed by it.
+          // eslint-disable-next-line no-console
+          console.warn(`[e2e] enrichment fixture missing for: ${name}`);
+        }
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ cards, notFound }),
+      });
+    });
+
+    // Default mock for /api/deck-combos: empty result. The Commander
+    // Spellbook API is rate-limited and slow under parallel load; tests
+    // that exercise combo detection (spellbook-combos.spec.ts) opt back in
+    // to the live API via deckPage.useLiveCombos().
+    await page.route("**/api/deck-combos", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ exactCombos: [], nearCombos: [] }),
+      })
+    );
+
     const deckPage = new DeckPage(page);
     await use(deckPage);
   },
