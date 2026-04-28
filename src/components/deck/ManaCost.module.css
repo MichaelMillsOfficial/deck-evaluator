@@ -1,50 +1,14 @@
 .cost {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   vertical-align: middle;
 }
 
 .pip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--radius-pill);
-  font-family: var(--font-sans);
-  font-size: 9.5px;
-  font-weight: var(--weight-bold);
-  color: rgba(0, 0, 0, 0.78);
-  letter-spacing: 0;
-  line-height: 1;
+  display: inline-block;
   flex-shrink: 0;
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.18),
-    0 1px 1px rgba(0, 0, 0, 0.35);
-}
-
-.lg .pip {
-  width: 22px;
-  height: 22px;
-  font-size: 12px;
-}
-
-.w {
-  background: var(--mana-w);
-}
-.u {
-  background: var(--mana-u);
-}
-.b {
-  background: var(--mana-b);
-}
-.r {
-  background: var(--mana-r);
-}
-.g {
-  background: var(--mana-g);
-}
-.c {
-  background: var(--mana-c);
+  vertical-align: middle;
+  /* Scryfall SVGs already have a circular outline + drop shadow baked in,
+     so we don't add any background or shadow here. */
 }

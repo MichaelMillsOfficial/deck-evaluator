@@ -78,7 +78,7 @@ test.describe("/preview — Astral primitives gallery", () => {
     }
   });
 
-  test("ManaCost renders one pip per symbol with mana-color tokens", async ({
+  test("ManaCost renders one Scryfall SVG per symbol with the right size", async ({
     page,
   }) => {
     const mc = page.getByTestId("preview-manacost");
@@ -88,7 +88,18 @@ test.describe("/preview — Astral primitives gallery", () => {
       .getByLabel("Mana cost: 2 generic, 1 blue, 1 green")
       .first();
     await expect(cost).toBeVisible();
-    await expect(cost.locator("[data-pip]")).toHaveCount(3);
+    const pips = cost.locator("[data-pip]");
+    await expect(pips).toHaveCount(3);
+    // First pip is "2" generic, served by Scryfall at the default md (16px) size.
+    await expect(pips.first()).toHaveAttribute(
+      "src",
+      /scryfall\.io\/card-symbols\/2\.svg/,
+    );
+    await expect(pips.first()).toHaveAttribute("width", "16");
+    await expect(pips.last()).toHaveAttribute(
+      "src",
+      /scryfall\.io\/card-symbols\/G\.svg/,
+    );
   });
 
   test("ColorPie renders one segment per non-zero color", async ({ page }) => {
