@@ -127,7 +127,7 @@
 
 /* ─── Identity block — manuscript margin: no border, just typography. ─── */
 .identity {
-  padding: var(--space-12) var(--space-7) var(--space-7);
+  padding: var(--space-7) var(--space-7) var(--space-6);
 }
 
 .identityHeader {
@@ -262,10 +262,10 @@
 /* ─── Manuscript margin index — chapter headings + text nav. ─── */
 .nav {
   flex: 1;
-  padding: var(--space-7) var(--space-7) var(--space-7);
+  padding: var(--space-6) var(--space-7);
   display: flex;
   flex-direction: column;
-  gap: var(--space-10);
+  gap: var(--space-7);
 }
 
 .navCollapsed {
@@ -279,7 +279,7 @@
 }
 
 .categoryHeading {
-  margin: 0 0 var(--space-4);
+  margin: 0 0 var(--space-3);
   padding: 0;
   font-family: var(--font-mono);
   font-size: var(--text-eyebrow);
@@ -313,7 +313,7 @@
   display: flex;
   align-items: center;
   width: 100%;
-  padding: var(--space-3) 0 var(--space-3) var(--space-5);
+  padding: var(--space-2) 0 var(--space-2) var(--space-5);
   border: none;
   border-left: 2px solid transparent;
   border-radius: 0;
@@ -414,7 +414,7 @@
 
 /* ─── New Reading link (quiet manuscript footer). ─── */
 .newReadingSection {
-  padding: var(--space-7);
+  padding: var(--space-5) var(--space-7);
   border-top: 1px solid var(--border);
 }
 
