@@ -27,6 +27,7 @@ import {
 import { computeCentrality } from "@/lib/interaction-centrality";
 import { computeAllRemovalImpacts } from "@/lib/interaction-removal-impact";
 import { extractCitations } from "@/lib/interaction-citations";
+import styles from "./InteractionSection.module.css";
 
 // ─── Lazy-loaded visualisation components (d3-force not in initial bundle) ────
 const InteractionGraph = lazy(() => import("@/components/InteractionGraph"));
@@ -57,43 +58,46 @@ const INTERACTION_TYPE_LABELS: Record<InteractionType, string> = {
   loops_with: "Loops With",
 };
 
-const INTERACTION_TYPE_COLORS: Record<InteractionType, string> = {
-  enables: "bg-green-600/60 text-green-100",
-  triggers: "bg-blue-600/60 text-blue-100",
-  amplifies: "bg-amber-600/60 text-amber-100",
-  protects: "bg-cyan-600/60 text-cyan-100",
-  recurs: "bg-emerald-600/60 text-emerald-100",
-  reduces_cost: "bg-lime-600/60 text-lime-100",
-  tutors_for: "bg-indigo-600/60 text-indigo-100",
-  blocks: "bg-red-600/60 text-red-100",
-  conflicts: "bg-orange-600/60 text-orange-100",
-  loops_with: "bg-fuchsia-600/60 text-fuchsia-100",
+// Per-type badge CSS module class names
+const INTERACTION_TYPE_BADGE_CLASSES: Record<InteractionType, string> = {
+  enables:      styles.typeBadgeEnables,
+  triggers:     styles.typeBadgeTriggers,
+  amplifies:    styles.typeBadgeAmplifies,
+  protects:     styles.typeBadgeProtects,
+  recurs:       styles.typeBadgeRecurs,
+  reduces_cost: styles.typeBadgeReduces,
+  tutors_for:   styles.typeBadgeTutors,
+  blocks:       styles.typeBadgeBlocks,
+  conflicts:    styles.typeBadgeConflicts,
+  loops_with:   styles.typeBadgeLoops,
 };
 
-const TYPE_FILTER_COLORS: Record<InteractionType, { active: string; border: string }> = {
-  enables: { active: "border-green-500 bg-green-900/30 text-green-300", border: "border-green-600/40" },
-  triggers: { active: "border-blue-500 bg-blue-900/30 text-blue-300", border: "border-blue-600/40" },
-  amplifies: { active: "border-amber-500 bg-amber-900/30 text-amber-300", border: "border-amber-600/40" },
-  protects: { active: "border-cyan-500 bg-cyan-900/30 text-cyan-300", border: "border-cyan-600/40" },
-  recurs: { active: "border-emerald-500 bg-emerald-900/30 text-emerald-300", border: "border-emerald-600/40" },
-  reduces_cost: { active: "border-lime-500 bg-lime-900/30 text-lime-300", border: "border-lime-600/40" },
-  tutors_for: { active: "border-indigo-500 bg-indigo-900/30 text-indigo-300", border: "border-indigo-600/40" },
-  blocks: { active: "border-red-500 bg-red-900/30 text-red-300", border: "border-red-600/40" },
-  conflicts: { active: "border-orange-500 bg-orange-900/30 text-orange-300", border: "border-orange-600/40" },
-  loops_with: { active: "border-fuchsia-500 bg-fuchsia-900/30 text-fuchsia-300", border: "border-fuchsia-600/40" },
+// Per-type filter pill active classes
+const TYPE_FILTER_PILL_CLASSES: Record<InteractionType, string> = {
+  enables:      styles.filterPillTypeEnables,
+  triggers:     styles.filterPillTypeTriggers,
+  amplifies:    styles.filterPillTypeAmplifies,
+  protects:     styles.filterPillTypeProtects,
+  recurs:       styles.filterPillTypeRecurs,
+  reduces_cost: styles.filterPillTypeReduces,
+  tutors_for:   styles.filterPillTypeTutors,
+  blocks:       styles.filterPillTypeBlocks,
+  conflicts:    styles.filterPillTypeConflicts,
+  loops_with:   styles.filterPillTypeLoops,
 };
 
+// Per-type group heading colors (keep as inline style so data-driven color is clear)
 const INTERACTION_GROUP_COLORS: Record<InteractionType, string> = {
-  enables: "text-green-400",
-  triggers: "text-blue-400",
-  amplifies: "text-amber-400",
-  protects: "text-cyan-400",
-  recurs: "text-emerald-400",
-  reduces_cost: "text-lime-400",
-  tutors_for: "text-indigo-400",
-  blocks: "text-red-400",
-  conflicts: "text-orange-400",
-  loops_with: "text-fuchsia-400",
+  enables:      "var(--status-ok)",
+  triggers:     "#93c5fd",
+  amplifies:    "var(--status-watch)",
+  protects:     "#67e8f9",
+  recurs:       "#6ee7b7",
+  reduces_cost: "#bef264",
+  tutors_for:   "#a5b4fc",
+  blocks:       "var(--status-warn)",
+  conflicts:    "#fba64c",
+  loops_with:   "var(--accent)",
 };
 
 type GroupMode = "type" | "card" | "strength";
@@ -135,17 +139,17 @@ class InteractionErrorBoundary extends Component<ErrorBoundaryProps, ErrorBounda
     if (this.state.hasError) {
       return (
         this.props.fallback ?? (
-          <div role="alert" className="rounded-lg border border-red-700/50 bg-red-900/20 px-4 py-5">
-            <p className="text-sm font-semibold text-red-300 mb-1">
+          <div role="alert" className={styles.errorBoundary}>
+            <p className={styles.errorBoundaryTitle}>
               Interaction analysis encountered an error
             </p>
-            <p className="text-xs text-red-400/80">
+            <p className={styles.errorBoundaryDetail}>
               {this.state.error?.message ?? "An unexpected error occurred while rendering interactions."}
             </p>
             <button
               type="button"
               onClick={() => this.setState({ hasError: false, error: null })}
-              className="mt-3 rounded-md border border-red-700/50 bg-red-900/30 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-900/50 transition-colors"
+              className={styles.errorBoundaryRetry}
             >
               Try again
             </button>
@@ -176,7 +180,7 @@ function ShowMoreButton({
     <button
       type="button"
       onClick={onShowMore}
-      className="w-full rounded-lg border border-slate-700 bg-slate-800/50 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:border-slate-600 hover:bg-slate-700/50 transition-colors cursor-pointer"
+      className={styles.showMoreBtn}
     >
       Show {Math.min(remaining, PAGE_SIZE)} more ({remaining} remaining)
     </button>
@@ -185,27 +189,25 @@ function ShowMoreButton({
 
 function StrengthBar({ strength }: { strength: number }) {
   const pct = strengthPercent(strength);
-  const barColor =
+  const fillClass =
     pct >= 75
-      ? "bg-purple-500"
+      ? styles.strengthFill
       : pct >= 50
-      ? "bg-purple-600/70"
-      : pct >= 25
-      ? "bg-slate-500"
-      : "bg-slate-600";
+      ? styles.strengthFillMid
+      : styles.strengthFillLow;
 
   return (
     <span
-      className="ml-auto flex items-center gap-1.5 shrink-0"
+      className={styles.strengthBarWrapper}
       aria-label={`Interaction strength: ${pct}%`}
     >
-      <span className="w-14 h-1.5 rounded-full bg-slate-700 overflow-hidden">
+      <span className={styles.strengthTrack}>
         <span
-          className={`block h-full rounded-full ${barColor} transition-all duration-300`}
+          className={fillClass}
           style={{ width: `${pct}%` }}
         />
       </span>
-      <span className="text-[10px] tabular-nums text-slate-500 w-7 text-right">
+      <span className={styles.strengthPct}>
         {pct}%
       </span>
     </span>
@@ -215,11 +217,7 @@ function StrengthBar({ strength }: { strength: number }) {
 function CardPill({ name, highlight }: { name: string; highlight?: boolean }) {
   return (
     <span
-      className={`rounded px-2 py-0.5 text-xs font-medium leading-none ${
-        highlight
-          ? "bg-purple-900/30 border border-purple-600/50 text-purple-200"
-          : "bg-slate-700/80 border border-slate-600/50 text-slate-200"
-      }`}
+      className={highlight ? styles.cardPillHighlight : styles.cardPill}
     >
       {name}
     </span>
@@ -227,7 +225,7 @@ function CardPill({ name, highlight }: { name: string; highlight?: boolean }) {
 }
 
 function EmptyState({ message }: { message: string }) {
-  return <p className="text-xs text-slate-500 italic py-1">{message}</p>;
+  return <p className={styles.emptyState}>{message}</p>;
 }
 
 // ─── Condition annotation badge ──────────────────────────────────
@@ -257,7 +255,7 @@ function ConditionBadge({ conditions }: { conditions: Condition[] }) {
     return (
       <span
         aria-label="Condition: requires game state"
-        className="rounded-full px-2 py-0.5 text-[9px] font-semibold bg-slate-700/60 text-slate-400 border border-slate-600/40"
+        className={styles.conditionBadge}
       >
         Cond: game state
       </span>
@@ -267,7 +265,7 @@ function ConditionBadge({ conditions }: { conditions: Condition[] }) {
   return (
     <span
       aria-label="This interaction has deck conditions"
-      className="rounded-full px-2 py-0.5 text-[9px] font-semibold bg-slate-700/60 text-slate-400 border border-slate-600/40"
+      className={styles.conditionBadge}
     >
       Conditional
     </span>
@@ -307,8 +305,8 @@ function InteractionItem({
     return result;
   }, [interaction.cards, profiles]);
 
-  const badgeColors =
-    INTERACTION_TYPE_COLORS[interaction.type] ?? "bg-slate-600/60 text-slate-100";
+  const badgeClass =
+    INTERACTION_TYPE_BADGE_CLASSES[interaction.type] ?? styles.typeBadgeFallback;
 
   // Detect command zone interactions (eminence)
   const isCommandZoneInteraction = profiles != null && interaction.cards.some(
@@ -321,13 +319,13 @@ function InteractionItem({
   return (
     <div
       data-testid={`interaction-${type}-${index}`}
-      className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 hover:bg-slate-700/30 hover:border-slate-600 transition-colors duration-150"
+      className={styles.itemCard}
     >
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5 flex-wrap">
+      <div className={styles.itemHeader}>
+        <div className={styles.itemHeaderLeft}>
           <span
             data-testid="interaction-type"
-            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badgeColors}`}
+            className={[styles.typeBadge, badgeClass].join(" ")}
           >
             {INTERACTION_TYPE_LABELS[interaction.type] ?? interaction.type}
           </span>
@@ -337,7 +335,7 @@ function InteractionItem({
           {isCommandZoneInteraction && (
             <span
               data-testid="command-zone-badge"
-              className="inline-flex items-center rounded-full border border-amber-700/50 bg-amber-900/40 px-1.5 py-0.5 text-[9px] font-medium text-amber-300"
+              className={styles.commandZoneBadge}
             >
               Command Zone
             </span>
@@ -345,14 +343,14 @@ function InteractionItem({
         </div>
         <StrengthBar strength={interaction.strength} />
       </div>
-      <div className="flex items-center gap-2 mb-2">
+      <div className={styles.rollupSummary} style={{ marginBottom: "var(--space-5)" }}>
         <CardPill name={interaction.cards[0]} />
-        <span className="text-slate-500 text-sm" aria-hidden="true">
+        <span className={styles.cardArrow} aria-hidden="true">
           &rarr;
         </span>
         <CardPill name={interaction.cards[1]} />
       </div>
-      <p className="text-xs text-slate-400 leading-relaxed mb-2">
+      <p className={styles.mechanical}>
         {interaction.mechanical}
       </p>
 
@@ -368,15 +366,16 @@ function InteractionItem({
             onKeyDown={(e) => {
               if (e.key === "Escape" && showCitations) setShowCitations(false);
             }}
-            className="group flex items-center gap-1 text-[11px] text-slate-500 hover:text-purple-300 transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-400 rounded min-h-[44px] py-2"
+            className={styles.disclosureToggle}
           >
             <svg
               aria-hidden="true"
               viewBox="0 0 20 20"
               fill="currentColor"
-              className={`h-3 w-3 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${
-                showCitations ? "rotate-90" : ""
-              }`}
+              className={[
+                styles.disclosureChevron,
+                showCitations ? styles.disclosureChevronOpen : "",
+              ].join(" ")}
             >
               <path
                 fillRule="evenodd"
@@ -384,19 +383,20 @@ function InteractionItem({
                 clipRule="evenodd"
               />
             </svg>
-            <span className="underline-offset-2 group-hover:underline">
+            <span className={styles.disclosureLabel}>
               {showCitations ? "Hide" : "Show"} rules text
             </span>
           </button>
 
           <div
             id={citationsId}
-            className={`grid transition-[grid-template-rows] duration-200 motion-reduce:transition-none ease-out ${
-              showCitations ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-            }`}
+            className={[
+              styles.expandable,
+              showCitations ? styles.expandableOpen : "",
+            ].join(" ")}
             aria-hidden={!showCitations}
           >
-            <div className="overflow-hidden">
+            <div className={styles.expandableInner}>
               <CitationList citations={citations} />
             </div>
           </div>
@@ -422,8 +422,8 @@ function RolledUpInteractionItem({
   const [open, setOpen] = useState(false);
   // Stable ID using anchor card + type (avoids index-based collisions across group modes)
   const contentId = `rollup-content-${group.anchorCard.replace(/\s+/g, "-")}-${group.type}-${index}`;
-  const badgeColors =
-    INTERACTION_TYPE_COLORS[group.type] ?? "bg-slate-600/60 text-slate-100";
+  const badgeClass =
+    INTERACTION_TYPE_BADGE_CLASSES[group.type] ?? styles.typeBadgeFallback;
   const verb =
     group.anchorRole === "source"
       ? INTERACTION_VERBS[group.type]?.sourceVerb ?? group.type
@@ -432,13 +432,13 @@ function RolledUpInteractionItem({
   return (
     <div
       data-testid={`interaction-${type}-${index}`}
-      className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 transition-colors duration-150"
+      className={styles.itemCard}
     >
       {/* Header row: type badge + strength */}
-      <div className="flex items-center justify-between mb-2">
+      <div className={styles.itemHeader}>
         <span
           data-testid="interaction-type"
-          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badgeColors}`}
+          className={[styles.typeBadge, badgeClass].join(" ")}
         >
           {INTERACTION_TYPE_LABELS[group.type] ?? group.type}
         </span>
@@ -446,11 +446,11 @@ function RolledUpInteractionItem({
       </div>
 
       {/* Summary line: anchor card + verb + count + noun */}
-      <div className="flex items-center gap-2 mb-2 flex-wrap">
+      <div className={styles.rollupSummary}>
         <CardPill name={group.anchorCard} highlight />
-        <span className="text-xs text-slate-300">
+        <span className={styles.rollupSummaryText}>
           {verb}{" "}
-          <span className="font-semibold text-slate-200 tabular-nums">
+          <span className={styles.rollupSummaryCount}>
             {group.interactions.length}
           </span>{" "}
           {group.targetNoun}
@@ -469,15 +469,16 @@ function RolledUpInteractionItem({
             setOpen(false);
           }
         }}
-        className="group flex items-center gap-1 text-xs text-slate-500 hover:text-sky-300 transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-sky-400 rounded"
+        className={[styles.disclosureToggle, styles.disclosureToggleChain].join(" ")}
       >
         <svg
           aria-hidden="true"
           viewBox="0 0 20 20"
           fill="currentColor"
-          className={`h-3 w-3 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${
-            open ? "rotate-90" : ""
-          }`}
+          className={[
+            styles.disclosureChevron,
+            open ? styles.disclosureChevronOpen : "",
+          ].join(" ")}
         >
           <path
             fillRule="evenodd"
@@ -485,22 +486,23 @@ function RolledUpInteractionItem({
             clipRule="evenodd"
           />
         </svg>
-        <span className="underline-offset-2 group-hover:underline">
+        <span className={styles.disclosureLabel}>
           {open ? "Hide" : "Show"} {group.interactions.length} {group.targetNoun}
         </span>
       </button>
 
       {/* Expandable sub-list — grid trick for smooth height animation */}
       <div
-        className={`grid transition-[grid-template-rows] duration-200 motion-reduce:transition-none ease-out ${
-          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        }`}
+        className={[
+          styles.expandable,
+          open ? styles.expandableOpen : "",
+        ].join(" ")}
         aria-hidden={!open}
       >
-        <div className="overflow-hidden">
+        <div className={styles.expandableInner}>
           <div
             id={contentId}
-            className="mt-2 rounded-md border border-slate-700/60 bg-slate-900/40 py-1 divide-y divide-slate-700/30"
+            className={styles.rollupSubPanel}
           >
             {group.interactions.map((inter, i) => {
               const targetCard =
@@ -534,15 +536,15 @@ function RolledUpSubRow({
 }) {
   const pct = strengthPercent(strength);
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-700/20 transition-colors duration-100">
+    <div className={styles.rollupSubRow}>
       <CardPill name={targetCard} />
       <span
-        className="text-[11px] text-slate-400 truncate min-w-0 flex-1"
+        className={styles.rollupSubMechanical}
         title={mechanical}
       >
         {mechanical}
       </span>
-      <span className="text-[10px] tabular-nums text-slate-500 shrink-0 w-7 text-right">
+      <span className={styles.rollupSubPct}>
         {pct}%
       </span>
     </div>
@@ -553,28 +555,28 @@ function ChainItem({ chain, index }: { chain: InteractionChain; index: number })
   const [open, setOpen] = useState(false);
   const contentId = `chain-detail-${index}`;
 
-  // Map interaction types to readable labels and colors
-  const typeLabel = (t: string) => {
+  // Map interaction types to readable labels and CSS classes
+  const typeLabel = (t: string): { text: string; className: string } => {
     switch (t) {
-      case "enables": return { text: "enables", color: "text-emerald-400" };
-      case "triggers": return { text: "triggers", color: "text-amber-400" };
-      case "recurs": return { text: "recurs", color: "text-violet-400" };
-      case "reduces_cost": return { text: "reduces cost of", color: "text-cyan-400" };
-      default: return { text: t, color: "text-slate-400" };
+      case "enables":      return { text: "enables",          className: styles.chainTypeLabelEnables };
+      case "triggers":     return { text: "triggers",         className: styles.chainTypeLabelTriggers };
+      case "recurs":       return { text: "recurs",           className: styles.chainTypeLabelRecurs };
+      case "reduces_cost": return { text: "reduces cost of",  className: styles.chainTypeLabelReduces };
+      default:             return { text: t,                  className: styles.chainTypeLabelDefault };
     }
   };
 
   return (
     <div
       data-testid={`chain-${index}`}
-      className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 hover:bg-slate-700/30 hover:border-slate-600 transition-colors duration-150"
+      className={styles.itemCard}
     >
       {/* Card flow header */}
-      <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+      <div className={styles.chainCards}>
         {chain.cards.map((card, i) => (
-          <span key={`${card}-${i}`} className="flex items-center gap-1.5">
+          <span key={`${card}-${i}`} style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-3)" }}>
             {i > 0 && (
-              <span className="text-slate-500 text-xs" aria-hidden="true">
+              <span className={styles.cardArrow} aria-hidden="true">
                 &rarr;
               </span>
             )}
@@ -582,7 +584,7 @@ function ChainItem({ chain, index }: { chain: InteractionChain; index: number })
           </span>
         ))}
         {chain.strength !== undefined && (
-          <span className="ml-auto text-[10px] text-slate-500 tabular-nums">
+          <span className={styles.chainStrengthPct}>
             {Math.round(chain.strength * 100)}%
           </span>
         )}
@@ -590,7 +592,7 @@ function ChainItem({ chain, index }: { chain: InteractionChain; index: number })
 
       {/* Reasoning summary */}
       {chain.reasoning && (
-        <p className="text-xs text-slate-300 leading-relaxed mb-1.5 italic">
+        <p className={styles.chainReasoning}>
           {chain.reasoning}
         </p>
       )}
@@ -603,15 +605,16 @@ function ChainItem({ chain, index }: { chain: InteractionChain; index: number })
             aria-expanded={open}
             aria-controls={contentId}
             onClick={() => setOpen((v) => !v)}
-            className="group flex items-center gap-1 text-xs text-slate-500 hover:text-sky-300 transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-sky-400 rounded"
+            className={[styles.disclosureToggle, styles.disclosureToggleChain].join(" ")}
           >
             <svg
               aria-hidden="true"
               viewBox="0 0 20 20"
               fill="currentColor"
-              className={`h-3 w-3 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${
-                open ? "rotate-90" : ""
-              }`}
+              className={[
+                styles.disclosureChevron,
+                open ? styles.disclosureChevronOpen : "",
+              ].join(" ")}
             >
               <path
                 fillRule="evenodd"
@@ -619,48 +622,49 @@ function ChainItem({ chain, index }: { chain: InteractionChain; index: number })
                 clipRule="evenodd"
               />
             </svg>
-            <span className="underline-offset-2 group-hover:underline">
+            <span className={styles.disclosureLabel}>
               Step-by-step breakdown
             </span>
           </button>
 
           <div
             id={contentId}
-            className={`grid transition-[grid-template-rows] duration-200 motion-reduce:transition-none ease-out ${
-              open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-            }`}
+            className={[
+              styles.expandable,
+              open ? styles.expandableOpen : "",
+            ].join(" ")}
             aria-hidden={!open}
           >
-            <div className="overflow-hidden">
-              <ol className="mt-2 space-y-0" aria-label="Chain steps">
+            <div className={styles.expandableInner}>
+              <ol className={styles.chainStepsList} aria-label="Chain steps">
                 {chain.steps.map((step, i) => {
                   const label = typeLabel(step.interactionType);
                   return (
-                    <li key={i} className="relative pl-8 pb-3 last:pb-0">
+                    <li key={i} className={styles.chainStep}>
                       {/* Vertical connector */}
                       {i < chain.steps.length - 1 && (
                         <span
                           aria-hidden="true"
-                          className="absolute left-[13px] top-6 bottom-0 w-px bg-slate-700"
+                          className={styles.chainConnector}
                         />
                       )}
                       {/* Step number circle */}
                       <span
                         aria-hidden="true"
-                        className="absolute left-0 top-0.5 flex h-[26px] w-[26px] items-center justify-center rounded-full bg-sky-900/60 text-[11px] font-semibold text-sky-300 ring-1 ring-sky-700/60"
+                        className={styles.chainStepNum}
                       >
                         {i + 1}
                       </span>
                       {/* Step content */}
-                      <div className="pt-0.5">
-                        <div className="flex flex-wrap items-center gap-1 text-xs">
+                      <div className={styles.chainStepContent}>
+                        <div className={styles.chainStepCards}>
                           <CardPill name={step.from} />
-                          <span className={`font-medium ${label.color}`}>
+                          <span className={label.className}>
                             {label.text}
                           </span>
                           <CardPill name={step.to} />
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                        <p className={styles.chainStepDesc}>
                           {step.description}
                         </p>
                       </div>
@@ -693,23 +697,24 @@ function LoopHowItWorks({ loop, id }: { loop: InteractionLoop; id: string }) {
   if (!hasSteps && !hasNet && !hasRequires) return null;
 
   return (
-    <div className="mt-2.5">
+    <div className={styles.howItWorksWrapper}>
       {/* Disclosure button */}
       <button
         type="button"
         aria-expanded={open}
         aria-controls={contentId}
         onClick={() => setOpen((v) => !v)}
-        className="group flex items-center gap-1 text-xs text-slate-500 hover:text-fuchsia-300 transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-fuchsia-400 rounded"
+        className={[styles.disclosureToggle, styles.disclosureToggleLoop].join(" ")}
       >
         {/* Chevron */}
         <svg
           aria-hidden="true"
           viewBox="0 0 20 20"
           fill="currentColor"
-          className={`h-3 w-3 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${
-            open ? "rotate-90" : ""
-          }`}
+          className={[
+            styles.disclosureChevron,
+            open ? styles.disclosureChevronOpen : "",
+          ].join(" ")}
         >
           <path
             fillRule="evenodd"
@@ -717,7 +722,7 @@ function LoopHowItWorks({ loop, id }: { loop: InteractionLoop; id: string }) {
             clipRule="evenodd"
           />
         </svg>
-        <span className="underline-offset-2 group-hover:underline">
+        <span className={styles.disclosureLabel}>
           How it works
         </span>
       </button>
@@ -725,24 +730,25 @@ function LoopHowItWorks({ loop, id }: { loop: InteractionLoop; id: string }) {
       {/* Expandable content — grid trick for smooth height animation */}
       <div
         id={contentId}
-        className={`grid transition-[grid-template-rows] duration-200 motion-reduce:transition-none ease-out ${
-          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        }`}
+        className={[
+          styles.expandable,
+          open ? styles.expandableOpen : "",
+        ].join(" ")}
         aria-hidden={!open}
       >
-        <div className="overflow-hidden">
-          <div className="mt-2.5 rounded-md border border-slate-700/60 bg-slate-900/60 px-3 pt-3 pb-2.5 space-y-3">
+        <div className={styles.expandableInner}>
+          <div className={styles.howItWorksContent}>
             {/* Steps */}
             {hasSteps && (
-              <ol className="space-y-0" aria-label="Loop steps">
+              <ol className={styles.loopStepsList} aria-label="Loop steps">
                 {loop.steps.map((step, i) => {
                   const isLast = i === loop.steps.length - 1;
                   return (
-                    <li key={i} className="flex gap-2.5">
+                    <li key={i} className={styles.loopStep}>
                       {/* Step number + vertical connector */}
-                      <div className="flex flex-col items-center shrink-0">
+                      <div className={styles.loopStepMarker}>
                         <span
-                          className="flex h-5 w-5 items-center justify-center rounded-full bg-fuchsia-900/60 border border-fuchsia-700/40 text-[9px] font-bold tabular-nums text-fuchsia-300 shrink-0"
+                          className={styles.loopStepNum}
                           aria-hidden="true"
                         >
                           {i + 1}
@@ -750,35 +756,35 @@ function LoopHowItWorks({ loop, id }: { loop: InteractionLoop; id: string }) {
                         {/* Connector line — hidden after last step */}
                         {!isLast && (
                           <span
-                            className="mt-0.5 mb-0.5 w-px flex-1 min-h-[10px] bg-fuchsia-800/30"
+                            className={styles.loopStepConnector}
                             aria-hidden="true"
                           />
                         )}
                       </div>
 
                       {/* Step content */}
-                      <div className={`${isLast ? "pb-0" : "pb-2"} min-w-0`}>
+                      <div className={isLast ? styles.loopStepBodyLast : styles.loopStepBody}>
                         {/* From → To card reference */}
-                        <div className="flex flex-wrap items-center gap-1 mb-0.5">
-                          <span className="rounded bg-slate-700/70 border border-slate-600/40 px-1.5 py-px text-[10px] font-medium text-slate-200 leading-none shrink-0">
+                        <div className={styles.loopStepFromTo}>
+                          <span className={styles.loopStepFromPill}>
                             {step.from}
                           </span>
                           {step.to && step.to !== step.from && (
                             <>
                               <span
-                                className="text-slate-600 text-[10px]"
+                                className={styles.loopStepArrow}
                                 aria-hidden="true"
                               >
                                 &rarr;
                               </span>
-                              <span className="rounded bg-slate-700/70 border border-slate-600/40 px-1.5 py-px text-[10px] font-medium text-slate-200 leading-none shrink-0">
+                              <span className={styles.loopStepFromPill}>
                                 {step.to}
                               </span>
                             </>
                           )}
                         </div>
                         {/* Step description */}
-                        <p className="text-xs text-slate-400 leading-relaxed">
+                        <p className={styles.loopStepDesc}>
                           {step.description}
                         </p>
                       </div>
@@ -787,17 +793,17 @@ function LoopHowItWorks({ loop, id }: { loop: InteractionLoop; id: string }) {
                 })}
 
                 {/* Loop-back indicator */}
-                <li className="flex gap-2.5">
-                  <div className="flex flex-col items-center shrink-0">
+                <li className={styles.loopBackRow}>
+                  <div className={styles.loopStepMarker}>
                     <span
-                      className="flex h-5 w-5 items-center justify-center text-fuchsia-400 text-sm font-bold"
+                      className={styles.loopBackIcon}
                       aria-hidden="true"
                     >
                       &#8634;
                     </span>
                   </div>
-                  <div className="pt-0.5 min-w-0">
-                    <p className="text-[10px] text-fuchsia-400/70 italic leading-relaxed">
+                  <div className={styles.loopStepBodyLast}>
+                    <p className={styles.loopBackText}>
                       {loop.isInfinite
                         ? "Repeat indefinitely — the loop has no natural stopping point."
                         : `Returns to step 1 — repeat as desired.`}
@@ -809,11 +815,11 @@ function LoopHowItWorks({ loop, id }: { loop: InteractionLoop; id: string }) {
 
             {/* Net effect */}
             {hasNet && (
-              <div className="border-t border-slate-700/50 pt-2">
-                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+              <div className={styles.netEffectSection}>
+                <div className={styles.netEffectLabel}>
                   Net per cycle
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className={styles.netEffectPills}>
                   {loop.netEffect.resources.map((r, i) => {
                     let label: string;
                     if (r.category === "mana") {
@@ -830,7 +836,7 @@ function LoopHowItWorks({ loop, id }: { loop: InteractionLoop; id: string }) {
                     return (
                       <span
                         key={`res-${i}`}
-                        className="rounded bg-slate-800/80 border border-slate-600/40 px-2 py-0.5 text-xs text-slate-300 tabular-nums"
+                        className={styles.netEffectPill}
                       >
                         {label}
                       </span>
@@ -849,7 +855,7 @@ function LoopHowItWorks({ loop, id }: { loop: InteractionLoop; id: string }) {
                     return (
                       <span
                         key={`attr-${i}`}
-                        className="rounded bg-slate-800/80 border border-slate-600/40 px-2 py-0.5 text-xs text-slate-300"
+                        className={styles.netEffectPill}
                       >
                         {label}
                       </span>
@@ -861,18 +867,18 @@ function LoopHowItWorks({ loop, id }: { loop: InteractionLoop; id: string }) {
 
             {/* Prerequisites */}
             {hasRequires && (
-              <div className="border-t border-slate-700/50 pt-2">
-                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+              <div className={styles.prereqSection}>
+                <div className={styles.prereqLabel}>
                   Requires each iteration
                 </div>
-                <ul className="space-y-0.5">
+                <ul className={styles.prereqList}>
                   {(loop.requires ?? []).map((cond, i) => (
                     <li
                       key={i}
-                      className="flex items-start gap-1.5 text-xs text-slate-400"
+                      className={styles.prereqItem}
                     >
                       <span
-                        className="mt-1 h-1 w-1 rounded-full bg-slate-500 shrink-0"
+                        className={styles.prereqDot}
                         aria-hidden="true"
                       />
                       <span>{cond.predicate}</span>
@@ -894,24 +900,24 @@ function LoopItem({ loop, index }: { loop: InteractionLoop; index: number }) {
   return (
     <div
       data-testid={`loop-${index}`}
-      className="rounded-lg border border-fuchsia-700/30 bg-fuchsia-900/5 p-3 hover:bg-fuchsia-900/10 hover:border-fuchsia-700/50 transition-colors duration-150"
+      className={[styles.itemCard, styles.itemCardLoop].join(" ")}
     >
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold text-fuchsia-300">
+      <div className={styles.loopHeader}>
+        <span className={styles.loopLabel}>
           {loop.isInfinite ? "Infinite Loop" : "Loop"}
         </span>
         {loop.isInfinite && (
-          <span className="rounded-full bg-fuchsia-600/80 border border-fuchsia-500/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fuchsia-100 flex items-center gap-1">
+          <span className={styles.loopInfiniteBadge}>
             <span aria-hidden="true">&infin;</span> Infinite
           </span>
         )}
       </div>
       {/* Loop cycle visualization */}
-      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+      <div className={styles.loopCards}>
         {loop.cards.map((card, i) => (
-          <span key={`${card}-${i}`} className="flex items-center gap-1.5">
+          <span key={`${card}-${i}`} style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-3)" }}>
             {i > 0 && (
-              <span className="text-fuchsia-500/60 text-xs" aria-hidden="true">
+              <span className={styles.loopArrow} aria-hidden="true">
                 &rarr;
               </span>
             )}
@@ -919,14 +925,14 @@ function LoopItem({ loop, index }: { loop: InteractionLoop; index: number }) {
           </span>
         ))}
         <span
-          className="text-fuchsia-400 text-sm font-bold"
+          className={styles.loopBackArrow}
           title={`Loops back to ${loop.cards[0]}`}
           aria-label={`Loops back to ${loop.cards[0]}`}
         >
           &#8634;
         </span>
       </div>
-      <p className="text-xs text-slate-400 leading-relaxed">{loop.description}</p>
+      <p className={styles.loopDescription}>{loop.description}</p>
 
       {/* "How it works" expandable section */}
       <LoopHowItWorks loop={loop} id={loopId} />
@@ -938,18 +944,18 @@ function BlockerItem({ blocker, index }: { blocker: InteractionBlocker; index: n
   return (
     <div
       data-testid={`blocker-${index}`}
-      className="rounded-lg border border-slate-600/50 bg-slate-800/30 p-3 hover:bg-slate-700/30 hover:border-slate-500/50 transition-colors duration-150"
+      className={[styles.itemCard, styles.itemCardBlocker].join(" ")}
     >
-      <div className="flex flex-wrap items-center gap-2 mb-1.5">
-        <span className="rounded bg-slate-600/80 border border-slate-500/50 px-2 py-0.5 text-xs font-medium text-slate-200 leading-none">
+      <div className={styles.enablerMeta} style={{ marginBottom: "var(--space-3)" }}>
+        <span className={styles.blockerPill}>
           {blocker.blocker}
         </span>
-        <span className="rounded-full bg-slate-700/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+        <span className={styles.blockerCountBadge}>
           Blocks {blocker.blockedInteractions.length} interaction
           {blocker.blockedInteractions.length !== 1 ? "s" : ""}
         </span>
       </div>
-      <p className="text-xs text-slate-400 leading-relaxed">{blocker.description}</p>
+      <p className={styles.mechanical}>{blocker.description}</p>
     </div>
   );
 }
@@ -958,18 +964,18 @@ function EnablerItem({ enabler, index }: { enabler: InteractionEnabler; index: n
   return (
     <div
       data-testid={`enabler-${index}`}
-      className="rounded-lg border border-green-700/30 bg-green-900/5 p-3 hover:bg-green-900/10 hover:border-green-700/50 transition-colors duration-150"
+      className={[styles.itemCard, styles.itemCardEnabler].join(" ")}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded bg-green-700/60 border border-green-600/40 px-2 py-0.5 text-xs font-medium text-green-100 leading-none">
+      <div className={styles.enablerMeta}>
+        <span className={styles.enablerPill}>
           {enabler.enabler}
         </span>
         {enabler.isRequired && (
-          <span className="rounded-full bg-green-700/60 border border-green-600/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-100">
+          <span className={styles.enablerKeyBadge}>
             Key Enabler
           </span>
         )}
-        <span className="text-xs text-green-400/80">
+        <span className={styles.enablerCount}>
           enables {enabler.enabledInteractions.length} interaction
           {enabler.enabledInteractions.length !== 1 ? "s" : ""}
         </span>
@@ -988,49 +994,47 @@ function LoadingState({ steps, progress }: { steps: AnalysisStep[]; progress: nu
       role="status"
       aria-live="polite"
       aria-label="Analyzing interactions"
-      className="py-10 px-4 flex flex-col items-center gap-5"
+      className={styles.loadingState}
     >
-      <span className="text-sm font-semibold text-slate-300">
+      <span className={styles.loadingHeading}>
         Analyzing card interactions
       </span>
 
       {/* Progress bar */}
-      <div className="w-full max-w-xs">
-        <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-purple-500 transition-all duration-500 ease-out"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
+      <div className={styles.progressTrack}>
+        <div
+          className={styles.progressFill}
+          style={{ width: `${progress}%` }}
+        />
       </div>
 
       {/* Step list */}
-      <div className="w-full max-w-xs space-y-1.5">
+      <div className={styles.stepsList}>
         {steps.map((step) => (
-          <div key={step.id} className="flex items-center gap-2 text-xs">
+          <div key={step.id} className={styles.stepRow}>
             {step.status === "done" && (
-              <svg className="h-3.5 w-3.5 text-green-400 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <svg className={styles.stepIconDone} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
             )}
             {step.status === "active" && (
-              <svg className="h-3.5 w-3.5 animate-spin text-purple-400 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <svg className={styles.stepIconActive} viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             )}
             {step.status === "pending" && (
-              <span className="h-3.5 w-3.5 shrink-0 flex items-center justify-center">
-                <span className="block h-1.5 w-1.5 rounded-full bg-slate-600" />
+              <span className={styles.stepIconPendingWrapper}>
+                <span className={styles.stepIconPendingDot} />
               </span>
             )}
             <span
               className={
                 step.status === "done"
-                  ? "text-slate-500"
+                  ? styles.stepLabelDone
                   : step.status === "active"
-                  ? "text-slate-200 font-medium"
-                  : "text-slate-600"
+                  ? styles.stepLabelActive
+                  : styles.stepLabelPending
               }
             >
               {step.label}
@@ -1054,36 +1058,36 @@ function SummaryDashboard({ analysis }: { analysis: InteractionAnalysis }) {
   const topEnabler = analysis.enablers[0]?.enabler;
 
   return (
-    <div className="mb-5">
+    <div className={styles.summaryDashboard}>
       {/* Primary stats - 3 large cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-        <div className="rounded-lg border border-purple-700/50 bg-purple-900/10 px-4 py-4">
-          <div className="text-2xl font-bold tabular-nums text-purple-300">{totalInteractions}</div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Interactions</div>
-          <div className="mt-1 text-xs text-slate-500">detected</div>
+      <div className={styles.summaryGrid}>
+        <div className={[styles.statTile, styles.statTileAccent].join(" ")}>
+          <div className={[styles.statTileValue, styles.statTileValueAccent].join(" ")}>{totalInteractions}</div>
+          <div className={styles.statTileLabel}>Interactions</div>
+          <div className={styles.statTileSub}>detected</div>
         </div>
-        <div className="rounded-lg border border-fuchsia-700/40 bg-fuchsia-900/10 px-4 py-4">
-          <div className="text-2xl font-bold tabular-nums text-fuchsia-300">{totalLoops}</div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Loops Found</div>
+        <div className={[styles.statTile, styles.statTileLoop].join(" ")}>
+          <div className={[styles.statTileValue, styles.statTileValueLoop].join(" ")}>{totalLoops}</div>
+          <div className={styles.statTileLabel}>Loops Found</div>
           {infiniteLoops > 0 && (
-            <div className="mt-1 text-xs text-fuchsia-400">{infiniteLoops} infinite</div>
+            <div className={styles.statTileSubAccent}>{infiniteLoops} infinite</div>
           )}
         </div>
-        <div className="rounded-lg border border-green-700/40 bg-green-900/10 px-4 py-4">
-          <div className="text-2xl font-bold tabular-nums text-green-300">{totalEnablers}</div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Key Enablers</div>
+        <div className={[styles.statTile, styles.statTileOk].join(" ")}>
+          <div className={[styles.statTileValue, styles.statTileValueOk].join(" ")}>{totalEnablers}</div>
+          <div className={styles.statTileLabel}>Key Enablers</div>
           {topEnabler && (
-            <div className="mt-1 text-xs text-slate-500 truncate">Top: {topEnabler}</div>
+            <div className={styles.statTileSub} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Top: {topEnabler}</div>
           )}
         </div>
       </div>
 
       {/* Secondary stats */}
-      <div className="flex flex-wrap gap-2">
-        <span className="rounded-full bg-slate-800 border border-slate-700 px-3 py-1 text-xs text-slate-400 tabular-nums">
+      <div className={styles.secondaryStats}>
+        <span className={styles.secondaryPill}>
           Chains: {analysis.chains.length}
         </span>
-        <span className="rounded-full bg-slate-800 border border-slate-700 px-3 py-1 text-xs text-slate-400 tabular-nums">
+        <span className={styles.secondaryPill}>
           Blockers: {analysis.blockers.length}
         </span>
       </div>
@@ -1134,11 +1138,11 @@ function FilterControls({
   );
 
   return (
-    <div className="mb-4 space-y-3">
+    <div className={styles.filterControls}>
       {/* Card search */}
-      <div className="relative">
+      <div className={styles.searchWrapper}>
         <svg
-          className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none"
+          className={styles.searchIcon}
           viewBox="0 0 20 20"
           fill="currentColor"
           aria-hidden="true"
@@ -1153,7 +1157,7 @@ function FilterControls({
           type="text"
           value={cardSearch}
           onChange={(e) => onCardSearch(e.target.value)}
-          className="w-full rounded-lg border border-slate-700 bg-slate-800/80 pl-8 pr-8 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 transition-colors"
+          className={styles.searchInput}
           placeholder="Filter by card name..."
           aria-label="Filter interactions by card name"
         />
@@ -1161,10 +1165,10 @@ function FilterControls({
           <button
             type="button"
             onClick={() => onCardSearch("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1"
+            className={styles.searchClearBtn}
             aria-label="Clear search"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg className="" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
             </svg>
           </button>
@@ -1172,27 +1176,26 @@ function FilterControls({
       </div>
 
       {/* Type filter pills + strength + grouping in one row */}
-      <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+      <div className={styles.typeStrengthRow}>
         {/* Type pills */}
-        <div className="flex flex-wrap gap-1.5 flex-1">
+        <div className={styles.typePillsGroup}>
           <button
             type="button"
             onClick={() => {
               // Clear all active types
               for (const t of activeTypes) onToggleType(t as InteractionType);
             }}
-            className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer shrink-0 ${
-              activeTypes.size === 0
-                ? "border-purple-500 bg-purple-900/30 text-purple-300"
-                : "border-slate-600 bg-slate-800 text-slate-400 hover:border-slate-400"
-            }`}
+            className={[
+              styles.filterPillBase,
+              activeTypes.size === 0 ? styles.filterPillAll : "",
+            ].join(" ")}
             aria-pressed={activeTypes.size === 0}
           >
             All {interactions.length}
           </button>
           {typesPresent.map((type) => {
             const isActive = activeTypes.has(type as InteractionType);
-            const colors = TYPE_FILTER_COLORS[type as InteractionType];
+            const activeClass = TYPE_FILTER_PILL_CLASSES[type as InteractionType] ?? "";
             return (
               <button
                 key={type}
@@ -1200,11 +1203,10 @@ function FilterControls({
                 role="switch"
                 aria-checked={isActive}
                 onClick={() => onToggleType(type as InteractionType)}
-                className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer shrink-0 ${
-                  isActive
-                    ? colors?.active ?? "border-slate-400 bg-slate-700 text-slate-200"
-                    : "border-slate-600 bg-slate-800 text-slate-400 hover:border-slate-400 hover:text-slate-200"
-                }`}
+                className={[
+                  styles.filterPillBase,
+                  isActive ? activeClass : "",
+                ].join(" ")}
               >
                 {INTERACTION_TYPE_LABELS[type as InteractionType] ?? type} {typeCounts[type]}
               </button>
@@ -1213,8 +1215,8 @@ function FilterControls({
         </div>
 
         {/* Strength threshold */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-xs text-slate-500">Min:</span>
+        <div className={styles.strengthGroup}>
+          <span className={styles.strengthLabel}>Min:</span>
           {[
             { label: "All", value: 0 },
             { label: "25%+", value: 0.25 },
@@ -1225,11 +1227,10 @@ function FilterControls({
               key={label}
               type="button"
               onClick={() => onMinStrength(value)}
-              className={`rounded-full border px-2 py-0.5 text-xs transition-colors cursor-pointer ${
-                minStrength === value
-                  ? "border-purple-500 bg-purple-900/30 text-purple-300"
-                  : "border-slate-600 bg-slate-800 text-slate-400 hover:border-slate-400"
-              }`}
+              className={[
+                styles.filterPillBase,
+                minStrength === value ? styles.filterPillAll : "",
+              ].join(" ")}
             >
               {label}
             </button>
@@ -1238,21 +1239,23 @@ function FilterControls({
       </div>
 
       {/* Grouping toggle + View mode toggle on the same row */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className={styles.groupViewRow}>
         {/* Group-by (only relevant in list mode) */}
-        <div className={`flex items-center gap-1.5 transition-opacity ${viewMode !== "list" ? "opacity-40 pointer-events-none" : ""}`}>
-          <span className="text-xs text-slate-500">Group by:</span>
+        <div className={[
+          styles.groupModeGroup,
+          viewMode !== "list" ? styles.groupModeGroupDisabled : "",
+        ].join(" ")}>
+          <span className={styles.groupModeLabel}>Group by:</span>
           {(["type", "card", "strength"] as GroupMode[]).map((mode) => (
             <button
               key={mode}
               type="button"
               onClick={() => onGroupMode(mode)}
               aria-pressed={groupMode === mode}
-              className={`rounded-md border px-2.5 py-1 text-xs transition-colors cursor-pointer ${
-                groupMode === mode
-                  ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
-                  : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
-              }`}
+              className={[
+                styles.segmentBtn,
+                groupMode === mode ? styles.segmentBtnActive : "",
+              ].join(" ")}
             >
               {mode === "type" ? "Type" : mode === "card" ? "Card" : "Strength"}
             </button>
@@ -1260,18 +1263,17 @@ function FilterControls({
         </div>
 
         {/* View mode: List | Graph | Heatmap */}
-        <div className="flex items-center gap-1" role="group" aria-label="View mode">
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }} role="group" aria-label="View mode">
           {(["list", "graph", "heatmap"] as ViewMode[]).map((mode) => (
             <button
               key={mode}
               type="button"
               onClick={() => onViewMode(mode)}
               aria-pressed={viewMode === mode}
-              className={`rounded-md border px-2.5 py-1 text-xs transition-colors cursor-pointer ${
-                viewMode === mode
-                  ? "border-purple-500 bg-purple-900/20 text-purple-300 font-medium"
-                  : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
-              }`}
+              className={[
+                styles.segmentBtn,
+                viewMode === mode ? styles.segmentBtnActive : "",
+              ].join(" ")}
             >
               {mode === "list" ? "List" : mode === "graph" ? "Graph" : "Heatmap"}
             </button>
@@ -1336,7 +1338,7 @@ function buildGroups(
       .map(([type, items]) => ({
         id: type,
         label: INTERACTION_TYPE_LABELS[type as InteractionType] ?? type,
-        accentColor: INTERACTION_GROUP_COLORS[type as InteractionType] ?? "text-slate-400",
+        accentColor: INTERACTION_GROUP_COLORS[type as InteractionType] ?? "var(--ink-tertiary)",
         interactions: rawGroups[type] ?? [],
         displayItems: [...items].sort((a, b) => getItemStrength(b) - getItemStrength(a)),
       }));
@@ -1368,7 +1370,7 @@ function buildGroups(
       .map(([card, items]) => ({
         id: card,
         label: card,
-        accentColor: "text-purple-400",
+        accentColor: "var(--accent)",
         interactions: rawCardGroups[card] ?? [],
         displayItems: [...items].sort((a, b) => getItemStrength(b) - getItemStrength(a)),
       }));
@@ -1393,9 +1395,9 @@ function buildGroups(
     else rawLow.push(i);
   }
   const groups: DisplayGroup[] = [];
-  if (high.length > 0) groups.push({ id: "high", label: "High (75%+)", accentColor: "text-green-400", interactions: rawHigh, displayItems: high.sort((a, b) => getItemStrength(b) - getItemStrength(a)) });
-  if (mid.length > 0) groups.push({ id: "mid", label: "Mid (50-75%)", accentColor: "text-amber-400", interactions: rawMid, displayItems: mid.sort((a, b) => getItemStrength(b) - getItemStrength(a)) });
-  if (low.length > 0) groups.push({ id: "low", label: "Low (< 50%)", accentColor: "text-slate-400", interactions: rawLow, displayItems: low.sort((a, b) => getItemStrength(b) - getItemStrength(a)) });
+  if (high.length > 0) groups.push({ id: "high", label: "High (75%+)", accentColor: "var(--status-ok)", interactions: rawHigh, displayItems: high.sort((a, b) => getItemStrength(b) - getItemStrength(a)) });
+  if (mid.length > 0) groups.push({ id: "mid", label: "Mid (50-75%)", accentColor: "var(--status-watch)", interactions: rawMid, displayItems: mid.sort((a, b) => getItemStrength(b) - getItemStrength(a)) });
+  if (low.length > 0) groups.push({ id: "low", label: "Low (< 50%)", accentColor: "var(--ink-tertiary)", interactions: rawLow, displayItems: low.sort((a, b) => getItemStrength(b) - getItemStrength(a)) });
   return groups;
 }
 
@@ -1520,13 +1522,13 @@ function InteractionSectionInner({
       {/* Beta banner */}
       <div
         data-testid="interactions-beta-banner"
-        className="mb-4 rounded-lg border border-purple-700/50 bg-purple-900/20 px-4 py-3 flex items-start gap-2"
+        className={styles.betaBanner}
       >
         <svg
           aria-hidden="true"
           viewBox="0 0 20 20"
           fill="currentColor"
-          className="h-3.5 w-3.5 shrink-0 mt-0.5 text-purple-400"
+          className={styles.betaBannerIcon}
         >
           <path
             fillRule="evenodd"
@@ -1534,8 +1536,8 @@ function InteractionSectionInner({
             clipRule="evenodd"
           />
         </svg>
-        <p className="text-xs text-purple-300 leading-relaxed">
-          <span className="font-semibold text-purple-200">Interaction Engine (Beta)</span>
+        <p className={styles.betaBannerText}>
+          <span className={styles.betaBannerBold}>Interaction Engine (Beta)</span>
           {" — "}This feature uses a deterministic oracle text compiler to detect mechanical
           card interactions. Results may be incomplete for complex cards.
         </p>
@@ -1546,9 +1548,9 @@ function InteractionSectionInner({
 
       {/* Error state */}
       {error && (
-        <div role="alert" className="rounded-lg border border-red-700/50 bg-red-900/20 px-4 py-3 mb-4">
-          <p className="text-xs text-red-300">
-            <span className="font-semibold">Analysis error:</span> {error}
+        <div role="alert" className={styles.errorAlert}>
+          <p>
+            <span style={{ fontWeight: "var(--weight-semibold)" }}>Analysis error:</span> {error}
           </p>
         </div>
       )}
@@ -1578,7 +1580,7 @@ function InteractionSectionInner({
 
           {/* Filter active summary */}
           {hasActiveFilters && (
-            <div className="text-xs text-slate-500 flex items-center gap-2 mb-3">
+            <div className={styles.filterSummary}>
               <span>
                 Showing {filteredInteractions.length} of {totalCount} interactions
               </span>
@@ -1589,7 +1591,7 @@ function InteractionSectionInner({
                   setCardSearch("");
                   setMinStrength(0);
                 }}
-                className="text-purple-400 hover:text-purple-300 underline"
+                className={styles.clearFiltersBtn}
               >
                 Clear filters
               </button>
@@ -1597,7 +1599,7 @@ function InteractionSectionInner({
           )}
 
           {/* Sections */}
-          <div className="space-y-3 min-w-0">
+          <div className={styles.sectionList}>
             {/* Card Centrality & Removal Impact — always shown regardless of view mode */}
             {centralityResult && centralityResult.scores.length > 0 && (
               <CollapsiblePanel
@@ -1609,7 +1611,7 @@ function InteractionSectionInner({
                 testId="centrality-panel"
               >
                 <div>
-                  <p className="text-[11px] text-slate-500 italic mb-2">
+                  <p className={styles.centralityNote}>
                     Click a card to see what breaks if you remove it.
                   </p>
                   <CentralityRanking
@@ -1635,10 +1637,10 @@ function InteractionSectionInner({
                   fallback={
                     <div
                       aria-live="polite"
-                      className="flex items-center justify-center rounded-lg border border-slate-700 bg-slate-800/30 text-xs text-slate-500"
+                      className={styles.vizFallback}
                       style={{ height: 680 }}
                     >
-                      <span className="animate-pulse">Loading graph…</span>
+                      <span className={styles.vizFallbackPulse}>Loading graph…</span>
                     </div>
                   }
                 >
@@ -1654,14 +1656,15 @@ function InteractionSectionInner({
 
             {/* ─── Heatmap view ─────────────────────────────────────────────── */}
             {viewMode === "heatmap" && (
-              <div data-testid="interaction-heatmap-view" className="w-full overflow-hidden">
+              <div data-testid="interaction-heatmap-view" className={styles.heatmapWrapper}>
                 <Suspense
                   fallback={
                     <div
                       aria-live="polite"
-                      className="flex items-center justify-center rounded-lg border border-slate-700 bg-slate-800/30 py-16 text-xs text-slate-500"
+                      className={styles.vizFallback}
+                      style={{ paddingTop: "var(--space-32)", paddingBottom: "var(--space-32)" }}
                     >
-                      <span className="animate-pulse">Loading heatmap…</span>
+                      <span className={styles.vizFallbackPulse}>Loading heatmap…</span>
                     </div>
                   }
                 >
@@ -1687,7 +1690,7 @@ function InteractionSectionInner({
                     expanded={expandedSections.has("ie-loops")}
                     onToggle={() => onToggleSection("ie-loops")}
                   >
-                    <div className="space-y-2">
+                    <div className={styles.loopsList}>
                       {analysis.loops.map((loop, i) => (
                         <LoopItem key={loop.cards.join("-")} loop={loop} index={i} />
                       ))}
@@ -1704,7 +1707,7 @@ function InteractionSectionInner({
                     expanded={expandedSections.has("ie-enablers")}
                     onToggle={() => onToggleSection("ie-enablers")}
                   >
-                    <div className="space-y-2">
+                    <div className={styles.enablersList}>
                       {analysis.enablers.slice(0, enablerPage).map((enabler, i) => (
                         <EnablerItem key={enabler.enabler} enabler={enabler} index={i} />
                       ))}
@@ -1738,21 +1741,22 @@ function InteractionSectionInner({
                       }
                     />
                   ) : (
-                    <div className="space-y-4">
+                    <div className={styles.groupItems} style={{ gap: "var(--space-10)" }}>
                       {groups.map((group) => {
                         const limit = getGroupLimit(group.id);
                         const visible = group.displayItems.slice(0, limit);
                         return (
                           <div key={group.id}>
                             <h4
-                              className={`mb-2 text-[10px] font-bold uppercase tracking-widest ${group.accentColor}`}
+                              className={styles.groupHeading}
+                              style={{ color: group.accentColor }}
                             >
                               {group.label}{" "}
-                              <span className="text-slate-500 font-normal">
+                              <span className={styles.groupCount}>
                                 ({group.interactions.length})
                               </span>
                             </h4>
-                            <div className="space-y-2">
+                            <div className={styles.groupItems}>
                               {visible.map((item, i) =>
                                 item.kind === "rollup" ? (
                                   <RolledUpInteractionItem
@@ -1793,7 +1797,7 @@ function InteractionSectionInner({
                     expanded={expandedSections.has("ie-chains")}
                     onToggle={() => onToggleSection("ie-chains")}
                   >
-                    <div className="space-y-2">
+                    <div className={styles.chainsList}>
                       {analysis.chains.slice(0, chainPage).map((chain, i) => (
                         <ChainItem key={chain.cards.join("-")} chain={chain} index={i} />
                       ))}
@@ -1815,7 +1819,7 @@ function InteractionSectionInner({
                     expanded={expandedSections.has("ie-blockers")}
                     onToggle={() => onToggleSection("ie-blockers")}
                   >
-                    <div className="space-y-2">
+                    <div className={styles.blockersList}>
                       {analysis.blockers.slice(0, blockerPage).map((blocker, i) => (
                         <BlockerItem key={blocker.blocker} blocker={blocker} index={i} />
                       ))}
