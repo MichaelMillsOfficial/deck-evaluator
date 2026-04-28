@@ -7,6 +7,7 @@ import CardTags from "@/components/CardTags";
 import OracleText from "@/components/OracleText";
 import { formatUSD } from "@/lib/budget-analysis";
 import { getFaceDisplayMode } from "@/lib/card-layout";
+import styles from "./EnrichedCardRow.module.css";
 
 // ---------------------------------------------------------------------------
 // CardFaceDetail — renders a single face's details (reused by tabs & inline)
@@ -14,15 +15,18 @@ import { getFaceDisplayMode } from "@/lib/card-layout";
 
 function CardFaceDetail({ face }: { face: CardFace }) {
   return (
-    <div className="space-y-2 text-sm" data-testid={`face-detail-${face.name.replace(/[^a-zA-Z0-9]/g, "-")}`}>
-      <p className="text-slate-400 text-xs">{face.typeLine}</p>
+    <div
+      className={styles.detailBlock}
+      data-testid={`face-detail-${face.name.replace(/[^a-zA-Z0-9]/g, "-")}`}
+    >
+      <p className={styles.faceTypeline}>{face.typeLine}</p>
       {face.manaCost && (
         <div>
           <ManaCost cost={face.manaCost} />
         </div>
       )}
       {face.oracleText && <OracleText text={face.oracleText} />}
-      <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+      <div className={styles.statRow}>
         {face.power !== null && face.toughness !== null && (
           <span>
             P/T: {face.power}/{face.toughness}
@@ -49,7 +53,7 @@ function TabsFaceDetail({
 }) {
   return (
     <div>
-      <div className="flex gap-1 mb-2" role="tablist" aria-label="Card faces">
+      <div className={styles.faceTabs} role="tablist" aria-label="Card faces">
         {faces.map((face, i) => (
           <button
             key={face.name}
@@ -57,11 +61,12 @@ function TabsFaceDetail({
             aria-selected={i === activeFace}
             aria-controls={`face-panel-${i}`}
             onClick={() => setActiveFace(i)}
-            className={`px-2 py-0.5 text-xs rounded ${
-              i === activeFace
-                ? "text-purple-300 bg-purple-500/20"
-                : "text-slate-400 bg-slate-700/50 hover:bg-slate-700 hover:text-slate-300"
-            }`}
+            className={[
+              styles.faceTab,
+              i === activeFace && styles.faceTabActive,
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
             {face.name}
           </button>
@@ -77,12 +82,9 @@ function TabsFaceDetail({
 function InlineFaceDetail({ faces }: { faces: CardFace[] }) {
   return (
     <div>
-      {faces.map((face, i) => (
-        <div key={face.name}>
-          {i > 0 && <div className="border-t border-slate-700/50 mt-2 pt-2" />}
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">
-            {face.name}
-          </p>
+      {faces.map((face) => (
+        <div key={face.name} className={styles.inlineFace}>
+          <p className={styles.faceName}>{face.name}</p>
           <CardFaceDetail face={face} />
         </div>
       ))}
@@ -122,30 +124,32 @@ export default memo(function EnrichedCardRow({
 
   return (
     <>
-      <tr className="border-b border-slate-700/50 hover:bg-slate-700/30">
-        <td className="py-1.5 pr-2 text-right font-mono text-slate-400 whitespace-nowrap">
+      <tr className={styles.row}>
+        <td className={styles.tdQty}>
           <span className="sr-only">{quantity}x </span>
           {quantity}
         </td>
-        <td className="py-1.5 px-2 whitespace-nowrap">
+        <td className={styles.tdCost}>
           <ManaCost cost={card.manaCost} />
         </td>
-        <td className="py-1.5 px-2">
-          <div className="flex flex-col gap-1 min-w-0">
+        <td className={styles.tdName}>
+          <div className={styles.nameCell}>
             <button
               type="button"
               aria-expanded={open}
               aria-controls={detailId}
               onClick={() => setOpen(!open)}
               onKeyDown={handleKeyDown}
-              className="flex items-center gap-1.5 min-h-[44px] min-w-0 text-left text-slate-200 hover:text-purple-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
+              className={styles.nameButton}
             >
               <svg
                 data-testid="expand-chevron"
                 aria-hidden="true"
                 viewBox="0 0 20 20"
                 fill="currentColor"
-                className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-150 motion-reduce:transition-none ${open ? "rotate-90" : ""}`}
+                className={[styles.chevron, open && styles.chevronOpen]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 <path
                   fillRule="evenodd"
@@ -153,10 +157,10 @@ export default memo(function EnrichedCardRow({
                   clipRule="evenodd"
                 />
               </svg>
-              <span className="min-w-0">
+              <span className={styles.nameLabel}>
                 {card.name}
                 {card.flavorName && (
-                  <span className="block text-xs text-slate-400 truncate">
+                  <span className={styles.flavorName}>
                     ({card.flavorName})
                   </span>
                 )}
@@ -165,13 +169,11 @@ export default memo(function EnrichedCardRow({
             <CardTags card={card} />
           </div>
         </td>
-        <td className="py-1.5 pl-2 text-slate-400 text-xs whitespace-nowrap hidden sm:table-cell">
-          {card.typeLine}
-        </td>
+        <td className={styles.tdType}>{card.typeLine}</td>
       </tr>
       {open && (
-        <tr id={detailId} className="bg-slate-900/50">
-          <td colSpan={4} className="px-4 py-3">
+        <tr id={detailId} className={styles.detailRow}>
+          <td colSpan={4}>
             {/* Multi-face: tabs or inline based on layout */}
             {isMultiFace && displayMode === "tabs" && (
               <TabsFaceDetail
@@ -186,15 +188,15 @@ export default memo(function EnrichedCardRow({
 
             {/* Single-face or fallback: original rendering */}
             {(!isMultiFace || displayMode === "single") && (
-              <div className="space-y-2 text-sm">
+              <div className={styles.detailBlock}>
                 {/* Type line (visible on mobile since column is hidden) */}
-                <p className="text-slate-400 sm:hidden">{card.typeLine}</p>
+                <p className={styles.detailMobileType}>{card.typeLine}</p>
 
                 {/* Oracle text */}
                 {card.oracleText && <OracleText text={card.oracleText} />}
 
                 {/* Stats row */}
-                <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+                <div className={styles.statRow}>
                   {card.power !== null && card.toughness !== null && (
                     <span>
                       P/T: {card.power}/{card.toughness}
@@ -204,9 +206,11 @@ export default memo(function EnrichedCardRow({
                   {card.keywords.length > 0 && (
                     <span>Keywords: {card.keywords.join(", ")}</span>
                   )}
-                  <span className="capitalize">Rarity: {card.rarity}</span>
+                  <span>Rarity: {card.rarity}</span>
                   {card.prices.usd != null && (
-                    <span data-testid="card-price">Price: {formatUSD(card.prices.usd)}</span>
+                    <span data-testid="card-price">
+                      Price: {formatUSD(card.prices.usd)}
+                    </span>
                   )}
                 </div>
               </div>
@@ -214,13 +218,15 @@ export default memo(function EnrichedCardRow({
 
             {/* Shared stats for multi-face cards (keywords, rarity, price) */}
             {isMultiFace && displayMode !== "single" && (
-              <div className="flex flex-wrap gap-3 text-xs text-slate-400 mt-2">
+              <div className={styles.statRow} style={{ marginTop: "var(--space-5)" }}>
                 {card.keywords.length > 0 && (
                   <span>Keywords: {card.keywords.join(", ")}</span>
                 )}
-                <span className="capitalize">Rarity: {card.rarity}</span>
+                <span>Rarity: {card.rarity}</span>
                 {card.prices.usd != null && (
-                  <span data-testid="card-price">Price: {formatUSD(card.prices.usd)}</span>
+                  <span data-testid="card-price">
+                    Price: {formatUSD(card.prices.usd)}
+                  </span>
                 )}
               </div>
             )}
