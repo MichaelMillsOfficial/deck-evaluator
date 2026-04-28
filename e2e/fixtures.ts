@@ -318,6 +318,12 @@ export class DeckPage {
 
 export const test = base.extend<{ deckPage: DeckPage }>({
   deckPage: async ({ page }, use) => {
+    // Skip the /ritual loader's 2s minimum floor by default so the e2e
+    // suite isn't paying 2s on every import. Tests that explicitly verify
+    // the floor remove this flag via their own addInitScript.
+    await page.addInitScript(() => {
+      (window as Window).__SKIP_RITUAL_FLOOR__ = true;
+    });
     const deckPage = new DeckPage(page);
     await use(deckPage);
   },

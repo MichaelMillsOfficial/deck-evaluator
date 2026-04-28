@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import type { DeckData } from "@/lib/types";
 import {
   generateDeckId,
-  saveDeckSession,
   type DeckSessionPayload,
 } from "@/lib/deck-session";
+import { useDeckSession } from "@/contexts/DeckSessionContext";
 import DeckInput from "@/components/DeckInput";
 import styles from "./DeckImportSection.module.css";
 
@@ -56,6 +56,7 @@ function reducer(state: ImportFormState, action: ImportFormAction): ImportFormSt
 export default function DeckImportSection() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const router = useRouter();
+  const { setPayload } = useDeckSession();
 
   const handleImport = async (fetcher: () => Promise<Response>) => {
     dispatch({ type: "START" });
@@ -87,8 +88,8 @@ export default function DeckImportSection() {
         createdAt: Date.now(),
       };
 
-      saveDeckSession(payload);
-      router.push("/reading");
+      setPayload(payload);
+      router.push("/ritual");
     } catch (err) {
       dispatch({
         type: "ERROR",
