@@ -20,6 +20,7 @@ import {
   computeCompositionScorecard,
   AVAILABLE_TEMPLATES,
 } from "@/lib/deck-composition";
+import styles from "./DeckViewTabs.module.css";
 
 interface DeckViewTabsProps {
   deck: DeckData;
@@ -267,15 +268,14 @@ export default function DeckViewTabs({
       >
         {activeTab === "synergy" && cardMap && synergyAnalysis && (
           <section aria-labelledby="synergy-heading">
-            <h3
-              id="synergy-heading"
-              className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
-            >
-              Card Synergy
-            </h3>
-            <p className="mb-4 text-xs text-slate-400">
-              Synergy analysis, known combos, and anti-synergy warnings
-            </p>
+            <header className={styles.sectionHeader}>
+              <h3 id="synergy-heading" className={styles.sectionHeading}>
+                Card Synergy
+              </h3>
+              <p className={styles.sectionTagline}>
+                Synergy analysis, known combos, and anti-synergy warnings
+              </p>
+            </header>
             <SynergySection
               deck={deck}
               analysis={synergyAnalysis}
@@ -297,16 +297,15 @@ export default function DeckViewTabs({
       >
         {activeTab === "hands" && cardMap && !enrichLoading && (
           <section aria-labelledby="hands-heading">
-            <h3
-              id="hands-heading"
-              className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
-            >
-              Opening Hand Simulator
-            </h3>
-            <p className="mb-4 text-xs text-slate-400">
-              Draw sample opening hands, evaluate quality, and view aggregate
-              statistics
-            </p>
+            <header className={styles.sectionHeader}>
+              <h3 id="hands-heading" className={styles.sectionHeading}>
+                Opening Hand Simulator
+              </h3>
+              <p className={styles.sectionTagline}>
+                Draw sample opening hands, evaluate quality, and view aggregate
+                statistics
+              </p>
+            </header>
             <HandSimulator
               deck={deck}
               cardMap={cardMap}
@@ -346,15 +345,15 @@ export default function DeckViewTabs({
       >
         {activeTab === "interactions" && cardMap && !enrichLoading && (
           <section aria-labelledby="interactions-heading">
-            <h3
-              id="interactions-heading"
-              className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
-            >
-              Card Interactions
-            </h3>
-            <p className="mb-4 text-xs text-slate-400">
-              Mechanical interaction analysis powered by oracle text compilation
-            </p>
+            <header className={styles.sectionHeader}>
+              <h3 id="interactions-heading" className={styles.sectionHeading}>
+                Card Interactions
+              </h3>
+              <p className={styles.sectionTagline}>
+                Mechanical interaction analysis powered by oracle text
+                compilation
+              </p>
+            </header>
             <InteractionSection
               analysis={interactionAnalysis}
               loading={interactionLoading}
@@ -380,16 +379,15 @@ export default function DeckViewTabs({
       >
         {activeTab === "goldfish" && cardMap && !enrichLoading && (
           <section aria-labelledby="goldfish-heading">
-            <h3
-              id="goldfish-heading"
-              className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
-            >
-              Goldfish Simulator
-            </h3>
-            <p className="mb-4 text-xs text-slate-400">
-              Monte Carlo solitaire simulation: mana development and spell casting over {/* turns shown dynamically */}
-              10 turns across 1,000+ games
-            </p>
+            <header className={styles.sectionHeader}>
+              <h3 id="goldfish-heading" className={styles.sectionHeading}>
+                Goldfish Simulator
+              </h3>
+              <p className={styles.sectionTagline}>
+                Monte Carlo solitaire simulation: mana development and spell
+                casting over 10 turns across 1,000+ games
+              </p>
+            </header>
             <GoldfishSimulator deck={deck} cardMap={cardMap} />
           </section>
         )}
