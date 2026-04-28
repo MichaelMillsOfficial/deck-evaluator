@@ -29,7 +29,6 @@ export default function PreviewPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.cosmos} aria-hidden="true" />
       <main className={styles.main}>
         <header className={styles.header}>
           <Eyebrow>ASTRAL · PRIMITIVES · 04.27.26</Eyebrow>

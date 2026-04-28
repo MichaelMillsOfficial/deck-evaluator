@@ -1,23 +1,9 @@
 .page {
   position: relative;
-  min-height: 100vh;
-  background: var(--bg-base);
   color: var(--ink-primary);
   font-family: var(--font-sans);
   font-size: var(--text-body);
   line-height: var(--leading-body);
-  overflow: hidden;
-}
-
-.cosmos {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 60% 50% at 15% 0%, rgba(124, 58, 237, 0.18), transparent 60%),
-    radial-gradient(ellipse 80% 60% at 100% 100%, rgba(240, 170, 255, 0.10), transparent 60%),
-    radial-gradient(ellipse 50% 40% at 50% 30%, rgba(136, 231, 255, 0.06), transparent 70%);
 }
 
 .main {
