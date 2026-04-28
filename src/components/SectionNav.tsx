@@ -1,5 +1,7 @@
 "use client";
 
+import styles from "./SectionNav.module.css";
+
 interface SectionNavProps {
   sections: readonly { id: string; label: string }[];
   expandedSections: Set<string>;
@@ -28,7 +30,7 @@ export default function SectionNav({
     <nav
       aria-label="Section navigation"
       data-testid="section-nav"
-      className="mb-4 flex flex-wrap gap-2"
+      className={styles.nav}
     >
       {sections.map((section) => {
         const isExpanded = expandedSections.has(section.id);
@@ -38,11 +40,9 @@ export default function SectionNav({
             type="button"
             onClick={() => handleClick(section.id)}
             data-testid={`section-nav-${section.id}`}
-            className={`rounded-full border px-3 py-1 text-xs transition-colors cursor-pointer ${
-              isExpanded
-                ? "border-purple-500 bg-purple-900/30 text-purple-300"
-                : "border-slate-600 bg-slate-800 text-slate-400 hover:border-purple-500 hover:text-slate-200"
-            }`}
+            className={[styles.pill, isExpanded && styles.pillActive]
+              .filter(Boolean)
+              .join(" ")}
           >
             {section.label}
           </button>

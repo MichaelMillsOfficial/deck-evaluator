@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
+import styles from "./CollapsiblePanel.module.css";
 
 interface CollapsiblePanelProps {
   id: string;
@@ -39,7 +40,7 @@ export default function CollapsiblePanel({
       ref={panelRef}
       id={`panel-${id}`}
       data-testid={testId ?? `panel-${id}`}
-      className="rounded-lg border border-slate-700 bg-slate-800/50 overflow-hidden"
+      className={styles.panel}
     >
       <button
         type="button"
@@ -47,15 +48,15 @@ export default function CollapsiblePanel({
         aria-controls={contentId}
         onClick={onToggle}
         onKeyDown={handleKeyDown}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-700/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-inset"
+        className={styles.toggle}
       >
         <svg
           aria-hidden="true"
           viewBox="0 0 20 20"
           fill="currentColor"
-          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-150 motion-reduce:transition-none ${
-            expanded ? "rotate-90" : ""
-          }`}
+          className={[styles.chevron, expanded && styles.chevronOpen]
+            .filter(Boolean)
+            .join(" ")}
         >
           <path
             fillRule="evenodd"
@@ -63,16 +64,12 @@ export default function CollapsiblePanel({
             clipRule="evenodd"
           />
         </svg>
-        <span className="text-sm font-semibold uppercase tracking-wide text-slate-300">
-          {title}
-        </span>
-        {summary && (
-          <span className="ml-auto text-xs text-slate-400">{summary}</span>
-        )}
+        <span className={styles.title}>{title}</span>
+        {summary && <span className={styles.summary}>{summary}</span>}
       </button>
 
       {expanded && (
-        <div id={contentId} className="px-4 pt-2 pb-5">
+        <div id={contentId} className={styles.content}>
           {children}
         </div>
       )}

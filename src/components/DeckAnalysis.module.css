@@ -1,0 +1,38 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.budgetStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.tagline {
+  margin: 0 0 var(--space-7);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--text-sm);
+  color: var(--ink-tertiary);
+  line-height: var(--leading-snug);
+}
+
+.filterWrap {
+  margin-bottom: var(--space-7);
+}
+
+.classificationBadge {
+  display: inline-block;
+  padding: var(--space-1) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: 0.06em;
+  font-weight: var(--weight-semibold);
+  color: var(--ink-secondary);
+  text-transform: uppercase;
+}
