@@ -3,19 +3,11 @@ import styles from "./ManaCost.module.css";
 export type ManaSymbol = "W" | "U" | "B" | "R" | "G" | "C" | "X" | string;
 
 export type ManaCostProps = {
-  /** Symbols in order, e.g. ["2", "U", "G"]. */
+  /** Symbols in order, e.g. ["2", "U", "G"] or ["W/U", "B/P"]. */
   symbols: ManaSymbol[];
-  size?: "md" | "lg";
+  /** Pip diameter. md=16, lg=22. Override numerically for finer control. */
+  size?: "md" | "lg" | number;
   className?: string;
-};
-
-const COLOR_KEY: Record<string, string> = {
-  W: "w",
-  U: "u",
-  B: "b",
-  R: "r",
-  G: "g",
-  C: "c",
 };
 
 const COLOR_LABEL: Record<string, string> = {
@@ -25,74 +17,89 @@ const COLOR_LABEL: Record<string, string> = {
   R: "red",
   G: "green",
   C: "colorless",
+  S: "snow",
 };
 
-function classify(symbol: string): { className: string; label: string; display: string } {
+function symbolToFilename(symbol: string): string {
+  return symbol.replace(/\//g, "") + ".svg";
+}
+
+function describeSymbol(symbol: string): string {
   const up = symbol.toUpperCase();
-  if (up in COLOR_KEY) {
-    return {
-      className: styles[COLOR_KEY[up]],
-      label: COLOR_LABEL[up],
-      display: up,
-    };
-  }
-  if (up === "X") {
-    return { className: styles.c, label: "X", display: "X" };
-  }
-  // Generic numeric (treat as colorless visually)
-  return { className: styles.c, label: "generic", display: up };
+  if (up in COLOR_LABEL) return COLOR_LABEL[up];
+  if (up === "X" || up === "Y" || up === "Z") return up;
+  if (/^\d+$/.test(up)) return `${up} generic`;
+  // Hybrid color: W/U → "white or blue"
+  const hybrid = up.match(/^([WUBRG])\/([WUBRG])$/);
+  if (hybrid) return `${COLOR_LABEL[hybrid[1]]} or ${COLOR_LABEL[hybrid[2]]}`;
+  // Hybrid generic-color: 2/W → "2 or white"
+  const genHybrid = up.match(/^(\d+)\/([WUBRG])$/);
+  if (genHybrid) return `${genHybrid[1]} or ${COLOR_LABEL[genHybrid[2]]}`;
+  // Phyrexian: U/P → "Phyrexian blue"
+  const phy = up.match(/^([WUBRG])\/P$/);
+  if (phy) return `Phyrexian ${COLOR_LABEL[phy[1]]}`;
+  if (up === "T") return "tap";
+  if (up === "Q") return "untap";
+  return up;
 }
 
 function buildAriaLabel(symbols: ManaSymbol[]): string {
+  if (symbols.length === 0) return "no mana cost";
+
   const colored: Record<string, number> = {};
   let generic = 0;
   let xCount = 0;
+  const others: string[] = [];
+
   for (const s of symbols) {
     const up = String(s).toUpperCase();
     if (up in COLOR_LABEL) {
       colored[up] = (colored[up] ?? 0) + 1;
-    } else if (up === "X") {
-      xCount += 1;
-    } else {
-      const n = Number(up);
-      if (!Number.isNaN(n)) generic += n;
+      continue;
     }
+    if (up === "X") {
+      xCount += 1;
+      continue;
+    }
+    if (/^\d+$/.test(up)) {
+      generic += Number(up);
+      continue;
+    }
+    others.push(describeSymbol(String(s)));
   }
+
   const parts: string[] = [];
   if (generic > 0) parts.push(`${generic} generic`);
   if (xCount > 0) parts.push(`${xCount} X`);
-  for (const k of ["W", "U", "B", "R", "G", "C"]) {
-    if (colored[k]) {
-      parts.push(`${colored[k]} ${COLOR_LABEL[k]}`);
-    }
+  for (const k of ["W", "U", "B", "R", "G", "C", "S"]) {
+    if (colored[k]) parts.push(`${colored[k]} ${COLOR_LABEL[k]}`);
   }
-  return parts.length === 0 ? "no mana cost" : `Mana cost: ${parts.join(", ")}`;
+  parts.push(...others);
+
+  return `Mana cost: ${parts.join(", ")}`;
 }
 
+const SIZE_PX: Record<"md" | "lg", number> = { md: 16, lg: 22 };
+
 export function ManaCost({ symbols, size = "md", className }: ManaCostProps) {
-  const classes = [styles.cost, size === "lg" && styles.lg, className]
-    .filter(Boolean)
-    .join(" ");
+  const px = typeof size === "number" ? size : SIZE_PX[size];
+  const classes = [styles.cost, className].filter(Boolean).join(" ");
 
   return (
-    <span
-      className={classes}
-      role="img"
-      aria-label={buildAriaLabel(symbols)}
-    >
-      {symbols.map((s, i) => {
-        const { className: pipClass, display } = classify(String(s));
-        return (
-          <span
-            key={i}
-            data-pip
-            className={[styles.pip, pipClass].filter(Boolean).join(" ")}
-            aria-hidden="true"
-          >
-            {display}
-          </span>
-        );
-      })}
+    <span className={classes} role="img" aria-label={buildAriaLabel(symbols)}>
+      {symbols.map((s, i) => (
+        <img
+          key={i}
+          data-pip
+          className={styles.pip}
+          src={`https://svgs.scryfall.io/card-symbols/${symbolToFilename(String(s))}`}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          width={px}
+          height={px}
+        />
+      ))}
     </span>
   );
 }
