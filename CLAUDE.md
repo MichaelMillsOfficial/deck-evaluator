@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Magic: The Gathering Deck Evaluator -- a Next.js (TypeScript) web app for importing, parsing, and analyzing MTG decklists. Features a dark-themed UI with purple accents, 3-tab deck import (Manual / Moxfield / Archidekt), Scryfall card enrichment, heuristic card tagging, and official MTG symbol rendering.
+Magic: The Gathering Deck Evaluator -- a Next.js (TypeScript) web app for importing and analyzing MTG decklists. The UI follows the **Astral** design system (cosmic dark theme, Spectral serif headings, JetBrains Mono eyebrows, gradient accent), and routes the user through a four-stage journey: **import → ritual → reading → sub-route**.
 
 ## Commands
 
@@ -40,64 +40,140 @@ The app is served on port **3000** (`http://localhost:3000`).
 ```
 src/
 ├── app/
-│   ├── globals.css                # Dark slate theme, Tailwind CSS
-│   ├── layout.tsx                 # Root layout with nav bar (sparkle icon + branding)
-│   ├── page.tsx                   # Home page: header, DeckInput, features section
-│   ├── error.tsx                  # Error boundary
-│   ├── not-found.tsx              # 404 page
+│   ├── globals.css                # Astral tokens import + base body styles
+│   ├── layout.tsx                 # Root layout: cosmos background, top nav, providers
+│   ├── page.tsx                   # Home: import hero + DeckImportSection
+│   ├── ritual/page.tsx            # Cosmic loader (held until enrichment terminates)
+│   ├── reading/
+│   │   ├── layout.tsx             # Redirect gate (no session → /)
+│   │   ├── page.tsx               # /reading verdict landing (ReadingHero + tile grid)
+│   │   └── (shell)/               # Route group: persistent sidebar + drawer
+│   │       ├── layout.tsx         # DeckReadingShell + CandidatesProvider
+│   │       ├── cards/page.tsx
+│   │       ├── composition/page.tsx
+│   │       ├── synergy/page.tsx
+│   │       ├── interactions/page.tsx
+│   │       ├── hands/page.tsx
+│   │       ├── goldfish/page.tsx
+│   │       ├── suggestions/page.tsx
+│   │       ├── add/page.tsx
+│   │       ├── compare/page.tsx
+│   │       └── share/page.tsx
+│   ├── shared/page.tsx            # Decode share URL → setPayload → push /reading
+│   ├── compare/page.tsx           # Standalone two-deck comparison
+│   ├── preview/page.tsx           # Design-system component preview
 │   └── api/
-│       ├── deck/route.ts          # GET  — fetch deck by Archidekt URL
-│       ├── deck-parse/route.ts    # POST — parse pasted decklist text
-│       └── deck-enrich/route.ts   # POST — enrich card names via Scryfall API
+│       ├── deck/                  # GET — Archidekt URL fetch
+│       ├── deck-parse/            # POST — text decklist parser
+│       ├── deck-enrich/           # POST — Scryfall enrichment
+│       ├── deck-combos/           # POST — Commander Spellbook lookup
+│       ├── card-autocomplete/
+│       ├── card-suggestions/
+│       ├── commander-rules/
+│       └── export-image/
 ├── components/
-│   ├── DeckInput.tsx              # 3-tab import form (Manual/Moxfield/Archidekt)
-│   ├── DeckImportSection.tsx      # Import section wrapper
-│   ├── DeckList.tsx               # Renders parsed deck by section (table or list view)
-│   ├── EnrichedCardRow.tsx        # Expandable card row with chevron, mana cost, tags
-│   ├── ManaCost.tsx               # Mana cost display with Scryfall SVG symbols
-│   ├── ManaSymbol.tsx             # Single MTG symbol <img> from Scryfall CDN
-│   ├── OracleText.tsx             # Oracle text with inline symbol images
-│   └── CardTags.tsx               # Heuristic card tag pills (Ramp, Removal, etc.)
+│   ├── reading/                   # New journey chrome
+│   │   ├── DeckReadingShell.tsx   # Persistent sidebar + drawer wrapper
+│   │   ├── ReadingOverview.tsx    # /reading verdict landing
+│   │   ├── ReadingHero.tsx        # Hero block (eyebrow + title + tagline + tiles)
+│   │   └── SectionHeader.tsx      # Per-route eyebrow + serif h1 + italic tagline
+│   ├── ritual/CosmicLoader.tsx    # Pulsing orb + incantation phrases
+│   ├── shell/                     # Top nav + cosmos background
+│   ├── DeckSidebar.tsx            # Route-aware nav (usePathname → activeTab)
+│   ├── DeckMobileTopBar.tsx
+│   ├── DeckInput.tsx              # 3-tab import form
+│   ├── DeckImportSection.tsx
+│   ├── DeckList.tsx
+│   ├── EnrichedCardRow.tsx
+│   ├── ManaCost.tsx · ManaSymbol.tsx · OracleText.tsx · CardTags.tsx
+│   └── ...                        # Analysis components (Synergy, Goldfish, etc.)
+├── contexts/
+│   ├── DeckSessionContext.tsx     # sessionStorage-backed deck + enrichment state
+│   └── CandidatesContext.tsx      # /reading/add candidate state (shell-scoped)
 └── lib/
-    ├── types.ts                   # DeckData, DeckCard, EnrichedCard, API types
-    ├── archidekt.ts               # Archidekt API client + card normalization
-    ├── moxfield.ts                # Moxfield API types (fetch support TBD)
-    ├── scryfall.ts                # Scryfall API helpers (card enrichment)
-    ├── decklist-parser.ts         # Text-based decklist parser
-    ├── mana.ts                    # Mana cost parsing utilities
-    ├── oracle.ts                  # Oracle text tokenizer (text + symbol segments)
-    └── card-tags.ts               # Heuristic tag generation from card data
+    ├── types.ts                   # DeckData, DeckCard, EnrichedCard
+    ├── deck-session.ts            # sessionStorage codec + payload schema
+    ├── deck-codec.ts              # v1/v2 share-URL gzip+base64 encoder/decoder
+    ├── deck-tagline.ts            # Heuristic deck → italic tagline
+    ├── view-tabs.ts               # ViewTab union, TAB_ROUTES, tabFromPathname
+    ├── archidekt.ts · moxfield.ts · scryfall.ts
+    ├── decklist-parser.ts · mana.ts · oracle.ts · card-tags.ts
+    └── ...                        # Synergy, combos, simulation, export
 ```
 
-### Data Flow
+### Data Flow (the journey)
 
-1. **URL import** (`/api/deck`): Accepts an Archidekt URL -> extracts deck ID -> fetches from Archidekt API -> normalizes to `DeckData`
-2. **Text import** (`/api/deck-parse`): Accepts raw decklist text -> parses via `decklist-parser.ts` -> returns `DeckData`
-3. **Card enrichment** (`/api/deck-enrich`): Accepts card names -> fetches from Scryfall API -> returns `EnrichedCard` map
-4. All three UI tabs (Manual, Moxfield, Archidekt) currently route through the text parser; direct Moxfield API fetching is not yet implemented
+1. **Import** (`/`): User pastes / fetches a decklist via `DeckImportSection`.
+   On submit, the form calls `setPayload(payload)` on the deck session
+   context (which persists to sessionStorage) and navigates to `/ritual`.
+2. **Ritual** (`/ritual`): `CosmicLoader` plays. The page watches
+   `DeckSessionContext` for `cardMap !== null || enrichError !== null` and
+   for the `MIN_RITUAL_MS` floor to elapse, then forwards to `/reading`.
+   Test escape hatch: `window.__SKIP_RITUAL_FLOOR__ = true`.
+3. **Reading** (`/reading`): `ReadingOverview` renders the verdict hero +
+   tile grid. The shell layout (`/reading/(shell)/layout.tsx`) wraps
+   every sub-route in `DeckReadingShell` + `CandidatesProvider`, giving
+   persistent sidebar nav and shared candidate state.
+4. **Sub-routes** (`/reading/<slug>`): Each page reads `payload` from
+   `useDeckSession()` and renders its analysis component inside a
+   `<SectionHeader>` + `tabpanel` wrapper. Soft `<Link>` navigation
+   keeps the shell mounted across switches.
+
+### API endpoints
+
+- `GET  /api/deck` — Archidekt URL → `DeckData`
+- `POST /api/deck-parse` — raw text → `DeckData`
+- `POST /api/deck-enrich` — card names → `EnrichedCard` map (Scryfall)
+- `POST /api/deck-combos` — card names → Commander Spellbook combos
+- `GET  /api/card-autocomplete` — typeahead for `/reading/add`
+- `GET  /api/card-suggestions` — themed candidate suggestions
 
 ### Key Types
 
 - `DeckCard` -- `{ name: string; quantity: number }`
 - `DeckData` -- `{ name, source, url, commanders[], mainboard[], sideboard[] }`
 - `EnrichedCard` -- Full card data from Scryfall (mana cost, oracle text, type line, keywords, power/toughness, etc.)
+- `DeckSessionPayload` -- `{ id, deck, cardMap?, parseWarnings, notFoundCount, ... }`
+- `ViewTab` -- union of 10 sub-route keys; `TAB_ROUTES[tab]` → `/reading/<slug>`
 - Source can be `"moxfield" | "archidekt" | "text"`
 
-### Design System
+### Design System (Astral)
 
-- Dark theme: slate gradient background (`from-slate-950 via-slate-900 to-slate-800`)
-- Purple accent for primary actions (`bg-purple-600`)
-- Card panels: `bg-slate-800/50 border-slate-700 rounded-xl`
-- Tab bar: `bg-slate-900` with `bg-slate-600` active state
-- Text: `text-white` headings, `text-slate-300` body, `text-slate-400` secondary
+Tokens live in `design-system/tokens.css` and are imported via `globals.css`.
+**Always use semantic tokens, never raw values.**
+
+- **Background** — `var(--bg-base)` cosmic dark, layered with `<CosmosBackground>`
+- **Accent** — `var(--accent)` and `var(--accent-gradient)` for primary actions
+- **Surfaces** — `var(--card-bg)` + `var(--border)` panels with `var(--blur-sm)`
+- **Type** — `--font-serif` (Spectral) for headings, `--font-sans` (Inter) for body, `--font-mono` (JetBrains) for eyebrows
+- **Eyebrow pattern (sacred)** — every section opens with mono uppercase
+  `var(--text-eyebrow)` size + `var(--tracking-eyebrow)` letter-spacing in
+  `var(--accent)`. Use `<SectionHeader>` to enforce.
+- **Spacing scale** — `--space-{0,1,2,3,4,5,6,7,8,10,12,14,16,20,24,32}` only.
+  **9, 11, 13, 15… are NOT defined** — using them silently drops the value.
+- **Reduced motion** — every animated component must gate with
+  `@media (prefers-reduced-motion: reduce) { transition: none; transform: none }`.
 - MTG symbols: Scryfall CDN SVGs (`https://svgs.scryfall.io/card-symbols/{SYMBOL}.svg`)
 
 ### Component Patterns
 
-- **ManaSymbol**: Always use `<img>` tags with explicit `width`/`height` HTML attributes, `aria-hidden="true"`, and `shrink-0 inline-block align-text-bottom` for proper layout. The parent container carries the accessible label.
-- **ManaCost**: Container `<span>` carries `aria-label` with human-readable cost description. Individual symbols are `aria-hidden`.
-- **EnrichedCardRow**: Expandable disclosure pattern with `aria-expanded`, `aria-controls`, and Escape key support. Chevron rotates on expand with `motion-reduce:transition-none`.
-- **Table layout**: Use `table-auto` with `whitespace-nowrap` on fixed-content columns (Qty, Cost, Type). The Name column fills remaining space with `min-w-0` for truncation.
+- **SectionHeader**: every `/reading/*` sub-route opens with
+  `<SectionHeader slug="…" eyebrow="…" title="…" tagline="…" />`.
+- **DeckSidebar**: route-aware via `usePathname()` + `tabFromPathname()`.
+  Active tab is derived from URL, not held in component state.
+- **DeckSessionContext**: hydrates from sessionStorage on mount with a
+  `pending` → `hydrated` / `absent` lifecycle. `/reading/layout.tsx`
+  redirects to `/` when status is `absent`.
+- **CandidatesProvider**: lifted to the shell layout so candidate state
+  on `/reading/add` survives navigation to other tabs.
+- **ManaSymbol**: `<img>` tags with explicit `width`/`height`,
+  `aria-hidden="true"`, `shrink-0 inline-block align-text-bottom`. The
+  parent carries the accessible label.
+- **ManaCost**: container `<span>` carries `aria-label` with the
+  human-readable cost description; individual symbols are `aria-hidden`.
+- **EnrichedCardRow**: expandable disclosure with `aria-expanded`,
+  `aria-controls`, and Escape support. Chevron rotation respects
+  `motion-reduce:transition-none`.
 
 ## Testing
 

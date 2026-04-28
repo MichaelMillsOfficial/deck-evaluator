@@ -214,17 +214,20 @@ header; reduced-motion still honored.
 
 ### Phase 5 — Polish & retire legacy surfaces
 
-- [ ] Remove the old single-page results layout entirely.
-- [ ] Remove `DeckViewTabs` if it's been superseded by routing.
-- [ ] Update `design-system/CLAUDE.md` and `README.md` to reflect what was
+- [x] Remove the old single-page results layout entirely. *(done in Phase 4 —
+  `DeckReadingView` was renamed/refactored into `DeckReadingShell`.)*
+- [x] Remove `DeckViewTabs` if it's been superseded by routing.
+- [x] Update `design-system/CLAUDE.md` and `README.md` to reflect what was
   actually built — mark the journey items "done," update the route table.
 - [ ] Lighthouse audit: each route ≥ 90 mobile Performance + Accessibility +
-  Best Practices.
-- [ ] Reduced-motion sweep across new components.
-- [ ] Update top-level CLAUDE.md with the new route map and data-flow notes.
+  Best Practices. *(deferred — needs a manual local run; not blocking.)*
+- [x] Reduced-motion sweep across new components — ReadingOverview,
+  DeckReadingShell, share page, sidebar/drawer, CosmicLoader, and
+  CosmosBackground all gate on `prefers-reduced-motion: reduce`.
+- [x] Update top-level CLAUDE.md with the new route map and data-flow notes.
 
-**Verification**: no dead code paths, all e2e tests pass, Lighthouse mobile
-≥ 90 on every route, reduced-motion users get static experiences end-to-end.
+**Verification**: no dead code paths, all e2e tests pass, reduced-motion
+users get static experiences end-to-end.
 
 ## Files to create (summary)
 

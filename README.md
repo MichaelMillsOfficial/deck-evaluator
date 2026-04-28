@@ -1,8 +1,8 @@
 # MTG Deck Evaluator
 
-A web application for importing, parsing, and analyzing Magic: The Gathering decklists. Built with Next.js and TypeScript.
+A web application for importing and analyzing Magic: The Gathering decklists. Built with Next.js and TypeScript.
 
-Import decks via manual text entry, Moxfield export, or Archidekt URL. Cards are automatically enriched with data from the Scryfall API, including mana costs rendered as official MTG symbols, oracle text with inline symbol images, heuristic card tags (Ramp, Removal, Card Draw, etc.), and expandable card detail rows.
+Import a deck (paste, Moxfield export, or Archidekt URL) and the app walks you through a four-stage **journey** — *import → ritual → reading → sub-route*. The reading lands on a verdict hero (bracket, power level, top theme), then fans out across ten sub-routes for cards, composition, synergy, interactions, opening hands, goldfish simulation, suggestions, candidate finder, deck-vs-deck compare, and share/export. Cards are automatically enriched via Scryfall (mana costs as official MTG symbols, oracle text with inline symbols, heuristic tags), and combos are detected via Commander Spellbook.
 
 See [Promises to You](./PROMISES.md) for how this tool handles your data and what drives the analysis.
 
@@ -48,38 +48,65 @@ docker compose logs -f         # Tail logs
 | `npm run test:headed` | Run tests with visible browser |
 | `npm run test:ui` | Open Playwright interactive UI |
 
+## Routes
+
+| Route | Purpose |
+|-------|---------|
+| `/` | Import surface (paste · Moxfield · Archidekt) |
+| `/ritual` | Cosmic loader, held until enrichment terminates |
+| `/reading` | Verdict hero + reading-overview tile grid |
+| `/reading/cards` | Full card list, grouped by section |
+| `/reading/composition` | Mana curve, color pie, type breakdown |
+| `/reading/synergy` | Synergy axes + pair detector |
+| `/reading/interactions` | Removal / protection / chains |
+| `/reading/hands` | Opening-hand keep simulator |
+| `/reading/goldfish` | Monte Carlo goldfish stats |
+| `/reading/suggestions` | Cut/add/swap recommendations |
+| `/reading/add` | Candidate finder (typeahead → analysis) |
+| `/reading/compare` | Deck-vs-deck redirect to `/compare` |
+| `/reading/share` | Share URL · PNG · Discord · Markdown · JSON |
+| `/shared` | Decode share URL → forward to `/reading` |
+| `/compare` | Standalone two-deck comparison |
+| `/preview` | Design-system component preview |
+
+State flows through `DeckSessionContext` (sessionStorage-backed) so navigation between sub-routes does not refetch the deck or re-enrich cards. `CandidatesContext` is mounted at the `/reading/(shell)` layout so candidate state on `/reading/add` survives tab switches.
+
 ## Project Structure
 
 ```
 src/
 ├── app/
-│   ├── globals.css                # Dark slate theme, Tailwind CSS
-│   ├── layout.tsx                 # Root layout with navigation bar
-│   ├── page.tsx                   # Home page: header, deck input, features section
-│   ├── error.tsx                  # Error boundary
-│   ├── not-found.tsx              # 404 page
-│   └── api/
-│       ├── deck/route.ts          # GET  — fetch deck by Archidekt URL
-│       ├── deck-parse/route.ts    # POST — parse pasted decklist text
-│       └── deck-enrich/route.ts   # POST — enrich card names via Scryfall API
+│   ├── layout.tsx                  # Root layout: Astral tokens, top nav, providers
+│   ├── page.tsx                    # Import home
+│   ├── ritual/page.tsx             # Cosmic loader
+│   ├── reading/
+│   │   ├── layout.tsx              # Session redirect gate
+│   │   ├── page.tsx                # Verdict landing
+│   │   └── (shell)/                # Shared sidebar + drawer + candidates
+│   │       ├── layout.tsx
+│   │       └── <slug>/page.tsx     # 10 sub-routes
+│   ├── shared/page.tsx             # Decode share URL → /reading
+│   ├── compare/                    # Standalone two-deck compare
+│   ├── preview/                    # Design-system component preview
+│   └── api/                        # /deck, /deck-parse, /deck-enrich, /deck-combos, ...
 ├── components/
-│   ├── DeckInput.tsx              # 3-tab import form (Manual/Moxfield/Archidekt)
-│   ├── DeckImportSection.tsx      # Import section wrapper
-│   ├── DeckList.tsx               # Renders parsed deck by section (table or list)
-│   ├── EnrichedCardRow.tsx        # Expandable card row with chevron, mana cost, tags
-│   ├── ManaCost.tsx               # Mana cost display with Scryfall SVG symbols
-│   ├── ManaSymbol.tsx             # Single MTG symbol <img> from Scryfall CDN
-│   ├── OracleText.tsx             # Oracle text with inline symbol images
-│   └── CardTags.tsx               # Heuristic card tag pills (Ramp, Removal, etc.)
+│   ├── reading/                    # Shell, hero, overview, section header
+│   ├── ritual/CosmicLoader.tsx
+│   ├── shell/                      # Top nav, cosmos background
+│   ├── DeckSidebar.tsx             # Route-aware nav
+│   ├── DeckMobileTopBar.tsx
+│   ├── DeckInput.tsx · DeckList.tsx · EnrichedCardRow.tsx
+│   └── ManaCost.tsx · ManaSymbol.tsx · OracleText.tsx · CardTags.tsx
+├── contexts/
+│   ├── DeckSessionContext.tsx      # sessionStorage-backed deck + enrichment
+│   └── CandidatesContext.tsx       # /reading/add candidate state
 └── lib/
-    ├── types.ts                   # DeckData, DeckCard, EnrichedCard, API types
-    ├── archidekt.ts               # Archidekt API client + card normalization
-    ├── moxfield.ts                # Moxfield API types
-    ├── scryfall.ts                # Scryfall API helpers (card enrichment)
-    ├── decklist-parser.ts         # Text-based decklist parser
-    ├── mana.ts                    # Mana cost parsing utilities
-    ├── oracle.ts                  # Oracle text tokenizer (text + symbol segments)
-    └── card-tags.ts               # Heuristic tag generation from card data
+    ├── types.ts                    # DeckData, DeckCard, EnrichedCard
+    ├── deck-session.ts             # sessionStorage codec + payload schema
+    ├── deck-codec.ts               # Share-URL gzip+base64 codec
+    ├── deck-tagline.ts             # Heuristic deck → tagline
+    ├── view-tabs.ts                # ViewTab union, TAB_ROUTES, tabFromPathname
+    └── ...                         # Parsers, enrichment, synergy, simulation
 ```
 
 ## Testing

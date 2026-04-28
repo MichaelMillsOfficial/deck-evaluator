@@ -4,6 +4,44 @@ You are picking up Astral, a cosmic deck-reading app, and rebuilding it as a
 production Next.js application. This file tells you what to build, what to
 match, and what to ignore.
 
+## Status — April 2026
+
+The Astral journey shipped across 5 phases (PRs #105 → merged into master).
+The four-stage `/ → /ritual → /reading → /reading/<sub>` flow is live and
+covered by 408 e2e tests + 2473 unit tests. Mark these as done in the
+"Build order" section below:
+
+- ✅ Foundations — tokens.css imported via `globals.css`; Spectral / Inter / JetBrains
+  Mono wired through `next/font/google`.
+- ✅ Cosmos shell — `<CosmosBackground>` + top nav landed in
+  `src/components/shell/`.
+- ✅ Primitives — `<Button>`, `<Card>`, `<Eyebrow>`, `<StatTile>`, `<Sheet>`,
+  `<Tag>` exposed via `src/components/ui/`.
+- ✅ Domain components — `<ManaCost>`, `<ColorPie>`, `<CurveConstellation>`,
+  `<CardRow>`, `<DeckHero>` exposed via `src/components/deck/`.
+- ✅ Screens — every route below the table now exists, including the
+  ritual loader (`/ritual`), the verdict hero on `/reading`, and the ten
+  shell sub-routes under `/reading/(shell)/`.
+- ✅ `prefers-reduced-motion` honored across CosmicLoader, ReadingOverview,
+  DeckReadingShell, DeckSidebar, share page, and CosmosBackground.
+
+### Deltas from the original plan
+
+- The loader route is `/ritual`, not `/loading`, and is held by a
+  `MIN_RITUAL_MS` floor (with a `window.__SKIP_RITUAL_FLOOR__` test
+  escape hatch) until enrichment terminates.
+- The `/reading` shell uses Next.js's `(shell)` route group so the URL
+  stays flat (`/reading/cards`, not `/reading/(shell)/cards`).
+- Four extra reading sub-routes were needed for parity with the existing
+  analysis surface: `/reading/composition`, `/reading/synergy`,
+  `/reading/interactions`, `/reading/hands`.
+- Cross-route React state lives in providers mounted at the shell
+  layout: `DeckSessionContext` (sessionStorage-backed) and
+  `CandidatesContext` (in-memory, scoped to a single reading session).
+- The original `--space-9, --space-11, --space-13…` half-steps are NOT
+  defined in `tokens.css`. Using them silently drops the value. Treat
+  the scale as `{0,1,2,3,4,5,6,7,8,10,12,14,16,20,24,32}` only.
+
 ## Source material
 
 | Path | What it is | Use as |
