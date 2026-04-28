@@ -15,6 +15,32 @@ import { DeckSidebar, DeckDrawer } from "@/components/DeckSidebar";
 import DeckMobileTopBar from "@/components/DeckMobileTopBar";
 import DiscordExportModal from "@/components/DiscordExportModal";
 import type { ViewTab } from "@/lib/view-tabs";
+import styles from "./DeckImportSection.module.css";
+
+function AlertIcon() {
+  return (
+    <svg
+      className={styles.alertIcon}
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        fillRule="evenodd"
+        d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function DismissIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+    </svg>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // State & Actions
@@ -366,7 +392,7 @@ export default function DeckImportSection() {
 
   return (
     <>
-      <div className="mx-auto max-w-4xl">
+      <div className={styles.layout}>
       <DeckInput
         onSubmitUrl={handleFetchDeck}
         onSubmitText={handleParseDeck}
@@ -378,30 +404,18 @@ export default function DeckImportSection() {
           role="status"
           aria-live="polite"
           aria-atomic="true"
-          className="mt-8 text-center text-sm text-slate-400 animate-pulse motion-reduce:animate-none"
+          className={styles.status}
         >
           Fetching deck...
         </p>
       )}
 
       {error && !loading && (
-        <div
-          role="alert"
-          className="mt-8 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400"
-        >
-          <svg
-            className="mr-2 inline-block h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              fillRule="evenodd"
-              d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
-              clipRule="evenodd"
-            />
-          </svg>
-          {error}
+        <div role="alert" className={`${styles.alert} ${styles.alertError}`}>
+          <div className={styles.alertContent}>
+            <AlertIcon />
+            <div className={styles.alertBody}>{error}</div>
+          </div>
         </div>
       )}
 
@@ -409,46 +423,44 @@ export default function DeckImportSection() {
         <div
           data-testid="parse-warnings"
           role="alert"
-          className="mt-8 flex items-start justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400"
+          className={`${styles.alert} ${styles.alertWatch}`}
         >
-          <div>
-            <p className="font-medium">
-              Some lines could not be parsed and were skipped:
-            </p>
-            <ul className="mt-1 list-disc pl-5">
-              {parseWarnings.slice(0, 5).map((w) => (
-                <li key={w}>{w}</li>
-              ))}
-              {parseWarnings.length > 5 && (
-                <li>...and {parseWarnings.length - 5} more</li>
-              )}
-            </ul>
+          <div className={styles.alertContent}>
+            <AlertIcon />
+            <div className={styles.alertBody}>
+              <p className={styles.alertTitle}>
+                Some lines could not be parsed and were skipped:
+              </p>
+              <ul className={styles.alertList}>
+                {parseWarnings.slice(0, 5).map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+                {parseWarnings.length > 5 && (
+                  <li>...and {parseWarnings.length - 5} more</li>
+                )}
+              </ul>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => dispatch({ type: "DISMISS_PARSE_WARNINGS" })}
-            className="ml-4 shrink-0 text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
-            aria-label="Dismiss parse warnings"
-          >
-            <svg
-              className="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              aria-hidden="true"
+          <div className={styles.alertActions}>
+            <button
+              type="button"
+              onClick={() => dispatch({ type: "DISMISS_PARSE_WARNINGS" })}
+              className={styles.dismissButton}
+              aria-label="Dismiss parse warnings"
             >
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
-          </button>
+              <DismissIcon />
+            </button>
+          </div>
         </div>
       )}
 
-      </div>{/* end max-w-4xl wrapper for import form */}
+      </div>{/* end layout wrapper for import form */}
 
       {deckData && !loading && (
         <div
           ref={deckResultRef}
           tabIndex={-1}
-          className="mt-10 focus:outline-none"
+          className={styles.results}
           aria-label="Deck import results"
         >
           {/* Mobile top bar (only visible below md) */}
@@ -481,7 +493,7 @@ export default function DeckImportSection() {
           />
 
           {/* Desktop layout: sidebar + content */}
-          <div className="flex min-h-0">
+          <div className={styles.resultsLayout}>
             {/* Desktop sidebar */}
             <DeckSidebar
               deck={deckData}
@@ -496,8 +508,8 @@ export default function DeckImportSection() {
             />
 
             {/* Content area */}
-            <div className="flex-1 min-w-0 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden md:rounded-l-none md:border-l-0">
-              <div className="p-6">
+            <div className={styles.contentPanel}>
+              <div className={styles.contentPanelInner}>
                 <DeckViewTabs
                   deck={deckData}
                   cardMap={cardMap}
@@ -513,12 +525,14 @@ export default function DeckImportSection() {
           </div>
 
           {enrichError && !enrichLoading && (
-            <div
-              role="alert"
-              className="mt-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400"
-            >
-              <span>{enrichError}. The basic decklist is still available.</span>
-              <div className="flex items-center gap-2 ml-4 shrink-0">
+            <div role="alert" className={`${styles.alert} ${styles.alertWatch}`}>
+              <div className={styles.alertContent}>
+                <AlertIcon />
+                <div className={styles.alertBody}>
+                  {enrichError}. The basic decklist is still available.
+                </div>
+              </div>
+              <div className={styles.alertActions}>
                 <button
                   type="button"
                   data-testid="enrich-retry-btn"
@@ -526,7 +540,7 @@ export default function DeckImportSection() {
                   onClick={() => {
                     if (deckData) enrichDeck(deckData);
                   }}
-                  className="rounded-md bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className={styles.retryButton}
                 >
                   Try Again
                 </button>
@@ -536,74 +550,57 @@ export default function DeckImportSection() {
                     dispatch({ type: "DISMISS_ENRICH_ERROR" });
                     deckResultRef.current?.focus();
                   }}
-                  className="text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
+                  className={styles.dismissButton}
                   aria-label="Dismiss warning"
                 >
-                  <svg
-                    className="h-4 w-4"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                  </svg>
+                  <DismissIcon />
                 </button>
               </div>
             </div>
           )}
 
           {notFoundCount > 0 && !enrichError && !enrichLoading && (
-            <div
-              role="alert"
-              className="mt-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400"
-            >
-              <span>
-                {notFoundCount} {notFoundCount === 1 ? "card" : "cards"} could
-                not be found and {notFoundCount === 1 ? "is" : "are"} shown
-                without details
-              </span>
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "DISMISS_NOT_FOUND" })}
-                className="ml-4 shrink-0 text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
-                aria-label="Dismiss warning"
-              >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
+            <div role="alert" className={`${styles.alert} ${styles.alertWatch}`}>
+              <div className={styles.alertContent}>
+                <AlertIcon />
+                <div className={styles.alertBody}>
+                  {notFoundCount} {notFoundCount === 1 ? "card" : "cards"} could
+                  not be found and {notFoundCount === 1 ? "is" : "are"} shown
+                  without details
+                </div>
+              </div>
+              <div className={styles.alertActions}>
+                <button
+                  type="button"
+                  onClick={() => dispatch({ type: "DISMISS_NOT_FOUND" })}
+                  className={styles.dismissButton}
+                  aria-label="Dismiss warning"
                 >
-                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                </svg>
-              </button>
+                  <DismissIcon />
+                </button>
+              </div>
             </div>
           )}
 
           {commanderWarning && !enrichLoading && (
-            <div
-              role="alert"
-              className="mt-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400"
-            >
-              <span>{commanderWarning}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  dispatch({ type: "SET_COMMANDER_WARNING", warning: null });
-                  deckResultRef.current?.focus();
-                }}
-                className="ml-4 shrink-0 text-amber-400 hover:text-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
-                aria-label="Dismiss commander warning"
-              >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
+            <div role="alert" className={`${styles.alert} ${styles.alertWatch}`}>
+              <div className={styles.alertContent}>
+                <AlertIcon />
+                <div className={styles.alertBody}>{commanderWarning}</div>
+              </div>
+              <div className={styles.alertActions}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({ type: "SET_COMMANDER_WARNING", warning: null });
+                    deckResultRef.current?.focus();
+                  }}
+                  className={styles.dismissButton}
+                  aria-label="Dismiss commander warning"
                 >
-                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                </svg>
-              </button>
+                  <DismissIcon />
+                </button>
+              </div>
             </div>
           )}
 
