@@ -253,12 +253,12 @@ test.describe("captureSnapshotsAtTurns", () => {
     expect(snapshots.map((s) => s.turn)).not.toContain(8);
   });
 
-  test("snapshot type is 'critical_mass' for turn snapshots", () => {
+  test("snapshot type is 'snapshot' for turn snapshots", () => {
     const log = makeGameLog([
       makeTurnLog({ turn: 5, permanentCount: 4 }),
     ]);
     const snapshots = captureSnapshotsAtTurns([log], [5]);
-    expect(snapshots[0].type).toBe("critical_mass");
+    expect(snapshots[0].type).toBe("snapshot");
   });
 
   test("snapshot aggregates data across multiple games at same turn", () => {

@@ -182,33 +182,10 @@ test.describe("Deck Header", () => {
     // Either way the test passes — zero themes is valid for a small deck
   });
 
-  test("hand stats visible after enrichment completes", async ({
-    deckPage,
-  }) => {
-    test.skip(!scryfallReachable, "Scryfall API is unreachable");
-    await deckPage.goto();
-    await deckPage.fillDecklist(SAMPLE_DECKLIST);
-    await deckPage.submitImport();
-    await deckPage.waitForDeckDisplay();
-
-    // Wait for enrichment to complete
-    await deckPage.page.waitForFunction(
-      () => {
-        const tabs = document.querySelectorAll('[role="tab"]');
-        const analysisTab = Array.from(tabs).find(
-          (t) => t.textContent === "Analysis"
-        );
-        return analysisTab && !(analysisTab as HTMLButtonElement).disabled;
-      },
-      { timeout: 20_000 }
-    );
-
-    const header = deckPage.page.getByTestId("deck-header");
-    const handStats = header.getByTestId("hand-stats");
-    await expect(handStats).toBeVisible();
-    await expect(handStats).toContainText("% keep");
-    await expect(handStats).toContainText("lands");
-  });
+  // Removed: "hand stats visible after enrichment completes"
+  // The hand-stats row was moved out of the sidebar in the editorial
+  // throughline pass; the same data now lives in the /reading/hands
+  // chapter epigraph (Keepable / Avg Lands / T2 Play).
 
   // Removed: "share button exists, disabled during enrichment"
   // Same reason — /reading is no longer reached mid-enrichment.

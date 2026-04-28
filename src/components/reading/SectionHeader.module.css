@@ -1,8 +1,68 @@
 .header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  margin-bottom: var(--space-12);
+  align-items: center;
+  text-align: center;
+  gap: var(--space-5);
+  padding: var(--space-12) 0 var(--space-12);
+  margin-bottom: var(--space-14);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Chapter-cover reveal: each element fades up with a small stagger so
+   the post-tile-click navigation feels like turning a magazine page
+   rather than cutting into the next view.
+
+   `animation-fill-mode: backwards` keeps each element at its `from`
+   state (invisible, offset) during its delay so we don't get a flash
+   of visible-then-fade.
+
+   `--dur-reveal` is gated to 0ms in tokens.css under
+   prefers-reduced-motion, but we also explicitly null the animation
+   below so reduced-motion users render straight to the final state
+   without sitting through any delay. */
+.header > * {
+  animation: chapterReveal var(--dur-reveal) var(--ease-out) backwards;
+}
+
+.runningHead {
+  animation-delay: 0ms;
+}
+.eyebrow {
+  animation-delay: 60ms;
+}
+.title {
+  animation-delay: 120ms;
+}
+.tagline {
+  animation-delay: 180ms;
+}
+.stats {
+  animation-delay: 240ms;
+}
+
+@keyframes chapterReveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.runningHead {
+  margin: 0 0 var(--space-5);
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+  max-width: 60ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .eyebrow {
@@ -16,20 +76,43 @@
 .title {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: var(--text-h1);
+  font-size: var(--text-display);
   font-weight: var(--weight-medium);
-  line-height: 1.1;
-  letter-spacing: -0.005em;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
   color: var(--ink-primary);
   text-wrap: balance;
+  max-width: 22ch;
 }
 
 .tagline {
   margin: 0;
-  max-width: 56ch;
+  max-width: 48ch;
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: var(--text-md);
+  font-size: var(--text-body-lg);
   line-height: var(--leading-relaxed);
-  color: var(--ink-tertiary);
+  color: var(--ink-secondary);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-5);
+  width: 100%;
+  max-width: 600px;
+  margin-top: var(--space-7);
+}
+
+@media (min-width: 640px) {
+  .stats {
+    grid-template-columns: repeat(var(--stat-count, 3), 1fr);
+    max-width: calc(var(--stat-count, 3) * 200px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header > * {
+    animation: none;
+  }
 }

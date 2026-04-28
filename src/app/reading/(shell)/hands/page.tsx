@@ -1,8 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
-import SectionHeader from "@/components/reading/SectionHeader";
+import { readingRunningHead } from "@/lib/reading-format";
+import SectionHeader, {
+  type SectionStat,
+} from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 import HandSimulator from "@/components/HandSimulator";
 
 export default function HandsPage() {
@@ -20,6 +24,29 @@ export default function HandsPage() {
     });
   }, []);
 
+  const stats = useMemo<SectionStat[] | undefined>(() => {
+    const sim = analysisResults?.simulationStats;
+    if (!sim) return undefined;
+    return [
+      {
+        label: "Keepable",
+        value: `${Math.round(sim.keepableRate * 100)}%`,
+        sub: `${sim.totalSimulations} hands`,
+        accent: true,
+      },
+      {
+        label: "Avg Lands",
+        value: sim.avgLandsInOpener.toFixed(1),
+        sub: "in opener",
+      },
+      {
+        label: "T2 Play",
+        value: `${Math.round(sim.probT2Play * 100)}%`,
+        sub: "spell on curve",
+      },
+    ];
+  }, [analysisResults]);
+
   if (!payload?.cardMap) return null;
 
   return (
@@ -30,9 +57,11 @@ export default function HandsPage() {
     >
       <SectionHeader
         slug="hands"
+        runningHead={readingRunningHead(payload.createdAt, payload.deck.name)}
         eyebrow="Opening Hands"
         title="The First Seven"
         tagline="Draw sample opening hands, evaluate keepability, and tune your mulligan instincts."
+        stats={stats}
       />
       <h2 id="hands-heading" className="sr-only">
         Opening Hand Simulator
@@ -44,6 +73,7 @@ export default function HandsPage() {
         expandedSections={expandedSections}
         onToggleSection={toggle}
       />
+      <ChapterFooter current="hands" />
     </section>
   );
 }

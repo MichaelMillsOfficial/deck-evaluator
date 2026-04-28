@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
+import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 
 export default function ComparePage() {
   const { payload } = useDeckSession();
@@ -16,6 +18,7 @@ export default function ComparePage() {
     >
       <SectionHeader
         slug="compare"
+        runningHead={readingRunningHead(payload.createdAt, payload.deck.name)}
         eyebrow="Compare"
         title="Side by Side"
         tagline="Diff this list against another for overlap, mana-curve divergence, and tag composition."
@@ -61,6 +64,7 @@ export default function ComparePage() {
           Open Compare
         </Link>
       </div>
+      <ChapterFooter current="compare" />
     </div>
   );
 }

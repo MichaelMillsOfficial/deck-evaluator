@@ -1,7 +1,9 @@
 "use client";
 
 import { useDeckSession } from "@/contexts/DeckSessionContext";
+import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader from "@/components/reading/SectionHeader";
+import ChapterFooter from "@/components/reading/ChapterFooter";
 import GoldfishSimulator from "@/components/GoldfishSimulator";
 
 export default function GoldfishPage() {
@@ -16,6 +18,7 @@ export default function GoldfishPage() {
     >
       <SectionHeader
         slug="goldfish"
+        runningHead={readingRunningHead(payload.createdAt, payload.deck.name)}
         eyebrow="Simulation"
         title="Goldfish Reading"
         tagline="Monte Carlo solitaire — mana development and spell casting across a thousand games over ten turns."
@@ -24,6 +27,7 @@ export default function GoldfishPage() {
         Goldfish Simulator
       </h2>
       <GoldfishSimulator deck={payload.deck} cardMap={payload.cardMap} />
+      <ChapterFooter current="goldfish" />
     </section>
   );
 }

@@ -12,6 +12,7 @@ const MILESTONE_LABELS: Record<string, string> = {
   commander_cast: "Commander",
   combo_assembled: "Combo",
   critical_mass: "Board",
+  snapshot: "Snapshot",
 };
 
 const MILESTONE_COLORS: Record<string, string> = {
@@ -19,6 +20,7 @@ const MILESTONE_COLORS: Record<string, string> = {
   commander_cast: "text-purple-300 border-purple-700 bg-purple-900/20",
   combo_assembled: "text-amber-300 border-amber-700 bg-amber-900/20",
   critical_mass: "text-green-300 border-green-700 bg-green-900/20",
+  snapshot: "text-slate-300 border-slate-700 bg-slate-800/40",
 };
 
 const MILESTONE_ACTIVE_COLORS: Record<string, string> = {
@@ -26,6 +28,7 @@ const MILESTONE_ACTIVE_COLORS: Record<string, string> = {
   commander_cast: "border-purple-500 bg-purple-900/40 text-purple-200",
   combo_assembled: "border-amber-500 bg-amber-900/40 text-amber-200",
   critical_mass: "border-green-500 bg-green-900/40 text-green-200",
+  snapshot: "border-slate-400 bg-slate-700/50 text-slate-100",
 };
 
 function MilestoneCard({ milestone }: { milestone: BoardMilestone }) {
