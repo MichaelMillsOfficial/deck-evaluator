@@ -12,6 +12,7 @@ import {
 } from "@/lib/export-report";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
+import styles from "./DeckSidebar.module.css";
 
 // ---------------------------------------------------------------------------
 // Inline SVG icons (Heroicons outline 20x20)
@@ -104,10 +105,13 @@ function IconChevronDown({ rotated }: { rotated?: boolean }) {
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
-      width="16"
-      height="16"
+      width="14"
+      height="14"
       aria-hidden="true"
-      className={`transition-transform duration-200 motion-reduce:transition-none ${rotated ? "rotate-180" : ""}`}
+      style={{
+        transform: rotated ? "rotate(180deg)" : undefined,
+        transition: "transform var(--dur-base) var(--ease-out)",
+      }}
     >
       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
     </svg>
@@ -124,7 +128,7 @@ function IconShare() {
 
 function IconX() {
   return (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20" aria-hidden="true">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="18" height="18" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
     </svg>
   );
@@ -160,10 +164,13 @@ function EnrichmentStatus({
 }) {
   if (enrichLoading) {
     return (
-      <span className="flex items-center gap-1 text-xs text-purple-300" title="Loading card details...">
-        <svg className="h-3.5 w-3.5 animate-spin motion-reduce:hidden" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      <span
+        className={`${styles.enrichmentStatus} ${styles.enrichmentLoading}`}
+        title="Loading card details..."
+      >
+        <svg className={styles.enrichmentSpinner} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" opacity="0.25" />
+          <path fill="currentColor" opacity="0.85" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
         <span className="sr-only">Loading card details</span>
       </span>
@@ -171,8 +178,11 @@ function EnrichmentStatus({
   }
   if (!enrichLoading && cardMap && !enrichError) {
     return (
-      <span className="text-xs text-green-400" title="Card details loaded">
-        <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <span
+        className={`${styles.enrichmentStatus} ${styles.enrichmentOk}`}
+        title="Card details loaded"
+      >
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
         </svg>
         <span className="sr-only">Card details loaded</span>
@@ -181,8 +191,11 @@ function EnrichmentStatus({
   }
   if (!enrichLoading && enrichError) {
     return (
-      <span className="text-xs text-amber-400" title="Card enrichment error">
-        <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <span
+        className={`${styles.enrichmentStatus} ${styles.enrichmentError}`}
+        title="Card enrichment error"
+      >
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
         </svg>
         <span className="sr-only">Card enrichment error</span>
@@ -217,6 +230,14 @@ function NavButton({
 }) {
   const icon = TAB_ICONS[tabKey];
 
+  const classes = [
+    styles.navButton,
+    isActive && styles.navButtonActive,
+    collapsed && styles.navButtonCollapsed,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <button
       id={`tab-deck-${tabKey}`}
@@ -229,21 +250,13 @@ function NavButton({
       onKeyDown={onKeyDown}
       disabled={isDisabled}
       title={collapsed ? label : undefined}
-      className={`group flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-40 disabled:cursor-not-allowed ${
-        isActive
-          ? "bg-purple-600/20 text-purple-300 border-l-2 border-purple-500 pl-[calc(0.5rem-2px)]"
-          : "text-slate-300 hover:text-white hover:bg-slate-800 border-l-2 border-transparent pl-[calc(0.5rem-2px)]"
-      }`}
+      className={classes}
     >
-      <span className="shrink-0">{icon}</span>
+      <span className={styles.navIcon}>{icon}</span>
       {!collapsed && (
-        <span className="min-w-0 truncate flex items-center gap-1.5">
+        <span className={styles.navLabel}>
           {label}
-          {badge && (
-            <span className="bg-purple-600/80 px-1.5 py-0.5 text-[10px] font-bold text-purple-100 rounded-full leading-none">
-              {badge}
-            </span>
-          )}
+          {badge && <span className={styles.navBadge}>{badge}</span>}
         </span>
       )}
     </button>
@@ -311,10 +324,8 @@ function ShareMenu({
   const disabled = !analysisResults || enrichLoading;
 
   return (
-    <div className="relative">
-      {copyFeedback && (
-        <span className="block mb-1 text-xs text-green-400 text-center">{copyFeedback}</span>
-      )}
+    <div className={styles.shareWrap}>
+      {copyFeedback && <span className={styles.copyFeedback}>{copyFeedback}</span>}
       <button
         ref={buttonRef}
         type="button"
@@ -324,7 +335,9 @@ function ShareMenu({
         aria-expanded={open}
         aria-haspopup="true"
         title={disabled ? "Waiting for card enrichment..." : "Share deck analysis"}
-        className={`flex items-center gap-1.5 rounded-md bg-purple-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-40 disabled:cursor-not-allowed ${collapsed ? "w-9 px-2 justify-center" : "w-full justify-center"}`}
+        className={[styles.shareButton, collapsed && styles.shareButtonCollapsed]
+          .filter(Boolean)
+          .join(" ")}
       >
         <IconShare />
         {!collapsed && "Share"}
@@ -335,13 +348,13 @@ function ShareMenu({
           ref={menuRef}
           data-testid="share-menu"
           aria-label="Share options"
-          className="absolute bottom-full left-0 mb-1 w-52 rounded-lg border border-slate-700 bg-slate-800 py-1 shadow-lg z-40"
+          className={styles.shareMenu}
         >
           <button
             type="button"
             onClick={() => { onCopyMarkdown(); setOpen(false); }}
             disabled={!analysisResults}
-            className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            className={styles.shareMenuItem}
           >
             Copy as Markdown
           </button>
@@ -349,7 +362,7 @@ function ShareMenu({
             type="button"
             onClick={() => { onCopyJson(); setOpen(false); }}
             disabled={!analysisResults}
-            className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            className={styles.shareMenuItem}
           >
             Copy as JSON
           </button>
@@ -357,7 +370,7 @@ function ShareMenu({
             type="button"
             onClick={() => { onDiscord(); setOpen(false); }}
             disabled={!analysisResults}
-            className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            className={styles.shareMenuItem}
           >
             Export to Discord...
           </button>
@@ -366,16 +379,16 @@ function ShareMenu({
             onClick={() => { onSaveImage(); setOpen(false); }}
             disabled={!analysisResults}
             data-testid="save-as-image-button"
-            className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            className={styles.shareMenuItem}
           >
             Save as Image
           </button>
-          <div className="border-t border-slate-700 my-1" />
+          <hr className={styles.shareMenuDivider} />
           <button
             type="button"
             onClick={() => { onShareLink(); setOpen(false); }}
             disabled={disabled}
-            className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            className={styles.shareMenuItem}
           >
             Copy Share Link
           </button>
@@ -544,21 +557,21 @@ function SidebarContent({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden">
+    <div className={styles.content}>
       {/* Deck identity */}
       {!collapsed && (
-        <div className="px-3 pt-4 pb-3 border-b border-slate-700/60">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h2 className="text-sm font-bold text-white truncate" title={deck.name}>
+        <div className={styles.identity}>
+          <div className={styles.identityHeader}>
+            <div className={styles.identityMain}>
+              <h2 className={styles.deckTitle} title={deck.name}>
                 {deck.name}
               </h2>
               {commanderNames.length > 0 && (
-                <p className="mt-0.5 text-xs text-slate-300 truncate" title={commanderNames.join(" & ")}>
+                <p className={styles.commanderText} title={commanderNames.join(" & ")}>
                   {commanderNames.join(" & ")}
                 </p>
               )}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-slate-400">
+              <div className={styles.metaRow}>
                 <span>
                   via{" "}
                   {deck.url ? (
@@ -566,19 +579,19 @@ function SidebarContent({
                       href={deck.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="capitalize text-purple-400 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-400 rounded-sm"
+                      className={styles.metaLink}
                     >
                       {deck.source}
                       <span className="sr-only"> (opens in a new tab)</span>
                     </a>
                   ) : (
-                    <span className="capitalize text-purple-400">{deck.source}</span>
+                    <span className={styles.metaLink}>{deck.source}</span>
                   )}
                 </span>
                 <span>{totalCards} cards</span>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className={styles.identityActions}>
               <EnrichmentStatus
                 enrichLoading={enrichLoading}
                 cardMap={cardMap}
@@ -588,7 +601,7 @@ function SidebarContent({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-md p-1 text-slate-400 hover:text-white hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 md:hidden"
+                  className={styles.closeButton}
                   aria-label="Close navigation"
                 >
                   <IconX />
@@ -599,10 +612,7 @@ function SidebarContent({
 
           {/* Bracket/power badge */}
           {analysisResults && (
-            <span
-              data-testid="bracket-power-badge"
-              className="mt-2 inline-block rounded border px-1.5 py-0.5 text-xs font-semibold bg-slate-700/50 border-slate-600 text-slate-300"
-            >
+            <span data-testid="bracket-power-badge" className={styles.bracketBadge}>
               B{analysisResults.bracketResult.bracket} | PL
               {analysisResults.powerLevel.powerLevel}
             </span>
@@ -612,7 +622,7 @@ function SidebarContent({
 
       {/* Collapsed: show enrichment icon only */}
       {collapsed && (
-        <div className="px-2 pt-3 pb-2 border-b border-slate-700/60 flex justify-center">
+        <div className={styles.collapsedStatusRow}>
           <EnrichmentStatus
             enrichLoading={enrichLoading}
             cardMap={cardMap}
@@ -623,8 +633,8 @@ function SidebarContent({
 
       {/* Theme pills */}
       {!collapsed && analysisResults && analysisResults.synergyAnalysis.deckThemes.length > 0 && (
-        <div className="px-3 py-2 border-b border-slate-700/60">
-          <div data-testid="header-themes" className="flex flex-wrap items-center gap-1.5">
+        <div className={styles.themesRow}>
+          <div data-testid="header-themes" className={styles.themesList}>
             {analysisResults.synergyAnalysis.deckThemes.slice(0, 3).map((theme) => {
               const axisDef = SYNERGY_AXES.find((a) => a.id === theme.axisId);
               const bg = axisDef?.color.bg ?? "bg-slate-500/20";
@@ -647,8 +657,8 @@ function SidebarContent({
 
       {/* Hand stats */}
       {!collapsed && analysisResults?.simulationStats && (
-        <div className="px-3 py-2 border-b border-slate-700/60">
-          <div data-testid="hand-stats" className="flex items-center gap-2 text-xs text-slate-400">
+        <div className={styles.handStatsRow}>
+          <div data-testid="hand-stats" style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-3)" }}>
             <span>{Math.round(analysisResults.simulationStats.keepableRate * 100)}% keep</span>
             <span aria-hidden="true">·</span>
             <span>{analysisResults.simulationStats.avgLandsInOpener.toFixed(1)} lands</span>
@@ -657,16 +667,16 @@ function SidebarContent({
       )}
 
       {/* Nav groups */}
-      <nav role="tablist" aria-label="Deck view" className="flex-1 px-2 py-2">
+      <nav role="tablist" aria-label="Deck view" className={styles.nav}>
         {NAV_CATEGORIES.map((category) => {
           const isExpanded = expandedCategories.has(category.id);
           return (
-            <div key={category.id} className="mb-1">
+            <div key={category.id} className={styles.category}>
               {!collapsed && (
                 <button
                   type="button"
                   onClick={() => toggleCategory(category.id)}
-                  className="flex w-full items-center justify-between px-2 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500 hover:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded"
+                  className={styles.categoryToggle}
                   aria-expanded={isExpanded}
                 >
                   {category.label}
@@ -675,7 +685,14 @@ function SidebarContent({
               )}
 
               {(collapsed || isExpanded) && (
-                <div className={collapsed ? "flex flex-col items-center gap-1 py-1" : "space-y-0.5"}>
+                <div
+                  className={[
+                    styles.categoryGroup,
+                    collapsed && styles.categoryGroupCollapsed,
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
                   {category.items.map((tabKey) => {
                     const tabDef = ALL_TABS.find((t) => t.key === tabKey)!;
                     const isDisabled = ENRICHMENT_REQUIRED_TABS.has(tabKey) && analysisDisabled;
@@ -701,7 +718,7 @@ function SidebarContent({
       </nav>
 
       {/* Share button */}
-      <div className="px-2 py-3 border-t border-slate-700/60">
+      <div className={styles.shareSection}>
         <ShareMenu
           analysisResults={analysisResults}
           enrichLoading={enrichLoading}
@@ -722,11 +739,7 @@ function SidebarContent({
           collapsed={collapsed}
         />
         {/* aria-live region for image export status announcements */}
-        <div
-          aria-live="assertive"
-          aria-atomic="true"
-          className="sr-only"
-        >
+        <div aria-live="assertive" aria-atomic="true" className="sr-only">
           {imageStatus === "generating" && "Generating image, please wait..."}
           {imageStatus === "success" && "Image saved successfully."}
           {imageStatus === "error" && "Image generation failed."}
@@ -771,7 +784,7 @@ export function DeckSidebar({
     <div
       data-testid="deck-header"
       style={{ width: collapsed ? 52 : 240 }}
-      className="hidden md:flex flex-col sticky top-0 h-screen shrink-0 bg-slate-900 border-r border-slate-700/60 transition-[width] duration-200 motion-reduce:transition-none overflow-hidden"
+      className={styles.sidebar}
     >
       <SidebarContent
         deck={deck}
@@ -791,7 +804,7 @@ export function DeckSidebar({
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center justify-center h-10 border-t border-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple-400 shrink-0"
+        className={styles.collapseToggle}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
@@ -849,24 +862,22 @@ export function DeckDrawer({
 
   return (
     <div
-      className={`md:hidden fixed inset-0 z-50 ${open ? "" : "pointer-events-none"}`}
+      className={[styles.drawer, open ? styles.drawerOpen : styles.drawerClosed]
+        .filter(Boolean)
+        .join(" ")}
       aria-modal="true"
       role="dialog"
       aria-label="Navigation"
     >
       {/* Overlay */}
       <div
-        className={`absolute inset-0 bg-black/60 transition-opacity duration-200 motion-reduce:transition-none ${open ? "opacity-100" : "opacity-0"}`}
+        className={styles.drawerOverlay}
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Drawer panel */}
-      <div
-        ref={drawerRef}
-        className={`absolute top-0 left-0 h-full bg-slate-900 border-r border-slate-700/60 transition-transform duration-200 motion-reduce:transition-none ${open ? "translate-x-0" : "-translate-x-full"}`}
-        style={{ width: "min(280px, 85vw)" }}
-      >
+      <div ref={drawerRef} className={styles.drawerPanel}>
         {open && (
           <SidebarContent
             deck={deck}
