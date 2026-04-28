@@ -33,6 +33,7 @@
   align-items: center;
   justify-content: flex-start;
   gap: var(--space-3);
+  width: 100%;
   height: 36px;
   padding: 0 var(--space-7);
   border: none;
@@ -44,7 +45,6 @@
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
   cursor: pointer;
-  flex-shrink: 0;
   transition: color var(--dur-fast) var(--ease-out);
 }
 

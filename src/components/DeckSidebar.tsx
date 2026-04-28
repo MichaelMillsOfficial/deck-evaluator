@@ -299,6 +299,9 @@ interface SidebarContentProps {
   enrichError: string | null;
   analysisResults: DeckAnalysisResults | null;
   onNewReading?: () => void;
+  /** Pass to render the inline Collapse footer below New Reading. Drawer
+   *  callers leave this undefined (drawer has its own close affordance). */
+  onToggleCollapsed?: () => void;
   collapsed: boolean;
   onClose?: () => void;
 }
@@ -310,6 +313,7 @@ function SidebarContent({
   enrichError,
   analysisResults,
   onNewReading,
+  onToggleCollapsed,
   collapsed,
   onClose,
 }: SidebarContentProps) {
@@ -523,6 +527,24 @@ function SidebarContent({
           </button>
         </div>
       )}
+
+      {onToggleCollapsed && (
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className={[
+            styles.collapseToggle,
+            collapsed && styles.collapseToggleCollapsed,
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? <IconChevronRight /> : <IconChevronLeft />}
+          {!collapsed && <span className={styles.collapseLabel}>Collapse</span>}
+        </button>
+      )}
     </div>
   );
 }
@@ -563,25 +585,9 @@ export function DeckSidebar({
         enrichError={enrichError}
         analysisResults={analysisResults}
         onNewReading={onNewReading}
+        onToggleCollapsed={() => setCollapsed(!collapsed)}
         collapsed={collapsed}
       />
-
-      {/* Collapse toggle */}
-      <button
-        type="button"
-        onClick={() => setCollapsed(!collapsed)}
-        className={[
-          styles.collapseToggle,
-          collapsed && styles.collapseToggleCollapsed,
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {collapsed ? <IconChevronRight /> : <IconChevronLeft />}
-        {!collapsed && <span className={styles.collapseLabel}>Collapse</span>}
-      </button>
     </div>
   );
 }
