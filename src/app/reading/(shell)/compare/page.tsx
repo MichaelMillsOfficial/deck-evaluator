@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
+import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader from "@/components/reading/SectionHeader";
 
 export default function ComparePage() {
@@ -16,6 +17,7 @@ export default function ComparePage() {
     >
       <SectionHeader
         slug="compare"
+        runningHead={readingRunningHead(payload.createdAt, payload.deck.name)}
         eyebrow="Compare"
         title="Side by Side"
         tagline="Diff this list against another for overlap, mana-curve divergence, and tag composition."

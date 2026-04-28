@@ -1,8 +1,11 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
-import SectionHeader from "@/components/reading/SectionHeader";
+import { readingRunningHead } from "@/lib/reading-format";
+import SectionHeader, {
+  type SectionStat,
+} from "@/components/reading/SectionHeader";
 import SynergySection from "@/components/SynergySection";
 
 export default function SynergyPage() {
@@ -20,6 +23,34 @@ export default function SynergyPage() {
     });
   }, []);
 
+  const stats = useMemo<SectionStat[] | undefined>(() => {
+    if (!analysisResults?.synergyAnalysis) return undefined;
+    const synergy = analysisResults.synergyAnalysis;
+    const topTheme = synergy.deckThemes[0];
+    return [
+      {
+        label: "Top Theme",
+        value: topTheme?.axisName ?? "Goodstuff",
+        sub: topTheme
+          ? `${topTheme.cardCount} cards`
+          : "no dominant theme",
+        accent: true,
+      },
+      {
+        label: "Synergies",
+        value: String(synergy.topSynergies.length),
+        sub: "pairs found",
+      },
+      {
+        label: "Combos",
+        value: String(synergy.knownCombos.length),
+        sub: synergy.antiSynergies.length
+          ? `${synergy.antiSynergies.length} anti`
+          : "verified",
+      },
+    ];
+  }, [analysisResults]);
+
   if (!payload?.cardMap || !analysisResults?.synergyAnalysis) return null;
 
   return (
@@ -30,9 +61,11 @@ export default function SynergyPage() {
     >
       <SectionHeader
         slug="synergy"
+        runningHead={readingRunningHead(payload.createdAt, payload.deck.name)}
         eyebrow="Synergies"
         title="How the Cards Read Together"
         tagline="Top synergies, anti-synergies, and verified combos drawn from oracle text and Commander Spellbook."
+        stats={stats}
       />
       <h2 id="synergy-heading" className="sr-only">
         Card Synergy

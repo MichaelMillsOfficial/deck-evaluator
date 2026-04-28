@@ -5,7 +5,10 @@ import type { EnrichedCard } from "@/lib/types";
 import { analyzeCandidateCard } from "@/lib/candidate-analysis";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
 import { useCandidates } from "@/contexts/CandidatesContext";
-import SectionHeader from "@/components/reading/SectionHeader";
+import { readingRunningHead } from "@/lib/reading-format";
+import SectionHeader, {
+  type SectionStat,
+} from "@/components/reading/SectionHeader";
 import AdditionsPanel from "@/components/AdditionsPanel";
 
 export default function AddPage() {
@@ -123,7 +126,45 @@ export default function AddPage() {
     [enrichCandidate]
   );
 
-  if (!cardMap || !synergyAnalysis) return null;
+  const stats = useMemo<SectionStat[] | undefined>(() => {
+    if (!candidates.length) return undefined;
+    const synergyScores = candidates
+      .map((name) => candidateAnalyses[name]?.synergyScore)
+      .filter((v): v is number => typeof v === "number");
+    const avgSynergy =
+      synergyScores.length > 0
+        ? synergyScores.reduce((s, v) => s + v, 0) / synergyScores.length
+        : null;
+    const errorCount = Object.keys(candidateErrors).length;
+    return [
+      {
+        label: "Trying",
+        value: String(candidates.length),
+        sub: candidates.length === 1 ? "candidate" : "candidates",
+        accent: true,
+      },
+      {
+        label: "Avg Synergy",
+        value: avgSynergy === null ? "—" : avgSynergy.toFixed(1),
+        sub: "score / 10",
+      },
+      {
+        label: "Status",
+        value:
+          errorCount > 0
+            ? `${errorCount} err`
+            : candidates.length === Object.keys(candidateAnalyses).length
+              ? "Ready"
+              : "Loading",
+        sub:
+          errorCount > 0
+            ? "retry below"
+            : `${Object.keys(candidateAnalyses).length} scored`,
+      },
+    ];
+  }, [candidates, candidateAnalyses, candidateErrors]);
+
+  if (!cardMap || !synergyAnalysis || !payload) return null;
 
   return (
     <div
@@ -133,9 +174,11 @@ export default function AddPage() {
     >
       <SectionHeader
         slug="add"
+        runningHead={readingRunningHead(payload.createdAt, payload.deck.name)}
         eyebrow="Candidates"
         title="Possible Additions"
         tagline="Try a card not in the deck and see how it would interact with the existing themes."
+        stats={stats}
       />
       <AdditionsPanel
         candidates={candidates}

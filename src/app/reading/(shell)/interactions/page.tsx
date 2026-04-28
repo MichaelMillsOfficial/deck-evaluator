@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
 import { useInteractionAnalysis } from "@/hooks/useInteractionAnalysis";
-import SectionHeader from "@/components/reading/SectionHeader";
+import { readingRunningHead } from "@/lib/reading-format";
+import SectionHeader, {
+  type SectionStat,
+} from "@/components/reading/SectionHeader";
 import InteractionSection from "@/components/InteractionSection";
 
 export default function InteractionsPage() {
@@ -30,6 +33,34 @@ export default function InteractionsPage() {
     });
   }, []);
 
+  const stats = useMemo<SectionStat[] | undefined>(() => {
+    if (!interactionAnalysis) return undefined;
+    const protect = interactionAnalysis.interactions.filter(
+      (i) => i.type === "protects"
+    ).length;
+    const recurs = interactionAnalysis.interactions.filter(
+      (i) => i.type === "recurs"
+    ).length;
+    return [
+      {
+        label: "Chains",
+        value: String(interactionAnalysis.chains.length),
+        sub: "multi-step",
+        accent: true,
+      },
+      {
+        label: "Protection",
+        value: String(protect),
+        sub: "interactions",
+      },
+      {
+        label: "Recursion",
+        value: String(recurs),
+        sub: "loops & graveyard",
+      },
+    ];
+  }, [interactionAnalysis]);
+
   if (!payload?.cardMap) return null;
 
   return (
@@ -40,9 +71,11 @@ export default function InteractionsPage() {
     >
       <SectionHeader
         slug="interactions"
+        runningHead={readingRunningHead(payload.createdAt, payload.deck.name)}
         eyebrow="Interactions"
         title="The Mechanics in Play"
         tagline="Removal, protection, recursion, and chains — derived by compiling oracle text into action graphs."
+        stats={stats}
       />
       <h2 id="interactions-heading" className="sr-only">
         Card Interactions

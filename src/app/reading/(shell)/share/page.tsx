@@ -7,6 +7,7 @@ import {
   formatJsonReport,
   formatMarkdownReport,
 } from "@/lib/export-report";
+import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader from "@/components/reading/SectionHeader";
 import DiscordExportModal from "@/components/DiscordExportModal";
 import styles from "./share.module.css";
@@ -237,6 +238,7 @@ export default function SharePage() {
       >
         <SectionHeader
           slug="share"
+          runningHead={readingRunningHead(payload.createdAt, deck.name)}
           eyebrow="Share"
           title="Take It Elsewhere"
           tagline="Hand the reading off as a link, image, Discord post, markdown, or raw JSON."

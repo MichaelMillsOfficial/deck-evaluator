@@ -10,24 +10,12 @@
 .contentPanel {
   flex: 1;
   min-width: 0;
-  border: 1px solid var(--card-border);
-  background: var(--card-bg);
-  border-radius: var(--card-radius);
-  overflow: hidden;
-  backdrop-filter: blur(var(--blur-sm));
-  -webkit-backdrop-filter: blur(var(--blur-sm));
-}
-
-@media (min-width: 768px) {
-  .contentPanel {
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    border-left: none;
-  }
 }
 
 .contentPanelInner {
-  padding: var(--space-12);
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-12) var(--space-8) var(--space-20);
 }
 
 .alert {
