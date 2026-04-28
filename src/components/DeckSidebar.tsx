@@ -413,6 +413,7 @@ interface SidebarContentProps {
   onOpenDiscordModal?: () => void;
   onCopyShareLink?: () => void;
   onSaveImage?: () => void;
+  onNewReading?: () => void;
   collapsed: boolean;
   onClose?: () => void;
 }
@@ -428,6 +429,7 @@ function SidebarContent({
   onOpenDiscordModal,
   onCopyShareLink,
   onSaveImage,
+  onNewReading,
   collapsed,
   onClose,
 }: SidebarContentProps) {
@@ -745,6 +747,36 @@ function SidebarContent({
           {imageStatus === "error" && "Image generation failed."}
         </div>
       </div>
+
+      {onNewReading && (
+        <div className={styles.newReadingSection}>
+          <button
+            type="button"
+            data-testid="new-reading-button"
+            onClick={onNewReading}
+            className={[
+              styles.newReadingButton,
+              collapsed && styles.newReadingButtonCollapsed,
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            title={collapsed ? "New reading" : undefined}
+            aria-label={collapsed ? "New reading" : undefined}
+          >
+            <svg
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              className={styles.newReadingIcon}
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 10h12M10 4v12" />
+            </svg>
+            <span className={styles.newReadingLabel}>New Reading</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -764,6 +796,7 @@ export interface DeckSidebarProps {
   onOpenDiscordModal?: () => void;
   onCopyShareLink?: () => void;
   onSaveImage?: () => void;
+  onNewReading?: () => void;
 }
 
 export function DeckSidebar({
@@ -777,6 +810,7 @@ export function DeckSidebar({
   onOpenDiscordModal,
   onCopyShareLink,
   onSaveImage,
+  onNewReading,
 }: DeckSidebarProps) {
   const [collapsed, setCollapsed] = useSidebarCollapsed();
 
@@ -797,6 +831,7 @@ export function DeckSidebar({
         onOpenDiscordModal={onOpenDiscordModal}
         onCopyShareLink={onCopyShareLink}
         onSaveImage={onSaveImage}
+        onNewReading={onNewReading}
         collapsed={collapsed}
       />
 
@@ -836,6 +871,7 @@ export function DeckDrawer({
   onOpenDiscordModal,
   onCopyShareLink,
   onSaveImage,
+  onNewReading,
 }: DeckDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null);
   useFocusTrap(drawerRef, open);
@@ -890,6 +926,7 @@ export function DeckDrawer({
             onOpenDiscordModal={onOpenDiscordModal}
             onCopyShareLink={onCopyShareLink}
             onSaveImage={onSaveImage}
+            onNewReading={onNewReading}
             collapsed={false}
             onClose={onClose}
           />
