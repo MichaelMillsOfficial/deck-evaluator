@@ -1,15 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
-import { encodeCompactDeckPayload } from "@/lib/deck-codec";
-import type { ViewTab } from "@/lib/view-tabs";
-import DeckViewTabs from "@/components/DeckViewTabs";
 import { DeckSidebar, DeckDrawer } from "@/components/DeckSidebar";
 import DeckMobileTopBar from "@/components/DeckMobileTopBar";
-import DiscordExportModal from "@/components/DiscordExportModal";
-import styles from "./DeckReadingView.module.css";
+import styles from "./DeckReadingShell.module.css";
 
 function AlertIcon() {
   return (
@@ -36,13 +37,20 @@ function DismissIcon() {
   );
 }
 
-export default function DeckReadingView() {
+/**
+ * Shared chrome for every /reading/* sub-route: persistent sidebar (desktop),
+ * drawer (mobile), top bar (mobile), enrichment status alerts, and the
+ * Discord export modal. The page-specific content is rendered inside the
+ * content panel via {children}.
+ *
+ * Activetab is route-aware — the sidebar derives it from usePathname().
+ */
+export default function DeckReadingShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const {
     payload,
     enrichLoading,
     enrichError,
-    spellbookLoading,
     commanderWarning,
     analysisResults,
     retryEnrichment,
@@ -52,56 +60,14 @@ export default function DeckReadingView() {
     clearSession,
   } = useDeckSession();
 
-  const [activeTab, setActiveTab] = useState<ViewTab>("list");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [discordModalOpen, setDiscordModalOpen] = useState(false);
   const [parseWarningsDismissed, setParseWarningsDismissed] = useState(false);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const deck = payload?.deck ?? null;
   const cardMap = payload?.cardMap ?? null;
-  const spellbookCombos = payload?.spellbookCombos ?? null;
   const parseWarnings = payload?.parseWarnings ?? [];
   const notFoundCount = payload?.notFoundCount ?? 0;
-
-  // Focus the results container on mount so screen readers land here.
-  useEffect(() => {
-    if (deck) {
-      containerRef.current?.focus();
-    }
-  }, [deck]);
-
-  // Generate the share URL once cardMap is available.
-  useEffect(() => {
-    if (!deck || !cardMap) {
-      setShareUrl(null);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const encoded = await encodeCompactDeckPayload(deck, cardMap);
-        if (!cancelled) {
-          setShareUrl(`${window.location.origin}/shared?d=${encoded}`);
-        }
-      } catch {
-        // Encoding error — leave shareUrl null.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [deck, cardMap]);
-
-  const handleCopyShareLink = useCallback(async () => {
-    if (!shareUrl) return;
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-    } catch {
-      // Clipboard error — silently fail.
-    }
-  }, [shareUrl]);
 
   const handleNewReading = useCallback(() => {
     clearSession();
@@ -115,17 +81,15 @@ export default function DeckReadingView() {
       <div
         ref={containerRef}
         tabIndex={-1}
-        className={styles.results}
-        aria-label="Deck import results"
+        className={styles.shell}
+        aria-label="Deck reading"
       >
         <DeckMobileTopBar
           deckName={deck.name}
           enrichLoading={enrichLoading}
           cardMap={cardMap}
           enrichError={enrichError}
-          hasAnalysis={!!analysisResults}
           onOpenDrawer={() => setDrawerOpen(true)}
-          onShare={handleCopyShareLink}
         />
 
         <DeckDrawer
@@ -135,44 +99,22 @@ export default function DeckReadingView() {
           cardMap={cardMap}
           enrichLoading={enrichLoading}
           enrichError={enrichError}
-          activeTab={activeTab}
-          onTabChange={(tab) => {
-            setActiveTab(tab);
-            setDrawerOpen(false);
-          }}
           analysisResults={analysisResults}
-          onOpenDiscordModal={() => setDiscordModalOpen(true)}
-          onCopyShareLink={handleCopyShareLink}
           onNewReading={handleNewReading}
         />
 
-        <div className={styles.resultsLayout}>
+        <div className={styles.layout}>
           <DeckSidebar
             deck={deck}
             cardMap={cardMap}
             enrichLoading={enrichLoading}
             enrichError={enrichError}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
             analysisResults={analysisResults}
-            onOpenDiscordModal={() => setDiscordModalOpen(true)}
-            onCopyShareLink={handleCopyShareLink}
             onNewReading={handleNewReading}
           />
 
           <div className={styles.contentPanel}>
-            <div className={styles.contentPanelInner}>
-              <DeckViewTabs
-                deck={deck}
-                cardMap={cardMap}
-                enrichLoading={enrichLoading}
-                spellbookCombos={spellbookCombos}
-                spellbookLoading={spellbookLoading}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                analysisResults={analysisResults}
-              />
-            </div>
+            <div className={styles.contentPanelInner}>{children}</div>
           </div>
         </div>
 
@@ -293,16 +235,6 @@ export default function DeckReadingView() {
           {cardMap && !enrichLoading ? "Card details loaded" : ""}
         </p>
       </div>
-
-      {analysisResults && (
-        <DiscordExportModal
-          open={discordModalOpen}
-          onClose={() => setDiscordModalOpen(false)}
-          analysisResults={analysisResults}
-          deck={deck}
-          shareUrl={shareUrl ?? undefined}
-        />
-      )}
     </>
   );
 }

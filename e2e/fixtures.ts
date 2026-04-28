@@ -153,11 +153,6 @@ export class DeckPage {
     return this.page.getByTestId("deck-header");
   }
 
-  /** Locator for the share button */
-  get shareButton() {
-    return this.page.getByTestId("share-button");
-  }
-
   /** Locator for the bracket/power badge */
   get bracketBadge() {
     return this.page.getByTestId("bracket-power-badge");

@@ -412,7 +412,7 @@ async function importDeckAndGoToAdditions(
 // ---------------------------------------------------------------------------
 
 test.describe("Additions tab", () => {
-  test("appears as the last tab in deck view", async ({ deckPage, page }) => {
+  test("Additions tab is present in deck view", async ({ deckPage, page }) => {
     await setupMocks(page);
     await deckPage.goto();
     await deckPage.fillDecklist(SAMPLE_DECKLIST);
@@ -427,10 +427,10 @@ test.describe("Additions tab", () => {
     const tablist = page.getByRole("tablist", { name: "Deck view" });
     const tabs = tablist.getByRole("tab");
 
-    // Should have 8 tabs total (Interactions + Goldfish + Suggestions added after Additions)
-    await expect(tabs).toHaveCount(8);
+    // Phase 4: 10 tabs total (added Compare + Share alongside the
+    // existing 8). Additions is no longer the last tab.
+    await expect(tabs).toHaveCount(10);
 
-    // Additions should be the second-to-last tab
     const additionsTab = tablist.getByRole("tab", { name: "Additions" });
     await expect(additionsTab).toBeVisible();
   });

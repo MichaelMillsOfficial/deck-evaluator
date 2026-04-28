@@ -25,6 +25,13 @@ test.beforeAll(async ({ request }) => {
   }
 });
 
+async function openDiscordModal(deckPage: import("./fixtures").DeckPage) {
+  await deckPage.page.goto("/reading/share");
+  const openExporter = deckPage.page.getByTestId("share-discord-button");
+  await expect(openExporter).toBeVisible();
+  await openExporter.click();
+}
+
 test.describe("Discord Export Modal", () => {
   test.beforeEach(async ({ deckPage }) => {
     test.skip(!scryfallReachable, "Scryfall API is unreachable");
@@ -33,7 +40,7 @@ test.describe("Discord Export Modal", () => {
     await deckPage.submitImport();
     await deckPage.waitForDeckDisplay();
 
-    // Wait for enrichment to complete
+    // Wait for enrichment so the Share tile actions are clickable.
     await deckPage.page.waitForFunction(
       () => {
         const tabs = document.querySelectorAll('[role="tab"]');
@@ -46,11 +53,8 @@ test.describe("Discord Export Modal", () => {
     );
   });
 
-  test('clicking "Export to Discord..." opens modal', async ({ deckPage }) => {
-    // Open share menu
-    await deckPage.shareButton.click();
-    await deckPage.page.getByText("Export to Discord...").click();
-
+  test('clicking "Open Exporter" opens modal', async ({ deckPage }) => {
+    await openDiscordModal(deckPage);
     await expect(
       deckPage.page.getByTestId("discord-export-modal")
     ).toBeVisible();
@@ -59,11 +63,8 @@ test.describe("Discord Export Modal", () => {
   test("modal shows checkbox list with section labels", async ({
     deckPage,
   }) => {
-    await deckPage.shareButton.click();
-    await deckPage.page.getByText("Export to Discord...").click();
-
+    await openDiscordModal(deckPage);
     const modal = deckPage.page.getByTestId("discord-export-modal");
-    // Use label locators in the sections list (not the preview)
     const sectionsList = modal.locator("label");
     await expect(sectionsList.filter({ hasText: "Header" })).toBeVisible();
     await expect(sectionsList.filter({ hasText: "Mana Curve" })).toBeVisible();
@@ -71,9 +72,7 @@ test.describe("Discord Export Modal", () => {
   });
 
   test("Header checkbox is checked and disabled", async ({ deckPage }) => {
-    await deckPage.shareButton.click();
-    await deckPage.page.getByText("Export to Discord...").click();
-
+    await openDiscordModal(deckPage);
     const modal = deckPage.page.getByTestId("discord-export-modal");
     const headerCheckbox = modal
       .locator("label")
@@ -84,25 +83,19 @@ test.describe("Discord Export Modal", () => {
   });
 
   test("live preview pane shows content", async ({ deckPage }) => {
-    await deckPage.shareButton.click();
-    await deckPage.page.getByText("Export to Discord...").click();
-
+    await openDiscordModal(deckPage);
     const preview = deckPage.page.getByTestId("discord-preview");
     await expect(preview).toContainText("Imported Decklist");
   });
 
   test("character counter is visible", async ({ deckPage }) => {
-    await deckPage.shareButton.click();
-    await deckPage.page.getByText("Export to Discord...").click();
-
+    await openDiscordModal(deckPage);
     const modal = deckPage.page.getByTestId("discord-export-modal");
     await expect(modal.getByText(/\/2000/)).toBeVisible();
   });
 
   test("Escape closes modal", async ({ deckPage }) => {
-    await deckPage.shareButton.click();
-    await deckPage.page.getByText("Export to Discord...").click();
-
+    await openDiscordModal(deckPage);
     const modal = deckPage.page.getByTestId("discord-export-modal");
     await expect(modal).toBeVisible();
 
@@ -111,9 +104,7 @@ test.describe("Discord Export Modal", () => {
   });
 
   test("modal has aria-label", async ({ deckPage }) => {
-    await deckPage.shareButton.click();
-    await deckPage.page.getByText("Export to Discord...").click();
-
+    await openDiscordModal(deckPage);
     const modal = deckPage.page.getByTestId("discord-export-modal");
     await expect(modal).toHaveAttribute("aria-label", "Export to Discord");
   });
@@ -121,25 +112,20 @@ test.describe("Discord Export Modal", () => {
   test("modal shows Analysis Link checkbox checked for small decks", async ({
     deckPage,
   }) => {
-    await deckPage.shareButton.click();
-    await deckPage.page.getByText("Export to Discord...").click();
-
+    await openDiscordModal(deckPage);
     const modal = deckPage.page.getByTestId("discord-export-modal");
     const linkLabel = modal
       .locator("label")
       .filter({ hasText: "Analysis Link" });
     await expect(linkLabel).toBeVisible();
 
-    // Small test deck has a short share URL that fits within budget
     const linkCheckbox = linkLabel.locator('input[type="checkbox"]');
     await expect(linkCheckbox).toBeChecked();
     await expect(linkCheckbox).not.toBeDisabled();
   });
 
   test("preview includes share URL for small decks", async ({ deckPage }) => {
-    await deckPage.shareButton.click();
-    await deckPage.page.getByText("Export to Discord...").click();
-
+    await openDiscordModal(deckPage);
     const preview = deckPage.page.getByTestId("discord-preview");
     await expect(preview).toContainText("View full analysis:");
     await expect(preview).toContainText("/shared?d=");
@@ -148,9 +134,7 @@ test.describe("Discord Export Modal", () => {
   test("unchecking Analysis Link removes URL from preview", async ({
     deckPage,
   }) => {
-    await deckPage.shareButton.click();
-    await deckPage.page.getByText("Export to Discord...").click();
-
+    await openDiscordModal(deckPage);
     const modal = deckPage.page.getByTestId("discord-export-modal");
     const linkCheckbox = modal
       .locator("label")

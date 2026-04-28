@@ -23,20 +23,6 @@ function IconBars3() {
   );
 }
 
-function IconShare() {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      width="14"
-      height="14"
-      aria-hidden="true"
-    >
-      <path d="M13 4.5a2.5 2.5 0 11.702 1.737L6.97 9.604a2.518 2.518 0 010 .792l6.733 3.367a2.5 2.5 0 11-.671 1.341l-6.733-3.367a2.5 2.5 0 110-3.474l6.733-3.367A2.52 2.52 0 0113 4.5z" />
-    </svg>
-  );
-}
-
 function EnrichmentStatusCompact({
   enrichLoading,
   cardMap,
@@ -130,9 +116,7 @@ interface DeckMobileTopBarProps {
   enrichLoading: boolean;
   cardMap: Record<string, EnrichedCard> | null;
   enrichError: string | null;
-  hasAnalysis: boolean;
   onOpenDrawer: () => void;
-  onShare?: () => void;
 }
 
 export default function DeckMobileTopBar({
@@ -140,9 +124,7 @@ export default function DeckMobileTopBar({
   enrichLoading,
   cardMap,
   enrichError,
-  hasAnalysis,
   onOpenDrawer,
-  onShare,
 }: DeckMobileTopBarProps) {
   return (
     <div className={styles.bar}>
@@ -162,23 +144,6 @@ export default function DeckMobileTopBar({
         cardMap={cardMap}
         enrichError={enrichError}
       />
-
-      {onShare && (
-        <button
-          type="button"
-          disabled={!hasAnalysis || enrichLoading}
-          onClick={onShare}
-          title={
-            !hasAnalysis || enrichLoading
-              ? "Waiting for card enrichment..."
-              : "Share deck analysis"
-          }
-          className={styles.shareButton}
-        >
-          <IconShare />
-          <span className={styles.shareLabel}>Share</span>
-        </button>
-      )}
     </div>
   );
 }

@@ -1,15 +1,19 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { DeckAnalysisResults } from "@/lib/deck-analysis-aggregate";
 import type { ViewTab } from "@/lib/view-tabs";
-import { NAV_CATEGORIES, ALL_TABS, ENRICHMENT_REQUIRED_TABS } from "@/lib/view-tabs";
-import { SYNERGY_AXES } from "@/lib/synergy-axes";
 import {
-  formatMarkdownReport,
-  formatJsonReport,
-} from "@/lib/export-report";
+  NAV_CATEGORIES,
+  ALL_TABS,
+  ENRICHMENT_REQUIRED_TABS,
+  TAB_ROUTES,
+  tabFromPathname,
+} from "@/lib/view-tabs";
+import { SYNERGY_AXES } from "@/lib/synergy-axes";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import styles from "./DeckSidebar.module.css";
@@ -118,14 +122,6 @@ function IconChevronDown({ rotated }: { rotated?: boolean }) {
   );
 }
 
-function IconShare() {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true">
-      <path d="M13 4.5a2.5 2.5 0 11.702 1.737L6.97 9.604a2.518 2.518 0 010 .792l6.733 3.367a2.5 2.5 0 11-.671 1.341l-6.733-3.367a2.5 2.5 0 110-3.474l6.733-3.367A2.52 2.52 0 0113 4.5z" />
-    </svg>
-  );
-}
-
 function IconX() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="18" height="18" aria-hidden="true">
@@ -138,6 +134,22 @@ function IconX() {
 // Tab icon map
 // ---------------------------------------------------------------------------
 
+function IconScales() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10 3v14M4 7l3-3 3 3M16 7l-3-3-3 3M3 17h6M11 17h6M5 14a3 3 0 003-3H2a3 3 0 003 3zm10 0a3 3 0 003-3h-6a3 3 0 003 3z" />
+    </svg>
+  );
+}
+
+function IconShareNode() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 5a2.5 2.5 0 11.7 1.7L7.5 11.4a2.5 2.5 0 010 .8l8.2 4.7A2.5 2.5 0 1115 15.5l-8-4.6a2.5 2.5 0 110-3.5l8-4.6c.07-.4.16-.6.3-.8z" />
+    </svg>
+  );
+}
+
 const TAB_ICONS: Record<ViewTab, React.ReactNode> = {
   list: <IconList />,
   analysis: <IconChartBar />,
@@ -147,6 +159,8 @@ const TAB_ICONS: Record<ViewTab, React.ReactNode> = {
   additions: <IconPlusCircle />,
   suggestions: <IconArrowsRightLeft />,
   goldfish: <IconBeaker />,
+  compare: <IconScales />,
+  share: <IconShareNode />,
 };
 
 // ---------------------------------------------------------------------------
@@ -209,6 +223,15 @@ function EnrichmentStatus({
 // Nav button
 // ---------------------------------------------------------------------------
 
+/**
+ * Sidebar nav entry. After Phase 4 each tab maps to a real /reading/* route;
+ * the link renders as `<Link>` so navigation is soft (provider stays mounted).
+ *
+ * When the tab is disabled (e.g. enrichment-required tab before enrichment
+ * completes), we render a non-interactive button-shaped element instead so
+ * a click still does nothing. role="tab" + aria-selected mirror the tablist
+ * semantics expected by existing tests.
+ */
 function NavButton({
   tabKey,
   label,
@@ -216,7 +239,7 @@ function NavButton({
   isActive,
   isDisabled,
   collapsed,
-  onClick,
+  onAfterClick,
   onKeyDown,
 }: {
   tabKey: ViewTab;
@@ -225,10 +248,12 @@ function NavButton({
   isActive: boolean;
   isDisabled: boolean;
   collapsed: boolean;
-  onClick: () => void;
-  onKeyDown?: (e: React.KeyboardEvent<HTMLButtonElement>) => void;
+  /** Optional hook fired after a successful click — used to close the mobile drawer. */
+  onAfterClick?: () => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLElement>) => void;
 }) {
   const icon = TAB_ICONS[tabKey];
+  const route = TAB_ROUTES[tabKey];
 
   const classes = [
     styles.navButton,
@@ -238,20 +263,8 @@ function NavButton({
     .filter(Boolean)
     .join(" ");
 
-  return (
-    <button
-      id={`tab-deck-${tabKey}`}
-      role="tab"
-      aria-selected={isActive}
-      aria-controls={`tabpanel-deck-${tabKey}`}
-      tabIndex={isActive ? 0 : -1}
-      type="button"
-      onClick={() => !isDisabled && onClick()}
-      onKeyDown={onKeyDown}
-      disabled={isDisabled}
-      title={collapsed ? label : undefined}
-      className={classes}
-    >
+  const inner = (
+    <>
       <span className={styles.navIcon}>{icon}</span>
       {!collapsed && (
         <span className={styles.navLabel}>
@@ -259,142 +272,43 @@ function NavButton({
           {badge && <span className={styles.navBadge}>{badge}</span>}
         </span>
       )}
-    </button>
+    </>
   );
-}
 
-// ---------------------------------------------------------------------------
-// Share menu
-// ---------------------------------------------------------------------------
-
-function ShareMenu({
-  analysisResults,
-  enrichLoading,
-  onCopyMarkdown,
-  onCopyJson,
-  onDiscord,
-  onShareLink,
-  onSaveImage,
-  copyFeedback,
-  collapsed,
-}: {
-  analysisResults: DeckAnalysisResults | null;
-  enrichLoading: boolean;
-  onCopyMarkdown: () => void;
-  onCopyJson: () => void;
-  onDiscord: () => void;
-  onShareLink: () => void;
-  onSaveImage: () => void;
-  copyFeedback: string | null;
-  collapsed: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (
-        menuRef.current && !menuRef.current.contains(e.target as Node) &&
-        buttonRef.current && !buttonRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  // Close on Escape (stopPropagation prevents drawer from also closing)
-  useEffect(() => {
-    if (!open) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        setOpen(false);
-        buttonRef.current?.focus();
-      }
-    };
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [open]);
-
-  const disabled = !analysisResults || enrichLoading;
+  if (isDisabled) {
+    return (
+      <button
+        id={`tab-deck-${tabKey}`}
+        role="tab"
+        aria-selected={isActive}
+        aria-controls={`tabpanel-deck-${tabKey}`}
+        tabIndex={isActive ? 0 : -1}
+        type="button"
+        disabled
+        onKeyDown={onKeyDown}
+        title={collapsed ? label : undefined}
+        className={classes}
+      >
+        {inner}
+      </button>
+    );
+  }
 
   return (
-    <div className={styles.shareWrap}>
-      {copyFeedback && <span className={styles.copyFeedback}>{copyFeedback}</span>}
-      <button
-        ref={buttonRef}
-        type="button"
-        data-testid="share-button"
-        disabled={disabled}
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-haspopup="true"
-        title={disabled ? "Waiting for card enrichment..." : "Share deck analysis"}
-        className={[styles.shareButton, collapsed && styles.shareButtonCollapsed]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        <IconShare />
-        {!collapsed && "Share"}
-      </button>
-
-      {open && (
-        <div
-          ref={menuRef}
-          data-testid="share-menu"
-          aria-label="Share options"
-          className={styles.shareMenu}
-        >
-          <button
-            type="button"
-            onClick={() => { onCopyMarkdown(); setOpen(false); }}
-            disabled={!analysisResults}
-            className={styles.shareMenuItem}
-          >
-            Copy as Markdown
-          </button>
-          <button
-            type="button"
-            onClick={() => { onCopyJson(); setOpen(false); }}
-            disabled={!analysisResults}
-            className={styles.shareMenuItem}
-          >
-            Copy as JSON
-          </button>
-          <button
-            type="button"
-            onClick={() => { onDiscord(); setOpen(false); }}
-            disabled={!analysisResults}
-            className={styles.shareMenuItem}
-          >
-            Export to Discord...
-          </button>
-          <button
-            type="button"
-            onClick={() => { onSaveImage(); setOpen(false); }}
-            disabled={!analysisResults}
-            data-testid="save-as-image-button"
-            className={styles.shareMenuItem}
-          >
-            Save as Image
-          </button>
-          <hr className={styles.shareMenuDivider} />
-          <button
-            type="button"
-            onClick={() => { onShareLink(); setOpen(false); }}
-            disabled={disabled}
-            className={styles.shareMenuItem}
-          >
-            Copy Share Link
-          </button>
-        </div>
-      )}
-    </div>
+    <Link
+      id={`tab-deck-${tabKey}`}
+      role="tab"
+      aria-selected={isActive}
+      aria-controls={`tabpanel-deck-${tabKey}`}
+      tabIndex={isActive ? 0 : -1}
+      href={route}
+      onClick={onAfterClick}
+      onKeyDown={onKeyDown}
+      title={collapsed ? label : undefined}
+      className={classes}
+    >
+      {inner}
+    </Link>
   );
 }
 
@@ -407,12 +321,7 @@ interface SidebarContentProps {
   cardMap: Record<string, EnrichedCard> | null;
   enrichLoading: boolean;
   enrichError: string | null;
-  activeTab: ViewTab;
-  onTabChange: (tab: ViewTab) => void;
   analysisResults: DeckAnalysisResults | null;
-  onOpenDiscordModal?: () => void;
-  onCopyShareLink?: () => void;
-  onSaveImage?: () => void;
   onNewReading?: () => void;
   collapsed: boolean;
   onClose?: () => void;
@@ -423,21 +332,18 @@ function SidebarContent({
   cardMap,
   enrichLoading,
   enrichError,
-  activeTab,
-  onTabChange,
   analysisResults,
-  onOpenDiscordModal,
-  onCopyShareLink,
-  onSaveImage,
   onNewReading,
   collapsed,
   onClose,
 }: SidebarContentProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const activeTab: ViewTab = tabFromPathname(pathname ?? "") ?? "list";
+
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(["deck", "insights", "tools", "actions"])
   );
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
-  const [imageStatus, setImageStatus] = useState<"idle" | "generating" | "success" | "error">("idle");
 
   const analysisDisabled = !cardMap || enrichLoading;
 
@@ -445,7 +351,7 @@ function SidebarContent({
   const allTabKeys = ALL_TABS.map((t) => t.key);
 
   const handleTabKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    (e: React.KeyboardEvent<HTMLElement>) => {
       const currentIndex = allTabKeys.indexOf(activeTab);
       let newIndex = currentIndex;
 
@@ -476,11 +382,12 @@ function SidebarContent({
         }
       }
 
-      onTabChange(allTabKeys[nextIndex]);
-      const nextButton = document.getElementById(`tab-deck-${allTabKeys[nextIndex]}`);
+      const nextTab = allTabKeys[nextIndex];
+      router.push(TAB_ROUTES[nextTab]);
+      const nextButton = document.getElementById(`tab-deck-${nextTab}`);
       nextButton?.focus();
     },
-    [activeTab, allTabKeys, analysisDisabled, onTabChange]
+    [activeTab, allTabKeys, analysisDisabled, router]
   );
 
   const totalCards =
@@ -499,62 +406,9 @@ function SidebarContent({
     });
   };
 
-  const showFeedback = (msg: string) => {
-    setCopyFeedback(msg);
-    setTimeout(() => setCopyFeedback(null), 2000);
-  };
-
-  const handleCopyMarkdown = async () => {
-    if (!analysisResults) return;
-    try {
-      const md = formatMarkdownReport(analysisResults, deck);
-      await navigator.clipboard.writeText(md);
-      showFeedback("Markdown copied!");
-    } catch { /* ignore */ }
-  };
-
-  const handleCopyJson = async () => {
-    if (!analysisResults) return;
-    try {
-      const json = formatJsonReport(analysisResults, deck);
-      await navigator.clipboard.writeText(json);
-      showFeedback("JSON copied!");
-    } catch { /* ignore */ }
-  };
-
-  const handleSaveImage = async () => {
-    if (onSaveImage) {
-      onSaveImage();
-      return;
-    }
-    if (!analysisResults) return;
-    if (imageStatus === "generating") return;
-
-    setImageStatus("generating");
-    try {
-      const { generateAndDownloadPng, buildExportImageData } = await import("@/lib/export-image");
-      const totalCards =
-        deck.commanders.reduce((s, c) => s + c.quantity, 0) +
-        deck.mainboard.reduce((s, c) => s + c.quantity, 0) +
-        deck.sideboard.reduce((s, c) => s + c.quantity, 0);
-      const data = buildExportImageData(
-        deck.name,
-        deck.commanders.map((c) => c.name),
-        totalCards,
-        analysisResults
-      );
-      await generateAndDownloadPng(data);
-      setImageStatus("success");
-      setTimeout(() => setImageStatus("idle"), 2000);
-    } catch (err) {
-      console.error("[Save as Image] Failed:", err);
-      setImageStatus("error");
-      setTimeout(() => setImageStatus("idle"), 3000);
-    }
-  };
-
-  const handleNavClick = (tab: ViewTab) => {
-    onTabChange(tab);
+  // Tab clicks are now Link navigations; only fire onClose to dismiss the
+  // mobile drawer after the user picks a destination.
+  const handleAfterNavClick = () => {
     onClose?.();
   };
 
@@ -707,7 +561,7 @@ function SidebarContent({
                         isActive={activeTab === tabKey}
                         isDisabled={isDisabled}
                         collapsed={collapsed}
-                        onClick={() => handleNavClick(tabKey)}
+                        onAfterClick={handleAfterNavClick}
                         onKeyDown={handleTabKeyDown}
                       />
                     );
@@ -718,35 +572,6 @@ function SidebarContent({
           );
         })}
       </nav>
-
-      {/* Share button */}
-      <div className={styles.shareSection}>
-        <ShareMenu
-          analysisResults={analysisResults}
-          enrichLoading={enrichLoading}
-          onCopyMarkdown={handleCopyMarkdown}
-          onCopyJson={handleCopyJson}
-          onDiscord={() => onOpenDiscordModal?.()}
-          onShareLink={() => onCopyShareLink?.()}
-          onSaveImage={handleSaveImage}
-          copyFeedback={
-            imageStatus === "generating"
-              ? "Generating..."
-              : imageStatus === "success"
-                ? "Saved!"
-                : imageStatus === "error"
-                  ? "Failed"
-                  : copyFeedback
-          }
-          collapsed={collapsed}
-        />
-        {/* aria-live region for image export status announcements */}
-        <div aria-live="assertive" aria-atomic="true" className="sr-only">
-          {imageStatus === "generating" && "Generating image, please wait..."}
-          {imageStatus === "success" && "Image saved successfully."}
-          {imageStatus === "error" && "Image generation failed."}
-        </div>
-      </div>
 
       {onNewReading && (
         <div className={styles.newReadingSection}>
@@ -790,12 +615,7 @@ export interface DeckSidebarProps {
   cardMap: Record<string, EnrichedCard> | null;
   enrichLoading: boolean;
   enrichError: string | null;
-  activeTab: ViewTab;
-  onTabChange: (tab: ViewTab) => void;
   analysisResults: DeckAnalysisResults | null;
-  onOpenDiscordModal?: () => void;
-  onCopyShareLink?: () => void;
-  onSaveImage?: () => void;
   onNewReading?: () => void;
 }
 
@@ -804,12 +624,7 @@ export function DeckSidebar({
   cardMap,
   enrichLoading,
   enrichError,
-  activeTab,
-  onTabChange,
   analysisResults,
-  onOpenDiscordModal,
-  onCopyShareLink,
-  onSaveImage,
   onNewReading,
 }: DeckSidebarProps) {
   const [collapsed, setCollapsed] = useSidebarCollapsed();
@@ -825,12 +640,7 @@ export function DeckSidebar({
         cardMap={cardMap}
         enrichLoading={enrichLoading}
         enrichError={enrichError}
-        activeTab={activeTab}
-        onTabChange={onTabChange}
         analysisResults={analysisResults}
-        onOpenDiscordModal={onOpenDiscordModal}
-        onCopyShareLink={onCopyShareLink}
-        onSaveImage={onSaveImage}
         onNewReading={onNewReading}
         collapsed={collapsed}
       />
@@ -865,12 +675,7 @@ export function DeckDrawer({
   cardMap,
   enrichLoading,
   enrichError,
-  activeTab,
-  onTabChange,
   analysisResults,
-  onOpenDiscordModal,
-  onCopyShareLink,
-  onSaveImage,
   onNewReading,
 }: DeckDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -920,12 +725,7 @@ export function DeckDrawer({
             cardMap={cardMap}
             enrichLoading={enrichLoading}
             enrichError={enrichError}
-            activeTab={activeTab}
-            onTabChange={onTabChange}
             analysisResults={analysisResults}
-            onOpenDiscordModal={onOpenDiscordModal}
-            onCopyShareLink={onCopyShareLink}
-            onSaveImage={onSaveImage}
             onNewReading={onNewReading}
             collapsed={false}
             onClose={onClose}

@@ -299,26 +299,13 @@ test.describe("Collapsible Panels — Analysis Tab", () => {
     await expect(button).toHaveAttribute("aria-expanded", "true");
   });
 
-  test("expanded section state persists across tab switches", async ({
-    deckPage,
-  }) => {
-    const { page } = deckPage;
-
-    // Expand mana curve on Analysis tab
-    await deckPage.expandAnalysisSection("mana-curve");
-
-    // Switch to Deck List tab
-    await deckPage.selectDeckViewTab("Deck List");
-    await expect(deckPage.deckDisplay).toBeVisible();
-
-    // Switch back to Analysis tab
-    await deckPage.selectDeckViewTab("Analysis");
-
-    // Mana curve should still be expanded
-    const panel = page.getByTestId("panel-mana-curve");
-    const button = panel.locator("button").first();
-    await expect(button).toHaveAttribute("aria-expanded", "true");
-  });
+  // Removed: "expanded section state persists across tab switches"
+  // Phase 4 split each view tab into its own /reading/* route. Each route
+  // mounts fresh React state, so collapsible-panel expansion no longer
+  // persists across navigations. Acceptable trade-off for the verdict-
+  // first IA: each route is a clean drill-in. The within-tab persistence
+  // (across re-renders, refreshes, etc.) is still verified by the other
+  // tests in this describe block.
 });
 
 test.describe("Collapsible Panels — Synergy Tab", () => {

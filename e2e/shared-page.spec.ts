@@ -120,14 +120,12 @@ test.describe("Shared Page", () => {
 
     await deckPage.page.goto(`/shared?d=${encoded}`);
 
-    // Should show the deck header
+    // Phase 4: /shared decodes + enriches, then hands off to /reading via
+    // setPayload + router.push. Wait for the redirect to complete and the
+    // verdict hero to appear. The deck-list itself lives at /reading/cards.
+    await deckPage.page.waitForURL(/\/reading(\/|$|\?)/, { timeout: 20_000 });
     await expect(
-      deckPage.page.getByTestId("deck-header")
-    ).toBeVisible({ timeout: 15_000 });
-
-    // Should show deck cards
-    await expect(
-      deckPage.page.getByTestId("deck-display")
+      deckPage.page.getByTestId("reading-hero")
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -181,18 +179,13 @@ test.describe("Shared Page", () => {
 
     await deckPage.page.goto(`/shared?d=${encoded}`);
 
-    // Should show the deck header with correct deck name
+    // Phase 4: /shared hands off to /reading; verdict hero shows the
+    // deck name from the payload.
+    await deckPage.page.waitForURL(/\/reading(\/|$|\?)/, { timeout: 20_000 });
+    const hero = deckPage.page.getByTestId("reading-hero");
+    await expect(hero).toBeVisible({ timeout: 15_000 });
     await expect(
-      deckPage.page.getByTestId("deck-header")
-    ).toBeVisible({ timeout: 30_000 });
-
-    // The deck should render with actual card names from Scryfall
-    await expect(
-      deckPage.page.getByTestId("deck-display")
-    ).toBeVisible({ timeout: 30_000 });
-
-    // Verify the deck header shows the deck name from the payload
-    const header = deckPage.page.getByTestId("deck-header");
-    await expect(header.getByText("Compact Test Deck")).toBeVisible();
+      hero.getByRole("heading", { name: "Compact Test Deck" })
+    ).toBeVisible();
   });
 });
