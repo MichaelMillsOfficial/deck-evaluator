@@ -6,6 +6,7 @@ import WeakCardList from "@/components/WeakCardList";
 import UpgradeList from "@/components/UpgradeList";
 import LandSwapList from "@/components/LandSwapList";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
+import styles from "./SuggestionsPanel.module.css";
 import {
   identifyWeakCards,
   selectUpgradeCandidates,
@@ -223,31 +224,28 @@ export default function SuggestionsPanel({
     <section
       data-testid="suggestions-panel"
       aria-labelledby="suggestions-heading"
+      className={styles.section}
     >
       <h3
         id="suggestions-heading"
-        className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
+        className={styles.heading}
       >
         Swap Suggestions
       </h3>
-      <p className="mb-4 text-xs text-slate-400">
+      <p className={styles.subHeading}>
         Cards to consider cutting and what to add instead
       </p>
 
       {/* Verdict banner */}
       <div
         data-testid="suggestions-verdict"
-        className={`mb-4 flex items-start gap-2 rounded-lg border px-4 py-3 text-sm ${
-          hasIssues
-            ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
-            : "border-green-500/30 bg-green-500/10 text-green-300"
-        }`}
+        className={`${styles.verdict} ${hasIssues ? styles.verdictIssues : styles.verdictOk}`}
       >
         {hasIssues ? (
           <svg
             viewBox="0 0 20 20"
             fill="currentColor"
-            className="mt-0.5 h-4 w-4 shrink-0 text-amber-400"
+            className={styles.verdictIcon}
             aria-hidden="true"
           >
             <path
@@ -260,7 +258,7 @@ export default function SuggestionsPanel({
           <svg
             viewBox="0 0 20 20"
             fill="currentColor"
-            className="mt-0.5 h-4 w-4 shrink-0 text-green-400"
+            className={styles.verdictIcon}
             aria-hidden="true"
           >
             <path
@@ -273,7 +271,7 @@ export default function SuggestionsPanel({
         <span>{verdictText}</span>
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className={styles.panelList}>
         {/* ----------------------------------------------------------------- */}
         {/* Section 1: Cards Your Deck Needs (Category Fills)                 */}
         {/* ----------------------------------------------------------------- */}
@@ -285,7 +283,7 @@ export default function SuggestionsPanel({
           testId="suggestions-fills-panel"
           summary={
             gaps.length > 0 ? (
-              <span className="text-xs text-slate-400">
+              <span className={styles.summaryPill}>
                 {gaps.length} categor{gaps.length !== 1 ? "ies" : "y"} underserved
               </span>
             ) : undefined
@@ -294,26 +292,26 @@ export default function SuggestionsPanel({
           {fetchStatus === "loading" && (
             <div
               data-testid="suggestions-loading"
-              className="flex items-center gap-2 text-sm text-slate-400 py-2"
+              className={styles.loadingRow}
             >
               <svg
-                className="h-4 w-4 animate-spin motion-reduce:hidden"
+                className={styles.spinner}
                 viewBox="0 0 24 24"
                 fill="none"
                 aria-hidden="true"
               >
                 <circle
-                  className="opacity-25"
                   cx="12"
                   cy="12"
                   r="10"
                   stroke="currentColor"
                   strokeWidth="4"
+                  style={{ opacity: 0.25 }}
                 />
                 <path
-                  className="opacity-75"
                   fill="currentColor"
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  style={{ opacity: 0.75 }}
                 />
               </svg>
               Loading recommendations...
@@ -323,14 +321,14 @@ export default function SuggestionsPanel({
           {fetchStatus === "error" && (
             <div
               data-testid="suggestions-api-error"
-              className="flex flex-col gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300"
+              className={styles.apiError}
             >
               <p>Could not load fill recommendations: {fetchError}</p>
               <button
                 type="button"
                 data-testid="refresh-suggestions"
                 onClick={() => fetchSuggestions(true)}
-                className="self-start rounded bg-red-500/20 px-2.5 py-1 text-xs font-medium text-red-300 hover:bg-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                className={styles.retryButtonError}
               >
                 Retry
               </button>
@@ -353,7 +351,7 @@ export default function SuggestionsPanel({
           testId="suggestions-weak-panel"
           summary={
             weakCards.length > 0 ? (
-              <span className="text-xs text-slate-400">
+              <span className={styles.summaryPill}>
                 {weakCards.length} card{weakCards.length !== 1 ? "s" : ""} underperforming
               </span>
             ) : undefined
@@ -373,7 +371,7 @@ export default function SuggestionsPanel({
           testId="suggestions-land-swap-panel"
           summary={
             landSwap ? (
-              <span className="text-xs text-slate-400">
+              <span className={styles.summaryPill}>
                 {landSwap.gap} land{landSwap.gap !== 1 ? "s" : ""} short
               </span>
             ) : undefined
@@ -393,20 +391,20 @@ export default function SuggestionsPanel({
           testId="suggestions-upgrades-panel"
           summary={
             upgrades.length > 0 ? (
-              <span className="text-xs text-slate-400">
+              <span className={styles.summaryPill}>
                 {upgrades.length} card{upgrades.length !== 1 ? "s" : ""} with alternatives
               </span>
             ) : undefined
           }
         >
           {fetchStatus === "loading" && (
-            <div className="text-sm text-slate-400 py-2">
+            <div className={styles.loadingTextOnly}>
               Loading upgrade alternatives...
             </div>
           )}
 
           {fetchStatus === "error" && (
-            <div className="text-sm text-slate-400 py-2">
+            <div className={styles.loadingTextOnly}>
               Could not load upgrades due to an error.
             </div>
           )}
@@ -417,12 +415,12 @@ export default function SuggestionsPanel({
 
       {/* Refresh button */}
       {fetchStatus === "success" && (gaps.length > 0 || upgradeCandidates.length > 0) && (
-        <div className="mt-4 flex justify-end">
+        <div className={styles.refreshRow}>
           <button
             type="button"
             data-testid="refresh-suggestions"
             onClick={() => fetchSuggestions(true)}
-            className="rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 transition-colors"
+            className={styles.refreshButton}
           >
             Refresh Suggestions
           </button>
