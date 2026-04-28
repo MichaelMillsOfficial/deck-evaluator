@@ -4,6 +4,7 @@ import type { EnrichedCard } from "@/lib/types";
 import type { CandidateAnalysis } from "@/lib/candidate-analysis";
 import CardSearchInput from "@/components/CardSearchInput";
 import CandidateCardRow from "@/components/CandidateCardRow";
+import styles from "./AdditionsPanel.module.css";
 
 interface AdditionsPanelProps {
   candidates: string[];
@@ -30,11 +31,11 @@ export default function AdditionsPanel({
     <section aria-labelledby="additions-heading">
       <h3
         id="additions-heading"
-        className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
+        className={styles.heading}
       >
         Possible Additions
       </h3>
-      <p className="mb-4 text-xs text-slate-400">
+      <p className={styles.description}>
         Search for candidate cards and evaluate their impact on your deck
       </p>
 
@@ -45,11 +46,11 @@ export default function AdditionsPanel({
       />
 
       {candidates.length === 0 ? (
-        <p className="text-center text-sm text-slate-500 py-8">
+        <p className={styles.emptyState}>
           Search for cards to evaluate as possible additions
         </p>
       ) : (
-        <div>
+        <div className={styles.candidateList}>
           {candidates.map((name) => {
             const card = candidateCardMap[name];
             const error = errors[name];
@@ -60,31 +61,31 @@ export default function AdditionsPanel({
                   key={name}
                   role="alert"
                   data-testid="candidate-error"
-                  className="rounded-lg border border-red-700/50 bg-slate-800/50 mb-3 p-3"
+                  className={styles.errorCard}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium text-slate-200">
+                  <div className={styles.errorCardInner}>
+                    <div className={styles.errorCardText}>
+                      <span className={styles.errorCardName}>
                         {name}
                       </span>
-                      <p className="text-xs text-red-400 mt-0.5">{error}</p>
+                      <p className={styles.errorCardMessage}>{error}</p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className={styles.errorCardActions}>
                       <button
                         type="button"
                         onClick={() => onRetryCard(name)}
-                        className="rounded-md bg-slate-700 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+                        className={styles.retryBtn}
                       >
                         Retry
                       </button>
                       <button
                         type="button"
                         onClick={() => onRemoveCard(name)}
-                        className="rounded-sm p-1 text-slate-400 hover:text-red-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+                        className={styles.removeBtn}
                         aria-label={`Remove ${name}`}
                       >
                         <svg
-                          className="h-4 w-4"
+                          className={styles.removeBtnIcon}
                           viewBox="0 0 20 20"
                           fill="currentColor"
                           aria-hidden="true"
@@ -103,14 +104,14 @@ export default function AdditionsPanel({
                 <div
                   key={name}
                   data-testid="candidate-loading"
-                  className="rounded-lg border border-slate-700 bg-slate-800/50 mb-3 p-3"
+                  className={styles.loadingCard}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className={styles.loadingCardInner}>
                     <div
-                      className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-purple-400"
+                      className={styles.loadingSpinner}
                       aria-hidden="true"
                     />
-                    <span className="text-sm text-slate-300">
+                    <span className={styles.loadingCardName}>
                       Loading {name}...
                     </span>
                   </div>
