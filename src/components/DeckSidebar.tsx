@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { DeckData, EnrichedCard } from "@/lib/types";
@@ -13,7 +13,6 @@ import {
   TAB_ROUTES,
   tabFromPathname,
 } from "@/lib/view-tabs";
-import { SYNERGY_AXES } from "@/lib/synergy-axes";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import styles from "./DeckSidebar.module.css";
@@ -98,26 +97,6 @@ function IconChevronRight() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l7.5-7.5-7.5-7.5" />
-    </svg>
-  );
-}
-
-function IconChevronDown({ rotated }: { rotated?: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      width="14"
-      height="14"
-      aria-hidden="true"
-      style={{
-        transform: rotated ? "rotate(180deg)" : undefined,
-        transition: "transform var(--dur-base) var(--ease-out)",
-      }}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
     </svg>
   );
 }
@@ -263,16 +242,13 @@ function NavButton({
     .filter(Boolean)
     .join(" ");
 
-  const inner = (
-    <>
-      <span className={styles.navIcon}>{icon}</span>
-      {!collapsed && (
-        <span className={styles.navLabel}>
-          {label}
-          {badge && <span className={styles.navBadge}>{badge}</span>}
-        </span>
-      )}
-    </>
+  const inner = collapsed ? (
+    <span className={styles.navIcon}>{icon}</span>
+  ) : (
+    <span className={styles.navLabel}>
+      {label}
+      {badge && <span className={styles.navBadge}>{badge}</span>}
+    </span>
   );
 
   if (isDisabled) {
@@ -341,10 +317,6 @@ function SidebarContent({
   const router = useRouter();
   const activeTab: ViewTab = tabFromPathname(pathname ?? "") ?? "list";
 
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(["deck", "insights", "tools", "actions"])
-  );
-
   const analysisDisabled = !cardMap || enrichLoading;
 
   // Flat ordered list of all tabs for keyboard navigation
@@ -397,15 +369,6 @@ function SidebarContent({
 
   const commanderNames = deck.commanders.map((c) => c.name);
 
-  const toggleCategory = (id: string) => {
-    setExpandedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
   // Tab clicks are now Link navigations; only fire onClose to dismiss the
   // mobile drawer after the user picks a destination.
   const handleAfterNavClick = () => {
@@ -414,7 +377,7 @@ function SidebarContent({
 
   return (
     <div className={styles.content}>
-      {/* Deck identity */}
+      {/* Deck identity — manuscript margin: serif title, italic commander, mono meta. */}
       {!collapsed && (
         <div className={styles.identity}>
           <div className={styles.identityHeader}>
@@ -444,6 +407,7 @@ function SidebarContent({
                     <span className={styles.metaLink}>{deck.source}</span>
                   )}
                 </span>
+                <span>·</span>
                 <span>{totalCards} cards</span>
               </div>
             </div>
@@ -465,11 +429,10 @@ function SidebarContent({
               )}
             </div>
           </div>
-
-          {/* Bracket/power badge */}
+          {/* Bracket/power retained as a quiet anchor for tests + at-a-glance verdict. */}
           {analysisResults && (
             <span data-testid="bracket-power-badge" className={styles.bracketBadge}>
-              B{analysisResults.bracketResult.bracket} | PL
+              B{analysisResults.bracketResult.bracket} · PL
               {analysisResults.powerLevel.powerLevel}
             </span>
           )}
@@ -487,90 +450,48 @@ function SidebarContent({
         </div>
       )}
 
-      {/* Theme pills */}
-      {!collapsed && analysisResults && analysisResults.synergyAnalysis.deckThemes.length > 0 && (
-        <div className={styles.themesRow}>
-          <div data-testid="header-themes" className={styles.themesList}>
-            {analysisResults.synergyAnalysis.deckThemes.slice(0, 3).map((theme) => {
-              const axisDef = SYNERGY_AXES.find((a) => a.id === theme.axisId);
-              const bg = axisDef?.color.bg ?? "bg-slate-500/20";
-              const text = axisDef?.color.text ?? "text-slate-300";
-              const label = theme.detail
-                ? `${theme.axisName} — ${theme.detail} (${theme.cardCount})`
-                : `${theme.axisName} (${theme.cardCount})`;
-              return (
-                <span
-                  key={theme.axisId}
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${bg} ${text}`}
-                >
-                  {label}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Hand stats */}
-      {!collapsed && analysisResults?.simulationStats && (
-        <div className={styles.handStatsRow}>
-          <div data-testid="hand-stats" style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-3)" }}>
-            <span>{Math.round(analysisResults.simulationStats.keepableRate * 100)}% keep</span>
-            <span aria-hidden="true">·</span>
-            <span>{analysisResults.simulationStats.avgLandsInOpener.toFixed(1)} lands</span>
-          </div>
-        </div>
-      )}
-
-      {/* Nav groups */}
-      <nav role="tablist" aria-label="Deck view" className={styles.nav}>
-        {NAV_CATEGORIES.map((category) => {
-          const isExpanded = expandedCategories.has(category.id);
-          return (
-            <div key={category.id} className={styles.category}>
-              {!collapsed && (
-                <button
-                  type="button"
-                  onClick={() => toggleCategory(category.id)}
-                  className={styles.categoryToggle}
-                  aria-expanded={isExpanded}
-                >
-                  {category.label}
-                  <IconChevronDown rotated={!isExpanded} />
-                </button>
-              )}
-
-              {(collapsed || isExpanded) && (
-                <div
-                  className={[
-                    styles.categoryGroup,
-                    collapsed && styles.categoryGroupCollapsed,
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                >
-                  {category.items.map((tabKey) => {
-                    const tabDef = ALL_TABS.find((t) => t.key === tabKey)!;
-                    const isDisabled = ENRICHMENT_REQUIRED_TABS.has(tabKey) && analysisDisabled;
-                    return (
-                      <NavButton
-                        key={tabKey}
-                        tabKey={tabKey}
-                        label={tabDef.label}
-                        badge={tabDef.badge}
-                        isActive={activeTab === tabKey}
-                        isDisabled={isDisabled}
-                        collapsed={collapsed}
-                        onAfterClick={handleAfterNavClick}
-                        onKeyDown={handleTabKeyDown}
-                      />
-                    );
-                  })}
-                </div>
-              )}
+      {/* Manuscript margin index — chapter headings + text-only nav. */}
+      <nav
+        role="tablist"
+        aria-label="Deck view"
+        className={[styles.nav, collapsed && styles.navCollapsed]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        {NAV_CATEGORIES.map((category) => (
+          <div key={category.id} className={styles.category}>
+            {!collapsed && (
+              <h3 className={styles.categoryHeading}>{category.label}</h3>
+            )}
+            <div
+              className={[
+                styles.categoryGroup,
+                collapsed && styles.categoryGroupCollapsed,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              {category.items.map((tabKey) => {
+                const tabDef = ALL_TABS.find((t) => t.key === tabKey)!;
+                const isDisabled =
+                  ENRICHMENT_REQUIRED_TABS.has(tabKey) && analysisDisabled;
+                return (
+                  <NavButton
+                    key={tabKey}
+                    tabKey={tabKey}
+                    label={tabDef.label}
+                    badge={tabDef.badge}
+                    isActive={activeTab === tabKey}
+                    isDisabled={isDisabled}
+                    collapsed={collapsed}
+                    onAfterClick={handleAfterNavClick}
+                    onKeyDown={handleTabKeyDown}
+                  />
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </nav>
 
       {onNewReading && (

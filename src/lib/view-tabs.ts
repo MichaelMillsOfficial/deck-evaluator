@@ -20,22 +20,22 @@ export const NAV_CATEGORIES: NavCategory[] = [
   {
     id: "deck",
     label: "Deck",
-    items: ["list"],
+    items: ["list", "analysis"],
   },
   {
-    id: "insights",
-    label: "Insights",
-    items: ["analysis", "synergy", "interactions"],
+    id: "mechanics",
+    label: "Mechanics",
+    items: ["synergy", "interactions"],
   },
   {
-    id: "tools",
-    label: "Tools",
-    items: ["hands", "additions", "goldfish"],
+    id: "simulations",
+    label: "Simulations",
+    items: ["hands", "goldfish"],
   },
   {
-    id: "actions",
-    label: "Actions",
-    items: ["suggestions", "compare", "share"],
+    id: "studio",
+    label: "Studio",
+    items: ["additions", "suggestions", "compare", "share"],
   },
 ];
 
