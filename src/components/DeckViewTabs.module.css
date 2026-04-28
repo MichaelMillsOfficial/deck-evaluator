@@ -1,0 +1,30 @@
+/* Section header pattern used across the analysis tabs.
+   Eyebrow-style heading (mono uppercase accent) + italic Spectral tagline,
+   as specified in design-system/README.md.
+
+   The <h3> retains heading semantics for `aria-labelledby` consumers. */
+
+.sectionHeader {
+  margin-bottom: var(--space-12);
+}
+
+.sectionHeading {
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: var(--weight-medium);
+  margin: 0 0 var(--space-4);
+  line-height: 1;
+}
+
+.sectionTagline {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--text-sm);
+  color: var(--ink-tertiary);
+  line-height: var(--leading-snug);
+  margin: 0;
+  max-width: 60ch;
+}
