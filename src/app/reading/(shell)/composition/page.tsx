@@ -8,11 +8,8 @@ import SectionHeader, {
 } from "@/components/reading/SectionHeader";
 import DeckAnalysis from "@/components/DeckAnalysis";
 
-const HEALTH_LABEL: Record<string, string> = {
-  healthy: "Healthy",
-  "needs-attention": "Watch",
-  "major-gaps": "Gaps",
-};
+type ColorKey = "W" | "U" | "B" | "R" | "G";
+const COLOR_ORDER: ColorKey[] = ["W", "U", "B", "R", "G"];
 
 export default function CompositionPage() {
   const { payload, analysisResults } = useDeckSession();
@@ -31,27 +28,59 @@ export default function CompositionPage() {
 
   const stats = useMemo<SectionStat[] | undefined>(() => {
     if (!analysisResults) return undefined;
-    const { compositionScorecard, manaBaseMetrics } = analysisResults;
-    if (compositionScorecard.categories.length === 0) return undefined;
-    const healthLabel =
-      HEALTH_LABEL[compositionScorecard.overallHealth] ?? "—";
-    const rampCategory = compositionScorecard.categories.find(
-      (c) => c.tag === "Ramp"
+    const {
+      bracketResult,
+      powerLevel,
+      landEfficiency,
+      colorDistribution,
+      manaCurve,
+    } = analysisResults;
+
+    // Color identity — letters present in the pip count, in WUBRG order.
+    const presentColors = COLOR_ORDER.filter(
+      (c) => colorDistribution.pips[c] > 0
     );
-    const drawCategory = compositionScorecard.categories.find(
-      (c) => c.tag === "Card Draw"
-    );
+    const colorLabel = presentColors.length
+      ? presentColors.join(" · ")
+      : "Colorless";
+
+    // Curve peak — bucket with the highest combined permanent + spell count.
+    let peakBucket = manaCurve[0];
+    let peakCount = 0;
+    for (const bucket of manaCurve) {
+      const total = bucket.permanents + bucket.nonPermanents;
+      if (total > peakCount) {
+        peakCount = total;
+        peakBucket = bucket;
+      }
+    }
+
     return [
-      { label: "Health", value: healthLabel, sub: "scorecard", accent: true },
       {
-        label: "Lands",
-        value: String(manaBaseMetrics.landCount),
-        sub: `${manaBaseMetrics.landPercentage.toFixed(0)}% of deck`,
+        label: "Bracket",
+        value: `B${bracketResult.bracket}`,
+        sub: bracketResult.bracketName,
       },
       {
-        label: "Ramp",
-        value: rampCategory ? String(rampCategory.count) : "—",
-        sub: drawCategory ? `${drawCategory.count} draw` : "ramp pieces",
+        label: "Power Level",
+        value: `PL${powerLevel.powerLevel}`,
+        sub: powerLevel.bandLabel,
+        accent: true,
+      },
+      {
+        label: "Land Base",
+        value: String(landEfficiency.overallScore),
+        sub: landEfficiency.scoreLabel,
+      },
+      {
+        label: "Colors",
+        value: String(presentColors.length || 0),
+        sub: colorLabel,
+      },
+      {
+        label: "Curve Peak",
+        value: peakBucket?.cmc ?? "—",
+        sub: peakCount > 0 ? `${peakCount} cards` : "no spells",
       },
     ];
   }, [analysisResults]);

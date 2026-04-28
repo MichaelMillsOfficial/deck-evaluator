@@ -64,6 +64,7 @@
 @media (min-width: 640px) {
   .stats {
     grid-template-columns: repeat(var(--stat-count, 3), 1fr);
+    max-width: calc(var(--stat-count, 3) * 200px);
   }
 }
 
