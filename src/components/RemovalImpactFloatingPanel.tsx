@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import type { RemovalImpact } from "@/lib/interaction-engine/types";
 import RemovalImpactInspector from "@/components/RemovalImpactInspector";
 
@@ -51,8 +52,14 @@ export default function RemovalImpactFloatingPanel({
   }, [isOpen]);
 
   if (!isOpen) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
+  // Render into document.body so the panel's `position: fixed` is anchored
+  // to the viewport — escaping any ancestor that creates a containing block
+  // via transform, filter, backdrop-filter, will-change, or contain: paint.
+  // Without this portal, the panel was being captured by ancestor
+  // backdrop-filter rules and scrolling away with its parent.
+  return createPortal(
     // No backdrop — panel floats without blocking page interaction.
     // Positioned fixed to the right side of the viewport so it stays
     // visible while the user scrolls or clicks cards in the centrality list.
@@ -123,6 +130,7 @@ export default function RemovalImpactFloatingPanel({
           Press <kbd className="font-mono">Esc</kbd> to dismiss
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
