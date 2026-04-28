@@ -1,0 +1,222 @@
+.row {
+  border-bottom: 1px solid var(--border);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.row:hover {
+  background: var(--accent-soft);
+}
+
+.tdQty {
+  padding: var(--space-3) var(--space-5) var(--space-3) 0;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: 0.04em;
+  color: var(--ink-tertiary);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.tdCost {
+  padding: var(--space-3) var(--space-5);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.tdName {
+  padding: var(--space-3) var(--space-5);
+  vertical-align: middle;
+}
+
+.tdType {
+  padding: var(--space-3) 0 var(--space-3) var(--space-5);
+  white-space: nowrap;
+  display: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+  vertical-align: middle;
+}
+
+@media (min-width: 640px) {
+  .tdType {
+    display: table-cell;
+  }
+}
+
+.nameCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.nameButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 32px;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--ink-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.nameButton:hover {
+  color: var(--accent);
+}
+
+.nameButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--accent);
+}
+
+.chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--ink-tertiary);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.nameLabel {
+  min-width: 0;
+}
+
+.flavorName {
+  display: block;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--text-eyebrow);
+  color: var(--ink-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detailRow {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.detailRow td {
+  padding: var(--space-7) var(--space-8);
+  border-bottom: 1px solid var(--border);
+}
+
+.detailBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--ink-secondary);
+}
+
+.detailMobileType {
+  color: var(--ink-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (min-width: 640px) {
+  .detailMobileType {
+    display: none;
+  }
+}
+
+.statRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-7);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+}
+
+/* Multi-face card layout */
+.faceTabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.faceTab {
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.faceTab:hover {
+  background: var(--surface-2-hi);
+  color: var(--ink-secondary);
+}
+
+.faceTab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--accent);
+}
+
+.faceTabActive {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--border-accent);
+}
+
+.inlineFace + .inlineFace {
+  margin-top: var(--space-7);
+  padding-top: var(--space-7);
+  border-top: 1px solid var(--border);
+}
+
+.faceName {
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: var(--weight-medium);
+  margin: 0 0 var(--space-3);
+}
+
+.faceTypeline {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+  margin: 0;
+}

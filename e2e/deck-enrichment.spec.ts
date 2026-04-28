@@ -274,12 +274,12 @@ test.describe("Deck Enrichment", () => {
     const chevron = solRingButton.locator("[data-testid='expand-chevron']");
     await expect(chevron).toBeVisible();
 
-    // Not rotated when collapsed
-    await expect(chevron).not.toHaveClass(/rotate-90/);
+    // Collapsed: aria-expanded=false drives the un-rotated chevron CSS state.
+    await expect(solRingButton).toHaveAttribute("aria-expanded", "false");
 
-    // Rotated when expanded
+    // Expanded: aria-expanded=true drives the rotated chevron CSS state.
     await solRingButton.click();
-    await expect(chevron).toHaveClass(/rotate-90/);
+    await expect(solRingButton).toHaveAttribute("aria-expanded", "true");
   });
 
   test("mana cost symbols render as img tags with Scryfall SVG src", async ({

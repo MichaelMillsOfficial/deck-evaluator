@@ -2,6 +2,7 @@
 
 import type { DeckCard, DeckData, EnrichedCard } from "@/lib/types";
 import EnrichedCardRow from "@/components/EnrichedCardRow";
+import styles from "./DeckList.module.css";
 
 function DeckSectionSimple({
   title,
@@ -15,26 +16,18 @@ function DeckSectionSimple({
   const totalCards = cards.reduce((sum, c) => sum + c.quantity, 0);
 
   return (
-    <div className="mb-6">
-      <h3 className="mb-2 border-b border-slate-700 pb-1 text-sm font-semibold uppercase tracking-wide text-slate-300">
-        {title}{" "}
-        <span className="text-xs font-normal text-slate-400">
-          ({totalCards})
-        </span>
+    <div className={styles.section}>
+      <h3 className={styles.sectionHeading}>
+        {title}
+        <span className={styles.sectionCount}>({totalCards})</span>
       </h3>
-      <ul className="space-y-0.5">
+      <ul className={styles.simpleList}>
         {cards.map((card) => (
-          <li
-            key={card.name}
-            className="flex items-baseline gap-2 text-sm min-w-0"
-          >
-            <span
-              aria-hidden="true"
-              className="w-6 shrink-0 text-right font-mono text-slate-400"
-            >
+          <li key={card.name} className={styles.simpleRow}>
+            <span aria-hidden="true" className={styles.simpleQty}>
               {card.quantity}
             </span>
-            <span className="text-slate-200 min-w-0 truncate">
+            <span className={styles.simpleName}>
               <span className="sr-only">{card.quantity}x </span>
               {card.name}
             </span>
@@ -60,23 +53,30 @@ function DeckSectionEnriched({
   const sectionId = `section-${title.toLowerCase()}`;
 
   return (
-    <div className="mb-6">
-      <h3
-        id={sectionId}
-        className="mb-2 border-b border-slate-700 pb-1 text-sm font-semibold uppercase tracking-wide text-slate-300"
-      >
-        {title}{" "}
-        <span className="text-xs font-normal text-slate-400">
-          ({totalCards})
-        </span>
+    <div className={styles.section}>
+      <h3 id={sectionId} className={styles.sectionHeading}>
+        {title}
+        <span className={styles.sectionCount}>({totalCards})</span>
       </h3>
-      <table className="w-full text-sm table-auto" data-testid={`enriched-${title.toLowerCase()}`} aria-labelledby={sectionId}>
+      <table
+        className={styles.table}
+        data-testid={`enriched-${title.toLowerCase()}`}
+        aria-labelledby={sectionId}
+      >
         <thead>
-          <tr className="text-left text-xs text-slate-500 uppercase tracking-wide">
-            <th scope="col" className="pb-1 pr-2 whitespace-nowrap text-right">Qty</th>
-            <th scope="col" className="pb-1 px-2 whitespace-nowrap">Cost</th>
-            <th scope="col" className="pb-1 px-2">Name</th>
-            <th scope="col" className="pb-1 pl-2 whitespace-nowrap hidden sm:table-cell">Type</th>
+          <tr className={styles.tableHeadRow}>
+            <th scope="col" className={styles.thQty}>
+              Qty
+            </th>
+            <th scope="col" className={styles.thCost}>
+              Cost
+            </th>
+            <th scope="col" className={styles.thName}>
+              Name
+            </th>
+            <th scope="col" className={styles.thType}>
+              Type
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -93,14 +93,14 @@ function DeckSectionEnriched({
             }
             // Fallback for cards not in the map
             return (
-              <tr key={card.name} className="border-b border-slate-700/50">
-                <td className="py-1.5 pr-2 text-right font-mono text-slate-400 whitespace-nowrap">
+              <tr key={card.name} className={styles.fallbackRow}>
+                <td className={styles.tdQty}>
                   <span className="sr-only">{card.quantity}x </span>
                   {card.quantity}
                 </td>
-                <td className="py-1.5 px-2 whitespace-nowrap" />
-                <td className="py-1.5 px-2 text-slate-200">{card.name}</td>
-                <td className="py-1.5 pl-2 whitespace-nowrap hidden sm:table-cell" />
+                <td className={styles.tdCost} />
+                <td className={styles.tdName}>{card.name}</td>
+                <td className={styles.tdType} />
               </tr>
             );
           })}
@@ -133,24 +133,28 @@ interface DeckListProps {
 
 export default function DeckList({ deck, cardMap, enrichLoading }: DeckListProps) {
   return (
-    <section
-      data-testid="deck-display"
-      aria-label={`Deck: ${deck.name}`}
-    >
+    <section data-testid="deck-display" aria-label={`Deck: ${deck.name}`}>
       {enrichLoading && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="mb-4 flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-500/10 px-4 py-3 text-sm text-purple-300"
-        >
+        <div role="status" aria-live="polite" className={styles.loadingBanner}>
           <svg
-            className="h-4 w-4 animate-spin motion-reduce:hidden"
+            className={styles.loadingSpinner}
             viewBox="0 0 24 24"
             fill="none"
             aria-hidden="true"
           >
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+              opacity="0.25"
+            />
+            <path
+              fill="currentColor"
+              opacity="0.85"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
           </svg>
           Enriching card data...
         </div>
