@@ -12,6 +12,7 @@ import CardSynergyTable from "@/components/CardSynergyTable";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import SectionNav from "@/components/SectionNav";
 import VerifiedCombos, { NearCombos } from "@/components/VerifiedCombos";
+import styles from "./SynergySection.module.css";
 
 interface SynergySectionProps {
   deck: DeckData;
@@ -76,7 +77,7 @@ export default function SynergySection({
   const localCombosTitle = hasSpellbookExact ? "Local Combos" : "Known Combos";
 
   return (
-    <div className="space-y-3">
+    <div className={styles.list}>
       <SectionNav
         sections={synergySections}
         expandedSections={expandedSections}
@@ -91,12 +92,12 @@ export default function SynergySection({
       >
         <DeckThemes themes={analysis.deckThemes} />
         {analysis.deckThemes.some((t) => t.axisId === "tribal") && (
-          <div className="mt-4">
+          <div className={styles.spacer}>
             <CreatureTypeBreakdown deck={deck} cardMap={cardMap} />
           </div>
         )}
         {analysis.deckThemes.some((t) => t.axisId === "supertypeMatter") && (
-          <div className="mt-4">
+          <div className={styles.spacer}>
             <SupertypeBreakdown deck={deck} cardMap={cardMap} />
           </div>
         )}
@@ -179,11 +180,11 @@ export default function SynergySection({
         )}
 
         {combos.length === 0 && heuristicSynergies.length === 0 && (
-          <div data-testid="synergy-pairs" className="mb-4">
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <div data-testid="synergy-pairs" className={styles.emptyState}>
+            <h4 className={styles.emptyHeading}>
               Top Synergies
             </h4>
-            <p className="text-xs text-slate-500">
+            <p className={styles.emptyBody}>
               No significant synergy pairs detected.
             </p>
           </div>
@@ -205,11 +206,11 @@ export default function SynergySection({
         />
 
         {analysis.antiSynergies.length === 0 && (
-          <div data-testid="anti-synergy-pairs" className="mb-4">
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <div data-testid="anti-synergy-pairs" className={styles.emptyState}>
+            <h4 className={styles.emptyHeading}>
               Anti-Synergy Warnings
             </h4>
-            <p className="text-xs text-slate-500">
+            <p className={styles.emptyBody}>
               No anti-synergies detected.
             </p>
           </div>

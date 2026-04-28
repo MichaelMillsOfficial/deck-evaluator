@@ -1,0 +1,30 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.spacer {
+  margin-top: var(--space-7);
+}
+
+.emptyState {
+  margin-bottom: var(--space-8);
+}
+
+.emptyHeading {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+  color: var(--ink-tertiary);
+}
+
+.emptyBody {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-tertiary);
+  line-height: var(--leading-body);
+}
