@@ -19,6 +19,11 @@ test.describe("/preview — Astral primitives gallery", () => {
       "CardTag",
       "StatTile",
       "Sheet",
+      "ManaCost",
+      "ColorPie",
+      "CurveConstellation",
+      "CardRow",
+      "DeckHero",
     ]) {
       await expect(
         page.getByRole("heading", { level: 2, name: section, exact: true }),
@@ -71,6 +76,53 @@ test.describe("/preview — Astral primitives gallery", () => {
     ]) {
       await expect(cardTagSection.getByText(role, { exact: true })).toBeVisible();
     }
+  });
+
+  test("ManaCost renders one pip per symbol with mana-color tokens", async ({
+    page,
+  }) => {
+    const mc = page.getByTestId("preview-manacost");
+    // {2}{U}{G} demo cost should produce 3 pips. The preview renders the
+    // same cost at md and lg sizes; .first() picks the md instance.
+    const cost = mc
+      .getByLabel("Mana cost: 2 generic, 1 blue, 1 green")
+      .first();
+    await expect(cost).toBeVisible();
+    await expect(cost.locator("[data-pip]")).toHaveCount(3);
+  });
+
+  test("ColorPie renders one segment per non-zero color", async ({ page }) => {
+    const pie = page.getByTestId("preview-colorpie");
+    // 4 non-zero colors in our demo (W, U, R, G — B is 0, C is 0)
+    await expect(pie.locator('[data-segment]')).toHaveCount(4);
+  });
+
+  test("CurveConstellation renders a planet per CMC bucket", async ({
+    page,
+  }) => {
+    const cc = page.getByTestId("preview-curveconstellation");
+    // 8 buckets: 0,1,2,3,4,5,6,7+
+    await expect(cc.locator('[data-planet]')).toHaveCount(8);
+  });
+
+  test("CardRow exposes qty, name, role tag, and price", async ({ page }) => {
+    const cr = page.getByTestId("preview-cardrow");
+    await expect(cr.getByText("Slogurk, the Overslime")).toBeVisible();
+    await expect(cr.getByText("COMMANDER")).toBeVisible();
+    await expect(cr.getByText("$4.20")).toBeVisible();
+  });
+
+  test("DeckHero shows eyebrow, title, tagline, and power score", async ({
+    page,
+  }) => {
+    const hero = page.getByTestId("preview-deckhero");
+    await expect(hero.getByText(/READING/i)).toBeVisible();
+    await expect(
+      hero.getByRole("heading", { name: /Slogurk, the Overslime/i }),
+    ).toBeVisible();
+    await expect(hero.getByText(/landfall engine/i)).toBeVisible();
+    await expect(hero.getByText("7.4")).toBeVisible();
+    await expect(hero.getByText(/UPGRADED BRACKET/i)).toBeVisible();
   });
 
   test("Sheet opens and closes via trigger and escape key", async ({ page }) => {
