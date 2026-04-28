@@ -147,12 +147,12 @@ test.describe("Deck Enrichment", () => {
     releaseEnrichment?.();
   });
 
-  test("form re-enables immediately after deck data loads", async ({
+  test("import flow does not block on enrichment", async ({
     deckPage,
   }) => {
     const { page } = deckPage;
 
-    // Hold enrichment until we assert the form state.
+    // Hold enrichment until we assert the navigation has completed.
     let releaseEnrichment: (() => void) | null = null;
     await page.route("**/api/deck-enrich", async (route) => {
       await new Promise<void>((resolve) => {
@@ -169,13 +169,12 @@ test.describe("Deck Enrichment", () => {
     await deckPage.goto();
     await deckPage.fillDecklist("1 Sol Ring");
     await deckPage.submitImport();
+
+    // Navigation to /reading should complete even though enrichment is still in-flight.
+    await page.waitForURL(/\/reading(\/|$|\?)/);
     await deckPage.waitForDeckDisplay();
 
-    // Form should be re-enabled even though enrichment is still loading
-    await expect(deckPage.importButton).toBeEnabled();
-    await expect(page.locator("textarea#decklist")).toBeEnabled();
-
-    // Release so the test completes cleanly
+    // Release so the test completes cleanly.
     releaseEnrichment?.();
   });
 

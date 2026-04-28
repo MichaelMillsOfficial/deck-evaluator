@@ -1,0 +1,163 @@
+.results {
+  outline: none;
+}
+
+.resultsLayout {
+  display: flex;
+  min-height: 0;
+}
+
+.contentPanel {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+}
+
+@media (min-width: 768px) {
+  .contentPanel {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: none;
+  }
+}
+
+.contentPanelInner {
+  padding: var(--space-12);
+}
+
+.alert {
+  margin-top: var(--space-14);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-7);
+  padding: var(--space-7) var(--space-8);
+  border-radius: var(--radius-xl);
+  border: 1px solid;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+}
+
+.alertContent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-5);
+  min-width: 0;
+  flex: 1;
+}
+
+.alertIcon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.alertBody {
+  min-width: 0;
+}
+
+.alertTitle {
+  font-weight: var(--weight-semibold);
+  margin: 0 0 var(--space-2);
+}
+
+.alertList {
+  list-style: disc inside;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.alertActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.alertWatch {
+  background: var(--status-watch-soft);
+  border-color: rgba(253, 230, 138, 0.3);
+  color: var(--status-watch);
+}
+
+.dismissButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 0.85;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.dismissButton:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dismissButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px currentColor;
+}
+
+.dismissButton svg {
+  width: 14px;
+  height: 14px;
+}
+
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 var(--space-6);
+  background: rgba(253, 230, 138, 0.18);
+  color: var(--status-watch);
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  border: 1px solid rgba(253, 230, 138, 0.35);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.retryButton:hover:not(:disabled) {
+  background: rgba(253, 230, 138, 0.28);
+}
+
+.retryButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--status-watch);
+}
+
+.retryButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.parseWarnings {
+  background: var(--status-watch-soft);
+  border-color: rgba(253, 230, 138, 0.3);
+  color: var(--status-watch);
+}

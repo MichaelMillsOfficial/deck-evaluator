@@ -424,6 +424,62 @@
   border-top: 1px solid var(--border);
 }
 
+/* ─── New Reading button ─── */
+.newReadingSection {
+  padding: var(--space-3) var(--space-3) var(--space-5);
+}
+
+.newReadingButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-7);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.newReadingButton:hover {
+  color: var(--accent);
+  border-color: var(--border-accent);
+  background: var(--accent-soft);
+}
+
+.newReadingButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--accent);
+}
+
+.newReadingButtonCollapsed {
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  gap: 0;
+}
+
+.newReadingButtonCollapsed .newReadingLabel {
+  display: none;
+}
+
+.newReadingIcon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 .copyFeedback {
   display: block;
   margin-bottom: var(--space-2);
