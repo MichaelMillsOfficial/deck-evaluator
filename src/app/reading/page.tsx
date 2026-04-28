@@ -1,5 +1,5 @@
-import DeckReadingView from "@/components/DeckReadingView";
+import ReadingOverview from "@/components/reading/ReadingOverview";
 
 export default function ReadingPage() {
-  return <DeckReadingView />;
+  return <ReadingOverview />;
 }

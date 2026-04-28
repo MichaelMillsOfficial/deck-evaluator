@@ -91,8 +91,36 @@ export class DeckPage {
     return this.page.getByLabel("Decklist");
   }
 
-  /** Wait for the deck header to appear after a successful import */
+  /**
+   * Wait for the deck header to appear after a successful import.
+   *
+   * After Phase 3, /reading is the verdict overview (no deck-header) and
+   * the deck list lives at /reading/cards. Most existing tests expect to
+   * interact with deck-list / tabs / panels — they don't care about the
+   * intermediate overview hop. If we're on /reading, navigate forward to
+   * /reading/cards before waiting. Tests that explicitly want the
+   * overview don't call waitForDeckDisplay; they assert reading-hero
+   * directly.
+   */
   async waitForDeckDisplay() {
+    // Wait for the post-submit navigation to settle on any /reading URL.
+    // submitImport() returns before router.push completes, so checking the
+    // URL too early would still see / or /ritual.
+    await this.page.waitForURL(/\/reading/, { timeout: 15_000 });
+    // /reading is the verdict overview (no deck-header); deck-header lives
+    // on /reading/cards. Click the Cards section link to soft-navigate
+    // there. (page.goto would do a full page reload, remounting the
+    // DeckSessionProvider and dropping in-memory error state — that
+    // breaks tests that probe the post-error retry UI.)
+    const url = new URL(this.page.url());
+    if (url.pathname === "/reading" || url.pathname === "/reading/") {
+      await this.page
+        .getByTestId("reading-section-grid")
+        .getByRole("link", { name: /cards/i })
+        .first()
+        .click();
+      await this.page.waitForURL(/\/reading\/cards/, { timeout: 5_000 });
+    }
     await this.page
       .getByTestId("deck-header")
       .waitFor({ timeout: 15_000 });
