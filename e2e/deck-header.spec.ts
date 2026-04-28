@@ -49,7 +49,7 @@ test.describe("Deck Header", () => {
     await expect(header.getByText("6 cards")).toBeVisible();
   });
 
-  test("header tab bar has 8 tabs", async ({ deckPage }) => {
+  test("header tab bar has 10 tabs", async ({ deckPage }) => {
     await deckPage.goto();
     await deckPage.fillDecklist(SAMPLE_DECKLIST);
     await deckPage.submitImport();
@@ -57,7 +57,8 @@ test.describe("Deck Header", () => {
 
     const header = deckPage.page.getByTestId("deck-header");
     const tabs = header.getByRole("tab");
-    await expect(tabs).toHaveCount(8);
+    // Phase 4 added Compare + Share alongside the existing 8.
+    await expect(tabs).toHaveCount(10);
 
     await expect(header.getByRole("tab", { name: "Deck List" })).toBeVisible();
     await expect(header.getByRole("tab", { name: "Analysis" })).toBeVisible();
@@ -67,6 +68,8 @@ test.describe("Deck Header", () => {
     await expect(header.getByRole("tab", { name: /Interactions/ })).toBeVisible();
     await expect(header.getByRole("tab", { name: /Goldfish/ })).toBeVisible();
     await expect(header.getByRole("tab", { name: "Suggestions" })).toBeVisible();
+    await expect(header.getByRole("tab", { name: "Compare" })).toBeVisible();
+    await expect(header.getByRole("tab", { name: "Share" })).toBeVisible();
   });
 
   test("clicking tabs switches panel content", async ({ deckPage }) => {

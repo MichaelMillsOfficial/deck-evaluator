@@ -107,7 +107,9 @@ test.describe("Goldfish Simulator Tab", () => {
     await deckPage.submitImport();
     await deckPage.waitForDeckDisplay();
 
-    // The goldfish tabpanel should exist in the DOM
+    // Phase 4: each tab is a real route, so the goldfish tabpanel only
+    // exists on /reading/goldfish. Navigate there before asserting.
+    await deckPage.page.goto("/reading/goldfish");
     const tabpanel = deckPage.page.locator("#tabpanel-deck-goldfish");
     await expect(tabpanel).toBeAttached();
   });

@@ -449,20 +449,29 @@ test.describe("Deck Analysis — Tab Navigation", () => {
     const tablist = page.getByRole("tablist", { name: "Deck view" });
     const deckListTab = tablist.getByRole("tab", { name: "Deck List" });
     const analysisTab = tablist.getByRole("tab", { name: "Analysis" });
+    // Phase 4 added Compare + Share as the last two tabs; End now lands
+    // on Share (the actual last entry).
+    const shareTab = tablist.getByRole("tab", { name: "Share" });
 
-    const goldfishTab = tablist.getByRole("tab", { name: /Goldfish/ });
-
+    // Phase 4: arrow keys still move focus + navigate via Link, but each
+    // press triggers a route change. Wait for the URL to settle between
+    // presses so focus assertions don't race the next render.
     await deckListTab.focus();
+
     await page.keyboard.press("ArrowRight");
+    await page.waitForURL(/\/reading\/composition/, { timeout: 5_000 });
     await expect(analysisTab).toBeFocused();
 
     await page.keyboard.press("ArrowLeft");
+    await page.waitForURL(/\/reading\/cards/, { timeout: 5_000 });
     await expect(deckListTab).toBeFocused();
 
     await page.keyboard.press("End");
-    await expect(goldfishTab).toBeFocused();
+    await page.waitForURL(/\/reading\/share/, { timeout: 5_000 });
+    await expect(shareTab).toBeFocused();
 
     await page.keyboard.press("Home");
+    await page.waitForURL(/\/reading\/cards/, { timeout: 5_000 });
     await expect(deckListTab).toBeFocused();
   });
 });
@@ -603,16 +612,18 @@ test.describe("Deck Analysis — Accessibility", () => {
       "tabpanel-deck-analysis"
     );
 
-    // List panel visible, analysis panel hidden
+    // After Phase 4, each tab is its own /reading/* route, so only one
+    // tabpanel exists at a time. List panel exists on /reading/cards;
+    // analysis panel exists on /reading/composition.
     const listPanel = page.locator("#tabpanel-deck-list");
     const analysisPanel = page.locator("#tabpanel-deck-analysis");
-    await expect(listPanel).not.toHaveAttribute("hidden", "");
-    await expect(analysisPanel).toHaveAttribute("hidden", "");
+    await expect(listPanel).toBeVisible();
+    await expect(analysisPanel).toHaveCount(0);
 
-    // Switch tabs
     await deckPage.selectDeckViewTab("Analysis");
-    await expect(listPanel).toHaveAttribute("hidden", "");
-    await expect(analysisPanel).not.toHaveAttribute("hidden", "");
+    await page.waitForURL(/\/reading\/composition/, { timeout: 5_000 });
+    await expect(listPanel).toHaveCount(0);
+    await expect(analysisPanel).toBeVisible();
   });
 
   test("tablist has aria-label 'Deck view'", async ({ deckPage }) => {

@@ -1,8 +1,8 @@
-.results {
+.shell {
   outline: none;
 }
 
-.resultsLayout {
+.layout {
   display: flex;
   min-height: 0;
 }
@@ -91,6 +91,12 @@
   color: var(--status-watch);
 }
 
+.parseWarnings {
+  background: var(--status-watch-soft);
+  border-color: rgba(253, 230, 138, 0.3);
+  color: var(--status-watch);
+}
+
 .dismissButton {
   display: inline-flex;
   align-items: center;
@@ -154,10 +160,4 @@
 .retryButton:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-.parseWarnings {
-  background: var(--status-watch-soft);
-  border-color: rgba(253, 230, 138, 0.3);
-  color: var(--status-watch);
 }

@@ -1,10 +1,18 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { DeckAnalysisResults } from "@/lib/deck-analysis-aggregate";
 import type { ViewTab } from "@/lib/view-tabs";
-import { NAV_CATEGORIES, ALL_TABS, ENRICHMENT_REQUIRED_TABS } from "@/lib/view-tabs";
+import {
+  NAV_CATEGORIES,
+  ALL_TABS,
+  ENRICHMENT_REQUIRED_TABS,
+  TAB_ROUTES,
+  tabFromPathname,
+} from "@/lib/view-tabs";
 import { SYNERGY_AXES } from "@/lib/synergy-axes";
 import {
   formatMarkdownReport,
@@ -138,6 +146,22 @@ function IconX() {
 // Tab icon map
 // ---------------------------------------------------------------------------
 
+function IconScales() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10 3v14M4 7l3-3 3 3M16 7l-3-3-3 3M3 17h6M11 17h6M5 14a3 3 0 003-3H2a3 3 0 003 3zm10 0a3 3 0 003-3h-6a3 3 0 003 3z" />
+    </svg>
+  );
+}
+
+function IconShareNode() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 5a2.5 2.5 0 11.7 1.7L7.5 11.4a2.5 2.5 0 010 .8l8.2 4.7A2.5 2.5 0 1115 15.5l-8-4.6a2.5 2.5 0 110-3.5l8-4.6c.07-.4.16-.6.3-.8z" />
+    </svg>
+  );
+}
+
 const TAB_ICONS: Record<ViewTab, React.ReactNode> = {
   list: <IconList />,
   analysis: <IconChartBar />,
@@ -147,6 +171,8 @@ const TAB_ICONS: Record<ViewTab, React.ReactNode> = {
   additions: <IconPlusCircle />,
   suggestions: <IconArrowsRightLeft />,
   goldfish: <IconBeaker />,
+  compare: <IconScales />,
+  share: <IconShareNode />,
 };
 
 // ---------------------------------------------------------------------------
@@ -209,6 +235,15 @@ function EnrichmentStatus({
 // Nav button
 // ---------------------------------------------------------------------------
 
+/**
+ * Sidebar nav entry. After Phase 4 each tab maps to a real /reading/* route;
+ * the link renders as `<Link>` so navigation is soft (provider stays mounted).
+ *
+ * When the tab is disabled (e.g. enrichment-required tab before enrichment
+ * completes), we render a non-interactive button-shaped element instead so
+ * a click still does nothing. role="tab" + aria-selected mirror the tablist
+ * semantics expected by existing tests.
+ */
 function NavButton({
   tabKey,
   label,
@@ -216,7 +251,7 @@ function NavButton({
   isActive,
   isDisabled,
   collapsed,
-  onClick,
+  onAfterClick,
   onKeyDown,
 }: {
   tabKey: ViewTab;
@@ -225,10 +260,12 @@ function NavButton({
   isActive: boolean;
   isDisabled: boolean;
   collapsed: boolean;
-  onClick: () => void;
-  onKeyDown?: (e: React.KeyboardEvent<HTMLButtonElement>) => void;
+  /** Optional hook fired after a successful click — used to close the mobile drawer. */
+  onAfterClick?: () => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLElement>) => void;
 }) {
   const icon = TAB_ICONS[tabKey];
+  const route = TAB_ROUTES[tabKey];
 
   const classes = [
     styles.navButton,
@@ -238,20 +275,8 @@ function NavButton({
     .filter(Boolean)
     .join(" ");
 
-  return (
-    <button
-      id={`tab-deck-${tabKey}`}
-      role="tab"
-      aria-selected={isActive}
-      aria-controls={`tabpanel-deck-${tabKey}`}
-      tabIndex={isActive ? 0 : -1}
-      type="button"
-      onClick={() => !isDisabled && onClick()}
-      onKeyDown={onKeyDown}
-      disabled={isDisabled}
-      title={collapsed ? label : undefined}
-      className={classes}
-    >
+  const inner = (
+    <>
       <span className={styles.navIcon}>{icon}</span>
       {!collapsed && (
         <span className={styles.navLabel}>
@@ -259,7 +284,43 @@ function NavButton({
           {badge && <span className={styles.navBadge}>{badge}</span>}
         </span>
       )}
-    </button>
+    </>
+  );
+
+  if (isDisabled) {
+    return (
+      <button
+        id={`tab-deck-${tabKey}`}
+        role="tab"
+        aria-selected={isActive}
+        aria-controls={`tabpanel-deck-${tabKey}`}
+        tabIndex={isActive ? 0 : -1}
+        type="button"
+        disabled
+        onKeyDown={onKeyDown}
+        title={collapsed ? label : undefined}
+        className={classes}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      id={`tab-deck-${tabKey}`}
+      role="tab"
+      aria-selected={isActive}
+      aria-controls={`tabpanel-deck-${tabKey}`}
+      tabIndex={isActive ? 0 : -1}
+      href={route}
+      onClick={onAfterClick}
+      onKeyDown={onKeyDown}
+      title={collapsed ? label : undefined}
+      className={classes}
+    >
+      {inner}
+    </Link>
   );
 }
 
@@ -407,8 +468,6 @@ interface SidebarContentProps {
   cardMap: Record<string, EnrichedCard> | null;
   enrichLoading: boolean;
   enrichError: string | null;
-  activeTab: ViewTab;
-  onTabChange: (tab: ViewTab) => void;
   analysisResults: DeckAnalysisResults | null;
   onOpenDiscordModal?: () => void;
   onCopyShareLink?: () => void;
@@ -423,8 +482,6 @@ function SidebarContent({
   cardMap,
   enrichLoading,
   enrichError,
-  activeTab,
-  onTabChange,
   analysisResults,
   onOpenDiscordModal,
   onCopyShareLink,
@@ -433,6 +490,10 @@ function SidebarContent({
   collapsed,
   onClose,
 }: SidebarContentProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const activeTab: ViewTab = tabFromPathname(pathname ?? "") ?? "list";
+
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(["deck", "insights", "tools", "actions"])
   );
@@ -445,7 +506,7 @@ function SidebarContent({
   const allTabKeys = ALL_TABS.map((t) => t.key);
 
   const handleTabKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    (e: React.KeyboardEvent<HTMLElement>) => {
       const currentIndex = allTabKeys.indexOf(activeTab);
       let newIndex = currentIndex;
 
@@ -476,11 +537,12 @@ function SidebarContent({
         }
       }
 
-      onTabChange(allTabKeys[nextIndex]);
-      const nextButton = document.getElementById(`tab-deck-${allTabKeys[nextIndex]}`);
+      const nextTab = allTabKeys[nextIndex];
+      router.push(TAB_ROUTES[nextTab]);
+      const nextButton = document.getElementById(`tab-deck-${nextTab}`);
       nextButton?.focus();
     },
-    [activeTab, allTabKeys, analysisDisabled, onTabChange]
+    [activeTab, allTabKeys, analysisDisabled, router]
   );
 
   const totalCards =
@@ -553,8 +615,9 @@ function SidebarContent({
     }
   };
 
-  const handleNavClick = (tab: ViewTab) => {
-    onTabChange(tab);
+  // Tab clicks are now Link navigations; only fire onClose to dismiss the
+  // mobile drawer after the user picks a destination.
+  const handleAfterNavClick = () => {
     onClose?.();
   };
 
@@ -707,7 +770,7 @@ function SidebarContent({
                         isActive={activeTab === tabKey}
                         isDisabled={isDisabled}
                         collapsed={collapsed}
-                        onClick={() => handleNavClick(tabKey)}
+                        onAfterClick={handleAfterNavClick}
                         onKeyDown={handleTabKeyDown}
                       />
                     );
@@ -790,8 +853,6 @@ export interface DeckSidebarProps {
   cardMap: Record<string, EnrichedCard> | null;
   enrichLoading: boolean;
   enrichError: string | null;
-  activeTab: ViewTab;
-  onTabChange: (tab: ViewTab) => void;
   analysisResults: DeckAnalysisResults | null;
   onOpenDiscordModal?: () => void;
   onCopyShareLink?: () => void;
@@ -804,8 +865,6 @@ export function DeckSidebar({
   cardMap,
   enrichLoading,
   enrichError,
-  activeTab,
-  onTabChange,
   analysisResults,
   onOpenDiscordModal,
   onCopyShareLink,
@@ -825,8 +884,6 @@ export function DeckSidebar({
         cardMap={cardMap}
         enrichLoading={enrichLoading}
         enrichError={enrichError}
-        activeTab={activeTab}
-        onTabChange={onTabChange}
         analysisResults={analysisResults}
         onOpenDiscordModal={onOpenDiscordModal}
         onCopyShareLink={onCopyShareLink}
@@ -865,8 +922,6 @@ export function DeckDrawer({
   cardMap,
   enrichLoading,
   enrichError,
-  activeTab,
-  onTabChange,
   analysisResults,
   onOpenDiscordModal,
   onCopyShareLink,
@@ -920,8 +975,6 @@ export function DeckDrawer({
             cardMap={cardMap}
             enrichLoading={enrichLoading}
             enrichError={enrichError}
-            activeTab={activeTab}
-            onTabChange={onTabChange}
             analysisResults={analysisResults}
             onOpenDiscordModal={onOpenDiscordModal}
             onCopyShareLink={onCopyShareLink}
