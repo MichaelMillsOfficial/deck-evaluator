@@ -13,6 +13,13 @@ import {
   Textarea,
   type DeckRole,
 } from "@/components/ui";
+import {
+  CardRow,
+  ColorPie,
+  CurveConstellation,
+  DeckHero,
+  ManaCost,
+} from "@/components/deck";
 import styles from "./preview.module.css";
 
 const DECK_ROLES: DeckRole[] = [
@@ -219,6 +226,138 @@ export default function PreviewPage() {
             <StatTile label="AVG WIN" value="T8.2" sub="TURNS" />
             <StatTile label="CURVE" value="2.84" />
           </div>
+        </section>
+
+        {/* ─── ManaCost ─── */}
+        <section className={styles.section} data-testid="preview-manacost">
+          <div className={styles.sectionHead}>
+            <Eyebrow>DOMAIN · 01</Eyebrow>
+            <h2 className={styles.sectionTitle}>ManaCost</h2>
+            <p className={styles.sectionTagline}>
+              Colored pips per WUBRG · numeric · X. Uses --mana-* tokens.
+            </p>
+          </div>
+          <div className={styles.panel}>
+            <div className={styles.column}>
+              <div className={styles.row}>
+                <ManaCost symbols={["2", "U", "G"]} />
+                <ManaCost symbols={["W", "W"]} />
+                <ManaCost symbols={["X", "B", "R"]} />
+                <ManaCost symbols={["3"]} />
+              </div>
+              <div className={styles.row}>
+                <ManaCost symbols={["2", "U", "G"]} size="lg" />
+                <ManaCost symbols={["1", "W", "U", "B", "R", "G"]} size="lg" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── ColorPie ─── */}
+        <section className={styles.section} data-testid="preview-colorpie">
+          <div className={styles.sectionHead}>
+            <Eyebrow>DOMAIN · 02</Eyebrow>
+            <h2 className={styles.sectionTitle}>ColorPie</h2>
+            <p className={styles.sectionTagline}>
+              SVG donut for color distribution. Empty colors are skipped.
+            </p>
+          </div>
+          <div className={styles.panel}>
+            <ColorPie
+              distribution={{ W: 5, U: 12, B: 0, R: 3, G: 7, C: 0 }}
+              size={120}
+            />
+          </div>
+        </section>
+
+        {/* ─── CurveConstellation ─── */}
+        <section
+          className={styles.section}
+          data-testid="preview-curveconstellation"
+        >
+          <div className={styles.sectionHead}>
+            <Eyebrow>DOMAIN · 03</Eyebrow>
+            <h2 className={styles.sectionTitle}>CurveConstellation</h2>
+            <p className={styles.sectionTagline}>
+              Planet-sized circles per CMC bucket. Radius ∝ √count.
+            </p>
+          </div>
+          <div className={styles.panel}>
+            <CurveConstellation
+              curve={{ buckets: [4, 8, 12, 9, 6, 4, 2, 1] }}
+            />
+          </div>
+        </section>
+
+        {/* ─── CardRow ─── */}
+        <section className={styles.section} data-testid="preview-cardrow">
+          <div className={styles.sectionHead}>
+            <Eyebrow>DOMAIN · 04</Eyebrow>
+            <h2 className={styles.sectionTitle}>CardRow</h2>
+            <p className={styles.sectionTagline}>
+              The list unit. Hover surfaces an accent fill.
+            </p>
+          </div>
+          <div className={styles.panel} style={{ padding: "var(--space-2)" }}>
+            <CardRow
+              qty={1}
+              name="Slogurk, the Overslime"
+              cost={["1", "G", "G", "U"]}
+              role="COMMANDER"
+              price="$4.20"
+              onClick={() => {}}
+            />
+            <CardRow
+              qty={1}
+              name="Crucible of Worlds"
+              cost={["3"]}
+              role="ENGINE"
+              price="$18.00"
+              onClick={() => {}}
+            />
+            <CardRow
+              qty={1}
+              name="Cultivate"
+              cost={["2", "G"]}
+              role="RAMP"
+              price="$0.50"
+              onClick={() => {}}
+            />
+            <CardRow
+              qty={1}
+              name="Brainstorm"
+              cost={["U"]}
+              role="DRAW"
+              price="$0.40"
+              onClick={() => {}}
+            />
+            <CardRow
+              qty={1}
+              name="Cyclonic Rift"
+              cost={["1", "U"]}
+              role="REMOVAL"
+              price="$32.00"
+              onClick={() => {}}
+            />
+          </div>
+        </section>
+
+        {/* ─── DeckHero ─── */}
+        <section className={styles.section} data-testid="preview-deckhero">
+          <div className={styles.sectionHead}>
+            <Eyebrow>DOMAIN · 05</Eyebrow>
+            <h2 className={styles.sectionTitle}>DeckHero</h2>
+            <p className={styles.sectionTagline}>
+              Eyebrow → serif title → italic tagline → gradient power score.
+            </p>
+          </div>
+          <DeckHero
+            eyebrow="READING · 04.27.26"
+            title="Slogurk, the Overslime"
+            tagline='"A landfall engine that wins decisively when it gets there — but watches the door for flood."'
+            score="7.4"
+            scoreMeta="/10 · UPGRADED BRACKET"
+          />
         </section>
 
         {/* ─── Sheet ─── */}

@@ -1,0 +1,53 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-10);
+}
+
+.svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.legend {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: var(--space-2) var(--space-7);
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: 0.06em;
+  color: var(--ink-secondary);
+  text-transform: uppercase;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.dotW {
+  background: var(--mana-w);
+}
+.dotU {
+  background: var(--mana-u);
+}
+.dotB {
+  background: var(--mana-b);
+}
+.dotR {
+  background: var(--mana-r);
+}
+.dotG {
+  background: var(--mana-g);
+}
+.dotC {
+  background: var(--mana-c);
+}
