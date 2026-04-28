@@ -20,6 +20,7 @@ import TopHands from "@/components/TopHands";
 import HandBuilder from "@/components/HandBuilder";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import SectionNav from "@/components/SectionNav";
+import styles from "./HandSimulator.module.css";
 
 const MAX_MULLIGANS = 3;
 
@@ -125,7 +126,7 @@ export default function HandSimulator({
   );
 
   return (
-    <div data-testid="hand-simulator" className="space-y-3">
+    <div data-testid="hand-simulator" className={styles.root}>
       <SectionNav
         sections={HANDS_SECTIONS}
         expandedSections={expandedSections}
@@ -157,13 +158,13 @@ export default function HandSimulator({
         onToggle={() => onToggleSection("draw-hand")}
       >
         {/* Action buttons */}
-        <div className="flex flex-wrap gap-3">
+        <div className={styles.buttonRow}>
           {!currentHand ? (
             <button
               type="button"
               onClick={handleDrawHand}
               data-testid="draw-hand-btn"
-              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+              className={styles.btnPrimary}
             >
               Draw Hand
             </button>
@@ -174,7 +175,7 @@ export default function HandSimulator({
                 onClick={handleMulligan}
                 disabled={mulliganCount >= MAX_MULLIGANS}
                 data-testid="mulligan-btn"
-                className="rounded-lg border border-purple-500 px-4 py-2 text-sm font-medium text-purple-300 transition-colors hover:bg-purple-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:cursor-not-allowed disabled:opacity-40"
+                className={styles.btnOutline}
               >
                 Mulligan{mulliganCount > 0 ? ` (${mulliganCount}/${MAX_MULLIGANS})` : ""}
               </button>
@@ -182,7 +183,7 @@ export default function HandSimulator({
                 type="button"
                 onClick={handleNewHand}
                 data-testid="new-hand-btn"
-                className="rounded-lg bg-slate-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+                className={styles.btnSecondary}
               >
                 New Hand
               </button>
@@ -192,7 +193,7 @@ export default function HandSimulator({
 
         {/* Hand display */}
         {currentHand && (
-          <div className="mt-4">
+          <div className={styles.handDisplayWrapper}>
             <HandDisplay hand={currentHand} commandZone={commandZone} />
           </div>
         )}
