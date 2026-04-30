@@ -111,6 +111,38 @@ test.describe("generateTags — Board Wipe", () => {
     const card = makeCard({ oracleText: "Destroy target creature." });
     expect(generateTags(card)).not.toContain("Board Wipe");
   });
+
+  test("Scavenger Grounds (graveyard hate) → NOT Board Wipe", () => {
+    // "Exile all" matches the literal phrase but the object is "cards from
+    // graveyards" — not a battlefield wipe. Regression guard.
+    const card = makeCard({
+      name: "Scavenger Grounds",
+      typeLine: "Land — Desert",
+      oracleText:
+        "{T}: Add {C}.\n{2}, {T}, Sacrifice a Desert: Exile all cards from all graveyards.",
+    });
+    const tags = generateTags(card);
+    expect(tags).not.toContain("Board Wipe");
+    expect(tags).not.toContain("Removal");
+  });
+
+  test("Abstergo Entertainment (single-graveyard hate) → NOT Board Wipe", () => {
+    // "Exile all cards from target graveyard" — graveyard interaction, not a wipe.
+    const card = makeCard({
+      name: "Abstergo Entertainment",
+      typeLine: "Land",
+      oracleText:
+        "{T}: Add {C}.\n{1}, {T}: Exile all cards from target graveyard.",
+    });
+    expect(generateTags(card)).not.toContain("Board Wipe");
+  });
+
+  test("'exile all cards from your hand' → NOT Board Wipe", () => {
+    const card = makeCard({
+      oracleText: "Exile all cards from your hand face down.",
+    });
+    expect(generateTags(card)).not.toContain("Board Wipe");
+  });
 });
 
 test.describe("generateTags — Asymmetric Wipe", () => {
