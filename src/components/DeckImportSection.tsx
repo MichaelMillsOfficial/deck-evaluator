@@ -113,6 +113,24 @@ export default function DeckImportSection() {
       })
     );
 
+  /**
+   * Called by DeckInput's Archidekt synopsis "Continue" action. The deck
+   * has already been fetched inside DeckInput, so we just persist + route.
+   */
+  const handleConfirmArchidektDeck = (deck: DeckData, warnings: string[]) => {
+    const payload: DeckSessionPayload = {
+      deckId: generateDeckId(),
+      deck,
+      parseWarnings: warnings,
+      cardMap: null,
+      notFoundCount: 0,
+      spellbookCombos: null,
+      createdAt: Date.now(),
+    };
+    setPayload(payload);
+    router.push("/ritual");
+  };
+
   const { loading, error } = state;
 
   return (
@@ -120,7 +138,9 @@ export default function DeckImportSection() {
       <DeckInput
         onSubmitUrl={handleFetchDeck}
         onSubmitText={handleParseDeck}
+        onConfirmArchidektDeck={handleConfirmArchidektDeck}
         loading={loading}
+        mode="navigate"
       />
 
       {loading && (

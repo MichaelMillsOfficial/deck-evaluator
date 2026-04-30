@@ -187,3 +187,14 @@
   align-items: center;
   gap: var(--space-5);
 }
+
+.inlineError {
+  margin: 0;
+  padding: var(--space-5) var(--space-7);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 134, 160, 0.3);
+  background: var(--status-warn-soft);
+  color: var(--status-warn);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}

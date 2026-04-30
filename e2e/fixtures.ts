@@ -61,6 +61,42 @@ export class DeckPage {
     await this.page.getByRole("tab", { name: tab }).click();
   }
 
+  // ---------------------------------------------------------------------------
+  // Archidekt URL flow
+  // ---------------------------------------------------------------------------
+
+  /** Click the Archidekt import tab */
+  async selectArchidektTab() {
+    await this.selectTab("Archidekt");
+  }
+
+  /** Fill the Archidekt URL input field */
+  async fillArchidektUrl(url: string) {
+    await this.archidektUrlInput.fill(url);
+  }
+
+  /** Submit the Archidekt URL fetch form */
+  async submitArchidektFetch() {
+    await this.page
+      .getByRole("button", { name: /^(import deck|fetch deck)$/i })
+      .click();
+  }
+
+  /** Locator for the Archidekt URL input */
+  get archidektUrlInput() {
+    return this.page.getByLabel(/archidekt deck url/i);
+  }
+
+  /** Locator for the rendered Archidekt synopsis card */
+  get archidektSynopsis() {
+    return this.page.getByTestId("archidekt-synopsis");
+  }
+
+  /** Click the "Continue to reading" button on the Archidekt synopsis */
+  async clickContinueFromSynopsis() {
+    await this.page.getByRole("button", { name: /continue to reading/i }).click();
+  }
+
   /** Fill the decklist textarea */
   async fillDecklist(text: string) {
     await this.page.getByLabel("Decklist").fill(text);
