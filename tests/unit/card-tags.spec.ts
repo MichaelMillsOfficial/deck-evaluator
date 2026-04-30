@@ -2292,3 +2292,270 @@ test.describe("generateTags — Secrets of Strixhaven mechanics", () => {
     expect(tags).not.toContain("Increment");
   });
 });
+
+// ---------------------------------------------------------------------------
+// GitHub issue #56 — Phase 1 false-positive fixes
+// ---------------------------------------------------------------------------
+
+test.describe("generateTags — issue #56 false-positive fixes", () => {
+  test("Invasion of Kaldheim // Pyre of the World Tree → NOT Board Wipe", () => {
+    // Front face says "exile all cards from your hand" — matches BOARD_WIPE_RE
+    // /\b(?:destroy|exile)\s+all\b/i, but is hand-exile, not a permanent wipe.
+    // Name-based denylist excludes the DFC.
+    const card = makeCard({
+      name: "Invasion of Kaldheim // Pyre of the World Tree",
+      typeLine: "Battle — Siege // Enchantment",
+      oracleText:
+        "When this Siege enters, exile all cards from your hand, then draw that many cards. Until the end of your next turn, you may play cards exiled this way.\n\nDiscard a land card: Pyre of the World Tree deals 2 damage to any target.\nWhenever you discard a land card, exile the top card of your library. You may play that card this turn.",
+      layout: "transform",
+    });
+    expect(generateTags(card)).not.toContain("Board Wipe");
+  });
+
+  test("Abraded Bluffs (deals 1 damage to target opponent) → NOT Removal", () => {
+    // Land that pings an OPPONENT, not a creature/permanent. The previous
+    // REMOVAL_DAMAGE_RE matched any "deals N damage to ... target" — too loose.
+    const card = makeCard({
+      name: "Abraded Bluffs",
+      typeLine: "Land — Desert",
+      oracleText:
+        "Abraded Bluffs enters tapped.\nWhen Abraded Bluffs enters, it deals 1 damage to target opponent.\n{T}: Add {R} or {W}.",
+      producedMana: ["R", "W"],
+    });
+    expect(generateTags(card)).not.toContain("Removal");
+  });
+
+  test("Dewdrop Cure (Gift: opponent draws a card) → NOT Card Draw", () => {
+    // The "draw a card" clause refers to an OPPONENT (Gift mechanic). Not your draw.
+    const card = makeCard({
+      name: "Dewdrop Cure",
+      typeLine: "Sorcery",
+      oracleText:
+        "Gift a card (You may promise an opponent a gift as you cast this spell. If you do, they draw a card before its other effects.)\nReturn up to two target creature cards each with mana value 2 or less from your graveyard to the battlefield. If the gift was promised, instead return up to three target creature cards each with mana value 2 or less from your graveyard to the battlefield.",
+    });
+    expect(generateTags(card)).not.toContain("Card Draw");
+  });
+
+  // ---- Regression: existing tests that MUST still pass after the tightening ----
+
+  test("Lightning Bolt (any target) → still Removal", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Chain Lightning (target creature, player, or planeswalker) → still Removal", () => {
+    const card = makeCard({
+      name: "Chain Lightning",
+      typeLine: "Sorcery",
+      oracleText:
+        "Chain Lightning deals 3 damage to any target. Then that player or that permanent's controller may pay {R}{R}. If the player does, they may copy this spell and may choose a new target for the copy.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Lightning Helix (any target) → still Removal", () => {
+    const card = makeCard({
+      name: "Lightning Helix",
+      typeLine: "Instant",
+      oracleText: "Lightning Helix deals 3 damage to any target and you gain 3 life.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Wrath of God → still Board Wipe (denylist regression)", () => {
+    const card = makeCard({
+      name: "Wrath of God",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all creatures. They can't be regenerated.",
+    });
+    expect(generateTags(card)).toContain("Board Wipe");
+  });
+
+  test("Damnation → still Board Wipe", () => {
+    const card = makeCard({
+      name: "Damnation",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all creatures. They can't be regenerated.",
+    });
+    expect(generateTags(card)).toContain("Board Wipe");
+  });
+
+  test("Cyclonic Rift overload → still Board Wipe", () => {
+    const card = makeCard({
+      name: "Cyclonic Rift",
+      typeLine: "Instant",
+      oracleText:
+        "Return target nonland permanent you don't control to its owner's hand.\nOverload {6}{U} (You may cast this spell for its overload cost. If you do, change \"target\" in its text to \"each.\")\nReturn all nonland permanents your opponents control to their owners' hands.",
+    });
+    expect(generateTags(card)).toContain("Board Wipe");
+  });
+
+  test("Sign in Blood (target player draws) → still Card Draw", () => {
+    const card = makeCard({
+      name: "Sign in Blood",
+      typeLine: "Sorcery",
+      oracleText: "Target player draws two cards and loses 2 life.",
+    });
+    expect(generateTags(card)).toContain("Card Draw");
+  });
+
+  test("Brainstorm → still Card Draw", () => {
+    const card = makeCard({
+      name: "Brainstorm",
+      typeLine: "Instant",
+      oracleText:
+        "Draw three cards, then put two cards from your hand on top of your library in any order.",
+    });
+    expect(generateTags(card)).toContain("Card Draw");
+  });
+
+  test("Concentrate → still Card Draw", () => {
+    const card = makeCard({
+      name: "Concentrate",
+      typeLine: "Sorcery",
+      oracleText: "Draw three cards.",
+    });
+    expect(generateTags(card)).toContain("Card Draw");
+  });
+
+  test("Phyrexian Arena (per-turn draw) → still Card Draw", () => {
+    const card = makeCard({
+      name: "Phyrexian Arena",
+      typeLine: "Enchantment",
+      oracleText:
+        "At the beginning of your upkeep, you draw a card and you lose 1 life.",
+    });
+    expect(generateTags(card)).toContain("Card Draw");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GitHub issue #56 — Phase 1 false-negative fixes (existing tags)
+// ---------------------------------------------------------------------------
+
+test.describe("generateTags — issue #56 false-negative fixes", () => {
+  test("Banefire (X damage) → Removal", () => {
+    const card = makeCard({
+      name: "Banefire",
+      typeLine: "Sorcery",
+      manaCost: "{X}{R}",
+      oracleText:
+        "Banefire deals X damage to any target. If X is 5 or more, this spell can't be countered and the damage can't be prevented.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Leyline Tyrant (deals that much damage) → Removal", () => {
+    const card = makeCard({
+      name: "Leyline Tyrant",
+      typeLine: "Creature — Dragon",
+      oracleText:
+        "Flying\nYou don't lose unspent red mana as steps and phases end.\nWhen Leyline Tyrant dies, you may pay any amount of {R}. When you do, it deals that much damage to any target.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Bonecrusher Giant // Stomp (combined oracle text, deals 2 to any target) → Removal", () => {
+    const card = makeCard({
+      name: "Bonecrusher Giant // Stomp",
+      typeLine: "Creature — Giant // Instant — Adventure",
+      oracleText:
+        "Whenever Bonecrusher Giant becomes the target of a spell, Bonecrusher Giant deals 2 damage to that spell's controller.\n\nDamage can't be prevented this turn. Stomp deals 2 damage to any target.",
+      layout: "adventure",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Comet Storm (X damage divided) → Removal", () => {
+    const card = makeCard({
+      name: "Comet Storm",
+      typeLine: "Instant",
+      oracleText:
+        "Multikicker {2}\nComet Storm deals X damage divided as you choose among any number of target creatures and/or players.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Braid of Fire (cumulative upkeep — Add {R}) → Ramp", () => {
+    const card = makeCard({
+      name: "Braid of Fire",
+      typeLine: "Enchantment",
+      oracleText:
+        "Cumulative upkeep—Add {R}. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)",
+    });
+    expect(generateTags(card)).toContain("Ramp");
+  });
+
+  test("Mana Geyser (Add {R} for each tapped land) → Ramp", () => {
+    const card = makeCard({
+      name: "Mana Geyser",
+      typeLine: "Sorcery",
+      oracleText: "Add {R} for each tapped land your opponents control.",
+    });
+    expect(generateTags(card)).toContain("Ramp");
+  });
+
+  test("Karn's Sylex (Destroy each nonland permanent ... mana value) → Board Wipe", () => {
+    const card = makeCard({
+      name: "Karn's Sylex",
+      typeLine: "Legendary Artifact",
+      oracleText:
+        "Players can't pay life to cast spells or to activate abilities that aren't mana abilities.\n{X}, {T}, Exile Karn's Sylex: Destroy each nonland permanent with mana value X or less. Activate only as a sorcery.",
+    });
+    expect(generateTags(card)).toContain("Board Wipe");
+  });
+
+  test("Winter Moon (untap restriction) → Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Winter Moon",
+      typeLine: "Enchantment",
+      oracleText:
+        "Players can't untap more than one nonbasic land during their untap steps.",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Generous Plunderer (creates Treasure tokens) → Ramp", () => {
+    const card = makeCard({
+      name: "Generous Plunderer",
+      typeLine: "Creature — Human Rogue",
+      oracleText:
+        "Menace\nAt the beginning of your upkeep, you may create a Treasure token. When you do, target opponent creates a tapped Treasure token.\nWhenever Generous Plunderer attacks, it deals damage to defending player equal to the number of artifacts they control.",
+    });
+    expect(generateTags(card)).toContain("Ramp");
+  });
+
+  test("Entrapment Maneuver (target player sacrifices a creature) → Removal", () => {
+    const card = makeCard({
+      name: "Entrapment Maneuver",
+      typeLine: "Instant",
+      oracleText:
+        "Target player sacrifices an attacking creature. You create X 1/1 white Soldier creature tokens, where X is that creature's toughness.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  // ---- Regression: existing tags that MUST still pass after additions ----
+
+  test("Armageddon → still Mass Land Denial (after MLD_DONT_UNTAP_RE addition)", () => {
+    const card = makeCard({
+      name: "Armageddon",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all lands.",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Ravages of War → still Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Ravages of War",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all lands.",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+});

@@ -56,11 +56,33 @@ const RAMP_ANY_COLOR_RE =
   /\{T\}.*?[Aa]dd\s+(?:one\s+mana\s+of\s+any|mana\s+of\s+any\s+(?:one\s+)?(?:color|type))\b/;
 const RAMP_AMOUNT_RE = /\{T\}.*?[Aa]dd\s+(?:an\s+amount\s+of\s+|X\s+)\{[WUBRGC]\}/;
 const RAMP_ADDITIONAL_LAND_RE = /\badditional lands?\b/i;
+// Upkeep mana effects — Braid of Fire's "cumulative upkeep — Add {R}" and
+// similar "at the beginning of your upkeep, add {X}" upkeep ramp.
+const RAMP_UPKEEP_ADD_RE =
+  /\b(?:at the beginning of (?:your )?upkeep[^.]*\badd\s+\{[WUBRGC]\}|cumulative upkeep[^.]*\badd\s+\{[WUBRGC]\})/i;
+// Ritual / "Add {X} for each ..." spells (Mana Geyser, Pyretic Ritual,
+// Seething Song). Per issue #56, classifying rituals as Ramp is intentional.
+const RAMP_RITUAL_FOR_EACH_RE = /\badd\s+\{[WUBRGC]\}\s+for each\b/i;
+// Treasure-token generators — non-land permanents that ETB or trigger to
+// create Treasure tokens (Generous Plunderer, Smothering Tithe, etc.).
+const RAMP_TREASURE_RE = /\bcreate[^.]+treasure token/i;
 // Matches mana-producing spell effects (rituals) — excludes tap abilities via
 // negative lookbehind. The Instant/Sorcery type-line gate in the goldfish
 // simulator is the primary filter; this regex is a secondary safety net.
 export const RITUAL_MANA_ADD_RE = /(?<!\{T\}[^.]*)[Aa]dd\s+\{[WUBRGC]\}/;
-const CARD_DRAW_RE = /\bdraw\b.+?\bcards?\b|\bdraw a card\b/i;
+// Card Draw — matches "draw a card", "draw N cards", or "draws N cards"
+// (the plural form covers "Target player draws two cards" on Sign in Blood).
+const CARD_DRAW_RE = /\bdraws?\b.+?\bcards?\b|\bdraws? a card\b/i;
+// Pattern used to locate individual draw clauses for the opponent-recipient
+// filter. Matches "draws? ... card(s)" or "draws? a card".
+const CARD_DRAW_CLAUSE_RE = /\bdraws?\b[^.]*?\bcards?\b/gi;
+// Opponent-recipient phrases that should suppress a Card Draw clause when
+// they appear before the "draw" verb in the same sentence. (Dewdrop Cure's
+// Gift reminder: "you may promise an opponent a gift ... they draw a card".)
+// Note: "target player" is intentionally NOT in this list — Sign in Blood
+// self-targets and is a real draw spell.
+const CARD_DRAW_OPPONENT_RECIPIENT_RE =
+  /\b(?:target opponent|each opponent|an opponent|each other player)\b/i;
 const CARD_ADVANTAGE_RE =
   /\b(?:look at|reveal)\b.+?\bput\b.+?\binto your hand\b/i;
 const CARD_ADVANTAGE_IMPULSE_RE =
@@ -68,11 +90,31 @@ const CARD_ADVANTAGE_IMPULSE_RE =
 const REMOVAL_TARGET_RE =
   /\b(?:destroy|exile)\s+target\b/i;
 const REMOVAL_BOUNCE_RE = /\breturn target.+?to its owner's hand\b/i;
-const REMOVAL_DAMAGE_RE = /\bdeals?\s+\d+\s+damage to\b.+?\btarget\b/i;
+// Single-target damage removal — accepts \d+ or X as the damage amount.
+// The "deals N damage" clause is the anchor; a separate same-clause check
+// requires the target to be a creature / planeswalker / permanent / battle,
+// "any target", or a modal target list that includes a creature/planeswalker.
+// Damage dealt ONLY to "target player" / "target opponent" is NOT removal
+// (Abraded Bluffs is the canonical false-positive).
+const REMOVAL_DAMAGE_AMOUNT_RE =
+  /\bdeals?\s+(?:\d+|X|that much)\s+damage\b/i;
+const REMOVAL_DAMAGE_VALID_TARGET_RE =
+  /\b(?:any target\b|target\s+(?:creatures?|planeswalkers?|permanents?|battles?|attacking|blocking)\b|target\s+creature\s+or\s+(?:player|planeswalker)\b|target\s+creature,\s*player,?\s*(?:or\s+planeswalker)?\b)/i;
 const BOARD_WIPE_RE =
   /\b(?:destroy|exile)\s+all\b/i;
+// Conditional board wipe — "destroy each ... nonland permanent ... mana value"
+// covers Karn's Sylex / Toxic Deluge-style X-cost wipes that say "each" rather
+// than "all" and gate on mana value or some condition.
+const BOARD_WIPE_CONDITIONAL_RE =
+  /\bdestroy each\b[^.]*\bnonland permanent[^.]*\bmana value\b/i;
 const BOARD_WIPE_BOUNCE_RE = /\breturn all\b.+?\bto their owners' hands\b/i;
 const BOARD_WIPE_MINUS_RE = /\ball creatures get -\d+\/-\d+/i;
+// Card names whose oracle text incidentally matches a board-wipe pattern but
+// which are not actually permanent wipes. Pyre of the World Tree's front face
+// "exile all cards from your hand" is a hand-exile, not a board wipe.
+const BOARD_WIPE_NAME_DENYLIST = new Set<string>([
+  "Invasion of Kaldheim // Pyre of the World Tree",
+]);
 // --- Asymmetric (one-sided) wipe patterns ---
 // Universal: "all <modifier?> creatures/permanents/planeswalkers you don't control" etc.
 // Anchored to "all" so single-target clauses ("target creature you don't control") on modal
@@ -201,6 +243,12 @@ const EXTRA_TURN_RE = /\bextra turn\b/i;
 const FULL_MLD_RE = /\bdestroy all\b[^.]*\blands\b/i;
 const SACRIFICE_MLD_RE =
   /\beach player\b[^.]*(?:\bsacrifices?\b[^.]*\bland|\bland[^.]*\bsacrifices?\b)/i;
+// "(nonbasic) lands don't untap" — Stasis-style untap denial on lands.
+const MLD_DONT_UNTAP_RE = /\b(?:nonbasic )?lands? don'?t untap\b/i;
+// Forced-sacrifice removal — "target player/opponent sacrifices a creature/permanent/nonland".
+// Allows optional modifiers ("an attacking creature", "a nonland permanent").
+const REMOVAL_FORCE_SAC_RE =
+  /\btarget (?:player|opponent) sacrifices?\s+(?:a |an )?(?:\w+\s+)?(?:creature|permanent|nonland)/i;
 // --- Tribal tag patterns ---
 const LORD_TYPE_SPECIFIC_RE = new RegExp(
   `(?:other )?(?:${CREATURE_TYPE_PATTERN})(?:s| creatures?) you control get \\+`,
@@ -288,6 +336,7 @@ const RESOURCE_DENIAL_NAMES = new Set([
   "Rising Waters",
   "Hokori, Dust Drinker",
   "Tanglewire",
+  "Winter Moon",
 ]);
 
 // Patterns to strip when detecting Utility Land —
@@ -307,6 +356,52 @@ const UTILITY_STRIP_PATTERNS = [
   /\w[\w',\s-]* enters the battlefield tapped\./gi, // "X enters tapped."
 ];
 
+/**
+ * Returns true if the oracle text contains at least one card-draw clause
+ * whose recipient is NOT explicitly an opponent. Filters out:
+ *   - "target opponent draws"
+ *   - "each opponent draws" / "an opponent draws"
+ *   - "they draw a card" where "opponent" was the most recently named
+ *     actor (Dewdrop Cure Gift reminder text — the "they" refers to
+ *     the opponent who was promised a gift).
+ * Keeps:
+ *   - "you (may) draw" — the controller draws (Rhystic Study)
+ *   - "Target player draws" (Sign in Blood self-targets)
+ *   - imperative "Draw N cards" / "Draw a card" (Concentrate, Brainstorm)
+ *   - "Whenever an opponent casts a spell, you may draw a card" — the
+ *     opponent is the trigger condition, "you" is the explicit subject.
+ */
+function hasNonOpponentCardDraw(text: string): boolean {
+  if (!CARD_DRAW_RE.test(text)) return false;
+  // Quick win: any "you (may) draw" anywhere means the controller draws.
+  if (/\byou(?:\s+may)?\s+draws?\b/i.test(text)) return true;
+  // Walk every draw clause across the full text.
+  CARD_DRAW_CLAUSE_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = CARD_DRAW_CLAUSE_RE.exec(text)) !== null) {
+    const before = text.slice(0, m.index);
+    const matchedClause = m[0];
+    // Skip if the clause itself is gated by an opponent recipient
+    // ("target opponent draws", "each opponent draws", etc.).
+    const last120 = before.slice(-120);
+    if (CARD_DRAW_OPPONENT_RECIPIENT_RE.test(last120)) continue;
+    // Skip "they draw" when an "opponent" was the most recently named actor
+    // (within the last 120 chars). Covers Dewdrop Cure's Gift reminder
+    // where "they" anaphorically refers to the opponent.
+    const immediateBefore = before.slice(-30);
+    if (
+      /\bthey\s*$/i.test(immediateBefore) &&
+      /\bopponent\b/i.test(last120)
+    ) {
+      continue;
+    }
+    // Suppress unused-variable warning — matchedClause is intentional context.
+    void matchedClause;
+    return true;
+  }
+  return false;
+}
+
 export function generateTags(card: EnrichedCard): string[] {
   const tags = new Set<string>();
   const text = card.oracleText;
@@ -322,14 +417,30 @@ export function generateTags(card: EnrichedCard): string[] {
       RAMP_AMOUNT_RE.test(text);
     const hasLandSearch = RAMP_LAND_SEARCH_RE.test(text);
     const hasAdditionalLand = !isLand && RAMP_ADDITIONAL_LAND_RE.test(text);
+    // Non-tap, non-land-search ramp: upkeep mana (Braid of Fire), ritual-style
+    // "Add {X} for each ..." (Mana Geyser), and Treasure-token generators
+    // (Generous Plunderer). Skip on lands — land-side mana is handled above.
+    const hasUpkeepAdd = !isLand && RAMP_UPKEEP_ADD_RE.test(text);
+    const hasRitualForEach = !isLand && RAMP_RITUAL_FOR_EACH_RE.test(text);
+    const hasTreasureToken = !isLand && RAMP_TREASURE_RE.test(text);
 
-    if ((!isLand && hasTapForMana) || hasLandSearch || hasAdditionalLand) {
+    if (
+      (!isLand && hasTapForMana) ||
+      hasLandSearch ||
+      hasAdditionalLand ||
+      hasUpkeepAdd ||
+      hasRitualForEach ||
+      hasTreasureToken
+    ) {
       tags.add("Ramp");
     }
   }
 
-  // Card Draw
-  if (CARD_DRAW_RE.test(text)) {
+  // Card Draw — must have at least one draw clause that is NOT explicitly
+  // an opponent recipient. (Dewdrop Cure's Gift reminder text reads
+  // "you may promise an opponent a gift ... they draw a card" — that "they"
+  // refers to the opponent and should not count as your draw.)
+  if (hasNonOpponentCardDraw(text)) {
     tags.add("Card Draw");
   }
 
@@ -344,11 +455,16 @@ export function generateTags(card: EnrichedCard): string[] {
     }
   }
 
-  // Board Wipe (check before single-target removal)
+  // Board Wipe (check before single-target removal). Cards on the name
+  // denylist incidentally match BOARD_WIPE_RE via non-permanent text
+  // ("exile all cards from your hand") — skip them entirely.
+  const onBoardWipeDenylist = BOARD_WIPE_NAME_DENYLIST.has(card.name);
   if (
-    BOARD_WIPE_RE.test(text) ||
-    BOARD_WIPE_BOUNCE_RE.test(text) ||
-    BOARD_WIPE_MINUS_RE.test(text)
+    !onBoardWipeDenylist &&
+    (BOARD_WIPE_RE.test(text) ||
+      BOARD_WIPE_BOUNCE_RE.test(text) ||
+      BOARD_WIPE_MINUS_RE.test(text) ||
+      BOARD_WIPE_CONDITIONAL_RE.test(text))
   ) {
     tags.add("Board Wipe");
     tags.add("Removal");
@@ -360,11 +476,16 @@ export function generateTags(card: EnrichedCard): string[] {
     }
   }
 
-  // Single-target Removal
+  // Single-target Removal — destroy/exile target, bounce target, force-sacrifice,
+  // or "deals N damage" combined with a valid (creature/planeswalker/etc.) target.
+  const hasDamageRemoval =
+    REMOVAL_DAMAGE_AMOUNT_RE.test(text) &&
+    REMOVAL_DAMAGE_VALID_TARGET_RE.test(text);
   if (
     REMOVAL_TARGET_RE.test(text) ||
     REMOVAL_BOUNCE_RE.test(text) ||
-    REMOVAL_DAMAGE_RE.test(text)
+    hasDamageRemoval ||
+    REMOVAL_FORCE_SAC_RE.test(text)
   ) {
     tags.add("Removal");
   }
@@ -486,6 +607,7 @@ export function generateTags(card: EnrichedCard): string[] {
   if (
     FULL_MLD_RE.test(text) ||
     SACRIFICE_MLD_RE.test(text) ||
+    MLD_DONT_UNTAP_RE.test(text) ||
     RESOURCE_DENIAL_NAMES.has(card.name)
   ) {
     tags.add("Mass Land Denial");
