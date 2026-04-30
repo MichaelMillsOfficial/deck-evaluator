@@ -18,6 +18,7 @@ export default function CardLookupInput({
   const [activeIndex, setActiveIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [networkError, setNetworkError] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
@@ -39,15 +40,24 @@ export default function CardLookupInput({
       );
       if (!res.ok) {
         setSuggestions([]);
+        setIsOpen(true);
+        setActiveIndex(-1);
+        setNetworkError(true);
         return;
       }
       const json = (await res.json()) as { suggestions: string[] };
       setSuggestions(json.suggestions);
-      setIsOpen(json.suggestions.length > 0);
+      // Keep the listbox open even when empty so the user gets the
+      // "No cards match" affordance instead of a silently-disappearing UI.
+      setIsOpen(true);
       setActiveIndex(-1);
+      setNetworkError(false);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setSuggestions([]);
+      setIsOpen(true);
+      setActiveIndex(-1);
+      setNetworkError(true);
     } finally {
       setLoading(false);
     }
@@ -62,6 +72,7 @@ export default function CardLookupInput({
     if (val.length < 2) {
       setSuggestions([]);
       setIsOpen(false);
+      setNetworkError(false);
       return;
     }
 
@@ -84,6 +95,7 @@ export default function CardLookupInput({
     setSuggestions([]);
     setIsOpen(false);
     setActiveIndex(-1);
+    setNetworkError(false);
     inputRef.current?.focus();
   };
 
@@ -193,36 +205,46 @@ export default function CardLookupInput({
 
           {loading && (
             <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-purple-400" />
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-purple-400 motion-reduce:animate-none" />
             </div>
           )}
 
-          {isOpen && suggestions.length > 0 && (
+          {isOpen && (suggestions.length > 0 || !loading) && (
             <ul
               ref={listboxRef}
               id="card-lookup-listbox"
               role="listbox"
               className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-slate-600 bg-slate-800 shadow-lg"
             >
-              {suggestions.map((name, i) => (
+              {suggestions.length > 0 ? (
+                suggestions.map((name, i) => (
+                  <li
+                    key={name}
+                    id={`card-lookup-option-${i}`}
+                    role="option"
+                    aria-selected={i === activeIndex}
+                    className={`cursor-pointer px-4 py-2 text-sm ${
+                      i === activeIndex
+                        ? "bg-slate-700 text-white"
+                        : "text-slate-200 hover:bg-slate-700"
+                    }`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      selectCard(name);
+                    }}
+                  >
+                    {name}
+                  </li>
+                ))
+              ) : (
                 <li
-                  key={name}
-                  id={`card-lookup-option-${i}`}
-                  role="option"
-                  aria-selected={i === activeIndex}
-                  className={`cursor-pointer px-4 py-2 text-sm ${
-                    i === activeIndex
-                      ? "bg-slate-700 text-white"
-                      : "text-slate-200 hover:bg-slate-700"
-                  }`}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    selectCard(name);
-                  }}
+                  role="status"
+                  aria-live="polite"
+                  className="cursor-default px-4 py-2 text-sm italic text-slate-400"
                 >
-                  {name}
+                  No cards match.
                 </li>
-              ))}
+              )}
             </ul>
           )}
         </div>
@@ -236,6 +258,17 @@ export default function CardLookupInput({
       >
         {statusMessage}
       </div>
+
+      {networkError && (
+        <div
+          data-testid="card-lookup-error"
+          role="alert"
+          aria-live="polite"
+          className="mt-1 text-xs text-rose-400"
+        >
+          Couldn&rsquo;t reach Scryfall. Try again.
+        </div>
+      )}
     </div>
   );
 }
