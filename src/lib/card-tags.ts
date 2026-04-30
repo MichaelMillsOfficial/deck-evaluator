@@ -76,13 +76,14 @@ const CARD_DRAW_RE = /\bdraws?\b.+?\bcards?\b|\bdraws? a card\b/i;
 // Pattern used to locate individual draw clauses for the opponent-recipient
 // filter. Matches "draws? ... card(s)" or "draws? a card".
 const CARD_DRAW_CLAUSE_RE = /\bdraws?\b[^.]*?\bcards?\b/gi;
-// Opponent-recipient phrases that should suppress a Card Draw clause when
-// they appear before the "draw" verb in the same sentence. (Dewdrop Cure's
-// Gift reminder: "you may promise an opponent a gift ... they draw a card".)
-// Note: "target player" is intentionally NOT in this list — Sign in Blood
+// Opponent-recipient phrases that, when the IMMEDIATE subject of the draw
+// verb, suppress the Card Draw tag. Trigger conditions like "Whenever an
+// opponent casts a spell, draw a card" are not affected because the opponent
+// reference is far from the draw verb.
+// Note: "target player" is intentionally NOT included — Sign in Blood
 // self-targets and is a real draw spell.
 const CARD_DRAW_OPPONENT_RECIPIENT_RE =
-  /\b(?:target opponent|each opponent|an opponent|each other player)\b/i;
+  /\b(?:target opponent|each opponent|an opponent|each other player)\s*$/i;
 const CARD_ADVANTAGE_RE =
   /\b(?:look at|reveal)\b.+?\bput\b.+?\binto your hand\b/i;
 const CARD_ADVANTAGE_IMPULSE_RE =
@@ -375,28 +376,25 @@ function hasNonOpponentCardDraw(text: string): boolean {
   if (!CARD_DRAW_RE.test(text)) return false;
   // Quick win: any "you (may) draw" anywhere means the controller draws.
   if (/\byou(?:\s+may)?\s+draws?\b/i.test(text)) return true;
-  // Walk every draw clause across the full text.
+  // Walk every draw clause across the full text. CARD_DRAW_CLAUSE_RE has the
+  // /g flag — reset lastIndex before use.
   CARD_DRAW_CLAUSE_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = CARD_DRAW_CLAUSE_RE.exec(text)) !== null) {
     const before = text.slice(0, m.index);
-    const matchedClause = m[0];
-    // Skip if the clause itself is gated by an opponent recipient
-    // ("target opponent draws", "each opponent draws", etc.).
-    const last120 = before.slice(-120);
-    if (CARD_DRAW_OPPONENT_RECIPIENT_RE.test(last120)) continue;
-    // Skip "they draw" when an "opponent" was the most recently named actor
-    // (within the last 120 chars). Covers Dewdrop Cure's Gift reminder
-    // where "they" anaphorically refers to the opponent.
-    const immediateBefore = before.slice(-30);
+    const immediateBefore = before.slice(-40);
+    // Skip if the IMMEDIATE subject is an opponent recipient
+    // ("target opponent draws", "an opponent draws", etc.).
+    if (CARD_DRAW_OPPONENT_RECIPIENT_RE.test(immediateBefore)) continue;
+    // Skip "they draw" when an "opponent" was named as the most recent
+    // actor within the last 120 chars (Dewdrop Cure Gift reminder text:
+    // "you may promise an opponent ... they draw a card").
     if (
       /\bthey\s*$/i.test(immediateBefore) &&
-      /\bopponent\b/i.test(last120)
+      /\bopponent\b/i.test(before.slice(-120))
     ) {
       continue;
     }
-    // Suppress unused-variable warning — matchedClause is intentional context.
-    void matchedClause;
     return true;
   }
   return false;
