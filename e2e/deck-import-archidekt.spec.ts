@@ -45,7 +45,7 @@ test.describe("Deck Import — Archidekt URL Flow", () => {
     deckPage,
     page,
   }) => {
-    await page.route("**/api/deck**", async (route) => {
+    await page.route(/\/api\/deck\?/, async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -62,7 +62,9 @@ test.describe("Deck Import — Archidekt URL Flow", () => {
     await expect(synopsis).toContainText("Atraxa Counters");
     await expect(synopsis).toContainText("Atraxa, Praetors' Voice");
     // Total cards: 1 commander + 5 mainboard = 6
-    await expect(synopsis).toContainText("6");
+    await expect(
+      synopsis.getByText("6", { exact: true })
+    ).toBeVisible();
 
     // Link out to the archidekt deck
     const link = synopsis.getByRole("link", { name: /archidekt/i });
@@ -74,7 +76,7 @@ test.describe("Deck Import — Archidekt URL Flow", () => {
     deckPage,
     page,
   }) => {
-    await page.route("**/api/deck**", async (route) => {
+    await page.route(/\/api\/deck\?/, async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -97,7 +99,7 @@ test.describe("Deck Import — Archidekt URL Flow", () => {
     deckPage,
     page,
   }) => {
-    await page.route("**/api/deck**", async (route) => {
+    await page.route(/\/api\/deck\?/, async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -122,7 +124,7 @@ test.describe("Deck Import — Archidekt URL Flow", () => {
     deckPage,
     page,
   }) => {
-    await page.route("**/api/deck**", async (route) => {
+    await page.route(/\/api\/deck\?/, async (route) => {
       await route.fulfill({
         status: 502,
         contentType: "application/json",
@@ -147,7 +149,7 @@ test.describe("Deck Import — Archidekt URL Flow", () => {
     page,
   }) => {
     let fetched = false;
-    await page.route("**/api/deck**", async (route) => {
+    await page.route(/\/api\/deck\?/, async (route) => {
       fetched = true;
       await route.fulfill({
         status: 200,
