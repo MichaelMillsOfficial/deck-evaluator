@@ -101,9 +101,6 @@ export default function DeckImportSection() {
     }
   };
 
-  const handleFetchDeck = (url: string) =>
-    handleImport(() => fetch(`/api/deck?url=${encodeURIComponent(url)}`));
-
   const handleParseDeck = (text: string, commanders?: string[]) =>
     handleImport(() =>
       fetch("/api/deck-parse", {
@@ -136,7 +133,6 @@ export default function DeckImportSection() {
   return (
     <div className={styles.layout}>
       <DeckInput
-        onSubmitUrl={handleFetchDeck}
         onSubmitText={handleParseDeck}
         onConfirmArchidektDeck={handleConfirmArchidektDeck}
         loading={loading}

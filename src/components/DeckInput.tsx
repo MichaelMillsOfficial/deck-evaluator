@@ -22,7 +22,12 @@ type ImportTab = "manual" | "moxfield" | "archidekt";
 export type DeckInputMode = "navigate" | "inline";
 
 interface DeckInputProps {
-  onSubmitUrl: (url: string) => void | Promise<void>;
+  /**
+   * Called when the user submits a URL in inline mode. Required when
+   * mode === "inline" (the parent owns the fetch + state). In navigate
+   * mode the URL is fetched inside DeckInput, so this is unused.
+   */
+  onSubmitUrl?: (url: string) => void | Promise<void>;
   onSubmitText: (text: string, commanders?: string[]) => void | Promise<void>;
   /**
    * Called when the user confirms an Archidekt deck from the synopsis card.
@@ -153,7 +158,7 @@ export default function DeckInput({
 
     if (mode === "inline") {
       // Legacy path: parent handles fetch + state.
-      onSubmitUrl(trimmed);
+      onSubmitUrl?.(trimmed);
       return;
     }
 
@@ -217,6 +222,12 @@ export default function DeckInput({
   };
 
   const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    // Mirror the disabled state on the tab buttons: don't allow keyboard
+    // arrow / Home / End nav while a fetch is in flight, otherwise the
+    // user could leave the Archidekt tab mid-request and trigger a state
+    // update against an unmounted form.
+    if (loading || archidektLoading) return;
+
     const tabKeys = tabs.map((t) => t.key);
     const currentIndex = tabKeys.indexOf(activeTab);
     let newIndex = currentIndex;
