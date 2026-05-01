@@ -2842,12 +2842,12 @@ test.describe("generateTags — Token Multiplier", () => {
     expect(generateTags(card)).toContain("Token Multiplier");
   });
 
-  test("Furnace of Rath (twice that many damage) → no Token Multiplier", () => {
+  test("Furnace of Rath (deals double that damage) → no Token Multiplier", () => {
     const card = makeCard({
       name: "Furnace of Rath",
       typeLine: "Enchantment",
       oracleText:
-        "If a source would deal damage to a permanent or player, it deals twice that much damage to that permanent or player instead.",
+        "If a source would deal damage to a permanent or player, it deals double that damage to that permanent or player instead.",
     });
     expect(generateTags(card)).not.toContain("Token Multiplier");
   });
