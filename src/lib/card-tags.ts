@@ -49,6 +49,7 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   "Token Multiplier": { bg: "bg-fuchsia-500/20", text: "text-fuchsia-300" },
   "Mana Reduction": { bg: "bg-emerald-500/20", text: "text-emerald-200" },
   "Token Payoff": { bg: "bg-rose-500/20", text: "text-rose-300" },
+  Flicker: { bg: "bg-sky-500/20", text: "text-sky-200" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -350,6 +351,18 @@ const MANA_REDUCTION_DEFILER_RE =
 // effect, otherwise we'd pull in static buffs that aren't payoffs.
 const TOKEN_PAYOFF_RE =
   /\bwhenever\b[^.]*\bcreatures?\s+(?:enters|enter)\b[^.]*(?:deals?\s+\d+|deals?\s+damage|loses?\s+\d+\s+life|gains?\s+\d+\s+life|create|puts?\s+a|draws?\s+(?:a|\d+)\s+cards?)/i;
+
+// --- Flicker (#56 phase 2) ---
+// Self-bounce / blink: exile a creature/permanent then return it to the
+// battlefield. Distinct from removal-style "Exile target creature" (Path to
+// Exile, Swords to Plowshares) which never returns the exiled card.
+// Pattern allows the exile clause and the return clause to be in the same
+// sentence (Cloudshift) or in adjacent sentences (Eerie Interlude:
+// "Exile ... creatures ... . Return those cards to the battlefield...").
+// We forbid the second-clause start from being "Its controller" — that's the
+// hallmark of removal-with-rider (Path to Exile / Swords to Plowshares).
+const FLICKER_RE =
+  /\bexile (?:any number of |another |target |that )(?:[a-z-]+ )*(?:creatures?|permanents?|artifacts?)[^.]*?(?:\.\s+(?!Its controller|It deals|Its owner)[^.]*)?\b(?:return|then return)[^.]*\b(?:to the battlefield|under (?:its|their) owner'?s control)\b/i;
 
 // Discard Payoff — triggers on discard events
 const DISCARD_PAYOFF_TRIGGER_RE = /\bwhenever[^.]*discards?\b/i;
@@ -780,6 +793,12 @@ export function generateTags(card: EnrichedCard): string[] {
   // synergizes with Token Generator decks that flood the board.
   if (TOKEN_PAYOFF_RE.test(text)) {
     tags.add("Token Payoff");
+  }
+
+  // --- Flicker (#56 phase 2) ---
+  // Exile-and-return effects (Cloudshift, Ephemerate, Conjurer's Closet).
+  if (FLICKER_RE.test(text)) {
+    tags.add("Flicker");
   }
 
   // --- Secrets of Strixhaven mechanics ---

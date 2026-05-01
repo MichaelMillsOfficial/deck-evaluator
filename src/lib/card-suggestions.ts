@@ -167,6 +167,9 @@ export const TAG_TO_SCRYFALL_QUERY: Record<string, string> = {
   // Token Payoff: ETB triggers that scale with creature count
   "Token Payoff": '(o:"whenever" o:"creature enters" o:"deals")',
 
+  // Flicker: exile-and-return blink effects
+  Flicker: '(o:"exile target" o:"return" o:"battlefield")',
+
   // Sacrifice Outlet: sacrifice effects
   "Sacrifice Outlet": '(o:"sacrifice" o:":" or o:"sacrifice a")',
 };

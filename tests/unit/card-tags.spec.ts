@@ -2956,3 +2956,108 @@ test.describe("generateTags — Token Payoff", () => {
     expect(generateTags(card)).not.toContain("Token Payoff");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Flicker (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Flicker", () => {
+  test("Cloudshift → Flicker", () => {
+    const card = makeCard({
+      name: "Cloudshift",
+      typeLine: "Instant",
+      oracleText:
+        "Exile target creature you control, then return that card to the battlefield under your control.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Ephemerate → Flicker", () => {
+    const card = makeCard({
+      name: "Ephemerate",
+      typeLine: "Instant",
+      oracleText:
+        "Exile target creature you control, then return that card to the battlefield under its owner's control.\nRebound",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Eerie Interlude → Flicker", () => {
+    const card = makeCard({
+      name: "Eerie Interlude",
+      typeLine: "Instant",
+      oracleText:
+        "Exile any number of target creatures you control. Return those cards to the battlefield under their owner's control at the beginning of the next end step.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Conjurer's Closet → Flicker", () => {
+    const card = makeCard({
+      name: "Conjurer's Closet",
+      typeLine: "Artifact",
+      oracleText:
+        "At the beginning of your end step, you may exile target creature you control, then return that card to the battlefield under its owner's control.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Soulherder → Flicker", () => {
+    const card = makeCard({
+      name: "Soulherder",
+      typeLine: "Creature — Spirit",
+      oracleText:
+        "Whenever a creature is exiled from the battlefield, put a +1/+1 counter on Soulherder.\nAt the beginning of your end step, you may exile another target creature you control, then return that card to the battlefield under its owner's control.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Restoration Angel → Flicker", () => {
+    const card = makeCard({
+      name: "Restoration Angel",
+      typeLine: "Creature — Angel",
+      oracleText:
+        "Flash\nFlying\nWhen Restoration Angel enters the battlefield, you may exile target non-Angel creature you control, then return that card to the battlefield under its owner's control.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Eldrazi Displacer → Flicker", () => {
+    const card = makeCard({
+      name: "Eldrazi Displacer",
+      typeLine: "Creature — Eldrazi",
+      oracleText:
+        "Devoid\n{2}{C}: Exile another target creature, then return it to the battlefield tapped under its owner's control.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Getaway Glamer → Flicker", () => {
+    const card = makeCard({
+      name: "Getaway Glamer",
+      typeLine: "Instant",
+      oracleText:
+        "Exile target creature or artifact you control, then return that card to the battlefield under its owner's control.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Path to Exile → no Flicker", () => {
+    const card = makeCard({
+      name: "Path to Exile",
+      typeLine: "Instant",
+      oracleText:
+        "Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
+    });
+    expect(generateTags(card)).not.toContain("Flicker");
+  });
+
+  test("Swords to Plowshares → no Flicker", () => {
+    const card = makeCard({
+      name: "Swords to Plowshares",
+      typeLine: "Instant",
+      oracleText:
+        "Exile target creature. Its controller gains life equal to its power.",
+    });
+    expect(generateTags(card)).not.toContain("Flicker");
+  });
+});
