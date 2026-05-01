@@ -384,10 +384,14 @@ const FLICKER_LEAVES_EXCLUSION_RE =
 
 // --- Fog (#56 phase 2) ---
 // Mass damage prevention: "Prevent all combat damage that would be dealt
-// this turn" (Fog, Holy Day, Angelsong) and the rarer "by sources" form.
-// Healing Salve uses "Prevent the next N damage" (single-source) — NOT a fog.
+// this turn" (Fog, Holy Day, Angelsong) and the rarer "by [class of
+// sources]" form. Healing Salve ("Prevent the next N damage") and
+// Awe-Strike ("by target creature") are single-source prevention — NOT a
+// fog. The "by ..." branch requires the source to be a CLASS (all
+// creatures, all sources, creatures you control / opponents control /
+// attacking / blocking), not a specific target.
 const FOG_RE =
-  /\bprevent all (?:combat )?damage that would be dealt (?:this turn|by[^.]+this turn)\b/i;
+  /\bprevent all (?:combat )?damage that would be dealt (?:this turn|by\s+(?:all (?:creatures|sources)|(?:creatures|sources)\s+(?:you (?:do not |don'?t )?control|attacking|blocking))[^.]+this turn)\b/i;
 
 // --- Hatebear / Tax (#56 phase 2) ---
 // Asymmetric tax effects only: the cost increase / payment must explicitly

@@ -3250,6 +3250,19 @@ test.describe("generateTags — Fog", () => {
     });
     expect(generateTags(card)).not.toContain("Fog");
   });
+
+  test("Awe Strike (single-source prevention by target creature) → no Fog", () => {
+    // "Prevent all damage that would be dealt by target creature this turn"
+    // is single-source prevention, not a fog. (Regression for #56
+    // adversarial review fix.)
+    const card = makeCard({
+      name: "Awe Strike",
+      typeLine: "Instant",
+      oracleText:
+        "Prevent all damage that would be dealt by target creature this turn. You gain life equal to that creature's power.",
+    });
+    expect(generateTags(card)).not.toContain("Fog");
+  });
 });
 
 // ---------------------------------------------------------------------------
