@@ -10,10 +10,10 @@ interface BracketComparisonProps {
 function BracketBadge({ bracket }: { bracket: number }) {
   const color =
     bracket <= 2
-      ? "var(--color-emerald, #10b981)"
+      ? "var(--color-good)"
       : bracket === 3
-        ? "var(--color-amber, #f59e0b)"
-        : "var(--color-red, #ef4444)";
+        ? "var(--color-warn)"
+        : "var(--color-danger)";
 
   return (
     <span
@@ -49,8 +49,8 @@ export default function BracketComparison({
     bracketDelta === 0
       ? "var(--ink-tertiary)"
       : bracketDelta > 0
-        ? "var(--color-red, #ef4444)"
-        : "var(--color-emerald, #10b981)";
+        ? "var(--color-danger)"
+        : "var(--color-good)";
 
   return (
     <div

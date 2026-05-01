@@ -12,9 +12,9 @@ function DeltaLabel({ delta, unit = "%" }: { delta: number; unit?: string }) {
   const formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}${unit}`;
   const color =
     delta > 0
-      ? "var(--color-emerald, #10b981)"
+      ? "var(--color-good)"
       : delta < 0
-        ? "var(--color-red, #ef4444)"
+        ? "var(--color-danger)"
         : "var(--ink-tertiary)";
 
   return (

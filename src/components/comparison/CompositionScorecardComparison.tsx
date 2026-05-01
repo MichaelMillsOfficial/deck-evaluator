@@ -10,13 +10,13 @@ interface CompositionScorecardComparisonProps {
 function statusColor(status: CategoryStatus): string {
   switch (status) {
     case "good":
-      return "var(--color-emerald, #10b981)";
+      return "var(--color-good)";
     case "low":
-      return "var(--color-amber, #f59e0b)";
+      return "var(--color-warn)";
     case "high":
-      return "var(--color-amber, #f59e0b)";
+      return "var(--color-warn)";
     case "critical":
-      return "var(--color-red, #ef4444)";
+      return "var(--color-danger)";
   }
 }
 
@@ -29,8 +29,8 @@ function DeltaIndicator({ delta }: { delta: number }) {
     );
   const color =
     delta > 0
-      ? "var(--color-emerald, #10b981)"
-      : "var(--color-red, #ef4444)";
+      ? "var(--color-good)"
+      : "var(--color-danger)";
   return (
     <span
       style={{

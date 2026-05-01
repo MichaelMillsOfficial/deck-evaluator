@@ -16,10 +16,10 @@ function PowerLevelBar({
   const pct = ((level - 1) / 9) * 100; // 1-10 scale → 0-100%
   const color =
     level <= 4
-      ? "var(--color-emerald, #10b981)"
+      ? "var(--color-good)"
       : level <= 7
-        ? "var(--color-amber, #f59e0b)"
-        : "var(--color-red, #ef4444)";
+        ? "var(--color-warn)"
+        : "var(--color-danger)";
 
   return (
     <div>
@@ -89,8 +89,8 @@ export default function PowerLevelComparison({
     powerLevelDelta === 0
       ? "var(--ink-tertiary)"
       : powerLevelDelta > 0
-        ? "var(--color-red, #ef4444)"
-        : "var(--color-emerald, #10b981)";
+        ? "var(--color-danger)"
+        : "var(--color-good)";
 
   return (
     <div
