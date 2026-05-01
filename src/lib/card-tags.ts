@@ -69,8 +69,13 @@ const REMOVAL_TARGET_RE =
   /\b(?:destroy|exile)\s+target\b/i;
 const REMOVAL_BOUNCE_RE = /\breturn target.+?to its owner's hand\b/i;
 const REMOVAL_DAMAGE_RE = /\bdeals?\s+\d+\s+damage to\b.+?\btarget\b/i;
+// Require a battlefield-zone object after "destroy/exile all" so that phrases
+// like "exile all cards from <a graveyard/library>" (Scavenger Grounds, Abstergo
+// Entertainment) don't false-positive as wipes. Allows up to 4 modifier tokens
+// between "all" and the noun (e.g. "destroy all non-Elf creatures", "exile all
+// nonland permanents your opponents control").
 const BOARD_WIPE_RE =
-  /\b(?:destroy|exile)\s+all\b/i;
+  /\b(?:destroy|exile)\s+all\s+(?:\S+\s+){0,4}?(?:creatures?|permanents?|planeswalkers?|artifacts?|enchantments?|lands?|tokens?)\b/i;
 const BOARD_WIPE_BOUNCE_RE = /\breturn all\b.+?\bto their owners' hands\b/i;
 const BOARD_WIPE_MINUS_RE = /\ball creatures get -\d+\/-\d+/i;
 // --- Asymmetric (one-sided) wipe patterns ---
