@@ -176,6 +176,9 @@ export const TAG_TO_SCRYFALL_QUERY: Record<string, string> = {
   // Hatebear / Tax: cost-tax permanents that disrupt opponents
   "Hatebear / Tax": '(o:"spells cost" o:"more" or o:"opponents" o:"pay")',
 
+  // Artifact Hate: destroy/exile artifacts
+  "Artifact Hate": '(o:"destroy target artifact" or o:"destroy all artifacts" or o:"exile target artifact")',
+
   // Sacrifice Outlet: sacrifice effects
   "Sacrifice Outlet": '(o:"sacrifice" o:":" or o:"sacrifice a")',
 };

@@ -52,6 +52,7 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   Flicker: { bg: "bg-sky-500/20", text: "text-sky-200" },
   Fog: { bg: "bg-stone-500/20", text: "text-stone-200" },
   "Hatebear / Tax": { bg: "bg-yellow-500/20", text: "text-yellow-200" },
+  "Artifact Hate": { bg: "bg-orange-500/20", text: "text-orange-300" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -379,6 +380,15 @@ const FOG_RE =
 // fit a generic regex (Drannith Magistrate, Grand Abolisher, etc.).
 const HATEBEAR_TAX_RE =
   /\b(?:(?:noncreature\s+|creature\s+)?spells?\s+(?:your opponents control\s+)?cost\s+\{?\d?\}?\s+more|opponents?[^.]+pays?\s+\{?\d?\}?\s+(?:more|additional))/i;
+
+// --- Artifact Hate (#56 phase 2) ---
+// Spells / permanents that destroy or exile artifacts (Vandalblast, Bane of
+// Progress, Shatterstorm, By Force) plus the rarer "damage equal to the
+// number of artifacts" scaling clause.
+const ARTIFACT_HATE_DESTROY_RE =
+  /\b(?:destroy|exile)\s+(?:target\s+|all\s+|x\s+target\s+|x\s+)?artifacts?\b/i;
+const ARTIFACT_HATE_SCALED_DAMAGE_RE =
+  /\bdamage equal to (?:the )?number of artifacts\b/i;
 const HATEBEAR_TAX_NAMES = new Set<string>([
   "Aven Interruptor",
   "Thalia, Guardian of Thraben",
@@ -840,6 +850,16 @@ export function generateTags(card: EnrichedCard): string[] {
   // a name allow-list of canonical staples whose text varies.
   if (HATEBEAR_TAX_RE.test(text) || HATEBEAR_TAX_NAMES.has(card.name)) {
     tags.add("Hatebear / Tax");
+  }
+
+  // --- Artifact Hate (#56 phase 2) ---
+  // Destroy/exile target artifact(s), plus the artifact-count scaled damage
+  // pattern.
+  if (
+    ARTIFACT_HATE_DESTROY_RE.test(text) ||
+    ARTIFACT_HATE_SCALED_DAMAGE_RE.test(text)
+  ) {
+    tags.add("Artifact Hate");
   }
 
   // --- Secrets of Strixhaven mechanics ---

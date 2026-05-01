@@ -3245,3 +3245,83 @@ test.describe("generateTags — Hatebear / Tax", () => {
     expect(generateTags(card)).not.toContain("Hatebear / Tax");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Artifact Hate (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Artifact Hate", () => {
+  test("Vandalblast → Artifact Hate", () => {
+    const card = makeCard({
+      name: "Vandalblast",
+      typeLine: "Sorcery",
+      oracleText:
+        "Destroy target artifact you don't control.\nOverload {4}{R}",
+    });
+    expect(generateTags(card)).toContain("Artifact Hate");
+  });
+
+  test("Bane of Progress → Artifact Hate", () => {
+    const card = makeCard({
+      name: "Bane of Progress",
+      typeLine: "Creature — Elemental",
+      oracleText:
+        "When Bane of Progress enters the battlefield, destroy all artifacts and enchantments. Bane of Progress gets +1/+1 for each permanent destroyed this way.",
+    });
+    expect(generateTags(card)).toContain("Artifact Hate");
+  });
+
+  test("By Force → Artifact Hate", () => {
+    const card = makeCard({
+      name: "By Force",
+      typeLine: "Sorcery",
+      oracleText: "Destroy X target artifacts.",
+    });
+    expect(generateTags(card)).toContain("Artifact Hate");
+  });
+
+  test("Smelt → Artifact Hate", () => {
+    const card = makeCard({
+      name: "Smelt",
+      typeLine: "Instant",
+      oracleText: "Destroy target artifact.",
+    });
+    expect(generateTags(card)).toContain("Artifact Hate");
+  });
+
+  test("Shatterstorm → Artifact Hate", () => {
+    const card = makeCard({
+      name: "Shatterstorm",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all artifacts. They can't be regenerated.",
+    });
+    expect(generateTags(card)).toContain("Artifact Hate");
+  });
+
+  test("scaled damage to number of artifacts → Artifact Hate", () => {
+    const card = makeCard({
+      name: "Test Artifact-Scaling Burn",
+      typeLine: "Sorcery",
+      oracleText:
+        "This spell deals damage equal to the number of artifacts you control to any target.",
+    });
+    expect(generateTags(card)).toContain("Artifact Hate");
+  });
+
+  test("Wrath of God → no Artifact Hate", () => {
+    const card = makeCard({
+      name: "Wrath of God",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all creatures. They can't be regenerated.",
+    });
+    expect(generateTags(card)).not.toContain("Artifact Hate");
+  });
+
+  test("Lightning Bolt → no Artifact Hate", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Artifact Hate");
+  });
+});
