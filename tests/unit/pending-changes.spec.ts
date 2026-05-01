@@ -284,7 +284,7 @@ test.describe("serializePendingChanges", () => {
     expect(solRingEntry).toBeDefined();
     expect(solRingEntry?.pairedCutName).toBe("Mind Stone");
     // enrichedCard should not be present
-    expect((solRingEntry as Record<string, unknown>)?.enrichedCard).toBeUndefined();
+    expect((solRingEntry as unknown as Record<string, unknown>)?.enrichedCard).toBeUndefined();
 
     const counterspellEntry = serialized.adds.find((a) => a.name === "Counterspell");
     expect(counterspellEntry).toBeDefined();
