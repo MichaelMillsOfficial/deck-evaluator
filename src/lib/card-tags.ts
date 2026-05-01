@@ -390,11 +390,13 @@ const FOG_RE =
   /\bprevent all (?:combat )?damage that would be dealt (?:this turn|by[^.]+this turn)\b/i;
 
 // --- Hatebear / Tax (#56 phase 2) ---
-// "Spells cost {N} more to cast" / "opponents pay N more / additional" plus
-// a name allow-list of canonical hatebear / tax pieces whose text doesn't
-// fit a generic regex (Drannith Magistrate, Grand Abolisher, etc.).
+// Asymmetric tax effects only: the cost increase / payment must explicitly
+// target opponents. Symmetric anthem-debuffs ("creature spells cost {1}
+// more") are NOT hatebears — they hit both players. Canonical staples
+// whose oracle text is symmetric in print (Sphere of Resistance, Thorn of
+// Amethyst) are admitted via HATEBEAR_TAX_NAMES instead.
 const HATEBEAR_TAX_RE =
-  /\b(?:(?:noncreature\s+|creature\s+)?spells?\s+(?:your opponents control\s+)?cost\s+\{?\d?\}?\s+more|opponents?[^.]+pays?\s+\{?\d?\}?\s+(?:more|additional))/i;
+  /\b(?:spells\s+(?:your opponents control|your opponents cast|opponents cast|of opponents)|opponents'?\s+spells)[^.]*\bcost\s+\{?\d?\}?\s+more\b|\bopponents?[^.]+pays?\s+\{?\d?\}?\s+(?:more|additional)/i;
 
 // --- Artifact Hate (#56 phase 2) ---
 // Spells / permanents that destroy or exile artifacts (Vandalblast, Bane of

@@ -3342,6 +3342,29 @@ test.describe("generateTags — Hatebear / Tax", () => {
     });
     expect(generateTags(card)).not.toContain("Hatebear / Tax");
   });
+
+  test("Symmetric anthem-debuff (creature spells cost more) → no Hatebear / Tax", () => {
+    // A symmetric cost increase that hits both players' creature spells is
+    // not a hatebear — it's an anthem-debuff. (Regression for #56
+    // adversarial review fix.) Sphere of Resistance / Thorn of Amethyst
+    // also have symmetric oracle text but ARE hatebears in practice; they
+    // remain tagged via the HATEBEAR_TAX_NAMES allow-list.
+    const card = makeCard({
+      name: "Hypothetical Symmetric Tax",
+      typeLine: "Enchantment",
+      oracleText: "Creature spells cost {1} more to cast.",
+    });
+    expect(generateTags(card)).not.toContain("Hatebear / Tax");
+  });
+
+  test("Asymmetric tax (spells your opponents cast cost more) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Hypothetical Asymmetric Tax",
+      typeLine: "Enchantment",
+      oracleText: "Spells your opponents cast cost {1} more to cast.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
 });
 
 // ---------------------------------------------------------------------------
