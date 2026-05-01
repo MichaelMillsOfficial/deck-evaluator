@@ -44,6 +44,8 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   Prepare: { bg: "bg-cyan-500/20", text: "text-cyan-300" },
   Book: { bg: "bg-amber-500/20", text: "text-amber-300" },
   Converge: { bg: "bg-indigo-500/20", text: "text-indigo-300" },
+  // #56 phase 2 functional tags
+  "Token Generator": { bg: "bg-lime-500/20", text: "text-lime-200" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -303,6 +305,14 @@ const SELF_DISCARD_ADDITIONAL_RE = /\bas an additional cost[^.]*discard/i;
 const SELF_DISCARD_UPKEEP_RE =
   /\b(?:at the beginning of|during) your upkeep[^.]*discard/i;
 const SELF_DISCARD_KEYWORDS = new Set(["Cycling", "Connive"]);
+
+// --- Token Generator (#56 phase 2) ---
+// "create ... tokens" — covers creature, Treasure, Clue, Food, etc. tokens.
+// Also matches the passive replacement form on token-doubling enchantments
+// ("...tokens would be created..." / "...tokens are created..." on
+// Anointed Procession, Parallel Lives, Doubling Season).
+const TOKEN_GENERATOR_RE =
+  /\bcreate\b[^.]*\btokens?\b|\btokens?\b[^.]*\b(?:would be created|are created)\b/i;
 
 // Discard Payoff — triggers on discard events
 const DISCARD_PAYOFF_TRIGGER_RE = /\bwhenever[^.]*discards?\b/i;
@@ -700,6 +710,12 @@ export function generateTags(card: EnrichedCard): string[] {
         break;
       }
     }
+  }
+
+  // --- Token Generator (#56 phase 2) ---
+  // Any "create ... token(s)" effect: creature tokens, Treasure, Clue, Food.
+  if (TOKEN_GENERATOR_RE.test(text)) {
+    tags.add("Token Generator");
   }
 
   // --- Secrets of Strixhaven mechanics ---

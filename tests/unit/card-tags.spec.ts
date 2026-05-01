@@ -2559,3 +2559,156 @@ test.describe("generateTags — issue #56 false-negative fixes", () => {
     expect(generateTags(card)).toContain("Mass Land Denial");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Token Generator (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Token Generator", () => {
+  test("Anax, Hardened in the Forge → Token Generator", () => {
+    const card = makeCard({
+      name: "Anax, Hardened in the Forge",
+      typeLine: "Legendary Enchantment Creature — God",
+      oracleText:
+        "Indestructible\nAs long as your devotion to red is less than five, Anax isn't a creature.\nWhenever Anax or another nontoken creature you control dies, create a 1/1 red Satyr creature token with haste unless that creature was a Satyr. If the creature's power was 4 or greater, create that many tokens instead.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Cat Collector → Token Generator", () => {
+    const card = makeCard({
+      name: "Cat Collector",
+      typeLine: "Creature — Cat",
+      oracleText:
+        "Whenever Cat Collector attacks, create a 1/1 white Cat creature token.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Decree of Justice → Token Generator", () => {
+    const card = makeCard({
+      name: "Decree of Justice",
+      typeLine: "Sorcery",
+      oracleText:
+        "Create X 4/4 white Angel creature tokens with flying. Then create X 1/1 white Soldier creature tokens.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Defiler of Faith → Token Generator", () => {
+    const card = makeCard({
+      name: "Defiler of Faith",
+      typeLine: "Creature — Phyrexian Cleric",
+      oracleText:
+        "As an additional cost to cast a white spell, you may pay 2 life. If you do, that spell costs {W} less to cast.\nWhenever you cast a white spell, create a 1/1 white Spirit creature token.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Elspeth, Storm Slayer → Token Generator", () => {
+    const card = makeCard({
+      name: "Elspeth, Storm Slayer",
+      typeLine: "Legendary Planeswalker — Elspeth",
+      oracleText:
+        "+2: Creatures you control get +1/+1 and gain double strike until end of turn.\n-2: If you control a creature, create twice that many 1/1 white Soldier creature tokens.\n-7: Exile up to two target nonland permanents. Each opponent creates a 2/2 white Knight creature token with vigilance.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Elspeth, Sun's Champion → Token Generator", () => {
+    const card = makeCard({
+      name: "Elspeth, Sun's Champion",
+      typeLine: "Legendary Planeswalker — Elspeth",
+      oracleText:
+        "+1: Create three 1/1 white Soldier creature tokens.\n-3: Destroy all creatures with power 4 or greater.\n-7: You get an emblem with \"Creatures you control get +2/+2 and have flying.\"",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Entrapment Maneuver → Token Generator", () => {
+    const card = makeCard({
+      name: "Entrapment Maneuver",
+      typeLine: "Instant",
+      oracleText:
+        "Target player sacrifices an attacking creature. You create two 1/1 white Soldier creature tokens.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Knight-Captain of Eos → Token Generator", () => {
+    const card = makeCard({
+      name: "Knight-Captain of Eos",
+      typeLine: "Creature — Human Soldier",
+      oracleText:
+        "When Knight-Captain of Eos enters the battlefield, create two 1/1 white Soldier creature tokens.\n{1}{W}, Sacrifice a Soldier: Prevent all combat damage that would be dealt this turn.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Generous Plunderer (Treasure tokens) → Token Generator", () => {
+    const card = makeCard({
+      name: "Generous Plunderer",
+      typeLine: "Creature — Human Pirate",
+      oracleText:
+        "When Generous Plunderer enters the battlefield, create a Treasure token.\nWhenever Generous Plunderer deals combat damage to a player, that player creates a Treasure token.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Bitterblossom → Token Generator", () => {
+    const card = makeCard({
+      name: "Bitterblossom",
+      typeLine: "Tribal Enchantment — Faerie",
+      oracleText:
+        "At the beginning of your upkeep, you lose 1 life and create a 1/1 black Faerie creature token with flying.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Krenko, Mob Boss → Token Generator", () => {
+    const card = makeCard({
+      name: "Krenko, Mob Boss",
+      typeLine: "Legendary Creature — Goblin Warrior",
+      oracleText:
+        "{T}: Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Avenger of Zendikar → Token Generator", () => {
+    const card = makeCard({
+      name: "Avenger of Zendikar",
+      typeLine: "Creature — Elemental",
+      oracleText:
+        "When Avenger of Zendikar enters the battlefield, create a 0/1 green Plant creature token for each land you control.\nLandfall — Whenever a land you control enters, put a +1/+1 counter on each Plant creature you control.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Anointed Procession → Token Generator (and Token Multiplier)", () => {
+    const card = makeCard({
+      name: "Anointed Procession",
+      typeLine: "Enchantment",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Lightning Bolt → no Token Generator", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Token Generator");
+  });
+
+  test("Counterspell → no Token Generator", () => {
+    const card = makeCard({
+      name: "Counterspell",
+      typeLine: "Instant",
+      oracleText: "Counter target spell.",
+    });
+    expect(generateTags(card)).not.toContain("Token Generator");
+  });
+});
