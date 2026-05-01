@@ -161,6 +161,9 @@ export const TAG_TO_SCRYFALL_QUERY: Record<string, string> = {
   // Token Multiplier: doublers (Anointed Procession, Parallel Lives, etc.)
   "Token Multiplier": '(o:"twice that many" o:"tokens")',
 
+  // Mana Reduction: pay life rather than mana (Defiler cycle)
+  "Mana Reduction": '(o:"pay" o:"life" o:"costs" o:"less")',
+
   // Sacrifice Outlet: sacrifice effects
   "Sacrifice Outlet": '(o:"sacrifice" o:":" or o:"sacrifice a")',
 };

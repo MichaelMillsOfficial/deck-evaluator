@@ -2796,3 +2796,79 @@ test.describe("generateTags — Token Multiplier", () => {
     expect(generateTags(card)).not.toContain("Token Multiplier");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Mana Reduction (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Mana Reduction", () => {
+  test("Defiler of Faith → Mana Reduction", () => {
+    const card = makeCard({
+      name: "Defiler of Faith",
+      typeLine: "Creature — Phyrexian Cleric",
+      oracleText:
+        "As an additional cost to cast a white spell, you may pay 2 life. If you do, that spell costs {W} less to cast.\nWhenever you cast a white spell, create a 1/1 white Spirit creature token.",
+    });
+    expect(generateTags(card)).toContain("Mana Reduction");
+  });
+
+  test("Defiler of Instinct → Mana Reduction", () => {
+    const card = makeCard({
+      name: "Defiler of Instinct",
+      typeLine: "Creature — Phyrexian Minotaur",
+      oracleText:
+        "As an additional cost to cast a red spell, you may pay 2 life. If you do, that spell costs {R} less to cast.\nWhenever you cast a red spell, Defiler of Instinct deals 1 damage to any target.",
+    });
+    expect(generateTags(card)).toContain("Mana Reduction");
+  });
+
+  test("Defiler of Vigor → Mana Reduction", () => {
+    const card = makeCard({
+      name: "Defiler of Vigor",
+      typeLine: "Creature — Phyrexian Hellion",
+      oracleText:
+        "As an additional cost to cast a green spell, you may pay 2 life. If you do, that spell costs {G} less to cast.\nWhenever you cast a green spell, put a +1/+1 counter on each creature you control with a +1/+1 counter on it.",
+    });
+    expect(generateTags(card)).toContain("Mana Reduction");
+  });
+
+  test("Defiler of Flesh (Grandeur) → Mana Reduction", () => {
+    const card = makeCard({
+      name: "Defiler of Flesh",
+      typeLine: "Creature — Phyrexian Horror",
+      oracleText:
+        "As an additional cost to cast a black spell, you may pay 2 life. If you do, that spell costs {B} less to cast.\nWhenever you cast a black spell, target creature you control gets +1/+1 and gains menace until end of turn.",
+    });
+    expect(generateTags(card)).toContain("Mana Reduction");
+  });
+
+  test("Defiler of Dreams → Mana Reduction", () => {
+    const card = makeCard({
+      name: "Defiler of Dreams",
+      typeLine: "Creature — Phyrexian Sphinx",
+      oracleText:
+        "As an additional cost to cast a blue spell, you may pay 2 life. If you do, that spell costs {U} less to cast.\nWhenever you cast a blue spell, draw a card.",
+    });
+    expect(generateTags(card)).toContain("Mana Reduction");
+  });
+
+  test("Goblin Electromancer (cost reduction) → no Mana Reduction", () => {
+    const card = makeCard({
+      name: "Goblin Electromancer",
+      typeLine: "Creature — Goblin Wizard",
+      oracleText:
+        "Instant and sorcery spells you cast cost {1} less to cast.",
+    });
+    const tags = generateTags(card);
+    expect(tags).not.toContain("Mana Reduction");
+    expect(tags).toContain("Cost Reduction");
+  });
+
+  test("Lightning Bolt → no Mana Reduction", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Mana Reduction");
+  });
+});

@@ -47,6 +47,7 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   // #56 phase 2 functional tags
   "Token Generator": { bg: "bg-lime-500/20", text: "text-lime-200" },
   "Token Multiplier": { bg: "bg-fuchsia-500/20", text: "text-fuchsia-300" },
+  "Mana Reduction": { bg: "bg-emerald-500/20", text: "text-emerald-200" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -328,6 +329,18 @@ const TOKEN_MULTIPLIER_NAMES = new Set<string>([
   "Mondrak, Glory Dominus",
   "Adrix and Nev, Twincasters",
 ]);
+
+// --- Mana Reduction (#56 phase 2) ---
+// Cards that let you pay an alternative resource (life, generic mana) in
+// place of a colored mana symbol — e.g. the Phyrexia: All Will Be One Defiler
+// cycle ("you may pay 2 life. If you do, that spell costs {W} less to cast").
+// Distinct from Cost Reduction, which is general "cost {X} less" effects.
+const MANA_REDUCTION_RATHER_THAN_RE =
+  /\byou may pay (?:\d+ life|\{[WUBRGC]\})\s+(?:rather than|instead of)\b/i;
+// Defiler-style: "pay N life. If you do, that spell costs {C} less to cast"
+// (the life payment substitutes for a single colored pip).
+const MANA_REDUCTION_DEFILER_RE =
+  /\bpay\s+\d+\s+life\b[^.]*\.\s*If you do,[^.]*\bcosts?\s+\{[WUBRGC]\}\s+less\b/i;
 
 // Discard Payoff — triggers on discard events
 const DISCARD_PAYOFF_TRIGGER_RE = /\bwhenever[^.]*discards?\b/i;
@@ -741,6 +754,16 @@ export function generateTags(card: EnrichedCard): string[] {
     TOKEN_MULTIPLIER_NAMES.has(card.name)
   ) {
     tags.add("Token Multiplier");
+  }
+
+  // --- Mana Reduction (#56 phase 2) ---
+  // "Pay X life rather than {C}" alternative-cost spells, plus the Defiler
+  // cycle that pays life to discount a colored pip.
+  if (
+    MANA_REDUCTION_RATHER_THAN_RE.test(text) ||
+    MANA_REDUCTION_DEFILER_RE.test(text)
+  ) {
+    tags.add("Mana Reduction");
   }
 
   // --- Secrets of Strixhaven mechanics ---
