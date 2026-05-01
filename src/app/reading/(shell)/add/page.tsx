@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
 import { usePendingChanges } from "@/contexts/PendingChangesContext";
@@ -24,7 +24,6 @@ export default function AddPage() {
     confirmedAdds,
     unpairedAddNames,
     confirmedCutNames,
-    buildModifiedDeck,
     lastAnnouncement,
   } = usePendingChanges();
 
@@ -89,6 +88,12 @@ export default function AddPage() {
         accent: confirmedCount > 0,
       },
       {
+        label: "Unpaired",
+        value: String(unpairedCount),
+        sub: unpairedCount > 0 ? "won't apply" : "all paired",
+        accent: false,
+      },
+      {
         label: "Avg Synergy",
         value: avgSynergy === null ? "—" : avgSynergy.toFixed(1),
         sub: errorCount > 0 ? `${errorCount} err` : "score / 10",
@@ -133,17 +138,11 @@ export default function AddPage() {
       id="tabpanel-deck-additions"
       aria-labelledby="tab-deck-additions"
     >
-      {/* Aria-live region for pair/unpair announcements */}
-      {lastAnnouncement && (
-        <p
-          role="status"
-          aria-live="polite"
-          className="sr-only"
-          key={lastAnnouncement}
-        >
-          {lastAnnouncement}
-        </p>
-      )}
+      {/* Aria-live region for pair/unpair announcements — always mounted so
+          NVDA/JAWS see content updates rather than a newly-inserted node. */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {lastAnnouncement ?? ""}
+      </p>
 
       <SectionHeader
         slug="add"

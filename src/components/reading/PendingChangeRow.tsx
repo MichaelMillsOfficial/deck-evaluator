@@ -137,9 +137,12 @@ export default function PendingChangeRow({
     (s) => !excludedCutNames.has(s.cardName)
   );
 
+  const helpId = `${add.name.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-]/g, "")}-unpaired-help`;
+
   return (
     <Card
       data-testid="pending-change-unpaired"
+      aria-describedby={helpId}
       style={{ marginTop: "var(--space-4)", padding: "var(--space-4)" }}
     >
       <Eyebrow
@@ -151,6 +154,7 @@ export default function PendingChangeRow({
       </Eyebrow>
 
       <p
+        id={helpId}
         style={{
           marginTop: "var(--space-2)",
           marginBottom: "var(--space-3)",
