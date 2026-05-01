@@ -2712,3 +2712,87 @@ test.describe("generateTags — Token Generator", () => {
     expect(generateTags(card)).not.toContain("Token Generator");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Token Multiplier (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Token Multiplier", () => {
+  test("Anointed Procession → Token Multiplier", () => {
+    const card = makeCard({
+      name: "Anointed Procession",
+      typeLine: "Enchantment",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.",
+    });
+    expect(generateTags(card)).toContain("Token Multiplier");
+  });
+
+  test("Doubling Season → Token Multiplier", () => {
+    const card = makeCard({
+      name: "Doubling Season",
+      typeLine: "Enchantment",
+      oracleText:
+        "If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.\nIf an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead.",
+    });
+    expect(generateTags(card)).toContain("Token Multiplier");
+  });
+
+  test("Parallel Lives → Token Multiplier", () => {
+    const card = makeCard({
+      name: "Parallel Lives",
+      typeLine: "Enchantment",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.",
+    });
+    expect(generateTags(card)).toContain("Token Multiplier");
+  });
+
+  test("Mondrak, Glory Dominus → Token Multiplier", () => {
+    const card = makeCard({
+      name: "Mondrak, Glory Dominus",
+      typeLine: "Legendary Creature — Phyrexian Horror",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.\nWhenever a nontoken creature you control dies, you may pay 2 life. When you do, return Mondrak from your graveyard to the battlefield. Activate only if Mondrak is on its third stage.",
+    });
+    expect(generateTags(card)).toContain("Token Multiplier");
+  });
+
+  test("Adrix and Nev, Twincasters → Token Multiplier", () => {
+    const card = makeCard({
+      name: "Adrix and Nev, Twincasters",
+      typeLine: "Legendary Creature — Merfolk Wizard",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.",
+    });
+    expect(generateTags(card)).toContain("Token Multiplier");
+  });
+
+  test("Elspeth, Storm Slayer (twice that many tokens) → Token Multiplier", () => {
+    const card = makeCard({
+      name: "Elspeth, Storm Slayer",
+      typeLine: "Legendary Planeswalker — Elspeth",
+      oracleText:
+        "+2: Creatures you control get +1/+1 and gain double strike until end of turn.\n-2: If you control a creature, create twice that many 1/1 white Soldier creature tokens.\n-7: Exile up to two target nonland permanents. Each opponent creates a 2/2 white Knight creature token with vigilance.",
+    });
+    expect(generateTags(card)).toContain("Token Multiplier");
+  });
+
+  test("Furnace of Rath (twice that many damage) → no Token Multiplier", () => {
+    const card = makeCard({
+      name: "Furnace of Rath",
+      typeLine: "Enchantment",
+      oracleText:
+        "If a source would deal damage to a permanent or player, it deals twice that much damage to that permanent or player instead.",
+    });
+    expect(generateTags(card)).not.toContain("Token Multiplier");
+  });
+
+  test("Lightning Bolt → no Token Multiplier", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Token Multiplier");
+  });
+});

@@ -46,6 +46,7 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   Converge: { bg: "bg-indigo-500/20", text: "text-indigo-300" },
   // #56 phase 2 functional tags
   "Token Generator": { bg: "bg-lime-500/20", text: "text-lime-200" },
+  "Token Multiplier": { bg: "bg-fuchsia-500/20", text: "text-fuchsia-300" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -313,6 +314,20 @@ const SELF_DISCARD_KEYWORDS = new Set(["Cycling", "Connive"]);
 // Anointed Procession, Parallel Lives, Doubling Season).
 const TOKEN_GENERATOR_RE =
   /\bcreate\b[^.]*\btokens?\b|\btokens?\b[^.]*\b(?:would be created|are created)\b/i;
+
+// --- Token Multiplier (#56 phase 2) ---
+// Cards that double / multiply token creation. Covers the "twice that many"
+// + "tokens" replacement pattern, plus a name allow-list for staples whose
+// oracle text style varies.
+const TOKEN_MULTIPLIER_RE =
+  /\b(?:twice that many|that many plus|those tokens? plus)[^.]*tokens?\b/i;
+const TOKEN_MULTIPLIER_NAMES = new Set<string>([
+  "Anointed Procession",
+  "Doubling Season",
+  "Parallel Lives",
+  "Mondrak, Glory Dominus",
+  "Adrix and Nev, Twincasters",
+]);
 
 // Discard Payoff — triggers on discard events
 const DISCARD_PAYOFF_TRIGGER_RE = /\bwhenever[^.]*discards?\b/i;
@@ -716,6 +731,16 @@ export function generateTags(card: EnrichedCard): string[] {
   // Any "create ... token(s)" effect: creature tokens, Treasure, Clue, Food.
   if (TOKEN_GENERATOR_RE.test(text)) {
     tags.add("Token Generator");
+  }
+
+  // --- Token Multiplier (#56 phase 2) ---
+  // "twice that many tokens" replacement effects, plus a name allow-list of
+  // canonical token-doubler staples.
+  if (
+    TOKEN_MULTIPLIER_RE.test(text) ||
+    TOKEN_MULTIPLIER_NAMES.has(card.name)
+  ) {
+    tags.add("Token Multiplier");
   }
 
   // --- Secrets of Strixhaven mechanics ---

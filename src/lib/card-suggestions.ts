@@ -158,6 +158,9 @@ export const TAG_TO_SCRYFALL_QUERY: Record<string, string> = {
   // Token Generator: create tokens
   "Token Generator": '(o:"create" o:"token")',
 
+  // Token Multiplier: doublers (Anointed Procession, Parallel Lives, etc.)
+  "Token Multiplier": '(o:"twice that many" o:"tokens")',
+
   // Sacrifice Outlet: sacrifice effects
   "Sacrifice Outlet": '(o:"sacrifice" o:":" or o:"sacrifice a")',
 };
