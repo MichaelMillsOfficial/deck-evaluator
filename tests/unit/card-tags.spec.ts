@@ -3153,3 +3153,95 @@ test.describe("generateTags — Fog", () => {
     expect(generateTags(card)).not.toContain("Fog");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Hatebear / Tax (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Hatebear / Tax", () => {
+  test("Sphere of Resistance (spells cost {1} more) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Sphere of Resistance",
+      typeLine: "Artifact",
+      oracleText: "Spells cost {1} more to cast.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Thorn of Amethyst (noncreature spells cost more) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Thorn of Amethyst",
+      typeLine: "Artifact",
+      oracleText: "Noncreature spells cost {1} more to cast.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Kambal, Consul of Allocation (opponents pay) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Kambal, Consul of Allocation",
+      typeLine: "Legendary Creature — Human Advisor",
+      oracleText:
+        "Whenever an opponent casts a noncreature spell, that player loses 2 life and you gain 2 life.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Aven Interruptor (allow-list) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Aven Interruptor",
+      typeLine: "Creature — Bird Detective",
+      oracleText:
+        "Flash\nFlying\nWhen Aven Interruptor enters the battlefield, plot target nonland card in an opponent's graveyard, hand, or library, then that player shuffles. (You may cast that card on a later turn without paying its mana cost.)",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Thalia, Guardian of Thraben (allow-list) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Thalia, Guardian of Thraben",
+      typeLine: "Legendary Creature — Human Soldier",
+      oracleText:
+        "First strike\nNoncreature spells cost {1} more to cast.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Grand Abolisher (allow-list) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Grand Abolisher",
+      typeLine: "Creature — Human Cleric",
+      oracleText:
+        "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Esper Sentinel (allow-list) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Esper Sentinel",
+      typeLine: "Artifact Creature — Human Soldier",
+      oracleText:
+        "Whenever an opponent casts their first noncreature spell each turn, unless that player pays {X}, where X is Esper Sentinel's power, draw a card.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Drannith Magistrate (allow-list) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Drannith Magistrate",
+      typeLine: "Creature — Human Wizard",
+      oracleText:
+        "Your opponents can't cast spells from anywhere other than their hands.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Lightning Bolt → no Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Hatebear / Tax");
+  });
+});

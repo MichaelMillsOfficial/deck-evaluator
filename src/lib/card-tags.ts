@@ -51,6 +51,7 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   "Token Payoff": { bg: "bg-rose-500/20", text: "text-rose-300" },
   Flicker: { bg: "bg-sky-500/20", text: "text-sky-200" },
   Fog: { bg: "bg-stone-500/20", text: "text-stone-200" },
+  "Hatebear / Tax": { bg: "bg-yellow-500/20", text: "text-yellow-200" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -371,6 +372,23 @@ const FLICKER_RE =
 // Healing Salve uses "Prevent the next N damage" (single-source) — NOT a fog.
 const FOG_RE =
   /\bprevent all (?:combat )?damage that would be dealt (?:this turn|by[^.]+this turn)\b/i;
+
+// --- Hatebear / Tax (#56 phase 2) ---
+// "Spells cost {N} more to cast" / "opponents pay N more / additional" plus
+// a name allow-list of canonical hatebear / tax pieces whose text doesn't
+// fit a generic regex (Drannith Magistrate, Grand Abolisher, etc.).
+const HATEBEAR_TAX_RE =
+  /\b(?:(?:noncreature\s+|creature\s+)?spells?\s+(?:your opponents control\s+)?cost\s+\{?\d?\}?\s+more|opponents?[^.]+pays?\s+\{?\d?\}?\s+(?:more|additional))/i;
+const HATEBEAR_TAX_NAMES = new Set<string>([
+  "Aven Interruptor",
+  "Thalia, Guardian of Thraben",
+  "Grand Abolisher",
+  "Esper Sentinel",
+  "Kambal, Consul of Allocation",
+  "Drannith Magistrate",
+  "Sphere of Resistance",
+  "Thorn of Amethyst",
+]);
 
 // Discard Payoff — triggers on discard events
 const DISCARD_PAYOFF_TRIGGER_RE = /\bwhenever[^.]*discards?\b/i;
@@ -814,6 +832,14 @@ export function generateTags(card: EnrichedCard): string[] {
   // single-source prevention spells like Healing Salve.
   if (FOG_RE.test(text)) {
     tags.add("Fog");
+  }
+
+  // --- Hatebear / Tax (#56 phase 2) ---
+  // Permanents that tax opponents' resources or restrict their plays.
+  // Combines a generic "spells cost more" / "opponents pay more" regex with
+  // a name allow-list of canonical staples whose text varies.
+  if (HATEBEAR_TAX_RE.test(text) || HATEBEAR_TAX_NAMES.has(card.name)) {
+    tags.add("Hatebear / Tax");
   }
 
   // --- Secrets of Strixhaven mechanics ---

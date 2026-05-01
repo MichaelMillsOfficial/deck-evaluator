@@ -173,6 +173,9 @@ export const TAG_TO_SCRYFALL_QUERY: Record<string, string> = {
   // Fog: mass combat damage prevention
   Fog: '(o:"prevent all combat damage" o:"this turn")',
 
+  // Hatebear / Tax: cost-tax permanents that disrupt opponents
+  "Hatebear / Tax": '(o:"spells cost" o:"more" or o:"opponents" o:"pay")',
+
   // Sacrifice Outlet: sacrifice effects
   "Sacrifice Outlet": '(o:"sacrifice" o:":" or o:"sacrifice a")',
 };
