@@ -234,6 +234,94 @@ test.describe("Card Lookup — Manual Tab", () => {
     // The deck display should NOT appear (form was not submitted)
     await expect(page.getByTestId("deck-header")).toBeHidden();
   });
+
+  test('shows "No cards match" when query has results-empty response', async ({
+    deckPage,
+    page,
+  }) => {
+    // Mock an empty suggestions array — the dropdown surface should still
+    // appear and surface a non-interactive status row so the user gets
+    // feedback. The empty state must NOT live inside the listbox (it's not a
+    // valid listbox child), so we look for the status node anywhere in the
+    // dropdown surface and pin "no options" by scoping the count to the
+    // listbox if it exists.
+    await mockAutocomplete(page, []);
+
+    await deckPage.cardLookupInput.fill("zz");
+
+    const empty = page.getByText(/no cards match/i);
+    await expect(empty).toBeVisible({ timeout: 5_000 });
+
+    // Either the listbox is absent, or it has zero options. Both are
+    // acceptable; what's NOT acceptable is stale options surviving alongside
+    // the empty-state status row.
+    const listbox = page.locator("#card-lookup-listbox");
+    const listboxCount = await listbox.count();
+    if (listboxCount > 0) {
+      await expect(listbox.getByRole("option")).toHaveCount(0);
+    }
+  });
+
+  test("shows network-error message when autocomplete fetch fails", async ({
+    deckPage,
+    page,
+  }) => {
+    // Mock a 502 so the fetch resolves !ok and our error path triggers.
+    await page.route("**/api/card-autocomplete*", async (route) => {
+      await route.fulfill({
+        status: 502,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "bad gateway" }),
+      });
+    });
+
+    await deckPage.cardLookupInput.fill("sol");
+
+    const errorMessage = page.getByTestId("card-lookup-error");
+    await expect(errorMessage).toBeVisible({ timeout: 5_000 });
+    await expect(errorMessage).toHaveText(
+      /couldn['’]t reach scryfall\. try again\./i
+    );
+
+    // The error banner must be the SOLE feedback — the empty-state row must
+    // not also appear, since two contradictory messages confuse the user.
+    await expect(page.getByText(/no cards match/i)).not.toBeVisible();
+  });
+
+  test("network-error message clears on next successful fetch", async ({
+    deckPage,
+    page,
+  }) => {
+    // First request fails — error should appear.
+    let failNext = true;
+    await page.route("**/api/card-autocomplete*", async (route) => {
+      if (failNext) {
+        failNext = false;
+        await route.fulfill({
+          status: 502,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "bad gateway" }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ suggestions: ["Sol Ring"] }),
+      });
+    });
+
+    await deckPage.cardLookupInput.fill("sol");
+    const errorMessage = page.getByTestId("card-lookup-error");
+    await expect(errorMessage).toBeVisible({ timeout: 5_000 });
+
+    // Second query succeeds — the error message should disappear.
+    await deckPage.cardLookupInput.fill("sola");
+    await expect(page.getByRole("option", { name: "Sol Ring" })).toBeVisible({
+      timeout: 5_000,
+    });
+    await expect(errorMessage).toBeHidden();
+  });
 });
 
 test.describe("Card Lookup — Zone Header Guard", () => {

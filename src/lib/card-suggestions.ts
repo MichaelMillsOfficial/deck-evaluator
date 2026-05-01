@@ -137,8 +137,11 @@ export const TAG_TO_SCRYFALL_QUERY: Record<string, string> = {
   // Removal: destroy/exile targeting opponents' permanents
   Removal: '(o:"destroy target" or o:"exile target" or o:"return target" o:"hand")',
 
-  // Board Wipe: destroy or exile all (mass removal)
-  "Board Wipe": '(o:"destroy all" or o:"exile all" or o:"all creatures get -")',
+  // Board Wipe: destroy or exile all <battlefield-zone object>. Phrases are
+  // explicit so that "exile all cards from <graveyard/library>" cards
+  // (e.g. Scavenger Grounds, Abstergo Entertainment) don't false-positive.
+  "Board Wipe":
+    '(o:"destroy all creatures" or o:"destroy all nonland" or o:"destroy all nontoken" or o:"destroy all permanents" or o:"destroy all artifacts" or o:"destroy all enchantments" or o:"destroy all planeswalkers" or o:"exile all creatures" or o:"exile all nonland" or o:"exile all nontoken" or o:"exile all permanents" or o:"exile all artifacts" or o:"exile all enchantments" or o:"exile all planeswalkers" or o:"all creatures get -")',
 
   // Counterspell: counter target spell
   Counterspell: '(o:"counter target spell" or o:"counter target" t:instant)',

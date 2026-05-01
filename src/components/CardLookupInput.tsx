@@ -18,6 +18,7 @@ export default function CardLookupInput({
   const [activeIndex, setActiveIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [networkError, setNetworkError] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
@@ -39,15 +40,24 @@ export default function CardLookupInput({
       );
       if (!res.ok) {
         setSuggestions([]);
+        setIsOpen(true);
+        setActiveIndex(-1);
+        setNetworkError(true);
         return;
       }
       const json = (await res.json()) as { suggestions: string[] };
       setSuggestions(json.suggestions);
-      setIsOpen(json.suggestions.length > 0);
+      // Keep the listbox open even when empty so the user gets the
+      // "No cards match" affordance instead of a silently-disappearing UI.
+      setIsOpen(true);
       setActiveIndex(-1);
+      setNetworkError(false);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setSuggestions([]);
+      setIsOpen(true);
+      setActiveIndex(-1);
+      setNetworkError(true);
     } finally {
       setLoading(false);
     }
@@ -62,6 +72,7 @@ export default function CardLookupInput({
     if (val.length < 2) {
       setSuggestions([]);
       setIsOpen(false);
+      setNetworkError(false);
       return;
     }
 
@@ -84,6 +95,7 @@ export default function CardLookupInput({
     setSuggestions([]);
     setIsOpen(false);
     setActiveIndex(-1);
+    setNetworkError(false);
     inputRef.current?.focus();
   };
 
@@ -193,7 +205,7 @@ export default function CardLookupInput({
 
           {loading && (
             <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-purple-400" />
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-purple-400 motion-reduce:animate-none" />
             </div>
           )}
 
@@ -225,6 +237,29 @@ export default function CardLookupInput({
               ))}
             </ul>
           )}
+
+          {/*
+            Empty-state surface lives OUTSIDE the listbox: a `role="status"`
+            node is not a valid listbox child (listbox children must be
+            `option` or `group`). We only render this when the user actually
+            performed a search (query.length >= 2), the request finished
+            without a network error, and the API returned zero suggestions —
+            otherwise the error banner below is the sole feedback.
+          */}
+          {isOpen &&
+            !networkError &&
+            !loading &&
+            suggestions.length === 0 &&
+            query.length >= 2 && (
+              <div
+                data-testid="card-lookup-empty"
+                role="status"
+                aria-live="polite"
+                className="absolute z-10 mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm italic text-slate-400 shadow-lg"
+              >
+                No cards match.
+              </div>
+            )}
         </div>
       </div>
 
@@ -236,6 +271,16 @@ export default function CardLookupInput({
       >
         {statusMessage}
       </div>
+
+      {networkError && (
+        <div
+          data-testid="card-lookup-error"
+          role="alert"
+          className="mt-1 text-xs text-rose-400"
+        >
+          Couldn&rsquo;t reach Scryfall. Try again.
+        </div>
+      )}
     </div>
   );
 }

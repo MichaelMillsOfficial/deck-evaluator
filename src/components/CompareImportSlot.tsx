@@ -212,6 +212,7 @@ export default function CompareImportSlot({
             onSubmitUrl={handleFetchDeck}
             onSubmitText={handleParseDeck}
             loading={loading}
+            mode="inline"
           />
 
           {loading && (

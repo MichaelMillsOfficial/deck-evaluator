@@ -110,8 +110,13 @@ const REMOVAL_DAMAGE_AMOUNT_RE =
   /\bdeals?\s+(?:\d+|X|that much)\s+damage\b/i;
 const REMOVAL_DAMAGE_VALID_TARGET_RE =
   /\b(?:any target\b|target\s+(?:creatures?|planeswalkers?|permanents?|battles?|attacking|blocking)\b|target\s+creature\s+or\s+(?:player|planeswalker)\b|target\s+creature,\s*player,?\s*(?:or\s+planeswalker)?\b)/i;
+// Require a battlefield-zone object after "destroy/exile all" so that phrases
+// like "exile all cards from <a graveyard/library>" (Scavenger Grounds, Abstergo
+// Entertainment) don't false-positive as wipes. Allows up to 4 modifier tokens
+// between "all" and the noun (e.g. "destroy all non-Elf creatures", "exile all
+// nonland permanents your opponents control").
 const BOARD_WIPE_RE =
-  /\b(?:destroy|exile)\s+all\b/i;
+  /\b(?:destroy|exile)\s+all\s+(?:\S+\s+){0,4}?(?:creatures?|permanents?|planeswalkers?|artifacts?|enchantments?|lands?|tokens?)\b/i;
 // Conditional board wipe — "destroy each ... nonland permanent ... mana value"
 // covers Karn's Sylex / Toxic Deluge-style X-cost wipes that say "each" rather
 // than "all" and gate on mana value or some condition.
