@@ -48,6 +48,7 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   "Token Generator": { bg: "bg-lime-500/20", text: "text-lime-200" },
   "Token Multiplier": { bg: "bg-fuchsia-500/20", text: "text-fuchsia-300" },
   "Mana Reduction": { bg: "bg-emerald-500/20", text: "text-emerald-200" },
+  "Token Payoff": { bg: "bg-rose-500/20", text: "text-rose-300" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -341,6 +342,14 @@ const MANA_REDUCTION_RATHER_THAN_RE =
 // (the life payment substitutes for a single colored pip).
 const MANA_REDUCTION_DEFILER_RE =
   /\bpay\s+\d+\s+life\b[^.]*\.\s*If you do,[^.]*\bcosts?\s+\{[WUBRGC]\}\s+less\b/i;
+
+// --- Token Payoff (#56 phase 2) ---
+// "Whenever <subject> creature(s) enter(s) the battlefield, <payoff>" —
+// triggers that fire on creature ETB, especially relevant in token decks.
+// The payoff clause must be a damage / life-change / token / counter / draw
+// effect, otherwise we'd pull in static buffs that aren't payoffs.
+const TOKEN_PAYOFF_RE =
+  /\bwhenever\b[^.]*\bcreatures?\s+(?:enters|enter)\b[^.]*(?:deals?\s+\d+|deals?\s+damage|loses?\s+\d+\s+life|gains?\s+\d+\s+life|create|puts?\s+a|draws?\s+(?:a|\d+)\s+cards?)/i;
 
 // Discard Payoff — triggers on discard events
 const DISCARD_PAYOFF_TRIGGER_RE = /\bwhenever[^.]*discards?\b/i;
@@ -764,6 +773,13 @@ export function generateTags(card: EnrichedCard): string[] {
     MANA_REDUCTION_DEFILER_RE.test(text)
   ) {
     tags.add("Mana Reduction");
+  }
+
+  // --- Token Payoff (#56 phase 2) ---
+  // Creature-ETB triggers with a damage / life / token / draw payoff —
+  // synergizes with Token Generator decks that flood the board.
+  if (TOKEN_PAYOFF_RE.test(text)) {
+    tags.add("Token Payoff");
   }
 
   // --- Secrets of Strixhaven mechanics ---

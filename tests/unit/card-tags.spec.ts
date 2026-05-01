@@ -2872,3 +2872,87 @@ test.describe("generateTags — Mana Reduction", () => {
     expect(generateTags(card)).not.toContain("Mana Reduction");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Token Payoff (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Token Payoff", () => {
+  test("Impact Tremors → Token Payoff", () => {
+    const card = makeCard({
+      name: "Impact Tremors",
+      typeLine: "Enchantment",
+      oracleText:
+        "Whenever a creature enters the battlefield under your control, Impact Tremors deals 1 damage to each opponent.",
+    });
+    expect(generateTags(card)).toContain("Token Payoff");
+  });
+
+  test("Purphoros, God of the Forge → Token Payoff", () => {
+    const card = makeCard({
+      name: "Purphoros, God of the Forge",
+      typeLine: "Legendary Enchantment Creature — God",
+      oracleText:
+        "Indestructible\nAs long as your devotion to red is less than five, Purphoros isn't a creature.\nWhenever another creature enters the battlefield under your control, Purphoros deals 2 damage to each opponent.\n{2}{R}: Creatures you control get +1/+0 until end of turn.",
+    });
+    expect(generateTags(card)).toContain("Token Payoff");
+  });
+
+  test("Terror of the Peaks → Token Payoff", () => {
+    const card = makeCard({
+      name: "Terror of the Peaks",
+      typeLine: "Creature — Dragon",
+      oracleText:
+        "Flying\nWhenever another creature enters the battlefield under your control, Terror of the Peaks deals damage equal to that creature's power to any target.",
+    });
+    expect(generateTags(card)).toContain("Token Payoff");
+  });
+
+  test("Warstorm Surge → Token Payoff", () => {
+    const card = makeCard({
+      name: "Warstorm Surge",
+      typeLine: "Enchantment",
+      oracleText:
+        "Whenever a creature enters the battlefield under your control, it deals damage equal to its power to any target.",
+    });
+    expect(generateTags(card)).toContain("Token Payoff");
+  });
+
+  test("Witty Roastmaster → Token Payoff", () => {
+    const card = makeCard({
+      name: "Witty Roastmaster",
+      typeLine: "Creature — Human Warrior",
+      oracleText:
+        "Whenever Witty Roastmaster or another creature enters the battlefield under your control, that creature deals 1 damage to any opponent or planeswalker an opponent controls.",
+    });
+    expect(generateTags(card)).toContain("Token Payoff");
+  });
+
+  test("Pandemonium → Token Payoff", () => {
+    const card = makeCard({
+      name: "Pandemonium",
+      typeLine: "Enchantment",
+      oracleText:
+        "Whenever a creature enters the battlefield, that creature's controller may have it deal damage equal to its power to any target.",
+    });
+    expect(generateTags(card)).toContain("Token Payoff");
+  });
+
+  test("Brainstorm → no Token Payoff", () => {
+    const card = makeCard({
+      name: "Brainstorm",
+      typeLine: "Instant",
+      oracleText:
+        "Draw three cards, then put two cards from your hand on top of your library in any order.",
+    });
+    expect(generateTags(card)).not.toContain("Token Payoff");
+  });
+
+  test("Lightning Bolt → no Token Payoff", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Token Payoff");
+  });
+});

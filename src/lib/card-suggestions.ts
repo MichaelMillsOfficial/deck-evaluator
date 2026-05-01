@@ -164,6 +164,9 @@ export const TAG_TO_SCRYFALL_QUERY: Record<string, string> = {
   // Mana Reduction: pay life rather than mana (Defiler cycle)
   "Mana Reduction": '(o:"pay" o:"life" o:"costs" o:"less")',
 
+  // Token Payoff: ETB triggers that scale with creature count
+  "Token Payoff": '(o:"whenever" o:"creature enters" o:"deals")',
+
   // Sacrifice Outlet: sacrifice effects
   "Sacrifice Outlet": '(o:"sacrifice" o:":" or o:"sacrifice a")',
 };
