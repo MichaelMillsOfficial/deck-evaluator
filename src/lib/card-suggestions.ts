@@ -161,6 +161,27 @@ export const TAG_TO_SCRYFALL_QUERY: Record<string, string> = {
   // Token Generator: create tokens
   "Token Generator": '(o:"create" o:"token")',
 
+  // Token Multiplier: doublers (Anointed Procession, Parallel Lives, etc.)
+  "Token Multiplier": '(o:"twice that many" o:"tokens")',
+
+  // Mana Reduction: pay life rather than mana (Defiler cycle)
+  "Mana Reduction": '(o:"pay" o:"life" o:"costs" o:"less")',
+
+  // Token Payoff: ETB triggers that scale with creature count
+  "Token Payoff": '(o:"whenever" o:"creature enters" o:"deals")',
+
+  // Flicker: exile-and-return blink effects
+  Flicker: '(o:"exile target" o:"return" o:"battlefield")',
+
+  // Fog: mass combat damage prevention
+  Fog: '(o:"prevent all combat damage" o:"this turn")',
+
+  // Hatebear / Tax: cost-tax permanents that disrupt opponents
+  "Hatebear / Tax": '(o:"spells cost" o:"more" or o:"opponents" o:"pay")',
+
+  // Artifact Hate: destroy/exile artifacts
+  "Artifact Hate": '(o:"destroy target artifact" or o:"destroy all artifacts" or o:"exile target artifact")',
+
   // Sacrifice Outlet: sacrifice effects
   "Sacrifice Outlet": '(o:"sacrifice" o:":" or o:"sacrifice a")',
 };
