@@ -209,44 +209,57 @@ export default function CardLookupInput({
             </div>
           )}
 
-          {isOpen && (suggestions.length > 0 || !loading) && (
+          {isOpen && suggestions.length > 0 && (
             <ul
               ref={listboxRef}
               id="card-lookup-listbox"
               role="listbox"
               className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-slate-600 bg-slate-800 shadow-lg"
             >
-              {suggestions.length > 0 ? (
-                suggestions.map((name, i) => (
-                  <li
-                    key={name}
-                    id={`card-lookup-option-${i}`}
-                    role="option"
-                    aria-selected={i === activeIndex}
-                    className={`cursor-pointer px-4 py-2 text-sm ${
-                      i === activeIndex
-                        ? "bg-slate-700 text-white"
-                        : "text-slate-200 hover:bg-slate-700"
-                    }`}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      selectCard(name);
-                    }}
-                  >
-                    {name}
-                  </li>
-                ))
-              ) : (
+              {suggestions.map((name, i) => (
                 <li
-                  role="status"
-                  aria-live="polite"
-                  className="cursor-default px-4 py-2 text-sm italic text-slate-400"
+                  key={name}
+                  id={`card-lookup-option-${i}`}
+                  role="option"
+                  aria-selected={i === activeIndex}
+                  className={`cursor-pointer px-4 py-2 text-sm ${
+                    i === activeIndex
+                      ? "bg-slate-700 text-white"
+                      : "text-slate-200 hover:bg-slate-700"
+                  }`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    selectCard(name);
+                  }}
                 >
-                  No cards match.
+                  {name}
                 </li>
-              )}
+              ))}
             </ul>
           )}
+
+          {/*
+            Empty-state surface lives OUTSIDE the listbox: a `role="status"`
+            node is not a valid listbox child (listbox children must be
+            `option` or `group`). We only render this when the user actually
+            performed a search (query.length >= 2), the request finished
+            without a network error, and the API returned zero suggestions —
+            otherwise the error banner below is the sole feedback.
+          */}
+          {isOpen &&
+            !networkError &&
+            !loading &&
+            suggestions.length === 0 &&
+            query.length >= 2 && (
+              <div
+                data-testid="card-lookup-empty"
+                role="status"
+                aria-live="polite"
+                className="absolute z-10 mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm italic text-slate-400 shadow-lg"
+              >
+                No cards match.
+              </div>
+            )}
         </div>
       </div>
 
@@ -263,7 +276,6 @@ export default function CardLookupInput({
         <div
           data-testid="card-lookup-error"
           role="alert"
-          aria-live="polite"
           className="mt-1 text-xs text-rose-400"
         >
           Couldn&rsquo;t reach Scryfall. Try again.

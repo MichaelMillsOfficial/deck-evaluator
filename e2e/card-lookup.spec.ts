@@ -239,17 +239,27 @@ test.describe("Card Lookup — Manual Tab", () => {
     deckPage,
     page,
   }) => {
-    // Mock an empty suggestions array — the listbox should still appear and
-    // surface a non-interactive status row so the user gets feedback.
+    // Mock an empty suggestions array — the dropdown surface should still
+    // appear and surface a non-interactive status row so the user gets
+    // feedback. The empty state must NOT live inside the listbox (it's not a
+    // valid listbox child), so we look for the status node anywhere in the
+    // dropdown surface and pin "no options" by scoping the count to the
+    // listbox if it exists.
     await mockAutocomplete(page, []);
 
     await deckPage.cardLookupInput.fill("zz");
 
+    const empty = page.getByText(/no cards match/i);
+    await expect(empty).toBeVisible({ timeout: 5_000 });
+
+    // Either the listbox is absent, or it has zero options. Both are
+    // acceptable; what's NOT acceptable is stale options surviving alongside
+    // the empty-state status row.
     const listbox = page.locator("#card-lookup-listbox");
-    await expect(listbox).toBeVisible({ timeout: 5_000 });
-    const empty = listbox.getByRole("status");
-    await expect(empty).toBeVisible();
-    await expect(empty).toHaveText(/no cards match/i);
+    const listboxCount = await listbox.count();
+    if (listboxCount > 0) {
+      await expect(listbox.getByRole("option")).toHaveCount(0);
+    }
   });
 
   test("shows network-error message when autocomplete fetch fails", async ({
@@ -272,6 +282,10 @@ test.describe("Card Lookup — Manual Tab", () => {
     await expect(errorMessage).toHaveText(
       /couldn['’]t reach scryfall\. try again\./i
     );
+
+    // The error banner must be the SOLE feedback — the empty-state row must
+    // not also appear, since two contradictory messages confuse the user.
+    await expect(page.getByText(/no cards match/i)).not.toBeVisible();
   });
 
   test("network-error message clears on next successful fetch", async ({
