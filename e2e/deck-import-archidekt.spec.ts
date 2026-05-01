@@ -171,3 +171,97 @@ test.describe("Deck Import — Archidekt URL Flow", () => {
     expect(page.url()).not.toMatch(/\/(ritual|reading)/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Compare page Archidekt URL flow — locks in inline-mode behavior so the
+// /compare slot's URL import can't silently regress when DeckInput evolves.
+// ---------------------------------------------------------------------------
+
+test.describe("Compare page — Archidekt URL import in slot", () => {
+  test("slot Archidekt tab shows URL input (no textarea) and populates the slot on submit", async ({
+    page,
+  }) => {
+    // Skip the default deckPage fixture so we can stub /api/deck cleanly
+    // without colliding with the home-page enrich mocks in fixtures.ts.
+    await page.route(/\/api\/deck\?/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ...SAMPLE_ARCHIDEKT_DECK, warnings: [] }),
+      });
+    });
+    // The Compare slot enriches after import; mock it so we don't hit the
+    // real Scryfall API.
+    await page.route("**/api/deck-enrich", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ cards: {}, notFound: [] }),
+      });
+    });
+
+    await page.goto("/compare");
+
+    const slot = page.getByTestId("compare-slot-a");
+    await expect(slot).toBeVisible();
+
+    // Switch slot A's DeckInput to the Archidekt tab.
+    await slot.getByRole("tab", { name: "Archidekt" }).click();
+
+    // URL input is visible; the legacy textarea is NOT rendered on this tab.
+    await expect(slot.getByLabel(/archidekt deck url/i)).toBeVisible();
+    await expect(slot.getByLabel("Decklist")).toBeHidden();
+
+    // Submit a valid Archidekt URL.
+    await slot.getByLabel(/archidekt deck url/i).fill(
+      "https://archidekt.com/decks/123456"
+    );
+    await slot.getByRole("button", { name: "Import Deck" }).click();
+
+    // The slot replaces the import form with the deck summary card. The
+    // import form's URL input goes away; the source label appears, and
+    // the Clear deck control is rendered.
+    await expect(slot.getByLabel(/archidekt deck url/i)).toBeHidden();
+    await expect(
+      slot.getByRole("button", { name: /clear .*? deck/i })
+    ).toBeVisible();
+
+    // Stays on /compare — no navigation away from the page.
+    expect(page.url()).toMatch(/\/compare$/);
+  });
+
+  test("slot Archidekt tab does NOT show the synopsis card (synopsis is navigate-mode only)", async ({
+    page,
+  }) => {
+    await page.route(/\/api\/deck\?/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ...SAMPLE_ARCHIDEKT_DECK, warnings: [] }),
+      });
+    });
+    await page.route("**/api/deck-enrich", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ cards: {}, notFound: [] }),
+      });
+    });
+
+    await page.goto("/compare");
+
+    const slot = page.getByTestId("compare-slot-a");
+    await slot.getByRole("tab", { name: "Archidekt" }).click();
+    await slot.getByLabel(/archidekt deck url/i).fill(
+      "https://archidekt.com/decks/123456"
+    );
+    await slot.getByRole("button", { name: "Import Deck" }).click();
+
+    // Inline mode skips the synopsis pre-confirm step and goes straight to
+    // the slot's deck summary.
+    await expect(page.getByTestId("archidekt-synopsis")).toBeHidden();
+    await expect(
+      slot.getByRole("button", { name: /clear .*? deck/i })
+    ).toBeVisible();
+  });
+});
