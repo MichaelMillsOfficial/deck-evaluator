@@ -32,8 +32,19 @@ test.describe("Tab Navigation", () => {
   test("switches to Archidekt tab", async ({ deckPage }) => {
     await deckPage.selectTab("Archidekt");
 
+    // The Archidekt tab swaps the textarea for a URL input. None of the
+    // text-import affordances (textarea, Load Example, commander input,
+    // card lookup) should be visible.
     await expect(deckPage.loadExampleButton).toBeHidden();
-    await expect(deckPage.decklistTextarea).toBeVisible();
+    await expect(deckPage.decklistTextarea).toBeHidden();
+    await expect(deckPage.commanderInput).toBeHidden();
+    await expect(deckPage.cardLookupInput).toBeHidden();
+
+    // URL input is shown with a how-to guide.
+    await expect(deckPage.archidektUrlInput).toBeVisible();
+    const guide = deckPage.page.getByTestId("archidekt-import-guide");
+    await expect(guide).toBeVisible();
+    await expect(guide).toContainText("archidekt.com");
   });
 
   test("switches back to Manual tab from another tab", async ({
