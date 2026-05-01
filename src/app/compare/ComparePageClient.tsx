@@ -6,9 +6,9 @@ import type { DeckData, EnrichedCard } from "@/lib/types";
 import { computeDeckComparison, type DeckComparisonResult } from "@/lib/deck-comparison";
 import CompareImportSlot from "@/components/CompareImportSlot";
 import ComparisonOverview from "@/components/ComparisonOverview";
-import MetricComparisonTable from "@/components/MetricComparisonTable";
-import ManaCurveOverlay from "@/components/ManaCurveOverlay";
-import TagComparisonChart from "@/components/TagComparisonChart";
+import ManaCurveComparison from "@/components/comparison/ManaCurveComparison";
+import ColorAnalysisComparison from "@/components/comparison/ColorAnalysisComparison";
+import ManaBaseComparison from "@/components/comparison/ManaBaseComparison";
 
 interface DeckSlot {
   deck: DeckData;
@@ -192,31 +192,25 @@ export default function ComparePageClient() {
               </div>
 
               {/* Metric comparison */}
-              <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
-                <MetricComparisonTable
-                  diffs={comparison.metricDiffs}
-                  labelA={labelA}
-                  labelB={labelB}
-                />
-              </div>
+              <ManaBaseComparison
+                diffs={comparison.metricDiffs}
+                labelA={labelA}
+                labelB={labelB}
+              />
             </div>
 
             {/* Charts — full width */}
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-              <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
-                <ManaCurveOverlay
-                  data={comparison.curveOverlay}
-                  labelA={labelA}
-                  labelB={labelB}
-                />
-              </div>
-              <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
-                <TagComparisonChart
-                  data={comparison.tagComparison}
-                  labelA={labelA}
-                  labelB={labelB}
-                />
-              </div>
+              <ManaCurveComparison
+                data={comparison.curveOverlay}
+                labelA={labelA}
+                labelB={labelB}
+              />
+              <ColorAnalysisComparison
+                data={comparison.tagComparison}
+                labelA={labelA}
+                labelB={labelB}
+              />
             </div>
           </div>
         )}
