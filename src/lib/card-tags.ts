@@ -374,6 +374,13 @@ const TOKEN_PAYOFF_RE =
 // hallmark of removal-with-rider (Path to Exile / Swords to Plowshares).
 const FLICKER_RE =
   /\bexile (?:any number of |another |target |that )(?:[a-z-]+ )*(?:creatures?|permanents?|artifacts?)[^.]*?(?:\.\s+(?!Its controller|It deals|Its owner)[^.]*)?\b(?:return|then return)[^.]*\b(?:to the battlefield|under (?:its|their) owner'?s control)\b/i;
+// Exile-removal with delayed return ("When [this] leaves the battlefield,
+// return the exiled card") is NOT flicker — the return is conditional on
+// the source itself leaving, so it functions as durable removal (Oblivion
+// Ring, Fiend Hunter, Banisher Priest). Suppress Flicker when the oracle
+// text contains a "leaves the battlefield" trigger.
+const FLICKER_LEAVES_EXCLUSION_RE =
+  /\bwhen\b[^.]*\bleaves the battlefield\b/i;
 
 // --- Fog (#56 phase 2) ---
 // Mass damage prevention: "Prevent all combat damage that would be dealt
@@ -849,7 +856,9 @@ export function generateTags(card: EnrichedCard): string[] {
 
   // --- Flicker (#56 phase 2) ---
   // Exile-and-return effects (Cloudshift, Ephemerate, Conjurer's Closet).
-  if (FLICKER_RE.test(text)) {
+  // Skip if the card has a "When [this] leaves the battlefield" return —
+  // that's exile-removal (Oblivion Ring / Fiend Hunter), not flicker.
+  if (FLICKER_RE.test(text) && !FLICKER_LEAVES_EXCLUSION_RE.test(text)) {
     tags.add("Flicker");
   }
 

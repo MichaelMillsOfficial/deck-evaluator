@@ -3125,6 +3125,39 @@ test.describe("generateTags — Flicker", () => {
     });
     expect(generateTags(card)).not.toContain("Flicker");
   });
+
+  test("Oblivion Ring (exile-removal with leaves trigger) → no Flicker", () => {
+    // Oblivion Ring is REMOVAL: it exiles on ETB and only returns when the
+    // Ring itself leaves the battlefield. This is not flicker. (Regression
+    // for #56 adversarial review fix.)
+    const card = makeCard({
+      name: "Oblivion Ring",
+      typeLine: "Enchantment",
+      oracleText:
+        "When Oblivion Ring enters the battlefield, exile another target nonland permanent. When Oblivion Ring leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
+    });
+    expect(generateTags(card)).not.toContain("Flicker");
+  });
+
+  test("Banisher Priest (exile-removal with leaves trigger) → no Flicker", () => {
+    const card = makeCard({
+      name: "Banisher Priest",
+      typeLine: "Creature — Human Cleric",
+      oracleText:
+        "When Banisher Priest enters the battlefield, exile target creature an opponent controls until Banisher Priest leaves the battlefield.",
+    });
+    expect(generateTags(card)).not.toContain("Flicker");
+  });
+
+  test("Fiend Hunter (exile-removal with leaves trigger) → no Flicker", () => {
+    const card = makeCard({
+      name: "Fiend Hunter",
+      typeLine: "Creature — Human Cleric",
+      oracleText:
+        "When Fiend Hunter enters the battlefield, you may exile another target creature. When Fiend Hunter leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
+    });
+    expect(generateTags(card)).not.toContain("Flicker");
+  });
 });
 
 // ---------------------------------------------------------------------------
