@@ -3061,3 +3061,95 @@ test.describe("generateTags — Flicker", () => {
     expect(generateTags(card)).not.toContain("Flicker");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Fog (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Fog", () => {
+  test("Fog → Fog", () => {
+    const card = makeCard({
+      name: "Fog",
+      typeLine: "Instant",
+      oracleText: "Prevent all combat damage that would be dealt this turn.",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Holy Day → Fog", () => {
+    const card = makeCard({
+      name: "Holy Day",
+      typeLine: "Instant",
+      oracleText: "Prevent all combat damage that would be dealt this turn.",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Angelsong → Fog", () => {
+    const card = makeCard({
+      name: "Angelsong",
+      typeLine: "Instant",
+      oracleText:
+        "Prevent all combat damage that would be dealt this turn.\nCycling {2}",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Constant Mists → Fog", () => {
+    const card = makeCard({
+      name: "Constant Mists",
+      typeLine: "Instant",
+      oracleText:
+        "Buyback—Sacrifice a land.\nPrevent all combat damage that would be dealt this turn.",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Tangle → Fog", () => {
+    const card = makeCard({
+      name: "Tangle",
+      typeLine: "Instant",
+      oracleText:
+        "Prevent all combat damage that would be dealt this turn. At the beginning of the next turn's untap step, creatures that attacked or blocked this turn don't untap during their controller's untap step.",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Spore Frog → Fog", () => {
+    const card = makeCard({
+      name: "Spore Frog",
+      typeLine: "Creature — Frog",
+      oracleText:
+        "Sacrifice Spore Frog: Prevent all combat damage that would be dealt this turn.",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Knight-Captain of Eos (sac trigger) → Fog", () => {
+    const card = makeCard({
+      name: "Knight-Captain of Eos",
+      typeLine: "Creature — Human Soldier",
+      oracleText:
+        "When Knight-Captain of Eos enters the battlefield, create two 1/1 white Soldier creature tokens.\n{1}{W}, Sacrifice a Soldier: Prevent all combat damage that would be dealt this turn.",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Healing Salve (single-source prevention) → no Fog", () => {
+    const card = makeCard({
+      name: "Healing Salve",
+      typeLine: "Instant",
+      oracleText:
+        "Choose one —\n• Target player gains 3 life.\n• Prevent the next 3 damage that would be dealt to any target this turn.",
+    });
+    expect(generateTags(card)).not.toContain("Fog");
+  });
+
+  test("Lightning Bolt → no Fog", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Fog");
+  });
+});

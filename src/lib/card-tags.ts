@@ -50,6 +50,7 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   "Mana Reduction": { bg: "bg-emerald-500/20", text: "text-emerald-200" },
   "Token Payoff": { bg: "bg-rose-500/20", text: "text-rose-300" },
   Flicker: { bg: "bg-sky-500/20", text: "text-sky-200" },
+  Fog: { bg: "bg-stone-500/20", text: "text-stone-200" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -363,6 +364,13 @@ const TOKEN_PAYOFF_RE =
 // hallmark of removal-with-rider (Path to Exile / Swords to Plowshares).
 const FLICKER_RE =
   /\bexile (?:any number of |another |target |that )(?:[a-z-]+ )*(?:creatures?|permanents?|artifacts?)[^.]*?(?:\.\s+(?!Its controller|It deals|Its owner)[^.]*)?\b(?:return|then return)[^.]*\b(?:to the battlefield|under (?:its|their) owner'?s control)\b/i;
+
+// --- Fog (#56 phase 2) ---
+// Mass damage prevention: "Prevent all combat damage that would be dealt
+// this turn" (Fog, Holy Day, Angelsong) and the rarer "by sources" form.
+// Healing Salve uses "Prevent the next N damage" (single-source) — NOT a fog.
+const FOG_RE =
+  /\bprevent all (?:combat )?damage that would be dealt (?:this turn|by[^.]+this turn)\b/i;
 
 // Discard Payoff — triggers on discard events
 const DISCARD_PAYOFF_TRIGGER_RE = /\bwhenever[^.]*discards?\b/i;
@@ -799,6 +807,13 @@ export function generateTags(card: EnrichedCard): string[] {
   // Exile-and-return effects (Cloudshift, Ephemerate, Conjurer's Closet).
   if (FLICKER_RE.test(text)) {
     tags.add("Flicker");
+  }
+
+  // --- Fog (#56 phase 2) ---
+  // Combat damage prevention (Fog, Holy Day, Constant Mists). Distinct from
+  // single-source prevention spells like Healing Salve.
+  if (FOG_RE.test(text)) {
+    tags.add("Fog");
   }
 
   // --- Secrets of Strixhaven mechanics ---

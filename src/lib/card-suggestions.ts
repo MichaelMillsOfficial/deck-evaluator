@@ -170,6 +170,9 @@ export const TAG_TO_SCRYFALL_QUERY: Record<string, string> = {
   // Flicker: exile-and-return blink effects
   Flicker: '(o:"exile target" o:"return" o:"battlefield")',
 
+  // Fog: mass combat damage prevention
+  Fog: '(o:"prevent all combat damage" o:"this turn")',
+
   // Sacrifice Outlet: sacrifice effects
   "Sacrifice Outlet": '(o:"sacrifice" o:":" or o:"sacrifice a")',
 };
