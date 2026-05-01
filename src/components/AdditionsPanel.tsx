@@ -66,13 +66,13 @@ export default function AdditionsPanel({
   const showPairingZone = !!onPairAdd;
 
   return (
-    <section aria-labelledby="additions-heading">
-      <h3
-        id="additions-heading"
+    <section aria-labelledby="additions-search-label">
+      <h2
+        id="additions-search-label"
         className={styles.heading}
       >
-        Possible Additions
-      </h3>
+        Search for Additions
+      </h2>
       <p className={styles.description}>
         Search for candidate cards and evaluate their impact on your deck
       </p>
