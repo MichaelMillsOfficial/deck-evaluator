@@ -1,63 +1,66 @@
 "use client";
 
+/**
+ * CandidatesContext — thin shim over PendingChangesContext.
+ *
+ * This file is kept for backward compatibility with components that already
+ * consume `useCandidates()`. It re-exports the same surface from
+ * `PendingChangesContext` so existing callers continue to work unchanged.
+ *
+ * The shim is intended to be removed in a follow-up PR once all callers
+ * migrate to `usePendingChanges()` directly.
+ *
+ * NOTE: CandidatesProvider is replaced by PendingChangesProvider in
+ * src/app/reading/(shell)/layout.tsx. This export is kept only so that
+ * any residual import of CandidatesProvider does not break at import time.
+ */
+
+import { type ReactNode } from "react";
 import {
-  createContext,
-  useContext,
-  useState,
-  type Dispatch,
-  type ReactNode,
-  type SetStateAction,
-} from "react";
-import type { EnrichedCard } from "@/lib/types";
-import type { CandidateAnalysis } from "@/lib/candidate-analysis";
+  PendingChangesProvider,
+  usePendingChanges,
+} from "@/contexts/PendingChangesContext";
 
-interface CandidatesState {
-  candidates: string[];
-  setCandidates: Dispatch<SetStateAction<string[]>>;
-  candidateCardMap: Record<string, EnrichedCard>;
-  setCandidateCardMap: Dispatch<SetStateAction<Record<string, EnrichedCard>>>;
-  candidateAnalyses: Record<string, CandidateAnalysis>;
-  setCandidateAnalyses: Dispatch<SetStateAction<Record<string, CandidateAnalysis>>>;
-  candidateErrors: Record<string, string>;
-  setCandidateErrors: Dispatch<SetStateAction<Record<string, string>>>;
-}
-
-const CandidatesContext = createContext<CandidatesState | null>(null);
-
+/** @deprecated Use PendingChangesProvider instead. */
 export function CandidatesProvider({ children }: { children: ReactNode }) {
-  const [candidates, setCandidates] = useState<string[]>([]);
-  const [candidateCardMap, setCandidateCardMap] = useState<
-    Record<string, EnrichedCard>
-  >({});
-  const [candidateAnalyses, setCandidateAnalyses] = useState<
-    Record<string, CandidateAnalysis>
-  >({});
-  const [candidateErrors, setCandidateErrors] = useState<
-    Record<string, string>
-  >({});
-
-  return (
-    <CandidatesContext.Provider
-      value={{
-        candidates,
-        setCandidates,
-        candidateCardMap,
-        setCandidateCardMap,
-        candidateAnalyses,
-        setCandidateAnalyses,
-        candidateErrors,
-        setCandidateErrors,
-      }}
-    >
-      {children}
-    </CandidatesContext.Provider>
-  );
+  // The actual provider is PendingChangesProvider (installed by the shell layout).
+  // This shim passes through without adding a second provider instance.
+  return <>{children}</>;
 }
 
+/**
+ * Backward-compatible hook. Returns a subset of PendingChangesContext
+ * matching the old CandidatesContext surface.
+ */
 export function useCandidates() {
-  const ctx = useContext(CandidatesContext);
-  if (!ctx) {
-    throw new Error("useCandidates must be used within CandidatesProvider");
-  }
-  return ctx;
+  const ctx = usePendingChanges();
+
+  return {
+    candidates: ctx.adds.map((a) => a.name),
+    setCandidates: () => {
+      // no-op: mutations go through addCandidate / removeCandidate
+    },
+    candidateCardMap: Object.fromEntries(
+      ctx.adds.flatMap((a) => (a.enrichedCard ? [[a.name, a.enrichedCard]] : []))
+    ),
+    setCandidateCardMap: () => {
+      // no-op
+    },
+    candidateAnalyses: Object.fromEntries(
+      ctx.adds.flatMap((a) => (a.analysis ? [[a.name, a.analysis]] : []))
+    ),
+    setCandidateAnalyses: () => {
+      // no-op
+    },
+    candidateErrors: Object.fromEntries(
+      ctx.adds.flatMap((a) => (a.error ? [[a.name, a.error]] : []))
+    ),
+    setCandidateErrors: () => {
+      // no-op
+    },
+    // New operations available to code that migrates to this shim
+    addCandidate: ctx.addCandidate,
+    removeCandidate: ctx.removeCandidate,
+    retryEnrich: ctx.retryEnrich,
+  };
 }

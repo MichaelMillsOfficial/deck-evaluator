@@ -5,6 +5,11 @@ import {
   computeTagComparison,
   computeCurveOverlay,
   computeDeckComparison,
+  computeHandKeepabilityComparison,
+  computeBracketComparison,
+  computePowerLevelComparison,
+  computeCompositionComparison,
+  computeExtendedDeckComparison,
 } from "../../src/lib/deck-comparison";
 import type { EnrichedCard } from "../../src/lib/types";
 import { makeCard, makeDeck } from "../helpers";
@@ -520,5 +525,204 @@ test.describe("computeDeckComparison", () => {
     // curveOverlay
     expect(result.curveOverlay).toBeInstanceOf(Array);
     expect(result.curveOverlay.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helpers for richer decks (needed for bracket/power/composition)
+// ---------------------------------------------------------------------------
+
+/** Build a minimal but non-trivial EDH deck (36 lands + 63 non-lands + 1 commander). */
+function makeMinimalCommanderDeck() {
+  const mainboard: { name: string; quantity: number }[] = [];
+  for (let i = 0; i < 36; i++) mainboard.push({ name: `Forest${i}`, quantity: 1 });
+  for (let i = 0; i < 63; i++) mainboard.push({ name: `Creature${i}`, quantity: 1 });
+
+  const commanders = [{ name: "Commander", quantity: 1 }];
+
+  const cardMap: Record<string, EnrichedCard> = {};
+  for (let i = 0; i < 36; i++) cardMap[`Forest${i}`] = makeLand(`Forest${i}`);
+  for (let i = 0; i < 63; i++) cardMap[`Creature${i}`] = makeCreature(`Creature${i}`, 3);
+  cardMap["Commander"] = makeCreature("Commander", 4);
+
+  return { deck: makeDeck({ commanders, mainboard }), cardMap };
+}
+
+// ---------------------------------------------------------------------------
+// computeHandKeepabilityComparison
+// ---------------------------------------------------------------------------
+
+test.describe("computeHandKeepabilityComparison", () => {
+  test("returns statsA, statsB, keepRateDelta, avgScoreDelta with valid shapes", () => {
+    const { deck: deckA, cardMap: cardMapA } = makeMinimalCommanderDeck();
+    const { deck: deckB, cardMap: cardMapB } = makeMinimalCommanderDeck();
+
+    const result = computeHandKeepabilityComparison(deckA, cardMapA, deckB, cardMapB);
+
+    expect(result).toHaveProperty("statsA");
+    expect(result).toHaveProperty("statsB");
+    expect(result).toHaveProperty("keepRateDelta");
+    expect(result).toHaveProperty("avgScoreDelta");
+
+    expect(typeof result.keepRateDelta).toBe("number");
+    expect(typeof result.avgScoreDelta).toBe("number");
+
+    // keepRateDelta = statsB.keepableRate - statsA.keepableRate
+    const expectedDelta = result.statsB.keepableRate - result.statsA.keepableRate;
+    expect(result.keepRateDelta).toBeCloseTo(expectedDelta);
+  });
+
+  test("identical decks produce keepRateDelta near 0", () => {
+    const { deck, cardMap } = makeMinimalCommanderDeck();
+    // Use the same deck for both slots
+    const result = computeHandKeepabilityComparison(deck, cardMap, deck, cardMap, 50);
+    // Not necessarily exactly 0 due to simulation randomness, but delta = 0 always
+    expect(result.keepRateDelta).toBe(result.statsB.keepableRate - result.statsA.keepableRate);
+  });
+
+  test("keepableRate is between 0 and 1", () => {
+    const { deck, cardMap } = makeMinimalCommanderDeck();
+    const result = computeHandKeepabilityComparison(deck, cardMap, deck, cardMap, 20);
+    expect(result.statsA.keepableRate).toBeGreaterThanOrEqual(0);
+    expect(result.statsA.keepableRate).toBeLessThanOrEqual(1);
+    expect(result.statsB.keepableRate).toBeGreaterThanOrEqual(0);
+    expect(result.statsB.keepableRate).toBeLessThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeBracketComparison
+// ---------------------------------------------------------------------------
+
+test.describe("computeBracketComparison", () => {
+  test("returns resultA, resultB, bracketDelta with valid shapes", () => {
+    const { deck: deckA, cardMap: cardMapA } = makeMinimalCommanderDeck();
+    const { deck: deckB, cardMap: cardMapB } = makeMinimalCommanderDeck();
+
+    const result = computeBracketComparison(deckA, cardMapA, deckB, cardMapB);
+
+    expect(result).toHaveProperty("resultA");
+    expect(result).toHaveProperty("resultB");
+    expect(result).toHaveProperty("bracketDelta");
+
+    expect(result.resultA.bracket).toBeGreaterThanOrEqual(1);
+    expect(result.resultA.bracket).toBeLessThanOrEqual(5);
+    expect(result.resultB.bracket).toBeGreaterThanOrEqual(1);
+    expect(result.resultB.bracket).toBeLessThanOrEqual(5);
+    expect(result.bracketDelta).toBe(result.resultB.bracket - result.resultA.bracket);
+  });
+
+  test("bracketDelta = resultB.bracket − resultA.bracket invariant", () => {
+    const { deck: deckA, cardMap: cardMapA } = makeMinimalCommanderDeck();
+    const { deck: deckB, cardMap: cardMapB } = makeMinimalCommanderDeck();
+    const result = computeBracketComparison(deckA, cardMapA, deckB, cardMapB);
+    expect(result.bracketDelta).toBe(result.resultB.bracket - result.resultA.bracket);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computePowerLevelComparison
+// ---------------------------------------------------------------------------
+
+test.describe("computePowerLevelComparison", () => {
+  test("returns resultA, resultB, powerLevelDelta, rawScoreDelta with valid shapes", () => {
+    const { deck: deckA, cardMap: cardMapA } = makeMinimalCommanderDeck();
+    const { deck: deckB, cardMap: cardMapB } = makeMinimalCommanderDeck();
+
+    const result = computePowerLevelComparison(deckA, cardMapA, deckB, cardMapB);
+
+    expect(result).toHaveProperty("resultA");
+    expect(result).toHaveProperty("resultB");
+    expect(result).toHaveProperty("powerLevelDelta");
+    expect(result).toHaveProperty("rawScoreDelta");
+
+    expect(result.resultA.powerLevel).toBeGreaterThanOrEqual(1);
+    expect(result.resultA.powerLevel).toBeLessThanOrEqual(10);
+    expect(result.resultB.powerLevel).toBeGreaterThanOrEqual(1);
+    expect(result.resultB.powerLevel).toBeLessThanOrEqual(10);
+    expect(result.powerLevelDelta).toBe(result.resultB.powerLevel - result.resultA.powerLevel);
+    expect(result.rawScoreDelta).toBeCloseTo(
+      result.resultB.rawScore - result.resultA.rawScore
+    );
+  });
+
+  test("identical decks produce powerLevelDelta = 0 and rawScoreDelta = 0", () => {
+    const { deck, cardMap } = makeMinimalCommanderDeck();
+    const result = computePowerLevelComparison(deck, cardMap, deck, cardMap);
+    expect(result.powerLevelDelta).toBe(0);
+    expect(result.rawScoreDelta).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeCompositionComparison
+// ---------------------------------------------------------------------------
+
+test.describe("computeCompositionComparison", () => {
+  test("returns resultA, resultB each with categories array and overallHealth", () => {
+    const { deck: deckA, cardMap: cardMapA } = makeMinimalCommanderDeck();
+    const { deck: deckB, cardMap: cardMapB } = makeMinimalCommanderDeck();
+
+    const result = computeCompositionComparison(deckA, cardMapA, deckB, cardMapB);
+
+    expect(result).toHaveProperty("resultA");
+    expect(result).toHaveProperty("resultB");
+    expect(result.resultA).toHaveProperty("categories");
+    expect(result.resultB).toHaveProperty("categories");
+    expect(result.resultA).toHaveProperty("overallHealth");
+    expect(result.resultB).toHaveProperty("overallHealth");
+
+    expect(result.resultA.categories).toBeInstanceOf(Array);
+    expect(result.resultB.categories).toBeInstanceOf(Array);
+
+    // Each category should have tag, label, count, status
+    for (const cat of result.resultA.categories) {
+      expect(typeof cat.tag).toBe("string");
+      expect(typeof cat.label).toBe("string");
+      expect(typeof cat.count).toBe("number");
+      expect(typeof cat.status).toBe("string");
+    }
+  });
+
+  test("identical decks produce identical category counts", () => {
+    const { deck, cardMap } = makeMinimalCommanderDeck();
+    const result = computeCompositionComparison(deck, cardMap, deck, cardMap);
+
+    for (let i = 0; i < result.resultA.categories.length; i++) {
+      expect(result.resultA.categories[i].count).toBe(
+        result.resultB.categories[i].count
+      );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeExtendedDeckComparison
+// ---------------------------------------------------------------------------
+
+test.describe("computeExtendedDeckComparison", () => {
+  test("includes all base fields plus the four new fields", () => {
+    const { deck: deckA, cardMap: cardMapA } = makeMinimalCommanderDeck();
+    const { deck: deckB, cardMap: cardMapB } = makeMinimalCommanderDeck();
+
+    const result = computeExtendedDeckComparison(deckA, cardMapA, deckB, cardMapB);
+
+    // Base fields
+    expect(result.cardOverlap).toBeDefined();
+    expect(result.metricDiffs).toBeInstanceOf(Array);
+    expect(result.tagComparison).toBeInstanceOf(Array);
+    expect(result.curveOverlay).toBeInstanceOf(Array);
+
+    // New fields
+    expect(result.handKeepability).toBeDefined();
+    expect(result.bracketComparison).toBeDefined();
+    expect(result.powerLevelComparison).toBeDefined();
+    expect(result.compositionComparison).toBeDefined();
+
+    // Spot-check shapes
+    expect(typeof result.handKeepability.keepRateDelta).toBe("number");
+    expect(typeof result.bracketComparison.bracketDelta).toBe("number");
+    expect(typeof result.powerLevelComparison.powerLevelDelta).toBe("number");
+    expect(result.compositionComparison.resultA.categories).toBeInstanceOf(Array);
   });
 });

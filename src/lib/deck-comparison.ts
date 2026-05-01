@@ -3,6 +3,23 @@ import { computeManaBaseMetrics } from "@/lib/color-distribution";
 import { computeLandBaseEfficiency } from "@/lib/land-base-efficiency";
 import { generateTags } from "@/lib/card-tags";
 import { computeManaCurve } from "@/lib/mana-curve";
+import {
+  runSimulation,
+  buildPool,
+  buildCommandZone,
+  type SimulationStats,
+} from "@/lib/opening-hand";
+import {
+  computeBracketEstimate,
+  type BracketResult,
+} from "@/lib/bracket-estimator";
+import { computePowerLevel, type PowerLevelResult } from "@/lib/power-level";
+import {
+  computeCompositionScorecard,
+  TEMPLATE_8X8,
+  type CompositionScorecardResult,
+} from "@/lib/deck-composition";
+import { STATIC_CEDH_STAPLES } from "@/lib/cedh-staples";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -308,5 +325,155 @@ export function computeDeckComparison(
     metricDiffs: computeMetricDiffs(deckA, cardMapA, deckB, cardMapB),
     tagComparison: computeTagComparison(deckA, cardMapA, deckB, cardMapB),
     curveOverlay: computeCurveOverlay(deckA, cardMapA, deckB, cardMapB),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// New comparison helpers for the four panels added in issue #119
+// ---------------------------------------------------------------------------
+
+// Re-export types for consumers
+export type { SimulationStats, BracketResult, PowerLevelResult, CompositionScorecardResult };
+
+export interface HandKeepabilityComparison {
+  statsA: SimulationStats;
+  statsB: SimulationStats;
+  keepRateDelta: number; // statsB.keepableRate - statsA.keepableRate
+  avgScoreDelta: number;
+}
+
+export interface BracketComparison {
+  resultA: BracketResult;
+  resultB: BracketResult;
+  bracketDelta: number; // resultB.bracket - resultA.bracket
+}
+
+export interface PowerLevelComparison {
+  resultA: PowerLevelResult;
+  resultB: PowerLevelResult;
+  powerLevelDelta: number; // resultB.powerLevel - resultA.powerLevel
+  rawScoreDelta: number;
+}
+
+export interface CompositionComparison {
+  resultA: CompositionScorecardResult;
+  resultB: CompositionScorecardResult;
+}
+
+/**
+ * Computes hand keepability comparison between two decks using opening-hand simulation.
+ * Uses a reduced iteration count (200) to keep comparison fast in UI.
+ */
+export function computeHandKeepabilityComparison(
+  deckA: DeckData,
+  cardMapA: Record<string, EnrichedCard>,
+  deckB: DeckData,
+  cardMapB: Record<string, EnrichedCard>,
+  iterations = 200
+): HandKeepabilityComparison {
+  const commanderIdentityA = new Set(
+    deckA.commanders.flatMap((c) => cardMapA[c.name]?.colorIdentity ?? [])
+  );
+  const commanderIdentityB = new Set(
+    deckB.commanders.flatMap((c) => cardMapB[c.name]?.colorIdentity ?? [])
+  );
+
+  const poolA = buildPool(deckA, cardMapA);
+  const commandZoneA = buildCommandZone(deckA, cardMapA);
+  const statsA = runSimulation(poolA, commanderIdentityA, iterations, commandZoneA);
+
+  const poolB = buildPool(deckB, cardMapB);
+  const commandZoneB = buildCommandZone(deckB, cardMapB);
+  const statsB = runSimulation(poolB, commanderIdentityB, iterations, commandZoneB);
+
+  return {
+    statsA,
+    statsB,
+    keepRateDelta: statsB.keepableRate - statsA.keepableRate,
+    avgScoreDelta: statsB.avgScore - statsA.avgScore,
+  };
+}
+
+/**
+ * Computes bracket estimate comparison between two decks.
+ */
+export function computeBracketComparison(
+  deckA: DeckData,
+  cardMapA: Record<string, EnrichedCard>,
+  deckB: DeckData,
+  cardMapB: Record<string, EnrichedCard>
+): BracketComparison {
+  const powerA = computePowerLevel(deckA, cardMapA);
+  const powerB = computePowerLevel(deckB, cardMapB);
+
+  const resultA = computeBracketEstimate(deckA, cardMapA, powerA, STATIC_CEDH_STAPLES, null);
+  const resultB = computeBracketEstimate(deckB, cardMapB, powerB, STATIC_CEDH_STAPLES, null);
+
+  return {
+    resultA,
+    resultB,
+    bracketDelta: resultB.bracket - resultA.bracket,
+  };
+}
+
+/**
+ * Computes power level comparison between two decks.
+ */
+export function computePowerLevelComparison(
+  deckA: DeckData,
+  cardMapA: Record<string, EnrichedCard>,
+  deckB: DeckData,
+  cardMapB: Record<string, EnrichedCard>
+): PowerLevelComparison {
+  const resultA = computePowerLevel(deckA, cardMapA);
+  const resultB = computePowerLevel(deckB, cardMapB);
+
+  return {
+    resultA,
+    resultB,
+    powerLevelDelta: resultB.powerLevel - resultA.powerLevel,
+    rawScoreDelta: resultB.rawScore - resultA.rawScore,
+  };
+}
+
+/**
+ * Computes composition scorecard comparison between two decks using the 8×8 template.
+ */
+export function computeCompositionComparison(
+  deckA: DeckData,
+  cardMapA: Record<string, EnrichedCard>,
+  deckB: DeckData,
+  cardMapB: Record<string, EnrichedCard>
+): CompositionComparison {
+  const resultA = computeCompositionScorecard(deckA, cardMapA, TEMPLATE_8X8);
+  const resultB = computeCompositionScorecard(deckB, cardMapB, TEMPLATE_8X8);
+
+  return { resultA, resultB };
+}
+
+/** Union of all four new comparison results for the /reading/compare page. */
+export interface ExtendedDeckComparisonResult extends DeckComparisonResult {
+  handKeepability: HandKeepabilityComparison;
+  bracketComparison: BracketComparison;
+  powerLevelComparison: PowerLevelComparison;
+  compositionComparison: CompositionComparison;
+}
+
+/**
+ * Orchestrates all comparison computations including the four new metrics.
+ * Superset of `computeDeckComparison`.
+ */
+export function computeExtendedDeckComparison(
+  deckA: DeckData,
+  cardMapA: Record<string, EnrichedCard>,
+  deckB: DeckData,
+  cardMapB: Record<string, EnrichedCard>
+): ExtendedDeckComparisonResult {
+  return {
+    ...computeDeckComparison(deckA, cardMapA, deckB, cardMapB),
+    handKeepability: computeHandKeepabilityComparison(deckA, cardMapA, deckB, cardMapB),
+    bracketComparison: computeBracketComparison(deckA, cardMapA, deckB, cardMapB),
+    powerLevelComparison: computePowerLevelComparison(deckA, cardMapA, deckB, cardMapB),
+    compositionComparison: computeCompositionComparison(deckA, cardMapA, deckB, cardMapB),
   };
 }

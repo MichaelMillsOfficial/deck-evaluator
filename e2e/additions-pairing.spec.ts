@@ -781,12 +781,12 @@ test.describe("Additions pairing: /reading/compare page", () => {
       timeout: 10_000,
     });
 
-    // Navigate away to compare tab (directly via tab nav)
-    await deckPage.selectDeckViewTab("Compare");
+    // Navigate away to compare tab (directly via URL)
+    await page.goto("/reading/compare");
     await expect(page).toHaveURL(/\/reading\/compare/, { timeout: 5_000 });
 
     // Navigate back to Additions
-    await deckPage.selectDeckViewTab("Additions");
+    await page.goto("/reading/add");
     await expect(page).toHaveURL(/\/reading\/add/, { timeout: 5_000 });
 
     // Pending add should still be there
@@ -810,7 +810,7 @@ test.describe("Additions pairing: /reading/compare page", () => {
     ).toBeVisible({ timeout: 15_000 });
 
     // Navigate directly to /reading/compare without any pending changes
-    await deckPage.selectDeckViewTab("Compare");
+    await page.goto("/reading/compare");
     await expect(page).toHaveURL(/\/reading\/compare/, { timeout: 5_000 });
 
     // Should show empty state with CTAs (not the full comparison)

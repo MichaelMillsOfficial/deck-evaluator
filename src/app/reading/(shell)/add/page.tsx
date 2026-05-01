@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import type { EnrichedCard } from "@/lib/types";
-import { analyzeCandidateCard } from "@/lib/candidate-analysis";
+import { useCallback, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
-import { useCandidates } from "@/contexts/CandidatesContext";
+import { usePendingChanges } from "@/contexts/PendingChangesContext";
 import { readingRunningHead } from "@/lib/reading-format";
 import SectionHeader, {
   type SectionStat,
@@ -13,17 +12,21 @@ import ChapterFooter from "@/components/reading/ChapterFooter";
 import AdditionsPanel from "@/components/AdditionsPanel";
 
 export default function AddPage() {
+  const router = useRouter();
   const { payload, analysisResults } = useDeckSession();
   const {
-    candidates,
-    setCandidates,
-    candidateCardMap,
-    setCandidateCardMap,
-    candidateAnalyses,
-    setCandidateAnalyses,
-    candidateErrors,
-    setCandidateErrors,
-  } = useCandidates();
+    adds,
+    addCandidate,
+    removeCandidate,
+    retryEnrich,
+    pairAdd,
+    unpairAdd,
+    confirmedAdds,
+    unpairedAddNames,
+    confirmedCutNames,
+    buildModifiedDeck,
+    lastAnnouncement,
+  } = usePendingChanges();
 
   const deck = payload?.deck;
   const cardMap = payload?.cardMap;
@@ -38,134 +41,91 @@ export default function AddPage() {
     return names;
   }, [deck]);
 
-  const enrichCandidate = useCallback(
-    async (name: string) => {
-      if (!cardMap || !synergyAnalysis || !deck) return;
-
-      setCandidateErrors((prev) => {
-        if (!(name in prev)) return prev;
-        const next = { ...prev };
-        delete next[name];
-        return next;
-      });
-
-      try {
-        const res = await fetch("/api/deck-enrich", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cardNames: [name] }),
-        });
-        if (!res.ok) {
-          setCandidateErrors((prev) => ({
-            ...prev,
-            [name]: "Failed to fetch card data",
-          }));
-          return;
-        }
-        const json = (await res.json()) as {
-          cards: Record<string, EnrichedCard>;
-        };
-        const enrichedCard = json.cards[name];
-        if (!enrichedCard) {
-          setCandidateErrors((prev) => ({ ...prev, [name]: "Card not found" }));
-          return;
-        }
-        setCandidateCardMap((prev) => ({ ...prev, [name]: enrichedCard }));
-
-        const fullMap = { ...cardMap, [name]: enrichedCard };
-        const analysis = analyzeCandidateCard(
-          enrichedCard,
-          deck,
-          fullMap,
-          synergyAnalysis
-        );
-        setCandidateAnalyses((prev) => ({ ...prev, [name]: analysis }));
-      } catch {
-        setCandidateErrors((prev) => ({
-          ...prev,
-          [name]: "Network error — check your connection",
-        }));
-      }
-    },
-    [cardMap, synergyAnalysis, deck]
-  );
-
   const handleAdd = useCallback(
     async (name: string) => {
-      if (!cardMap || !synergyAnalysis) return;
-      if (candidates.includes(name)) return;
-      setCandidates((prev) => [...prev, name]);
-      await enrichCandidate(name);
+      await addCandidate(name);
     },
-    [cardMap, synergyAnalysis, candidates, enrichCandidate]
+    [addCandidate]
   );
 
-  const handleRemove = useCallback((name: string) => {
-    setCandidates((prev) => prev.filter((c) => c !== name));
-    setCandidateCardMap((prev) => {
-      const next = { ...prev };
-      delete next[name];
-      return next;
-    });
-    setCandidateAnalyses((prev) => {
-      const next = { ...prev };
-      delete next[name];
-      return next;
-    });
-    setCandidateErrors((prev) => {
-      if (!(name in prev)) return prev;
-      const next = { ...prev };
-      delete next[name];
-      return next;
-    });
-  }, []);
+  const handleRemove = useCallback(
+    (name: string) => {
+      removeCandidate(name);
+    },
+    [removeCandidate]
+  );
 
   const handleRetry = useCallback(
     async (name: string) => {
-      await enrichCandidate(name);
+      await retryEnrich(name);
     },
-    [enrichCandidate]
+    [retryEnrich]
   );
 
+  const confirmedCount = confirmedAdds.length;
+  const unpairedCount = unpairedAddNames.size;
+
   const stats = useMemo<SectionStat[] | undefined>(() => {
-    if (!candidates.length) return undefined;
-    const synergyScores = candidates
-      .map((name) => candidateAnalyses[name]?.synergyScore)
+    if (!adds.length) return undefined;
+    const synergyScores = adds
+      .map((a) => a.analysis?.synergyScore)
       .filter((v): v is number => typeof v === "number");
     const avgSynergy =
       synergyScores.length > 0
         ? synergyScores.reduce((s, v) => s + v, 0) / synergyScores.length
         : null;
-    const errorCount = Object.keys(candidateErrors).length;
+    const errorCount = adds.filter((a) => a.error).length;
     return [
       {
         label: "Trying",
-        value: String(candidates.length),
-        sub: candidates.length === 1 ? "candidate" : "candidates",
+        value: String(adds.length),
+        sub: adds.length === 1 ? "candidate" : "candidates",
         accent: true,
+      },
+      {
+        label: "Paired",
+        value: String(confirmedCount),
+        sub: `of ${adds.length}`,
+        accent: confirmedCount > 0,
       },
       {
         label: "Avg Synergy",
         value: avgSynergy === null ? "—" : avgSynergy.toFixed(1),
-        sub: "score / 10",
-      },
-      {
-        label: "Status",
-        value:
-          errorCount > 0
-            ? `${errorCount} err`
-            : candidates.length === Object.keys(candidateAnalyses).length
-              ? "Ready"
-              : "Loading",
-        sub:
-          errorCount > 0
-            ? "retry below"
-            : `${Object.keys(candidateAnalyses).length} scored`,
+        sub: errorCount > 0 ? `${errorCount} err` : "score / 10",
       },
     ];
-  }, [candidates, candidateAnalyses, candidateErrors]);
+  }, [adds, confirmedCount]);
+
+  const candidates = useMemo(() => adds.map((a) => a.name), [adds]);
+  const candidateCardMap = useMemo(
+    () =>
+      Object.fromEntries(
+        adds.flatMap((a) => (a.enrichedCard ? [[a.name, a.enrichedCard]] : []))
+      ),
+    [adds]
+  );
+  const analyses = useMemo(
+    () =>
+      Object.fromEntries(
+        adds.flatMap((a) => (a.analysis ? [[a.name, a.analysis]] : []))
+      ),
+    [adds]
+  );
+  const errors = useMemo(
+    () =>
+      Object.fromEntries(
+        adds.flatMap((a) => (a.error ? [[a.name, a.error]] : []))
+      ),
+    [adds]
+  );
 
   if (!cardMap || !synergyAnalysis || !payload) return null;
+
+  const ctaLabel =
+    confirmedCount > 0
+      ? `Update Reading (${confirmedCount})`
+      : "Update Reading";
+  const ctaDisabled = confirmedCount === 0;
 
   return (
     <div
@@ -173,6 +133,18 @@ export default function AddPage() {
       id="tabpanel-deck-additions"
       aria-labelledby="tab-deck-additions"
     >
+      {/* Aria-live region for pair/unpair announcements */}
+      {lastAnnouncement && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="sr-only"
+          key={lastAnnouncement}
+        >
+          {lastAnnouncement}
+        </p>
+      )}
+
       <SectionHeader
         slug="add"
         runningHead={readingRunningHead(payload.createdAt, payload.deck.name)}
@@ -181,15 +153,83 @@ export default function AddPage() {
         tagline="Try a card not in the deck and see how it would interact with the existing themes."
         stats={stats}
       />
+
+      {/* Update Reading CTA */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-4)",
+          marginBottom: "var(--space-6)",
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          type="button"
+          disabled={ctaDisabled}
+          onClick={() => router.push("/reading/compare")}
+          aria-describedby={ctaDisabled ? "update-reading-hint" : undefined}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            padding: "var(--space-3) var(--space-6)",
+            borderRadius: "var(--btn-radius)",
+            background: ctaDisabled ? "var(--surface-2)" : "var(--accent-gradient)",
+            color: ctaDisabled ? "var(--ink-secondary)" : "var(--ink-on-accent)",
+            fontFamily: "var(--font-sans)",
+            fontWeight: "var(--weight-semibold)",
+            fontSize: "var(--text-sm)",
+            border: "none",
+            cursor: ctaDisabled ? "not-allowed" : "pointer",
+            opacity: ctaDisabled ? 0.6 : 1,
+            transition: "opacity 150ms ease",
+          }}
+          className="motion-reduce:transition-none"
+        >
+          {ctaLabel}
+        </button>
+        {ctaDisabled && adds.length > 0 && (
+          <span
+            id="update-reading-hint"
+            style={{
+              fontSize: "var(--text-xs)",
+              color: "var(--ink-secondary)",
+              fontFamily: "var(--font-sans)",
+            }}
+          >
+            Pair at least one add with a cut to compare
+          </span>
+        )}
+        {!ctaDisabled && unpairedCount > 0 && (
+          <span
+            style={{
+              fontSize: "var(--text-xs)",
+              color: "var(--ink-secondary)",
+              fontFamily: "var(--font-sans)",
+            }}
+          >
+            {unpairedCount} unpaired waiting
+          </span>
+        )}
+      </div>
+
       <AdditionsPanel
         candidates={candidates}
         candidateCardMap={candidateCardMap}
-        analyses={candidateAnalyses}
-        errors={candidateErrors}
+        analyses={analyses}
+        errors={errors}
         onAddCard={handleAdd}
         onRemoveCard={handleRemove}
         onRetryCard={handleRetry}
         deckCardNames={deckCardNames}
+        onPairAdd={pairAdd}
+        onUnpairAdd={unpairAdd}
+        confirmedCutNames={confirmedCutNames}
+        mainboard={deck?.mainboard ?? []}
+        commanders={deck?.commanders ?? []}
+        adds={adds}
+        addNames={new Set(adds.map((a) => a.name))}
       />
       <ChapterFooter current="additions" />
     </div>
