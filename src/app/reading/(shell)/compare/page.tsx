@@ -31,15 +31,29 @@ export default function ComparePage() {
     return buildModifiedDeck(deck);
   }, [deck, confirmedAdds, buildModifiedDeck]);
 
-  // Compute extended comparison only when we have both decks and a card map
+  // Build augmented cardMap for slot B: merge original cardMap with the
+  // enrichedCard from each confirmed add so all 7 panels see the new cards.
+  const cardMapB = useMemo(() => {
+    if (!cardMap) return null;
+    const merged: typeof cardMap = { ...cardMap };
+    for (const add of confirmedAdds) {
+      if (add.enrichedCard) merged[add.name] = add.enrichedCard;
+    }
+    return merged;
+  }, [cardMap, confirmedAdds]);
+
+  // Check whether any confirmed add is still loading (enrichedCard missing)
+  const hasPendingEnrich = confirmedAdds.some((a) => !a.enrichedCard && !a.error);
+
+  // Compute extended comparison only when we have both decks and both card maps
   const comparison = useMemo(() => {
-    if (!deck || !cardMap || !modifiedDeck) return null;
+    if (!deck || !cardMap || !cardMapB || !modifiedDeck) return null;
     try {
-      return computeExtendedDeckComparison(deck, cardMap, modifiedDeck, cardMap);
+      return computeExtendedDeckComparison(deck, cardMap, modifiedDeck, cardMapB);
     } catch {
       return null;
     }
-  }, [deck, cardMap, modifiedDeck]);
+  }, [deck, cardMap, cardMapB, modifiedDeck]);
 
   if (!payload) return null;
 
@@ -60,6 +74,34 @@ export default function ComparePage() {
         title="Original vs Modified"
         tagline="See how your staged swaps change the deck's power level, bracket, hand keepability, and composition."
       />
+
+      {/* Loading state — some confirmed adds are still enriching */}
+      {hasPendingEnrich && !comparison && (
+        <div
+          style={{
+            padding: "var(--space-8) var(--space-6)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-xl)",
+            background: "var(--surface-2)",
+            textAlign: "center",
+            marginBottom: "var(--space-6)",
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <p
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              color: "var(--ink-secondary)",
+              margin: 0,
+            }}
+          >
+            Enriching added cards — comparison will appear once all cards are
+            loaded.
+          </p>
+        </div>
+      )}
 
       {/* Mode 1 — has confirmed pending changes: show all 7 panels */}
       {comparison && modifiedDeck ? (
@@ -171,11 +213,11 @@ export default function ComparePage() {
                     color: "var(--ink-tertiary)",
                   }}
                 >
-                  <span style={{ color: "var(--color-emerald, #10b981)" }}>
+                  <span style={{ color: "var(--color-good)" }}>
                     +{a.name}
                   </span>
                   {" → "}
-                  <span style={{ color: "var(--color-red, #ef4444)" }}>
+                  <span style={{ color: "var(--color-danger)" }}>
                     −{a.pairedCutName}
                   </span>
                 </span>

@@ -62,6 +62,10 @@ export function PendingChangesProvider({ children }: { children: ReactNode }) {
   const [adds, setAdds] = useState<PendingAdd[]>([]);
   const [lastAnnouncement, setLastAnnouncement] = useState<string | null>(null);
   const hydratedRef = useRef(false);
+  // Track names that have already been scheduled for enrichment to prevent
+  // the re-enrich effect from firing again for the same name when `adds`
+  // changes as a result of enrichment completing.
+  const enrichingRef = useRef<Set<string>>(new Set());
 
   const deckId = payload?.deckId ?? null;
   const cardMap = payload?.cardMap ?? null;
@@ -84,12 +88,6 @@ export function PendingChangesProvider({ children }: { children: ReactNode }) {
       pairedCutName: s.pairedCutName,
     }));
     setAdds(restored);
-
-    // Re-enrich each restored add asynchronously (fire-and-forget)
-    for (const add of restored) {
-      // The enrich function will be triggered via the re-enrich logic once deck
-      // data is available. We trigger a silent re-enrich below.
-    }
   }, [deckId]);
 
   // ---------------------------------------------------------------------------
@@ -105,14 +103,20 @@ export function PendingChangesProvider({ children }: { children: ReactNode }) {
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!cardMap || !synergyAnalysis || !deck) return;
-    const needsEnrich = adds.filter((a) => !a.enrichedCard && !a.error);
+    const needsEnrich = adds.filter(
+      (a) => !a.enrichedCard && !a.error && !enrichingRef.current.has(a.name)
+    );
     if (needsEnrich.length === 0) return;
 
     for (const add of needsEnrich) {
-      // Trigger enrichment (we don't await here — it updates state internally)
+      // Mark as in-flight so this effect doesn't re-schedule on the next render
+      // that results from the enrichment itself updating `adds`.
+      // `adds` is intentionally excluded from the dep array to avoid a loop
+      // where every successful enrich triggers another scan of the full list.
+      enrichingRef.current.add(add.name);
       void enrichAdd(add.name);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `adds` excluded intentionally: including it causes a re-fire loop on every enrichment state update; we use enrichingRef to guard against double-scheduling
   }, [cardMap, synergyAnalysis, deck, adds.map((a) => a.name).join(",")]);
 
   // ---------------------------------------------------------------------------
@@ -191,13 +195,21 @@ export function PendingChangesProvider({ children }: { children: ReactNode }) {
   const addCandidate = useCallback(
     async (name: string) => {
       if (!cardMap || !synergyAnalysis) return;
-      // No-op if already in the list
-      if (adds.some((a) => a.name === name)) return;
-
-      setAdds((prev) => [...prev, { name }]);
-      await enrichAdd(name);
+      // Use functional setter form to avoid stale-closure duplicate-add race
+      // when called twice in quick succession (C4 fix).
+      let alreadyPresent = false;
+      setAdds((prev) => {
+        if (prev.some((a) => a.name === name)) {
+          alreadyPresent = true;
+          return prev;
+        }
+        return [...prev, { name }];
+      });
+      if (!alreadyPresent) {
+        await enrichAdd(name);
+      }
     },
-    [cardMap, synergyAnalysis, adds, enrichAdd]
+    [cardMap, synergyAnalysis, enrichAdd]
   );
 
   // ---------------------------------------------------------------------------
@@ -222,30 +234,30 @@ export function PendingChangesProvider({ children }: { children: ReactNode }) {
   // ---------------------------------------------------------------------------
   const pairAdd = useCallback(
     (addName: string, cutName: string) => {
-      // Enforce 1:1 — same cut can't be paired twice
-      const alreadyUsed = adds.some(
-        (a) => a.pairedCutName === cutName && a.name !== addName
-      );
-      if (alreadyUsed) return;
-
-      const confirmedCount = adds.filter(
-        (a) => a.pairedCutName !== undefined
-      ).length;
-
-      setAdds((prev) =>
-        prev.map((a) =>
+      setAdds((prev) => {
+        // Enforce 1:1 — same cut can't be paired twice (uses latest state)
+        const alreadyUsed = prev.some(
+          (a) => a.pairedCutName === cutName && a.name !== addName
+        );
+        if (alreadyUsed) return prev;
+        return prev.map((a) =>
           a.name === addName ? { ...a, pairedCutName: cutName } : a
-        )
-      );
-
-      // New confirmed count (this add becomes confirmed)
-      const newConfirmedCount = confirmedCount + 1;
-      const totalAdds = adds.length;
-      setLastAnnouncement(
-        `${addName} paired with ${cutName}. ${newConfirmedCount} of ${totalAdds} additions paired.`
-      );
+        );
+      });
+      // Announce using latest state snapshot; a tiny race here is acceptable
+      // (announcement count may lag by 1 frame but the mutation is correct).
+      setAdds((prev) => {
+        const confirmedCount = prev.filter(
+          (a) => a.pairedCutName !== undefined
+        ).length;
+        const totalAdds = prev.length;
+        setLastAnnouncement(
+          `${addName} paired with ${cutName}. ${confirmedCount} of ${totalAdds} additions paired.`
+        );
+        return prev;
+      });
     },
-    [adds]
+    []
   );
 
   // ---------------------------------------------------------------------------
@@ -253,23 +265,21 @@ export function PendingChangesProvider({ children }: { children: ReactNode }) {
   // ---------------------------------------------------------------------------
   const unpairAdd = useCallback(
     (addName: string) => {
-      const confirmedCount = adds.filter(
-        (a) => a.pairedCutName !== undefined
-      ).length;
-      const newCount = Math.max(0, confirmedCount - 1);
-      const totalAdds = adds.length;
-
-      setAdds((prev) =>
-        prev.map((a) =>
+      setAdds((prev) => {
+        const updated = prev.map((a) =>
           a.name === addName ? { ...a, pairedCutName: undefined } : a
-        )
-      );
-
-      setLastAnnouncement(
-        `${addName} unpaired. ${newCount} of ${totalAdds} additions paired.`
-      );
+        );
+        const newCount = updated.filter(
+          (a) => a.pairedCutName !== undefined
+        ).length;
+        const totalAdds = updated.length;
+        setLastAnnouncement(
+          `${addName} unpaired. ${newCount} of ${totalAdds} additions paired.`
+        );
+        return updated;
+      });
     },
-    [adds]
+    []
   );
 
   // ---------------------------------------------------------------------------

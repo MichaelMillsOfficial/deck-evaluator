@@ -135,6 +135,51 @@ test.describe("buildModifiedDeck", () => {
     expect(modifiedCount).toBe(originalCount);
   });
 
+  test("cutting a 4-of only removes 1 copy, leaving 3 (strict 1:1 invariant)", () => {
+    const deck = makeDeck({
+      mainboard: [
+        { name: "Forest", quantity: 4 },
+        { name: "Island", quantity: 1 },
+      ],
+    });
+
+    const adds: PendingAdd[] = [makePairedAdd("Lightning Bolt", "Forest")];
+    const result = buildModifiedDeck(deck, adds);
+
+    const forestEntry = result.mainboard.find((c) => c.name === "Forest");
+    expect(forestEntry).toBeDefined();
+    expect(forestEntry?.quantity).toBe(3);
+
+    // Total count preserved (5 total: 4 Forest + 1 Island → 3 Forest + 1 Island + 1 Bolt)
+    const originalCount = deck.mainboard.reduce((s, c) => s + c.quantity, 0);
+    const modifiedCount = result.mainboard.reduce((s, c) => s + c.quantity, 0);
+    expect(modifiedCount).toBe(originalCount);
+  });
+
+  test("cutting a 2-of with two paired swaps removes 1 copy each time", () => {
+    const deck = makeDeck({
+      mainboard: [
+        { name: "Swamp", quantity: 2 },
+        { name: "Island", quantity: 2 },
+      ],
+    });
+
+    const adds: PendingAdd[] = [
+      makePairedAdd("Counterspell", "Swamp"),
+      makePairedAdd("Lightning Bolt", "Swamp"),
+    ];
+    const result = buildModifiedDeck(deck, adds);
+
+    // Both cuts target "Swamp": 2 copies → both removed → entry gone
+    const swampEntry = result.mainboard.find((c) => c.name === "Swamp");
+    expect(swampEntry).toBeUndefined();
+
+    // Total count preserved (4 total → 2 Island + 1 Counterspell + 1 Lightning Bolt)
+    const originalCount = deck.mainboard.reduce((s, c) => s + c.quantity, 0);
+    const modifiedCount = result.mainboard.reduce((s, c) => s + c.quantity, 0);
+    expect(modifiedCount).toBe(originalCount);
+  });
+
   test("preserves commanders untouched", () => {
     const deck = makeDeck({
       commanders: [

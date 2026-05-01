@@ -74,14 +74,35 @@ export function unpairedAddNames(adds: PendingAdd[]): Set<string> {
  * Commanders and sideboard are never touched.
  */
 export function buildModifiedDeck(deck: DeckData, adds: PendingAdd[]): DeckData {
-  const confirmedCuts = confirmedCutNames(adds);
   const confirmedAddNames = adds
     .filter((a) => a.pairedCutName !== undefined)
     .map((a) => a.name);
 
-  const filteredMainboard = deck.mainboard.filter(
-    (c) => !confirmedCuts.has(c.name)
-  );
+  // Build a map of how many copies of each card to cut (strict 1:1 per pair).
+  // Multiple pairs can target the same card name (e.g. cut 2 copies of a 4-of).
+  const cutsRemaining = new Map<string, number>();
+  for (const a of adds) {
+    if (a.pairedCutName !== undefined) {
+      cutsRemaining.set(
+        a.pairedCutName,
+        (cutsRemaining.get(a.pairedCutName) ?? 0) + 1
+      );
+    }
+  }
+
+  // Reduce quantity by 1 per paired cut; drop entries that reach 0.
+  const filteredMainboard: import("@/lib/types").DeckCard[] = [];
+  for (const card of deck.mainboard) {
+    const remaining = cutsRemaining.get(card.name) ?? 0;
+    if (remaining > 0) {
+      const newQty = card.quantity - remaining;
+      cutsRemaining.set(card.name, 0); // consumed all pending cuts for this entry
+      if (newQty > 0) filteredMainboard.push({ ...card, quantity: newQty });
+    } else {
+      filteredMainboard.push(card);
+    }
+  }
+
   const additions = confirmedAddNames.map((name) => ({ name, quantity: 1 }));
 
   return {
