@@ -315,11 +315,19 @@ const SELF_DISCARD_KEYWORDS = new Set(["Cycling", "Connive"]);
 
 // --- Token Generator (#56 phase 2) ---
 // "create ... tokens" — covers creature, Treasure, Clue, Food, etc. tokens.
-// Also matches the passive replacement form on token-doubling enchantments
-// ("...tokens would be created..." / "...tokens are created..." on
-// Anointed Procession, Parallel Lives, Doubling Season).
-const TOKEN_GENERATOR_RE =
-  /\bcreate\b[^.]*\btokens?\b|\btokens?\b[^.]*\b(?:would be created|are created)\b/i;
+// We deliberately use only the active "create" form. Passive forms
+// ("...tokens would be created...") are too easy to misfire on token
+// PAYOFF cards that trigger off token creation but don't generate any
+// tokens themselves. Token-doubler staples (Anointed Procession,
+// Doubling Season, etc.) are admitted via TOKEN_GENERATOR_NAMES.
+const TOKEN_GENERATOR_RE = /\bcreate\b[^.]*\btokens?\b/i;
+const TOKEN_GENERATOR_NAMES = new Set<string>([
+  "Anointed Procession",
+  "Doubling Season",
+  "Parallel Lives",
+  "Mondrak, Glory Dominus",
+  "Adrix and Nev, Twincasters",
+]);
 
 // --- Token Multiplier (#56 phase 2) ---
 // Cards that double / multiply token creation. Covers the "twice that many"
@@ -800,7 +808,15 @@ export function generateTags(card: EnrichedCard): string[] {
 
   // --- Token Generator (#56 phase 2) ---
   // Any "create ... token(s)" effect: creature tokens, Treasure, Clue, Food.
-  if (TOKEN_GENERATOR_RE.test(text)) {
+  // The name allow-list covers token-doubler staples (Anointed Procession,
+  // Doubling Season, Parallel Lives, Mondrak, Adrix and Nev) whose oracle
+  // text uses the passive "tokens would be created" wording — that wording
+  // alone is too ambiguous to match by regex without false positives on
+  // token PAYOFF cards.
+  if (
+    TOKEN_GENERATOR_RE.test(text) ||
+    TOKEN_GENERATOR_NAMES.has(card.name)
+  ) {
     tags.add("Token Generator");
   }
 

@@ -2711,6 +2711,71 @@ test.describe("generateTags — Token Generator", () => {
     });
     expect(generateTags(card)).not.toContain("Token Generator");
   });
+
+  test("Token payoff card (would be created) → no Token Generator", () => {
+    // Hypothetical token payoff: triggers when a token is created but
+    // doesn't itself generate any tokens. Should NOT be tagged Token
+    // Generator. (Regression for #56 adversarial review fix.)
+    const card = makeCard({
+      name: "Hypothetical Token Payoff",
+      typeLine: "Enchantment",
+      oracleText:
+        "Whenever a token would be created under your control, you gain 1 life.",
+    });
+    expect(generateTags(card)).not.toContain("Token Generator");
+  });
+
+  test("Token-buff anthem (tokens are creatures) → no Token Generator", () => {
+    // Static effect that buffs existing tokens. Doesn't create tokens, so
+    // it should NOT be tagged Token Generator.
+    const card = makeCard({
+      name: "Hypothetical Token Anthem",
+      typeLine: "Enchantment",
+      oracleText:
+        "Tokens you control are creatures in addition to their other types.",
+    });
+    expect(generateTags(card)).not.toContain("Token Generator");
+  });
+
+  test("Doubling Season → Token Generator (via name allow-list)", () => {
+    const card = makeCard({
+      name: "Doubling Season",
+      typeLine: "Enchantment",
+      oracleText:
+        "If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.\nIf an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Parallel Lives → Token Generator (via name allow-list)", () => {
+    const card = makeCard({
+      name: "Parallel Lives",
+      typeLine: "Enchantment",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Mondrak, Glory Dominus → Token Generator (via name allow-list)", () => {
+    const card = makeCard({
+      name: "Mondrak, Glory Dominus",
+      typeLine: "Legendary Creature — Phyrexian Horror",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.\nWhenever a nontoken creature you control dies, you may pay 2 life. When you do, return Mondrak from your graveyard to the battlefield.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Adrix and Nev, Twincasters → Token Generator (via name allow-list)", () => {
+    const card = makeCard({
+      name: "Adrix and Nev, Twincasters",
+      typeLine: "Legendary Creature — Merfolk Wizard",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
 });
 
 // ---------------------------------------------------------------------------
