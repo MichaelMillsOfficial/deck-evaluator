@@ -726,14 +726,21 @@ test.describe("Additions pairing: /reading/compare page", () => {
       timeout: 5_000,
     });
 
-    // Pair via suggestion
-    const suggestionButtons = panel.locator("[data-testid='use-suggestion']");
-    if ((await suggestionButtons.count()) === 0) {
-      // No suggestion buttons means feature not fully implemented yet; skip
-      test.skip();
-      return;
-    }
-    await suggestionButtons.first().click();
+    // Pair via "Pick from your deck" (always available; doesn't depend on suggestions)
+    const pickButton = panel.getByRole("button", { name: /Pick from your deck/ });
+    await expect(pickButton).toBeVisible({ timeout: 5_000 });
+    await pickButton.click();
+
+    const sheet = page.getByRole("dialog");
+    await expect(sheet).toBeVisible({ timeout: 3_000 });
+
+    // Pick Sol Ring from the deck
+    const solRingBtn = sheet.getByRole("button", { name: "Sol Ring" }).first();
+    await expect(solRingBtn).toBeVisible({ timeout: 3_000 });
+    await solRingBtn.click();
+
+    // Sheet closes and row collapses to chip-pair
+    await expect(sheet).not.toBeVisible({ timeout: 3_000 });
 
     // Navigate to compare
     const cta = panel.getByRole("button", { name: /Update Reading/ });
@@ -765,6 +772,142 @@ test.describe("Additions pairing: /reading/compare page", () => {
     await expect(
       comparePage.locator("[data-testid='comparison-panel-composition']")
     ).toBeVisible();
+  });
+
+  test("EditModifiedDeckSheet removes pending add and navigating back shows it gone", async ({
+    deckPage,
+    page,
+  }) => {
+    await importDeckAndNavigateToAdditions(deckPage, page);
+    await setupAutocomplete(page, ["Path to Exile"]);
+
+    await addCandidate(page, "Path to Exile");
+
+    const panel = page.locator("#tabpanel-deck-additions");
+    await expect(panel.getByText("Path to Exile").first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(panel.getByText("NEEDS PAIRING")).toBeVisible({
+      timeout: 5_000,
+    });
+
+    // Pair via "Pick from your deck"
+    const pickButton = panel.getByRole("button", { name: /Pick from your deck/ });
+    await expect(pickButton).toBeVisible({ timeout: 5_000 });
+    await pickButton.click();
+
+    const sheet = page.getByRole("dialog");
+    await expect(sheet).toBeVisible({ timeout: 3_000 });
+    const solRingBtn = sheet.getByRole("button", { name: "Sol Ring" }).first();
+    await expect(solRingBtn).toBeVisible({ timeout: 3_000 });
+    await solRingBtn.click();
+    await expect(sheet).not.toBeVisible({ timeout: 3_000 });
+
+    // Navigate to compare
+    const cta = panel.getByRole("button", { name: /Update Reading/ });
+    await expect(cta).toBeEnabled({ timeout: 5_000 });
+    await cta.click();
+    await expect(page).toHaveURL(/\/reading\/compare/, { timeout: 5_000 });
+
+    const comparePage = page.locator("#tabpanel-deck-compare");
+    await expect(
+      comparePage.locator("[data-testid='comparison-panel-mana-curve']")
+    ).toBeVisible({ timeout: 10_000 });
+
+    // Open Edit modified deck sheet
+    const editBtn = comparePage.getByRole("button", { name: /Edit modified deck/ });
+    await expect(editBtn).toBeVisible({ timeout: 3_000 });
+    await editBtn.click();
+
+    const editSheet = page.getByRole("dialog");
+    await expect(editSheet).toBeVisible({ timeout: 3_000 });
+
+    // Remove the Path to Exile swap
+    const removeBtn = editSheet.getByRole("button", {
+      name: /Remove swap.*Path to Exile/,
+    });
+    await expect(removeBtn).toBeVisible({ timeout: 3_000 });
+    await removeBtn.click();
+
+    // Edit sheet closes (last add removed)
+    await expect(editSheet).not.toBeVisible({ timeout: 3_000 });
+
+    // Compare page should now show empty state (no more pending changes)
+    await expect(
+      comparePage.locator("[data-testid='comparison-panel-mana-curve']")
+    ).not.toBeVisible({ timeout: 5_000 });
+
+    // Navigate back to Additions — Path to Exile should be gone
+    await page.goto("/reading/add");
+    await expect(page).toHaveURL(/\/reading\/add/, { timeout: 5_000 });
+    const addPanel = page.locator("#tabpanel-deck-additions");
+    await expect(addPanel.getByText("Path to Exile").first()).not.toBeVisible({
+      timeout: 5_000,
+    });
+  });
+
+  test("round-trip: /reading/compare → /reading/add → /reading/compare preserves state both ways", async ({
+    deckPage,
+    page,
+  }) => {
+    await importDeckAndNavigateToAdditions(deckPage, page);
+    await setupAutocomplete(page, ["Path to Exile"]);
+
+    await addCandidate(page, "Path to Exile");
+
+    const panel = page.locator("#tabpanel-deck-additions");
+    await expect(panel.getByText("Path to Exile").first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(panel.getByText("NEEDS PAIRING")).toBeVisible({
+      timeout: 5_000,
+    });
+
+    // Pair via "Pick from your deck"
+    const pickButton = panel.getByRole("button", { name: /Pick from your deck/ });
+    await expect(pickButton).toBeVisible({ timeout: 5_000 });
+    await pickButton.click();
+    const sheet = page.getByRole("dialog");
+    await expect(sheet).toBeVisible({ timeout: 3_000 });
+    const solRingBtn = sheet.getByRole("button", { name: "Sol Ring" }).first();
+    await expect(solRingBtn).toBeVisible({ timeout: 3_000 });
+    await solRingBtn.click();
+    await expect(sheet).not.toBeVisible({ timeout: 3_000 });
+
+    // Navigate to /reading/compare
+    const cta = panel.getByRole("button", { name: /Update Reading/ });
+    await expect(cta).toBeEnabled({ timeout: 5_000 });
+    await cta.click();
+    await expect(page).toHaveURL(/\/reading\/compare/, { timeout: 5_000 });
+
+    // Compare shows 7 panels — state is there
+    const comparePage = page.locator("#tabpanel-deck-compare");
+    await expect(
+      comparePage.locator("[data-testid='comparison-panel-mana-curve']")
+    ).toBeVisible({ timeout: 10_000 });
+
+    // Navigate back to /reading/add
+    await page.goto("/reading/add");
+    await expect(page).toHaveURL(/\/reading\/add/, { timeout: 5_000 });
+
+    // Pending add should still show as PAIRED (chip-pair, not NEEDS PAIRING)
+    const addPanel = page.locator("#tabpanel-deck-additions");
+    await expect(addPanel.getByText("Path to Exile").first()).toBeVisible({
+      timeout: 5_000,
+    });
+    // Should be paired (chip-pair state) — no NEEDS PAIRING
+    await expect(addPanel.getByText("NEEDS PAIRING")).not.toBeVisible({
+      timeout: 3_000,
+    });
+
+    // Navigate forward to /reading/compare again
+    await page.goto("/reading/compare");
+    await expect(page).toHaveURL(/\/reading\/compare/, { timeout: 5_000 });
+
+    // Panels still there
+    await expect(
+      page.locator("[data-testid='comparison-panel-mana-curve']")
+    ).toBeVisible({ timeout: 10_000 });
   });
 
   test("state preserved when navigating add → compare → add", async ({
@@ -825,7 +968,7 @@ test.describe("Additions pairing: /reading/compare page", () => {
 });
 
 test.describe("Additions pairing: sessionStorage persistence", () => {
-  test("pending changes persist after page reload", async ({
+  test("pending changes persist after page reload on /reading/add", async ({
     deckPage,
     page,
   }) => {
@@ -838,31 +981,30 @@ test.describe("Additions pairing: sessionStorage persistence", () => {
     await expect(panel.getByText("Path to Exile").first()).toBeVisible({
       timeout: 10_000,
     });
+    await expect(panel.getByText("NEEDS PAIRING")).toBeVisible({
+      timeout: 5_000,
+    });
 
-    // Reload the page
+    // Reload the page while on /reading/add
     await page.reload();
-    await setupMocks(page);
-    await setupAutocomplete(page, []);
 
-    // After reload, we should be back at the home (since session state needs
-    // the deck to hydrate from sessionStorage) — OR directly on the add page
-    // if the reading layout successfully hydrated from session.
-    // Either way, navigate to Additions if we end up at /reading
-    const url = page.url();
-    if (url.includes("/reading")) {
-      // The deck was hydrated from sessionStorage
-      if (!url.includes("/add")) {
-        await deckPage.selectDeckViewTab("Additions");
-      }
-      // Pending changes should still be there
-      const addPanel = page.locator("#tabpanel-deck-additions");
-      // Note: on reload the enrichment for the candidate re-runs asynchronously
-      // so we just check the name appears (NEEDS PAIRING or chip-pair state)
-      await expect(addPanel.getByText("Path to Exile").first()).toBeVisible({
-        timeout: 10_000,
-      });
-    }
-    // If we ended up at home, the sessionStorage had the deck but the UI
-    // redirected. This is acceptable behavior — just verify no crash.
+    // Re-register mocks after reload (route handlers are lost on reload)
+    await setupMocks(page);
+    await setupAutocomplete(page, ["Path to Exile"]);
+
+    // After reload, the deck session and pending changes should both hydrate
+    // from sessionStorage. The reading layout keeps us on the reading sub-route
+    // if the session is still present.
+    await expect(page).toHaveURL(/\/reading\/add/, { timeout: 10_000 });
+
+    // Pending changes must still be there after hydration
+    const addPanel = page.locator("#tabpanel-deck-additions");
+    await expect(addPanel.getByText("Path to Exile").first()).toBeVisible({
+      timeout: 10_000,
+    });
+    // NEEDS PAIRING should also appear (card was unpaired before reload)
+    await expect(addPanel.getByText("NEEDS PAIRING")).toBeVisible({
+      timeout: 5_000,
+    });
   });
 });
