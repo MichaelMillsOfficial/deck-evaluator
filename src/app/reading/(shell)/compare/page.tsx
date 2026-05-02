@@ -262,6 +262,11 @@ export default function ComparePage() {
               labelA={labelA}
               labelB={labelB}
             />
+            <CompositionScorecardComparison
+              data={comparison.compositionComparison}
+              labelA={labelA}
+              labelB={labelB}
+            />
             {/* Mana base panel spans two columns to fit the per-color pressure table. */}
             <div style={{ gridColumn: "span 2" }}>
               <ManaBaseComparison
@@ -271,11 +276,6 @@ export default function ComparePage() {
                 labelB={labelB}
               />
             </div>
-            <CompositionScorecardComparison
-              data={comparison.compositionComparison}
-              labelA={labelA}
-              labelB={labelB}
-            />
           </div>
 
           {/* Edit modified deck sheet */}
