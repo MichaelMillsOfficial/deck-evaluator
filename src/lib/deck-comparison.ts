@@ -527,9 +527,13 @@ function classifyVerdict(p: Omit<ColorPressure, "verdict">): ManaPressureVerdict
     if (delta < -NEUTRAL_RATIO_DELTA) return "pressure";
   }
 
-  // Going from no demand to demand: improved iff sources cover, else pressure
+  // Going from no demand to demand: only "improved" when sources cover 1:1+;
+  // a 0.5 ratio is technically supported but practically tight, so it counts
+  // as pressure even though the prior ratio was undefined.
   if (p.pipsA === 0 && p.pipsB > 0) {
-    return p.ratioB >= UNDERSERVED_RATIO_THRESHOLD ? "improved" : "pressure";
+    if (p.ratioB >= 1) return "improved";
+    if (p.ratioB >= UNDERSERVED_RATIO_THRESHOLD) return "pressure";
+    return "underserved";
   }
 
   return "neutral";
@@ -571,17 +575,17 @@ export function computeManaPressureComparison(
     return { ...base, verdict: classifyVerdict(base) };
   });
 
-  // Worst color: the regression with the most negative finite ratio delta on a
-  // color that still has demand post-swap. Ties: pick the one with the most
-  // pip pressure (largest pipsDelta).
+  // Worst color: the pressured/underserved color whose post-swap mana base hurts
+  // most. We score by (1 / ratioB) * pipsB — a low ratio with a lot of demand
+  // is much worse than a low ratio with one off-color pip. ratioB == 0 (demand
+  // with zero sources) gets the maximum penalty.
   let worstColor: MtgColor | null = null;
   let worstScore = 0;
   for (const c of byColor) {
     if (c.verdict !== "pressure" && c.verdict !== "underserved") continue;
     if (c.pipsB === 0) continue;
-    const finiteA = Number.isFinite(c.ratioA) ? c.ratioA : 1;
-    const finiteB = Number.isFinite(c.ratioB) ? c.ratioB : 1;
-    const score = finiteA - finiteB + Math.max(0, c.pipsDelta) * 0.01;
+    const inverseRatio = c.ratioB > 0 ? 1 / c.ratioB : 1000;
+    const score = inverseRatio * c.pipsB;
     if (score > worstScore) {
       worstScore = score;
       worstColor = c.color;
