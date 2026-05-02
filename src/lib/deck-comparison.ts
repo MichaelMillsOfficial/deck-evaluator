@@ -1,5 +1,10 @@
 import type { DeckData, EnrichedCard } from "@/lib/types";
-import { computeManaBaseMetrics } from "@/lib/color-distribution";
+import {
+  computeColorDistribution,
+  computeManaBaseMetrics,
+  MTG_COLORS,
+  type MtgColor,
+} from "@/lib/color-distribution";
 import { computeLandBaseEfficiency } from "@/lib/land-base-efficiency";
 import { generateTags } from "@/lib/card-tags";
 import { computeManaCurve } from "@/lib/mana-curve";
@@ -451,12 +456,152 @@ export function computeCompositionComparison(
   return { resultA, resultB };
 }
 
+// ---------------------------------------------------------------------------
+// Mana pressure: per-color pip vs source delta
+// ---------------------------------------------------------------------------
+
+/**
+ * One color's pip-vs-source picture across both decks.
+ *
+ * verdict semantics (only emitted when at least one side has demand):
+ *   - "improved":    pip-per-source ratio improved or sources increased to keep pace
+ *   - "pressure":    pips went up but sources did not — the user's exact concern
+ *   - "underserved": post-swap ratio below the safe threshold (sources/pips < 0.45)
+ *                    even when pips didn't move; flags a baseline-bad mana base
+ *   - "neutral":     ratio movement is small or both sides are zero
+ */
+export type ManaPressureVerdict =
+  | "improved"
+  | "pressure"
+  | "underserved"
+  | "neutral";
+
+export interface ColorPressure {
+  color: MtgColor;
+  pipsA: number;
+  pipsB: number;
+  pipsDelta: number;
+  sourcesA: number;
+  sourcesB: number;
+  sourcesDelta: number;
+  /** sources / pips; Infinity when no demand on either side, 0 when no sources */
+  ratioA: number;
+  ratioB: number;
+  verdict: ManaPressureVerdict;
+}
+
+export interface ManaPressureComparison {
+  byColor: ColorPressure[];
+  /** Color with the worst regression (largest negative ratio delta with non-zero pips). null if none. */
+  worstColor: MtgColor | null;
+  /** Whether any color is flagged "pressure" or "underserved" in slot B. */
+  anyPressure: boolean;
+}
+
+/** Threshold below which a color is considered structurally under-supported. */
+const UNDERSERVED_RATIO_THRESHOLD = 0.45;
+/** Ratio delta within this band counts as "neutral" (avoids noise). */
+const NEUTRAL_RATIO_DELTA = 0.05;
+
+function computeRatio(sources: number, pips: number): number {
+  if (pips === 0) return sources > 0 ? Infinity : 0;
+  return sources / pips;
+}
+
+function classifyVerdict(p: Omit<ColorPressure, "verdict">): ManaPressureVerdict {
+  if (p.pipsA === 0 && p.pipsB === 0) return "neutral";
+
+  // Both sides have demand and post-swap ratio is below the floor → underserved
+  if (p.pipsB > 0 && p.ratioB < UNDERSERVED_RATIO_THRESHOLD) {
+    if (p.pipsB > p.pipsA && p.sourcesDelta <= 0) return "pressure";
+    return "underserved";
+  }
+
+  // Pips went up but sources did not keep pace → pressure (user's exact case)
+  if (p.pipsB > p.pipsA && p.sourcesDelta <= 0) return "pressure";
+
+  // Use ratio delta when both sides had demand
+  if (p.pipsA > 0 && p.pipsB > 0) {
+    const delta = p.ratioB - p.ratioA;
+    if (delta > NEUTRAL_RATIO_DELTA) return "improved";
+    if (delta < -NEUTRAL_RATIO_DELTA) return "pressure";
+  }
+
+  // Going from no demand to demand: improved iff sources cover, else pressure
+  if (p.pipsA === 0 && p.pipsB > 0) {
+    return p.ratioB >= UNDERSERVED_RATIO_THRESHOLD ? "improved" : "pressure";
+  }
+
+  return "neutral";
+}
+
+/**
+ * Computes per-color mana pressure between two decks.
+ *
+ * Surfaces the case the user described: adds increase pip demand for a color
+ * (e.g. three RRR spells) without lifting that color's source count.
+ */
+export function computeManaPressureComparison(
+  deckA: DeckData,
+  cardMapA: Record<string, EnrichedCard>,
+  deckB: DeckData,
+  cardMapB: Record<string, EnrichedCard>
+): ManaPressureComparison {
+  const distA = computeColorDistribution(deckA, cardMapA);
+  const distB = computeColorDistribution(deckB, cardMapB);
+
+  const byColor: ColorPressure[] = MTG_COLORS.map((color) => {
+    const pipsA = distA.pips[color];
+    const pipsB = distB.pips[color];
+    const sourcesA = distA.sources[color];
+    const sourcesB = distB.sources[color];
+    const ratioA = computeRatio(sourcesA, pipsA);
+    const ratioB = computeRatio(sourcesB, pipsB);
+    const base: Omit<ColorPressure, "verdict"> = {
+      color,
+      pipsA,
+      pipsB,
+      pipsDelta: pipsB - pipsA,
+      sourcesA,
+      sourcesB,
+      sourcesDelta: sourcesB - sourcesA,
+      ratioA,
+      ratioB,
+    };
+    return { ...base, verdict: classifyVerdict(base) };
+  });
+
+  // Worst color: the regression with the most negative finite ratio delta on a
+  // color that still has demand post-swap. Ties: pick the one with the most
+  // pip pressure (largest pipsDelta).
+  let worstColor: MtgColor | null = null;
+  let worstScore = 0;
+  for (const c of byColor) {
+    if (c.verdict !== "pressure" && c.verdict !== "underserved") continue;
+    if (c.pipsB === 0) continue;
+    const finiteA = Number.isFinite(c.ratioA) ? c.ratioA : 1;
+    const finiteB = Number.isFinite(c.ratioB) ? c.ratioB : 1;
+    const score = finiteA - finiteB + Math.max(0, c.pipsDelta) * 0.01;
+    if (score > worstScore) {
+      worstScore = score;
+      worstColor = c.color;
+    }
+  }
+
+  const anyPressure = byColor.some(
+    (c) => c.verdict === "pressure" || c.verdict === "underserved"
+  );
+
+  return { byColor, worstColor, anyPressure };
+}
+
 /** Union of all four new comparison results for the /reading/compare page. */
 export interface ExtendedDeckComparisonResult extends DeckComparisonResult {
   handKeepability: HandKeepabilityComparison;
   bracketComparison: BracketComparison;
   powerLevelComparison: PowerLevelComparison;
   compositionComparison: CompositionComparison;
+  manaPressure: ManaPressureComparison;
 }
 
 /**
@@ -475,5 +620,6 @@ export function computeExtendedDeckComparison(
     bracketComparison: computeBracketComparison(deckA, cardMapA, deckB, cardMapB),
     powerLevelComparison: computePowerLevelComparison(deckA, cardMapA, deckB, cardMapB),
     compositionComparison: computeCompositionComparison(deckA, cardMapA, deckB, cardMapB),
+    manaPressure: computeManaPressureComparison(deckA, cardMapA, deckB, cardMapB),
   };
 }

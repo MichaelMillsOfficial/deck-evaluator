@@ -9,6 +9,7 @@ import {
   computeBracketComparison,
   computePowerLevelComparison,
   computeCompositionComparison,
+  computeManaPressureComparison,
   computeExtendedDeckComparison,
 } from "../../src/lib/deck-comparison";
 import type { EnrichedCard } from "../../src/lib/types";
@@ -718,11 +719,265 @@ test.describe("computeExtendedDeckComparison", () => {
     expect(result.bracketComparison).toBeDefined();
     expect(result.powerLevelComparison).toBeDefined();
     expect(result.compositionComparison).toBeDefined();
+    expect(result.manaPressure).toBeDefined();
 
     // Spot-check shapes
     expect(typeof result.handKeepability.keepRateDelta).toBe("number");
     expect(typeof result.bracketComparison.bracketDelta).toBe("number");
     expect(typeof result.powerLevelComparison.powerLevelDelta).toBe("number");
     expect(result.compositionComparison.resultA.categories).toBeInstanceOf(Array);
+    expect(result.manaPressure.byColor).toHaveLength(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeManaPressureComparison
+// ---------------------------------------------------------------------------
+
+function makeRedSpell(name: string, redPips: number, cmc: number): EnrichedCard {
+  const cost = "{R}".repeat(redPips) + (cmc - redPips > 0 ? `{${cmc - redPips}}` : "");
+  return makeCard({
+    name,
+    manaCost: cost,
+    cmc,
+    colorIdentity: ["R"],
+    colors: ["R"],
+    typeLine: "Sorcery",
+    manaPips: { W: 0, U: 0, B: 0, R: redPips, G: 0, C: 0 },
+  });
+}
+
+function makeBasicLand(name: string, color: "W" | "U" | "B" | "R" | "G"): EnrichedCard {
+  const subMap = {
+    W: "Plains",
+    U: "Island",
+    B: "Swamp",
+    R: "Mountain",
+    G: "Forest",
+  } as const;
+  return makeCard({
+    name,
+    typeLine: `Basic Land — ${subMap[color]}`,
+    supertypes: ["Basic"],
+    subtypes: [subMap[color]],
+    producedMana: [color],
+  });
+}
+
+test.describe("computeManaPressureComparison", () => {
+  test("returns one entry per WUBRG color even when deck is empty", () => {
+    const deck = makeDeck({ mainboard: [] });
+    const result = computeManaPressureComparison(deck, {}, deck, {});
+    expect(result.byColor).toHaveLength(5);
+    expect(result.byColor.map((c) => c.color).sort()).toEqual(
+      ["B", "G", "R", "U", "W"]
+    );
+    expect(result.anyPressure).toBe(false);
+    expect(result.worstColor).toBeNull();
+  });
+
+  test("identical decks produce all-neutral verdicts and no pressure", () => {
+    const lightning = makeRedSpell("Lightning Bolt", 1, 1);
+    const mountain = makeBasicLand("Mountain", "R");
+    const cardMap = { "Lightning Bolt": lightning, Mountain: mountain };
+    const deck = makeDeck({
+      mainboard: [
+        { name: "Lightning Bolt", quantity: 4 },
+        { name: "Mountain", quantity: 20 },
+      ],
+    });
+    const result = computeManaPressureComparison(deck, cardMap, deck, cardMap);
+    for (const c of result.byColor) {
+      expect(c.pipsDelta).toBe(0);
+      expect(c.sourcesDelta).toBe(0);
+      expect(c.verdict).toBe("neutral");
+    }
+    expect(result.anyPressure).toBe(false);
+  });
+
+  test("user case: adds add 9 R pips without adding red sources → pressure", () => {
+    // Original deck: 1× Lightning Bolt (1R pip) + 7 Mountains (7 R sources)
+    // Modified: cut a Forest (irrelevant), add 3× spell with 3 R pips each
+    // Net: pipsDelta(R) = +9, sourcesDelta(R) = 0 → pressure on R
+    const lightning = makeRedSpell("Lightning Bolt", 1, 1);
+    const triple = makeRedSpell("Triple Red Spell", 3, 4);
+    const mountain = makeBasicLand("Mountain", "R");
+    const forest = makeBasicLand("Forest", "G");
+
+    const cardMapA: Record<string, EnrichedCard> = {
+      "Lightning Bolt": lightning,
+      Mountain: mountain,
+      Forest: forest,
+    };
+    const deckA = makeDeck({
+      mainboard: [
+        { name: "Lightning Bolt", quantity: 1 },
+        { name: "Mountain", quantity: 7 },
+        { name: "Forest", quantity: 4 },
+      ],
+    });
+
+    const cardMapB: Record<string, EnrichedCard> = {
+      ...cardMapA,
+      "Triple Red Spell": triple,
+    };
+    const deckB = makeDeck({
+      mainboard: [
+        { name: "Lightning Bolt", quantity: 1 },
+        { name: "Triple Red Spell", quantity: 3 },
+        { name: "Mountain", quantity: 7 },
+        { name: "Forest", quantity: 1 }, // 3 cut
+      ],
+    });
+
+    const result = computeManaPressureComparison(deckA, cardMapA, deckB, cardMapB);
+    const r = result.byColor.find((c) => c.color === "R")!;
+    expect(r.pipsA).toBe(1);
+    expect(r.pipsB).toBe(10);
+    expect(r.pipsDelta).toBe(9);
+    expect(r.sourcesA).toBe(7);
+    expect(r.sourcesB).toBe(7);
+    expect(r.sourcesDelta).toBe(0);
+    expect(r.verdict).toBe("pressure");
+    expect(result.anyPressure).toBe(true);
+    expect(result.worstColor).toBe("R");
+  });
+
+  test("adding red lands while keeping pip count constant → improved on R", () => {
+    const lightning = makeRedSpell("Lightning Bolt", 1, 1);
+    const mountain = makeBasicLand("Mountain", "R");
+    const forest = makeBasicLand("Forest", "G");
+
+    const cardMap: Record<string, EnrichedCard> = {
+      "Lightning Bolt": lightning,
+      Mountain: mountain,
+      Forest: forest,
+    };
+    const deckA = makeDeck({
+      mainboard: [
+        { name: "Lightning Bolt", quantity: 4 },
+        { name: "Mountain", quantity: 4 },
+        { name: "Forest", quantity: 8 },
+      ],
+    });
+    const deckB = makeDeck({
+      mainboard: [
+        { name: "Lightning Bolt", quantity: 4 },
+        { name: "Mountain", quantity: 8 },
+        { name: "Forest", quantity: 4 },
+      ],
+    });
+    const result = computeManaPressureComparison(deckA, cardMap, deckB, cardMap);
+    const r = result.byColor.find((c) => c.color === "R")!;
+    expect(r.pipsDelta).toBe(0);
+    expect(r.sourcesDelta).toBe(4);
+    expect(r.verdict).toBe("improved");
+  });
+
+  test("ratio below 0.45 in slot B is flagged underserved", () => {
+    // 12 R pips, 4 R sources → ratio 0.33 — well below the 0.45 floor
+    const triple = makeRedSpell("Triple Red Spell", 3, 4);
+    const mountain = makeBasicLand("Mountain", "R");
+    const forest = makeBasicLand("Forest", "G");
+    const cardMap: Record<string, EnrichedCard> = {
+      "Triple Red Spell": triple,
+      Mountain: mountain,
+      Forest: forest,
+    };
+    const deck = makeDeck({
+      mainboard: [
+        { name: "Triple Red Spell", quantity: 4 },
+        { name: "Mountain", quantity: 4 },
+        { name: "Forest", quantity: 20 },
+      ],
+    });
+    const result = computeManaPressureComparison(deck, cardMap, deck, cardMap);
+    const r = result.byColor.find((c) => c.color === "R")!;
+    expect(r.ratioB).toBeCloseTo(4 / 12, 3);
+    expect(r.verdict).toBe("underserved");
+    expect(result.anyPressure).toBe(true);
+  });
+
+  test("introducing a brand-new color with no sources is flagged pressure", () => {
+    const mountain = makeBasicLand("Mountain", "R");
+    const forest = makeBasicLand("Forest", "G");
+    const blueSpell = makeCard({
+      name: "Counterspell",
+      manaCost: "{U}{U}",
+      cmc: 2,
+      colorIdentity: ["U"],
+      colors: ["U"],
+      typeLine: "Instant",
+      manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
+    });
+    const cardMapA: Record<string, EnrichedCard> = {
+      Mountain: mountain,
+      Forest: forest,
+    };
+    const deckA = makeDeck({
+      mainboard: [
+        { name: "Mountain", quantity: 10 },
+        { name: "Forest", quantity: 10 },
+      ],
+    });
+    const cardMapB = { ...cardMapA, Counterspell: blueSpell };
+    const deckB = makeDeck({
+      mainboard: [
+        { name: "Counterspell", quantity: 4 },
+        { name: "Mountain", quantity: 10 },
+        { name: "Forest", quantity: 6 },
+      ],
+    });
+    const result = computeManaPressureComparison(deckA, cardMapA, deckB, cardMapB);
+    const u = result.byColor.find((c) => c.color === "U")!;
+    expect(u.pipsA).toBe(0);
+    expect(u.pipsB).toBe(8);
+    expect(u.sourcesB).toBe(0);
+    expect(u.verdict).toBe("pressure");
+  });
+
+  test("multiple pressured colors → worstColor is the largest regression", () => {
+    // R loses by a hair; B loses dramatically (large pip increase, no sources)
+    const redSpell = makeRedSpell("Bolt", 1, 1);
+    const blackSpell = makeCard({
+      name: "Drain",
+      manaCost: "{B}{B}{B}",
+      cmc: 3,
+      colorIdentity: ["B"],
+      colors: ["B"],
+      typeLine: "Sorcery",
+      manaPips: { W: 0, U: 0, B: 3, R: 0, G: 0, C: 0 },
+    });
+    const mountain = makeBasicLand("Mountain", "R");
+    const swamp = makeBasicLand("Swamp", "B");
+    const forest = makeBasicLand("Forest", "G");
+    const cardMapA: Record<string, EnrichedCard> = {
+      Bolt: redSpell,
+      Mountain: mountain,
+      Swamp: swamp,
+      Forest: forest,
+    };
+    const deckA = makeDeck({
+      mainboard: [
+        { name: "Bolt", quantity: 1 },
+        { name: "Mountain", quantity: 6 },
+        { name: "Swamp", quantity: 6 },
+        { name: "Forest", quantity: 10 },
+      ],
+    });
+    const cardMapB = { ...cardMapA, Drain: blackSpell };
+    const deckB = makeDeck({
+      mainboard: [
+        { name: "Bolt", quantity: 2 }, // +1 R pip
+        { name: "Drain", quantity: 4 }, // +12 B pips, no swamps added
+        { name: "Mountain", quantity: 6 },
+        { name: "Swamp", quantity: 6 },
+        { name: "Forest", quantity: 5 },
+      ],
+    });
+    const result = computeManaPressureComparison(deckA, cardMapA, deckB, cardMapB);
+    expect(result.worstColor).toBe("B");
+    const b = result.byColor.find((c) => c.color === "B")!;
+    expect(b.verdict).toBe("pressure");
   });
 });

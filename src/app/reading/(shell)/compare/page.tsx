@@ -58,7 +58,11 @@ export default function ComparePage() {
   if (!payload) return null;
 
   const deckName = payload.deck.name;
-  const labelA = deckName || "Original";
+  // In the modified-compare view the contrast that matters is "current state"
+  // vs "after staged swaps", so labelA is always "Current" — the deck name is
+  // already shown in the SectionHeader running head above.
+  void deckName;
+  const labelA = "Current";
   const labelB = "Modified";
 
   return (
@@ -260,6 +264,7 @@ export default function ComparePage() {
             />
             <ManaBaseComparison
               diffs={comparison.metricDiffs}
+              pressure={comparison.manaPressure}
               labelA={labelA}
               labelB={labelB}
             />
