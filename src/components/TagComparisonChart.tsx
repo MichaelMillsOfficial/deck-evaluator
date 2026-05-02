@@ -66,8 +66,14 @@ export default function TagComparisonChart({ data, labelA, labelB }: TagComparis
     return () => mql.removeEventListener("change", handler);
   }, []);
 
-  // Only show tags where at least one deck has cards with that tag
-  const filteredData = data.filter((t) => t.countA > 0 || t.countB > 0).slice(0, MAX_TAGS_CHART);
+  // Show only tags whose counts actually changed between the two decks.
+  // Same-count tags are noise — a comparison view should surface deltas, not
+  // an inventory of unchanged categories. Sorted by magnitude so the biggest
+  // swings come first.
+  const filteredData = data
+    .filter((t) => t.diff !== 0)
+    .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+    .slice(0, MAX_TAGS_CHART);
 
   return (
     <section
@@ -82,7 +88,9 @@ export default function TagComparisonChart({ data, labelA, labelB }: TagComparis
       </h3>
 
       {filteredData.length === 0 ? (
-        <p className="text-sm text-slate-500 italic">No tags found in either deck.</p>
+        <p className="text-sm text-slate-500 italic">
+          No tag changes between {labelA} and {labelB}.
+        </p>
       ) : (
         <>
           {/* Chart — hidden on mobile, shown on sm+ */}
