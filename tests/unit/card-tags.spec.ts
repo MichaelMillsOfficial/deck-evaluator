@@ -2324,3 +2324,1170 @@ test.describe("generateTags — Secrets of Strixhaven mechanics", () => {
     expect(tags).not.toContain("Increment");
   });
 });
+
+// ---------------------------------------------------------------------------
+// GitHub issue #56 — Phase 1 false-positive fixes
+// ---------------------------------------------------------------------------
+
+test.describe("generateTags — issue #56 false-positive fixes", () => {
+  test("Invasion of Kaldheim // Pyre of the World Tree → NOT Board Wipe", () => {
+    // Front face says "exile all cards from your hand" — matches BOARD_WIPE_RE
+    // /\b(?:destroy|exile)\s+all\b/i, but is hand-exile, not a permanent wipe.
+    // Name-based denylist excludes the DFC.
+    const card = makeCard({
+      name: "Invasion of Kaldheim // Pyre of the World Tree",
+      typeLine: "Battle — Siege // Enchantment",
+      oracleText:
+        "When this Siege enters, exile all cards from your hand, then draw that many cards. Until the end of your next turn, you may play cards exiled this way.\n\nDiscard a land card: Pyre of the World Tree deals 2 damage to any target.\nWhenever you discard a land card, exile the top card of your library. You may play that card this turn.",
+      layout: "transform",
+    });
+    expect(generateTags(card)).not.toContain("Board Wipe");
+  });
+
+  test("Abraded Bluffs (deals 1 damage to target opponent) → NOT Removal", () => {
+    // Land that pings an OPPONENT, not a creature/permanent. The previous
+    // REMOVAL_DAMAGE_RE matched any "deals N damage to ... target" — too loose.
+    const card = makeCard({
+      name: "Abraded Bluffs",
+      typeLine: "Land — Desert",
+      oracleText:
+        "Abraded Bluffs enters tapped.\nWhen Abraded Bluffs enters, it deals 1 damage to target opponent.\n{T}: Add {R} or {W}.",
+      producedMana: ["R", "W"],
+    });
+    expect(generateTags(card)).not.toContain("Removal");
+  });
+
+  test("Dewdrop Cure (Gift: opponent draws a card) → NOT Card Draw", () => {
+    // The "draw a card" clause refers to an OPPONENT (Gift mechanic). Not your draw.
+    const card = makeCard({
+      name: "Dewdrop Cure",
+      typeLine: "Sorcery",
+      oracleText:
+        "Gift a card (You may promise an opponent a gift as you cast this spell. If you do, they draw a card before its other effects.)\nReturn up to two target creature cards each with mana value 2 or less from your graveyard to the battlefield. If the gift was promised, instead return up to three target creature cards each with mana value 2 or less from your graveyard to the battlefield.",
+    });
+    expect(generateTags(card)).not.toContain("Card Draw");
+  });
+
+  // ---- Regression: existing tests that MUST still pass after the tightening ----
+
+  test("Lightning Bolt (any target) → still Removal", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Chain Lightning (target creature, player, or planeswalker) → still Removal", () => {
+    const card = makeCard({
+      name: "Chain Lightning",
+      typeLine: "Sorcery",
+      oracleText:
+        "Chain Lightning deals 3 damage to any target. Then that player or that permanent's controller may pay {R}{R}. If the player does, they may copy this spell and may choose a new target for the copy.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Lightning Helix (any target) → still Removal", () => {
+    const card = makeCard({
+      name: "Lightning Helix",
+      typeLine: "Instant",
+      oracleText: "Lightning Helix deals 3 damage to any target and you gain 3 life.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Wrath of God → still Board Wipe (denylist regression)", () => {
+    const card = makeCard({
+      name: "Wrath of God",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all creatures. They can't be regenerated.",
+    });
+    expect(generateTags(card)).toContain("Board Wipe");
+  });
+
+  test("Damnation → still Board Wipe", () => {
+    const card = makeCard({
+      name: "Damnation",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all creatures. They can't be regenerated.",
+    });
+    expect(generateTags(card)).toContain("Board Wipe");
+  });
+
+  test("Cyclonic Rift overload → still Board Wipe", () => {
+    const card = makeCard({
+      name: "Cyclonic Rift",
+      typeLine: "Instant",
+      oracleText:
+        "Return target nonland permanent you don't control to its owner's hand.\nOverload {6}{U} (You may cast this spell for its overload cost. If you do, change \"target\" in its text to \"each.\")\nReturn all nonland permanents your opponents control to their owners' hands.",
+    });
+    expect(generateTags(card)).toContain("Board Wipe");
+  });
+
+  test("Sign in Blood (target player draws) → still Card Draw", () => {
+    const card = makeCard({
+      name: "Sign in Blood",
+      typeLine: "Sorcery",
+      oracleText: "Target player draws two cards and loses 2 life.",
+    });
+    expect(generateTags(card)).toContain("Card Draw");
+  });
+
+  test("Brainstorm → still Card Draw", () => {
+    const card = makeCard({
+      name: "Brainstorm",
+      typeLine: "Instant",
+      oracleText:
+        "Draw three cards, then put two cards from your hand on top of your library in any order.",
+    });
+    expect(generateTags(card)).toContain("Card Draw");
+  });
+
+  test("Concentrate → still Card Draw", () => {
+    const card = makeCard({
+      name: "Concentrate",
+      typeLine: "Sorcery",
+      oracleText: "Draw three cards.",
+    });
+    expect(generateTags(card)).toContain("Card Draw");
+  });
+
+  test("Phyrexian Arena (per-turn draw) → still Card Draw", () => {
+    const card = makeCard({
+      name: "Phyrexian Arena",
+      typeLine: "Enchantment",
+      oracleText:
+        "At the beginning of your upkeep, you draw a card and you lose 1 life.",
+    });
+    expect(generateTags(card)).toContain("Card Draw");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GitHub issue #56 — Phase 1 false-negative fixes (existing tags)
+// ---------------------------------------------------------------------------
+
+test.describe("generateTags — issue #56 false-negative fixes", () => {
+  test("Banefire (X damage) → Removal", () => {
+    const card = makeCard({
+      name: "Banefire",
+      typeLine: "Sorcery",
+      manaCost: "{X}{R}",
+      oracleText:
+        "Banefire deals X damage to any target. If X is 5 or more, this spell can't be countered and the damage can't be prevented.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Leyline Tyrant (deals that much damage) → Removal", () => {
+    const card = makeCard({
+      name: "Leyline Tyrant",
+      typeLine: "Creature — Dragon",
+      oracleText:
+        "Flying\nYou don't lose unspent red mana as steps and phases end.\nWhen Leyline Tyrant dies, you may pay any amount of {R}. When you do, it deals that much damage to any target.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Bonecrusher Giant // Stomp (combined oracle text, deals 2 to any target) → Removal", () => {
+    const card = makeCard({
+      name: "Bonecrusher Giant // Stomp",
+      typeLine: "Creature — Giant // Instant — Adventure",
+      oracleText:
+        "Whenever Bonecrusher Giant becomes the target of a spell, Bonecrusher Giant deals 2 damage to that spell's controller.\n\nDamage can't be prevented this turn. Stomp deals 2 damage to any target.",
+      layout: "adventure",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Comet Storm (X damage divided) → Removal", () => {
+    const card = makeCard({
+      name: "Comet Storm",
+      typeLine: "Instant",
+      oracleText:
+        "Multikicker {2}\nComet Storm deals X damage divided as you choose among any number of target creatures and/or players.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  test("Braid of Fire (cumulative upkeep — Add {R}) → Ramp", () => {
+    const card = makeCard({
+      name: "Braid of Fire",
+      typeLine: "Enchantment",
+      oracleText:
+        "Cumulative upkeep—Add {R}. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)",
+    });
+    expect(generateTags(card)).toContain("Ramp");
+  });
+
+  test("Mana Geyser (Add {R} for each tapped land) → Ramp", () => {
+    const card = makeCard({
+      name: "Mana Geyser",
+      typeLine: "Sorcery",
+      oracleText: "Add {R} for each tapped land your opponents control.",
+    });
+    expect(generateTags(card)).toContain("Ramp");
+  });
+
+  test("Karn's Sylex (Destroy each nonland permanent ... mana value) → Board Wipe", () => {
+    const card = makeCard({
+      name: "Karn's Sylex",
+      typeLine: "Legendary Artifact",
+      oracleText:
+        "Players can't pay life to cast spells or to activate abilities that aren't mana abilities.\n{X}, {T}, Exile Karn's Sylex: Destroy each nonland permanent with mana value X or less. Activate only as a sorcery.",
+    });
+    expect(generateTags(card)).toContain("Board Wipe");
+  });
+
+  test("Winter Moon (untap restriction) → Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Winter Moon",
+      typeLine: "Enchantment",
+      oracleText:
+        "Players can't untap more than one nonbasic land during their untap steps.",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Generous Plunderer (creates Treasure tokens) → Ramp", () => {
+    const card = makeCard({
+      name: "Generous Plunderer",
+      typeLine: "Creature — Human Rogue",
+      oracleText:
+        "Menace\nAt the beginning of your upkeep, you may create a Treasure token. When you do, target opponent creates a tapped Treasure token.\nWhenever Generous Plunderer attacks, it deals damage to defending player equal to the number of artifacts they control.",
+    });
+    expect(generateTags(card)).toContain("Ramp");
+  });
+
+  test("Entrapment Maneuver (target player sacrifices a creature) → Removal", () => {
+    const card = makeCard({
+      name: "Entrapment Maneuver",
+      typeLine: "Instant",
+      oracleText:
+        "Target player sacrifices an attacking creature. You create X 1/1 white Soldier creature tokens, where X is that creature's toughness.",
+    });
+    expect(generateTags(card)).toContain("Removal");
+  });
+
+  // ---- Regression: existing tags that MUST still pass after additions ----
+
+  test("Armageddon → still Mass Land Denial (after MLD_DONT_UNTAP_RE addition)", () => {
+    const card = makeCard({
+      name: "Armageddon",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all lands.",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+
+  test("Ravages of War → still Mass Land Denial", () => {
+    const card = makeCard({
+      name: "Ravages of War",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all lands.",
+    });
+    expect(generateTags(card)).toContain("Mass Land Denial");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token Generator (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Token Generator", () => {
+  test("Anax, Hardened in the Forge → Token Generator", () => {
+    const card = makeCard({
+      name: "Anax, Hardened in the Forge",
+      typeLine: "Legendary Enchantment Creature — God",
+      oracleText:
+        "Indestructible\nAs long as your devotion to red is less than five, Anax isn't a creature.\nWhenever Anax or another nontoken creature you control dies, create a 1/1 red Satyr creature token with haste unless that creature was a Satyr. If the creature's power was 4 or greater, create that many tokens instead.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Cat Collector → Token Generator", () => {
+    const card = makeCard({
+      name: "Cat Collector",
+      typeLine: "Creature — Cat",
+      oracleText:
+        "Whenever Cat Collector attacks, create a 1/1 white Cat creature token.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Decree of Justice → Token Generator", () => {
+    const card = makeCard({
+      name: "Decree of Justice",
+      typeLine: "Sorcery",
+      oracleText:
+        "Create X 4/4 white Angel creature tokens with flying. Then create X 1/1 white Soldier creature tokens.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Defiler of Faith → Token Generator", () => {
+    const card = makeCard({
+      name: "Defiler of Faith",
+      typeLine: "Creature — Phyrexian Cleric",
+      oracleText:
+        "As an additional cost to cast a white spell, you may pay 2 life. If you do, that spell costs {W} less to cast.\nWhenever you cast a white spell, create a 1/1 white Spirit creature token.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Elspeth, Storm Slayer → Token Generator", () => {
+    const card = makeCard({
+      name: "Elspeth, Storm Slayer",
+      typeLine: "Legendary Planeswalker — Elspeth",
+      oracleText:
+        "+2: Creatures you control get +1/+1 and gain double strike until end of turn.\n-2: If you control a creature, create twice that many 1/1 white Soldier creature tokens.\n-7: Exile up to two target nonland permanents. Each opponent creates a 2/2 white Knight creature token with vigilance.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Elspeth, Sun's Champion → Token Generator", () => {
+    const card = makeCard({
+      name: "Elspeth, Sun's Champion",
+      typeLine: "Legendary Planeswalker — Elspeth",
+      oracleText:
+        "+1: Create three 1/1 white Soldier creature tokens.\n-3: Destroy all creatures with power 4 or greater.\n-7: You get an emblem with \"Creatures you control get +2/+2 and have flying.\"",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Entrapment Maneuver → Token Generator", () => {
+    const card = makeCard({
+      name: "Entrapment Maneuver",
+      typeLine: "Instant",
+      oracleText:
+        "Target player sacrifices an attacking creature. You create two 1/1 white Soldier creature tokens.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Knight-Captain of Eos → Token Generator", () => {
+    const card = makeCard({
+      name: "Knight-Captain of Eos",
+      typeLine: "Creature — Human Soldier",
+      oracleText:
+        "When Knight-Captain of Eos enters the battlefield, create two 1/1 white Soldier creature tokens.\n{1}{W}, Sacrifice a Soldier: Prevent all combat damage that would be dealt this turn.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Generous Plunderer (Treasure tokens) → Token Generator", () => {
+    const card = makeCard({
+      name: "Generous Plunderer",
+      typeLine: "Creature — Human Pirate",
+      oracleText:
+        "When Generous Plunderer enters the battlefield, create a Treasure token.\nWhenever Generous Plunderer deals combat damage to a player, that player creates a Treasure token.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Bitterblossom → Token Generator", () => {
+    const card = makeCard({
+      name: "Bitterblossom",
+      typeLine: "Tribal Enchantment — Faerie",
+      oracleText:
+        "At the beginning of your upkeep, you lose 1 life and create a 1/1 black Faerie creature token with flying.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Krenko, Mob Boss → Token Generator", () => {
+    const card = makeCard({
+      name: "Krenko, Mob Boss",
+      typeLine: "Legendary Creature — Goblin Warrior",
+      oracleText:
+        "{T}: Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Avenger of Zendikar → Token Generator", () => {
+    const card = makeCard({
+      name: "Avenger of Zendikar",
+      typeLine: "Creature — Elemental",
+      oracleText:
+        "When Avenger of Zendikar enters the battlefield, create a 0/1 green Plant creature token for each land you control.\nLandfall — Whenever a land you control enters, put a +1/+1 counter on each Plant creature you control.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Anointed Procession → Token Generator (and Token Multiplier)", () => {
+    const card = makeCard({
+      name: "Anointed Procession",
+      typeLine: "Enchantment",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Lightning Bolt → no Token Generator", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Token Generator");
+  });
+
+  test("Counterspell → no Token Generator", () => {
+    const card = makeCard({
+      name: "Counterspell",
+      typeLine: "Instant",
+      oracleText: "Counter target spell.",
+    });
+    expect(generateTags(card)).not.toContain("Token Generator");
+  });
+
+  test("Token payoff card (would be created) → no Token Generator", () => {
+    // Hypothetical token payoff: triggers when a token is created but
+    // doesn't itself generate any tokens. Should NOT be tagged Token
+    // Generator. (Regression for #56 adversarial review fix.)
+    const card = makeCard({
+      name: "Hypothetical Token Payoff",
+      typeLine: "Enchantment",
+      oracleText:
+        "Whenever a token would be created under your control, you gain 1 life.",
+    });
+    expect(generateTags(card)).not.toContain("Token Generator");
+  });
+
+  test("Token-buff anthem (tokens are creatures) → no Token Generator", () => {
+    // Static effect that buffs existing tokens. Doesn't create tokens, so
+    // it should NOT be tagged Token Generator.
+    const card = makeCard({
+      name: "Hypothetical Token Anthem",
+      typeLine: "Enchantment",
+      oracleText:
+        "Tokens you control are creatures in addition to their other types.",
+    });
+    expect(generateTags(card)).not.toContain("Token Generator");
+  });
+
+  test("Doubling Season → Token Generator (via name allow-list)", () => {
+    const card = makeCard({
+      name: "Doubling Season",
+      typeLine: "Enchantment",
+      oracleText:
+        "If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.\nIf an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Parallel Lives → Token Generator (via name allow-list)", () => {
+    const card = makeCard({
+      name: "Parallel Lives",
+      typeLine: "Enchantment",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Mondrak, Glory Dominus → Token Generator (via name allow-list)", () => {
+    const card = makeCard({
+      name: "Mondrak, Glory Dominus",
+      typeLine: "Legendary Creature — Phyrexian Horror",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.\nWhenever a nontoken creature you control dies, you may pay 2 life. When you do, return Mondrak from your graveyard to the battlefield.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+
+  test("Adrix and Nev, Twincasters → Token Generator (via name allow-list)", () => {
+    const card = makeCard({
+      name: "Adrix and Nev, Twincasters",
+      typeLine: "Legendary Creature — Merfolk Wizard",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.",
+    });
+    expect(generateTags(card)).toContain("Token Generator");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token Multiplier (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Token Multiplier", () => {
+  test("Anointed Procession → Token Multiplier", () => {
+    const card = makeCard({
+      name: "Anointed Procession",
+      typeLine: "Enchantment",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.",
+    });
+    expect(generateTags(card)).toContain("Token Multiplier");
+  });
+
+  test("Doubling Season → Token Multiplier", () => {
+    const card = makeCard({
+      name: "Doubling Season",
+      typeLine: "Enchantment",
+      oracleText:
+        "If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.\nIf an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead.",
+    });
+    expect(generateTags(card)).toContain("Token Multiplier");
+  });
+
+  test("Parallel Lives → Token Multiplier", () => {
+    const card = makeCard({
+      name: "Parallel Lives",
+      typeLine: "Enchantment",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.",
+    });
+    expect(generateTags(card)).toContain("Token Multiplier");
+  });
+
+  test("Mondrak, Glory Dominus → Token Multiplier", () => {
+    const card = makeCard({
+      name: "Mondrak, Glory Dominus",
+      typeLine: "Legendary Creature — Phyrexian Horror",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.\nWhenever a nontoken creature you control dies, you may pay 2 life. When you do, return Mondrak from your graveyard to the battlefield. Activate only if Mondrak is on its third stage.",
+    });
+    expect(generateTags(card)).toContain("Token Multiplier");
+  });
+
+  test("Adrix and Nev, Twincasters → Token Multiplier", () => {
+    const card = makeCard({
+      name: "Adrix and Nev, Twincasters",
+      typeLine: "Legendary Creature — Merfolk Wizard",
+      oracleText:
+        "If one or more tokens would be created under your control, twice that many of those tokens are created instead.",
+    });
+    expect(generateTags(card)).toContain("Token Multiplier");
+  });
+
+  test("Elspeth, Storm Slayer (twice that many tokens) → Token Multiplier", () => {
+    const card = makeCard({
+      name: "Elspeth, Storm Slayer",
+      typeLine: "Legendary Planeswalker — Elspeth",
+      oracleText:
+        "+2: Creatures you control get +1/+1 and gain double strike until end of turn.\n-2: If you control a creature, create twice that many 1/1 white Soldier creature tokens.\n-7: Exile up to two target nonland permanents. Each opponent creates a 2/2 white Knight creature token with vigilance.",
+    });
+    expect(generateTags(card)).toContain("Token Multiplier");
+  });
+
+  test("Furnace of Rath (deals double that damage) → no Token Multiplier", () => {
+    const card = makeCard({
+      name: "Furnace of Rath",
+      typeLine: "Enchantment",
+      oracleText:
+        "If a source would deal damage to a permanent or player, it deals double that damage to that permanent or player instead.",
+    });
+    expect(generateTags(card)).not.toContain("Token Multiplier");
+  });
+
+  test("Lightning Bolt → no Token Multiplier", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Token Multiplier");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mana Reduction (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Mana Reduction", () => {
+  test("Defiler of Faith → Mana Reduction", () => {
+    const card = makeCard({
+      name: "Defiler of Faith",
+      typeLine: "Creature — Phyrexian Cleric",
+      oracleText:
+        "As an additional cost to cast a white spell, you may pay 2 life. If you do, that spell costs {W} less to cast.\nWhenever you cast a white spell, create a 1/1 white Spirit creature token.",
+    });
+    expect(generateTags(card)).toContain("Mana Reduction");
+  });
+
+  test("Defiler of Instinct → Mana Reduction", () => {
+    const card = makeCard({
+      name: "Defiler of Instinct",
+      typeLine: "Creature — Phyrexian Minotaur",
+      oracleText:
+        "As an additional cost to cast a red spell, you may pay 2 life. If you do, that spell costs {R} less to cast.\nWhenever you cast a red spell, Defiler of Instinct deals 1 damage to any target.",
+    });
+    expect(generateTags(card)).toContain("Mana Reduction");
+  });
+
+  test("Defiler of Vigor → Mana Reduction", () => {
+    const card = makeCard({
+      name: "Defiler of Vigor",
+      typeLine: "Creature — Phyrexian Hellion",
+      oracleText:
+        "As an additional cost to cast a green spell, you may pay 2 life. If you do, that spell costs {G} less to cast.\nWhenever you cast a green spell, put a +1/+1 counter on each creature you control with a +1/+1 counter on it.",
+    });
+    expect(generateTags(card)).toContain("Mana Reduction");
+  });
+
+  test("Defiler of Flesh (Grandeur) → Mana Reduction", () => {
+    const card = makeCard({
+      name: "Defiler of Flesh",
+      typeLine: "Creature — Phyrexian Horror",
+      oracleText:
+        "As an additional cost to cast a black spell, you may pay 2 life. If you do, that spell costs {B} less to cast.\nWhenever you cast a black spell, target creature you control gets +1/+1 and gains menace until end of turn.",
+    });
+    expect(generateTags(card)).toContain("Mana Reduction");
+  });
+
+  test("Defiler of Dreams → Mana Reduction", () => {
+    const card = makeCard({
+      name: "Defiler of Dreams",
+      typeLine: "Creature — Phyrexian Sphinx",
+      oracleText:
+        "As an additional cost to cast a blue spell, you may pay 2 life. If you do, that spell costs {U} less to cast.\nWhenever you cast a blue spell, draw a card.",
+    });
+    expect(generateTags(card)).toContain("Mana Reduction");
+  });
+
+  test("Goblin Electromancer (cost reduction) → no Mana Reduction", () => {
+    const card = makeCard({
+      name: "Goblin Electromancer",
+      typeLine: "Creature — Goblin Wizard",
+      oracleText:
+        "Instant and sorcery spells you cast cost {1} less to cast.",
+    });
+    const tags = generateTags(card);
+    expect(tags).not.toContain("Mana Reduction");
+    expect(tags).toContain("Cost Reduction");
+  });
+
+  test("Lightning Bolt → no Mana Reduction", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Mana Reduction");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token Payoff (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Token Payoff", () => {
+  test("Impact Tremors → Token Payoff", () => {
+    const card = makeCard({
+      name: "Impact Tremors",
+      typeLine: "Enchantment",
+      oracleText:
+        "Whenever a creature enters the battlefield under your control, Impact Tremors deals 1 damage to each opponent.",
+    });
+    expect(generateTags(card)).toContain("Token Payoff");
+  });
+
+  test("Purphoros, God of the Forge → Token Payoff", () => {
+    const card = makeCard({
+      name: "Purphoros, God of the Forge",
+      typeLine: "Legendary Enchantment Creature — God",
+      oracleText:
+        "Indestructible\nAs long as your devotion to red is less than five, Purphoros isn't a creature.\nWhenever another creature enters the battlefield under your control, Purphoros deals 2 damage to each opponent.\n{2}{R}: Creatures you control get +1/+0 until end of turn.",
+    });
+    expect(generateTags(card)).toContain("Token Payoff");
+  });
+
+  test("Terror of the Peaks → Token Payoff", () => {
+    const card = makeCard({
+      name: "Terror of the Peaks",
+      typeLine: "Creature — Dragon",
+      oracleText:
+        "Flying\nWhenever another creature enters the battlefield under your control, Terror of the Peaks deals damage equal to that creature's power to any target.",
+    });
+    expect(generateTags(card)).toContain("Token Payoff");
+  });
+
+  test("Warstorm Surge → Token Payoff", () => {
+    const card = makeCard({
+      name: "Warstorm Surge",
+      typeLine: "Enchantment",
+      oracleText:
+        "Whenever a creature enters the battlefield under your control, it deals damage equal to its power to any target.",
+    });
+    expect(generateTags(card)).toContain("Token Payoff");
+  });
+
+  test("Witty Roastmaster → Token Payoff", () => {
+    const card = makeCard({
+      name: "Witty Roastmaster",
+      typeLine: "Creature — Human Warrior",
+      oracleText:
+        "Whenever Witty Roastmaster or another creature enters the battlefield under your control, that creature deals 1 damage to any opponent or planeswalker an opponent controls.",
+    });
+    expect(generateTags(card)).toContain("Token Payoff");
+  });
+
+  test("Pandemonium → Token Payoff", () => {
+    const card = makeCard({
+      name: "Pandemonium",
+      typeLine: "Enchantment",
+      oracleText:
+        "Whenever a creature enters the battlefield, that creature's controller may have it deal damage equal to its power to any target.",
+    });
+    expect(generateTags(card)).toContain("Token Payoff");
+  });
+
+  test("Brainstorm → no Token Payoff", () => {
+    const card = makeCard({
+      name: "Brainstorm",
+      typeLine: "Instant",
+      oracleText:
+        "Draw three cards, then put two cards from your hand on top of your library in any order.",
+    });
+    expect(generateTags(card)).not.toContain("Token Payoff");
+  });
+
+  test("Lightning Bolt → no Token Payoff", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Token Payoff");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Flicker (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Flicker", () => {
+  test("Cloudshift → Flicker", () => {
+    const card = makeCard({
+      name: "Cloudshift",
+      typeLine: "Instant",
+      oracleText:
+        "Exile target creature you control, then return that card to the battlefield under your control.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Ephemerate → Flicker", () => {
+    const card = makeCard({
+      name: "Ephemerate",
+      typeLine: "Instant",
+      oracleText:
+        "Exile target creature you control, then return that card to the battlefield under its owner's control.\nRebound",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Eerie Interlude → Flicker", () => {
+    const card = makeCard({
+      name: "Eerie Interlude",
+      typeLine: "Instant",
+      oracleText:
+        "Exile any number of target creatures you control. Return those cards to the battlefield under their owner's control at the beginning of the next end step.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Conjurer's Closet → Flicker", () => {
+    const card = makeCard({
+      name: "Conjurer's Closet",
+      typeLine: "Artifact",
+      oracleText:
+        "At the beginning of your end step, you may exile target creature you control, then return that card to the battlefield under its owner's control.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Soulherder → Flicker", () => {
+    const card = makeCard({
+      name: "Soulherder",
+      typeLine: "Creature — Spirit",
+      oracleText:
+        "Whenever a creature is exiled from the battlefield, put a +1/+1 counter on Soulherder.\nAt the beginning of your end step, you may exile another target creature you control, then return that card to the battlefield under its owner's control.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Restoration Angel → Flicker", () => {
+    const card = makeCard({
+      name: "Restoration Angel",
+      typeLine: "Creature — Angel",
+      oracleText:
+        "Flash\nFlying\nWhen Restoration Angel enters the battlefield, you may exile target non-Angel creature you control, then return that card to the battlefield under its owner's control.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Eldrazi Displacer → Flicker", () => {
+    const card = makeCard({
+      name: "Eldrazi Displacer",
+      typeLine: "Creature — Eldrazi",
+      oracleText:
+        "Devoid\n{2}{C}: Exile another target creature, then return it to the battlefield tapped under its owner's control.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Getaway Glamer → Flicker", () => {
+    const card = makeCard({
+      name: "Getaway Glamer",
+      typeLine: "Instant",
+      oracleText:
+        "Exile target creature or artifact you control, then return that card to the battlefield under its owner's control.",
+    });
+    expect(generateTags(card)).toContain("Flicker");
+  });
+
+  test("Path to Exile → no Flicker", () => {
+    const card = makeCard({
+      name: "Path to Exile",
+      typeLine: "Instant",
+      oracleText:
+        "Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
+    });
+    expect(generateTags(card)).not.toContain("Flicker");
+  });
+
+  test("Swords to Plowshares → no Flicker", () => {
+    const card = makeCard({
+      name: "Swords to Plowshares",
+      typeLine: "Instant",
+      oracleText:
+        "Exile target creature. Its controller gains life equal to its power.",
+    });
+    expect(generateTags(card)).not.toContain("Flicker");
+  });
+
+  test("Oblivion Ring (exile-removal with leaves trigger) → no Flicker", () => {
+    // Oblivion Ring is REMOVAL: it exiles on ETB and only returns when the
+    // Ring itself leaves the battlefield. This is not flicker. (Regression
+    // for #56 adversarial review fix.)
+    const card = makeCard({
+      name: "Oblivion Ring",
+      typeLine: "Enchantment",
+      oracleText:
+        "When Oblivion Ring enters the battlefield, exile another target nonland permanent. When Oblivion Ring leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
+    });
+    expect(generateTags(card)).not.toContain("Flicker");
+  });
+
+  test("Banisher Priest (exile-removal with leaves trigger) → no Flicker", () => {
+    const card = makeCard({
+      name: "Banisher Priest",
+      typeLine: "Creature — Human Cleric",
+      oracleText:
+        "When Banisher Priest enters the battlefield, exile target creature an opponent controls until Banisher Priest leaves the battlefield.",
+    });
+    expect(generateTags(card)).not.toContain("Flicker");
+  });
+
+  test("Fiend Hunter (exile-removal with leaves trigger) → no Flicker", () => {
+    const card = makeCard({
+      name: "Fiend Hunter",
+      typeLine: "Creature — Human Cleric",
+      oracleText:
+        "When Fiend Hunter enters the battlefield, you may exile another target creature. When Fiend Hunter leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
+    });
+    expect(generateTags(card)).not.toContain("Flicker");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fog (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Fog", () => {
+  test("Fog → Fog", () => {
+    const card = makeCard({
+      name: "Fog",
+      typeLine: "Instant",
+      oracleText: "Prevent all combat damage that would be dealt this turn.",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Holy Day → Fog", () => {
+    const card = makeCard({
+      name: "Holy Day",
+      typeLine: "Instant",
+      oracleText: "Prevent all combat damage that would be dealt this turn.",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Angelsong → Fog", () => {
+    const card = makeCard({
+      name: "Angelsong",
+      typeLine: "Instant",
+      oracleText:
+        "Prevent all combat damage that would be dealt this turn.\nCycling {2}",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Constant Mists → Fog", () => {
+    const card = makeCard({
+      name: "Constant Mists",
+      typeLine: "Instant",
+      oracleText:
+        "Buyback—Sacrifice a land.\nPrevent all combat damage that would be dealt this turn.",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Tangle → Fog", () => {
+    const card = makeCard({
+      name: "Tangle",
+      typeLine: "Instant",
+      oracleText:
+        "Prevent all combat damage that would be dealt this turn. At the beginning of the next turn's untap step, creatures that attacked or blocked this turn don't untap during their controller's untap step.",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Spore Frog → Fog", () => {
+    const card = makeCard({
+      name: "Spore Frog",
+      typeLine: "Creature — Frog",
+      oracleText:
+        "Sacrifice Spore Frog: Prevent all combat damage that would be dealt this turn.",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Knight-Captain of Eos (sac trigger) → Fog", () => {
+    const card = makeCard({
+      name: "Knight-Captain of Eos",
+      typeLine: "Creature — Human Soldier",
+      oracleText:
+        "When Knight-Captain of Eos enters the battlefield, create two 1/1 white Soldier creature tokens.\n{1}{W}, Sacrifice a Soldier: Prevent all combat damage that would be dealt this turn.",
+    });
+    expect(generateTags(card)).toContain("Fog");
+  });
+
+  test("Healing Salve (single-source prevention) → no Fog", () => {
+    const card = makeCard({
+      name: "Healing Salve",
+      typeLine: "Instant",
+      oracleText:
+        "Choose one —\n• Target player gains 3 life.\n• Prevent the next 3 damage that would be dealt to any target this turn.",
+    });
+    expect(generateTags(card)).not.toContain("Fog");
+  });
+
+  test("Lightning Bolt → no Fog", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Fog");
+  });
+
+  test("Awe Strike (single-source prevention by target creature) → no Fog", () => {
+    // "Prevent all damage that would be dealt by target creature this turn"
+    // is single-source prevention, not a fog. (Regression for #56
+    // adversarial review fix.)
+    const card = makeCard({
+      name: "Awe Strike",
+      typeLine: "Instant",
+      oracleText:
+        "Prevent all damage that would be dealt by target creature this turn. You gain life equal to that creature's power.",
+    });
+    expect(generateTags(card)).not.toContain("Fog");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hatebear / Tax (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Hatebear / Tax", () => {
+  test("Sphere of Resistance (spells cost {1} more) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Sphere of Resistance",
+      typeLine: "Artifact",
+      oracleText: "Spells cost {1} more to cast.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Thorn of Amethyst (noncreature spells cost more) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Thorn of Amethyst",
+      typeLine: "Artifact",
+      oracleText: "Noncreature spells cost {1} more to cast.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Kambal, Consul of Allocation (opponents pay) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Kambal, Consul of Allocation",
+      typeLine: "Legendary Creature — Human Advisor",
+      oracleText:
+        "Whenever an opponent casts a noncreature spell, that player loses 2 life and you gain 2 life.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Aven Interruptor (allow-list) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Aven Interruptor",
+      typeLine: "Creature — Bird Detective",
+      oracleText:
+        "Flash\nFlying\nWhen Aven Interruptor enters the battlefield, plot target nonland card in an opponent's graveyard, hand, or library, then that player shuffles. (You may cast that card on a later turn without paying its mana cost.)",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Thalia, Guardian of Thraben (allow-list) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Thalia, Guardian of Thraben",
+      typeLine: "Legendary Creature — Human Soldier",
+      oracleText:
+        "First strike\nNoncreature spells cost {1} more to cast.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Grand Abolisher (allow-list) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Grand Abolisher",
+      typeLine: "Creature — Human Cleric",
+      oracleText:
+        "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Esper Sentinel (allow-list) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Esper Sentinel",
+      typeLine: "Artifact Creature — Human Soldier",
+      oracleText:
+        "Whenever an opponent casts their first noncreature spell each turn, unless that player pays {X}, where X is Esper Sentinel's power, draw a card.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Drannith Magistrate (allow-list) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Drannith Magistrate",
+      typeLine: "Creature — Human Wizard",
+      oracleText:
+        "Your opponents can't cast spells from anywhere other than their hands.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+
+  test("Lightning Bolt → no Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Hatebear / Tax");
+  });
+
+  test("Symmetric anthem-debuff (creature spells cost more) → no Hatebear / Tax", () => {
+    // A symmetric cost increase that hits both players' creature spells is
+    // not a hatebear — it's an anthem-debuff. (Regression for #56
+    // adversarial review fix.) Sphere of Resistance / Thorn of Amethyst
+    // also have symmetric oracle text but ARE hatebears in practice; they
+    // remain tagged via the HATEBEAR_TAX_NAMES allow-list.
+    const card = makeCard({
+      name: "Hypothetical Symmetric Tax",
+      typeLine: "Enchantment",
+      oracleText: "Creature spells cost {1} more to cast.",
+    });
+    expect(generateTags(card)).not.toContain("Hatebear / Tax");
+  });
+
+  test("Asymmetric tax (spells your opponents cast cost more) → Hatebear / Tax", () => {
+    const card = makeCard({
+      name: "Hypothetical Asymmetric Tax",
+      typeLine: "Enchantment",
+      oracleText: "Spells your opponents cast cost {1} more to cast.",
+    });
+    expect(generateTags(card)).toContain("Hatebear / Tax");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Artifact Hate (#56 phase 2)
+// ---------------------------------------------------------------------------
+test.describe("generateTags — Artifact Hate", () => {
+  test("Vandalblast → Artifact Hate", () => {
+    const card = makeCard({
+      name: "Vandalblast",
+      typeLine: "Sorcery",
+      oracleText:
+        "Destroy target artifact you don't control.\nOverload {4}{R}",
+    });
+    expect(generateTags(card)).toContain("Artifact Hate");
+  });
+
+  test("Bane of Progress → Artifact Hate", () => {
+    const card = makeCard({
+      name: "Bane of Progress",
+      typeLine: "Creature — Elemental",
+      oracleText:
+        "When Bane of Progress enters the battlefield, destroy all artifacts and enchantments. Bane of Progress gets +1/+1 for each permanent destroyed this way.",
+    });
+    expect(generateTags(card)).toContain("Artifact Hate");
+  });
+
+  test("By Force → Artifact Hate", () => {
+    const card = makeCard({
+      name: "By Force",
+      typeLine: "Sorcery",
+      oracleText: "Destroy X target artifacts.",
+    });
+    expect(generateTags(card)).toContain("Artifact Hate");
+  });
+
+  test("Smelt → Artifact Hate", () => {
+    const card = makeCard({
+      name: "Smelt",
+      typeLine: "Instant",
+      oracleText: "Destroy target artifact.",
+    });
+    expect(generateTags(card)).toContain("Artifact Hate");
+  });
+
+  test("Shatterstorm → Artifact Hate", () => {
+    const card = makeCard({
+      name: "Shatterstorm",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all artifacts. They can't be regenerated.",
+    });
+    expect(generateTags(card)).toContain("Artifact Hate");
+  });
+
+  test("scaled damage to number of artifacts → Artifact Hate", () => {
+    const card = makeCard({
+      name: "Test Artifact-Scaling Burn",
+      typeLine: "Sorcery",
+      oracleText:
+        "This spell deals damage equal to the number of artifacts you control to any target.",
+    });
+    expect(generateTags(card)).toContain("Artifact Hate");
+  });
+
+  test("Wrath of God → no Artifact Hate", () => {
+    const card = makeCard({
+      name: "Wrath of God",
+      typeLine: "Sorcery",
+      oracleText: "Destroy all creatures. They can't be regenerated.",
+    });
+    expect(generateTags(card)).not.toContain("Artifact Hate");
+  });
+
+  test("Lightning Bolt → no Artifact Hate", () => {
+    const card = makeCard({
+      name: "Lightning Bolt",
+      typeLine: "Instant",
+      oracleText: "Lightning Bolt deals 3 damage to any target.",
+    });
+    expect(generateTags(card)).not.toContain("Artifact Hate");
+  });
+});
