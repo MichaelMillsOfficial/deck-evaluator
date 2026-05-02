@@ -44,6 +44,15 @@ export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   Prepare: { bg: "bg-cyan-500/20", text: "text-cyan-300" },
   Book: { bg: "bg-amber-500/20", text: "text-amber-300" },
   Converge: { bg: "bg-indigo-500/20", text: "text-indigo-300" },
+  // #56 phase 2 functional tags
+  "Token Generator": { bg: "bg-lime-500/20", text: "text-lime-200" },
+  "Token Multiplier": { bg: "bg-fuchsia-500/20", text: "text-fuchsia-300" },
+  "Mana Reduction": { bg: "bg-emerald-500/20", text: "text-emerald-200" },
+  "Token Payoff": { bg: "bg-rose-500/20", text: "text-rose-300" },
+  Flicker: { bg: "bg-sky-500/20", text: "text-sky-200" },
+  Fog: { bg: "bg-stone-500/20", text: "text-stone-200" },
+  "Hatebear / Tax": { bg: "bg-yellow-500/20", text: "text-yellow-200" },
+  "Artifact Hate": { bg: "bg-orange-500/20", text: "text-orange-300" },
 };
 
 const BASIC_LAND_RE = /^Basic Land/i;
@@ -56,11 +65,34 @@ const RAMP_ANY_COLOR_RE =
   /\{T\}.*?[Aa]dd\s+(?:one\s+mana\s+of\s+any|mana\s+of\s+any\s+(?:one\s+)?(?:color|type))\b/;
 const RAMP_AMOUNT_RE = /\{T\}.*?[Aa]dd\s+(?:an\s+amount\s+of\s+|X\s+)\{[WUBRGC]\}/;
 const RAMP_ADDITIONAL_LAND_RE = /\badditional lands?\b/i;
+// Upkeep mana effects — Braid of Fire's "cumulative upkeep — Add {R}" and
+// similar "at the beginning of your upkeep, add {X}" upkeep ramp.
+const RAMP_UPKEEP_ADD_RE =
+  /\b(?:at the beginning of (?:your )?upkeep[^.]*\badd\s+\{[WUBRGC]\}|cumulative upkeep[^.]*\badd\s+\{[WUBRGC]\})/i;
+// Ritual / "Add {X} for each ..." spells (Mana Geyser, Pyretic Ritual,
+// Seething Song). Per issue #56, classifying rituals as Ramp is intentional.
+const RAMP_RITUAL_FOR_EACH_RE = /\badd\s+\{[WUBRGC]\}\s+for each\b/i;
+// Treasure-token generators — non-land permanents that ETB or trigger to
+// create Treasure tokens (Generous Plunderer, Smothering Tithe, etc.).
+const RAMP_TREASURE_RE = /\bcreate[^.]+treasure token/i;
 // Matches mana-producing spell effects (rituals) — excludes tap abilities via
 // negative lookbehind. The Instant/Sorcery type-line gate in the goldfish
 // simulator is the primary filter; this regex is a secondary safety net.
 export const RITUAL_MANA_ADD_RE = /(?<!\{T\}[^.]*)[Aa]dd\s+\{[WUBRGC]\}/;
-const CARD_DRAW_RE = /\bdraw\b.+?\bcards?\b|\bdraw a card\b/i;
+// Card Draw — matches "draw a card", "draw N cards", or "draws N cards"
+// (the plural form covers "Target player draws two cards" on Sign in Blood).
+const CARD_DRAW_RE = /\bdraws?\b.+?\bcards?\b|\bdraws? a card\b/i;
+// Pattern used to locate individual draw clauses for the opponent-recipient
+// filter. Matches "draws? ... card(s)" or "draws? a card".
+const CARD_DRAW_CLAUSE_RE = /\bdraws?\b[^.]*?\bcards?\b/gi;
+// Opponent-recipient phrases that, when the IMMEDIATE subject of the draw
+// verb, suppress the Card Draw tag. Trigger conditions like "Whenever an
+// opponent casts a spell, draw a card" are not affected because the opponent
+// reference is far from the draw verb.
+// Note: "target player" is intentionally NOT included — Sign in Blood
+// self-targets and is a real draw spell.
+const CARD_DRAW_OPPONENT_RECIPIENT_RE =
+  /\b(?:target opponent|each opponent|an opponent|each other player)\s*$/i;
 const CARD_ADVANTAGE_RE =
   /\b(?:look at|reveal)\b.+?\bput\b.+?\binto your hand\b/i;
 const CARD_ADVANTAGE_IMPULSE_RE =
@@ -68,7 +100,16 @@ const CARD_ADVANTAGE_IMPULSE_RE =
 const REMOVAL_TARGET_RE =
   /\b(?:destroy|exile)\s+target\b/i;
 const REMOVAL_BOUNCE_RE = /\breturn target.+?to its owner's hand\b/i;
-const REMOVAL_DAMAGE_RE = /\bdeals?\s+\d+\s+damage to\b.+?\btarget\b/i;
+// Single-target damage removal — accepts \d+ or X as the damage amount.
+// The "deals N damage" clause is the anchor; a separate same-clause check
+// requires the target to be a creature / planeswalker / permanent / battle,
+// "any target", or a modal target list that includes a creature/planeswalker.
+// Damage dealt ONLY to "target player" / "target opponent" is NOT removal
+// (Abraded Bluffs is the canonical false-positive).
+const REMOVAL_DAMAGE_AMOUNT_RE =
+  /\bdeals?\s+(?:\d+|X|that much)\s+damage\b/i;
+const REMOVAL_DAMAGE_VALID_TARGET_RE =
+  /\b(?:any target\b|target\s+(?:creatures?|planeswalkers?|permanents?|battles?|attacking|blocking)\b|target\s+creature\s+or\s+(?:player|planeswalker)\b|target\s+creature,\s*player,?\s*(?:or\s+planeswalker)?\b)/i;
 // Require a battlefield-zone object after "destroy/exile all" so that phrases
 // like "exile all cards from <a graveyard/library>" (Scavenger Grounds, Abstergo
 // Entertainment) don't false-positive as wipes. Allows up to 4 modifier tokens
@@ -76,8 +117,19 @@ const REMOVAL_DAMAGE_RE = /\bdeals?\s+\d+\s+damage to\b.+?\btarget\b/i;
 // nonland permanents your opponents control").
 const BOARD_WIPE_RE =
   /\b(?:destroy|exile)\s+all\s+(?:\S+\s+){0,4}?(?:creatures?|permanents?|planeswalkers?|artifacts?|enchantments?|lands?|tokens?)\b/i;
+// Conditional board wipe — "destroy each ... nonland permanent ... mana value"
+// covers Karn's Sylex / Toxic Deluge-style X-cost wipes that say "each" rather
+// than "all" and gate on mana value or some condition.
+const BOARD_WIPE_CONDITIONAL_RE =
+  /\bdestroy each\b[^.]*\bnonland permanent[^.]*\bmana value\b/i;
 const BOARD_WIPE_BOUNCE_RE = /\breturn all\b.+?\bto their owners' hands\b/i;
 const BOARD_WIPE_MINUS_RE = /\ball creatures get -\d+\/-\d+/i;
+// Card names whose oracle text incidentally matches a board-wipe pattern but
+// which are not actually permanent wipes. Pyre of the World Tree's front face
+// "exile all cards from your hand" is a hand-exile, not a board wipe.
+const BOARD_WIPE_NAME_DENYLIST = new Set<string>([
+  "Invasion of Kaldheim // Pyre of the World Tree",
+]);
 // --- Asymmetric (one-sided) wipe patterns ---
 // Universal: "all <modifier?> creatures/permanents/planeswalkers you don't control" etc.
 // Anchored to "all" so single-target clauses ("target creature you don't control") on modal
@@ -206,6 +258,12 @@ const EXTRA_TURN_RE = /\bextra turn\b/i;
 const FULL_MLD_RE = /\bdestroy all\b[^.]*\blands\b/i;
 const SACRIFICE_MLD_RE =
   /\beach player\b[^.]*(?:\bsacrifices?\b[^.]*\bland|\bland[^.]*\bsacrifices?\b)/i;
+// "(nonbasic) lands don't untap" — Stasis-style untap denial on lands.
+const MLD_DONT_UNTAP_RE = /\b(?:nonbasic )?lands? don'?t untap\b/i;
+// Forced-sacrifice removal — "target player/opponent sacrifices a creature/permanent/nonland".
+// Allows optional modifiers ("an attacking creature", "a nonland permanent").
+const REMOVAL_FORCE_SAC_RE =
+  /\btarget (?:player|opponent) sacrifices?\s+(?:a |an )?(?:\w+\s+)?(?:creature|permanent|nonland)/i;
 // --- Tribal tag patterns ---
 const LORD_TYPE_SPECIFIC_RE = new RegExp(
   `(?:other )?(?:${CREATURE_TYPE_PATTERN})(?:s| creatures?) you control get \\+`,
@@ -260,6 +318,114 @@ const SELF_DISCARD_UPKEEP_RE =
   /\b(?:at the beginning of|during) your upkeep[^.]*discard/i;
 const SELF_DISCARD_KEYWORDS = new Set(["Cycling", "Connive"]);
 
+// --- Token Generator (#56 phase 2) ---
+// "create ... tokens" — covers creature, Treasure, Clue, Food, etc. tokens.
+// We deliberately use only the active "create" form. Passive forms
+// ("...tokens would be created...") are too easy to misfire on token
+// PAYOFF cards that trigger off token creation but don't generate any
+// tokens themselves. Token-doubler staples (Anointed Procession,
+// Doubling Season, etc.) are admitted via TOKEN_GENERATOR_NAMES.
+const TOKEN_GENERATOR_RE = /\bcreate\b[^.]*\btokens?\b/i;
+const TOKEN_GENERATOR_NAMES = new Set<string>([
+  "Anointed Procession",
+  "Doubling Season",
+  "Parallel Lives",
+  "Mondrak, Glory Dominus",
+  "Adrix and Nev, Twincasters",
+]);
+
+// --- Token Multiplier (#56 phase 2) ---
+// Cards that double / multiply token creation. Covers the "twice that many"
+// + "tokens" replacement pattern, plus a name allow-list for staples whose
+// oracle text style varies.
+const TOKEN_MULTIPLIER_RE =
+  /\b(?:twice that many|that many plus|those tokens? plus)[^.]*tokens?\b/i;
+const TOKEN_MULTIPLIER_NAMES = new Set<string>([
+  "Anointed Procession",
+  "Doubling Season",
+  "Parallel Lives",
+  "Mondrak, Glory Dominus",
+  "Adrix and Nev, Twincasters",
+]);
+
+// --- Mana Reduction (#56 phase 2) ---
+// Cards that let you pay an alternative resource (life, generic mana) in
+// place of a colored mana symbol — e.g. the Phyrexia: All Will Be One Defiler
+// cycle ("you may pay 2 life. If you do, that spell costs {W} less to cast").
+// Distinct from Cost Reduction, which is general "cost {X} less" effects.
+const MANA_REDUCTION_RATHER_THAN_RE =
+  /\byou may pay (?:\d+ life|\{[WUBRGC]\})\s+(?:rather than|instead of)\b/i;
+// Defiler-style: "pay N life. If you do, that spell costs {C} less to cast"
+// (the life payment substitutes for a single colored pip).
+const MANA_REDUCTION_DEFILER_RE =
+  /\bpay\s+\d+\s+life\b[^.]*\.\s*If you do,[^.]*\bcosts?\s+\{[WUBRGC]\}\s+less\b/i;
+
+// --- Token Payoff (#56 phase 2) ---
+// "Whenever <subject> creature(s) enter(s) the battlefield, <payoff>" —
+// triggers that fire on creature ETB, especially relevant in token decks.
+// The payoff clause must be a damage / life-change / token / counter / draw
+// effect, otherwise we'd pull in static buffs that aren't payoffs.
+const TOKEN_PAYOFF_RE =
+  /\bwhenever\b[^.]*\bcreatures?\s+(?:enters|enter)\b[^.]*(?:deals?\s+\d+|deals?\s+damage|loses?\s+\d+\s+life|gains?\s+\d+\s+life|create|puts?\s+a|draws?\s+(?:a|\d+)\s+cards?)/i;
+
+// --- Flicker (#56 phase 2) ---
+// Self-bounce / blink: exile a creature/permanent then return it to the
+// battlefield. Distinct from removal-style "Exile target creature" (Path to
+// Exile, Swords to Plowshares) which never returns the exiled card.
+// Pattern allows the exile clause and the return clause to be in the same
+// sentence (Cloudshift) or in adjacent sentences (Eerie Interlude:
+// "Exile ... creatures ... . Return those cards to the battlefield...").
+// We forbid the second-clause start from being "Its controller" — that's the
+// hallmark of removal-with-rider (Path to Exile / Swords to Plowshares).
+const FLICKER_RE =
+  /\bexile (?:any number of |another |target |that )(?:[a-z-]+ )*(?:creatures?|permanents?|artifacts?)[^.]*?(?:\.\s+(?!Its controller|It deals|Its owner)[^.]*)?\b(?:return|then return)[^.]*\b(?:to the battlefield|under (?:its|their) owner'?s control)\b/i;
+// Exile-removal with delayed return ("When [this] leaves the battlefield,
+// return the exiled card") is NOT flicker — the return is conditional on
+// the source itself leaving, so it functions as durable removal (Oblivion
+// Ring, Fiend Hunter, Banisher Priest). Suppress Flicker when the oracle
+// text contains a "leaves the battlefield" trigger.
+const FLICKER_LEAVES_EXCLUSION_RE =
+  /\bwhen\b[^.]*\bleaves the battlefield\b/i;
+
+// --- Fog (#56 phase 2) ---
+// Mass damage prevention: "Prevent all combat damage that would be dealt
+// this turn" (Fog, Holy Day, Angelsong) and the rarer "by [class of
+// sources]" form. Healing Salve ("Prevent the next N damage") and
+// Awe-Strike ("by target creature") are single-source prevention — NOT a
+// fog. The "by ..." branch requires the source to be a CLASS (all
+// creatures, all sources, creatures you control / opponents control /
+// attacking / blocking), not a specific target.
+const FOG_RE =
+  /\bprevent all (?:combat )?damage that would be dealt (?:this turn|by\s+(?:all (?:creatures|sources)|(?:creatures|sources)\s+(?:you (?:do not |don'?t )?control|attacking|blocking))[^.]+this turn)\b/i;
+
+// --- Hatebear / Tax (#56 phase 2) ---
+// Asymmetric tax effects only: the cost increase / payment must explicitly
+// target opponents. Symmetric anthem-debuffs ("creature spells cost {1}
+// more") are NOT hatebears — they hit both players. Canonical staples
+// whose oracle text is symmetric in print (Sphere of Resistance, Thorn of
+// Amethyst) are admitted via HATEBEAR_TAX_NAMES instead.
+const HATEBEAR_TAX_RE =
+  /\b(?:spells\s+(?:your opponents control|your opponents cast|opponents cast|of opponents)|opponents'?\s+spells)[^.]*\bcost\s+\{?\d?\}?\s+more\b|\bopponents?[^.]+pays?\s+\{?\d?\}?\s+(?:more|additional)/i;
+
+// --- Artifact Hate (#56 phase 2) ---
+// Spells / permanents that destroy or exile artifacts (Vandalblast, Bane of
+// Progress, Shatterstorm, By Force) plus the rarer "damage equal to the
+// number of artifacts" scaling clause.
+const ARTIFACT_HATE_DESTROY_RE =
+  /\b(?:destroy|exile)\s+(?:target\s+|all\s+|x\s+target\s+|x\s+)?artifacts?\b/i;
+const ARTIFACT_HATE_SCALED_DAMAGE_RE =
+  /\bdamage equal to (?:the )?number of artifacts\b/i;
+const HATEBEAR_TAX_NAMES = new Set<string>([
+  "Aven Interruptor",
+  "Thalia, Guardian of Thraben",
+  "Grand Abolisher",
+  "Esper Sentinel",
+  "Kambal, Consul of Allocation",
+  "Drannith Magistrate",
+  "Sphere of Resistance",
+  "Thorn of Amethyst",
+]);
+
 // Discard Payoff — triggers on discard events
 const DISCARD_PAYOFF_TRIGGER_RE = /\bwhenever[^.]*discards?\b/i;
 const DISCARD_PAYOFF_CONDITION_RE =
@@ -293,6 +459,7 @@ const RESOURCE_DENIAL_NAMES = new Set([
   "Rising Waters",
   "Hokori, Dust Drinker",
   "Tanglewire",
+  "Winter Moon",
 ]);
 
 // Patterns to strip when detecting Utility Land —
@@ -312,6 +479,49 @@ const UTILITY_STRIP_PATTERNS = [
   /\w[\w',\s-]* enters the battlefield tapped\./gi, // "X enters tapped."
 ];
 
+/**
+ * Returns true if the oracle text contains at least one card-draw clause
+ * whose recipient is NOT explicitly an opponent. Filters out:
+ *   - "target opponent draws"
+ *   - "each opponent draws" / "an opponent draws"
+ *   - "they draw a card" where "opponent" was the most recently named
+ *     actor (Dewdrop Cure Gift reminder text — the "they" refers to
+ *     the opponent who was promised a gift).
+ * Keeps:
+ *   - "you (may) draw" — the controller draws (Rhystic Study)
+ *   - "Target player draws" (Sign in Blood self-targets)
+ *   - imperative "Draw N cards" / "Draw a card" (Concentrate, Brainstorm)
+ *   - "Whenever an opponent casts a spell, you may draw a card" — the
+ *     opponent is the trigger condition, "you" is the explicit subject.
+ */
+function hasNonOpponentCardDraw(text: string): boolean {
+  if (!CARD_DRAW_RE.test(text)) return false;
+  // Quick win: any "you (may) draw" anywhere means the controller draws.
+  if (/\byou(?:\s+may)?\s+draws?\b/i.test(text)) return true;
+  // Walk every draw clause across the full text. CARD_DRAW_CLAUSE_RE has the
+  // /g flag — reset lastIndex before use.
+  CARD_DRAW_CLAUSE_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = CARD_DRAW_CLAUSE_RE.exec(text)) !== null) {
+    const before = text.slice(0, m.index);
+    const immediateBefore = before.slice(-40);
+    // Skip if the IMMEDIATE subject is an opponent recipient
+    // ("target opponent draws", "an opponent draws", etc.).
+    if (CARD_DRAW_OPPONENT_RECIPIENT_RE.test(immediateBefore)) continue;
+    // Skip "they draw" when an "opponent" was named as the most recent
+    // actor within the last 120 chars (Dewdrop Cure Gift reminder text:
+    // "you may promise an opponent ... they draw a card").
+    if (
+      /\bthey\s*$/i.test(immediateBefore) &&
+      /\bopponent\b/i.test(before.slice(-120))
+    ) {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
+
 export function generateTags(card: EnrichedCard): string[] {
   const tags = new Set<string>();
   const text = card.oracleText;
@@ -327,14 +537,30 @@ export function generateTags(card: EnrichedCard): string[] {
       RAMP_AMOUNT_RE.test(text);
     const hasLandSearch = RAMP_LAND_SEARCH_RE.test(text);
     const hasAdditionalLand = !isLand && RAMP_ADDITIONAL_LAND_RE.test(text);
+    // Non-tap, non-land-search ramp: upkeep mana (Braid of Fire), ritual-style
+    // "Add {X} for each ..." (Mana Geyser), and Treasure-token generators
+    // (Generous Plunderer). Skip on lands — land-side mana is handled above.
+    const hasUpkeepAdd = !isLand && RAMP_UPKEEP_ADD_RE.test(text);
+    const hasRitualForEach = !isLand && RAMP_RITUAL_FOR_EACH_RE.test(text);
+    const hasTreasureToken = !isLand && RAMP_TREASURE_RE.test(text);
 
-    if ((!isLand && hasTapForMana) || hasLandSearch || hasAdditionalLand) {
+    if (
+      (!isLand && hasTapForMana) ||
+      hasLandSearch ||
+      hasAdditionalLand ||
+      hasUpkeepAdd ||
+      hasRitualForEach ||
+      hasTreasureToken
+    ) {
       tags.add("Ramp");
     }
   }
 
-  // Card Draw
-  if (CARD_DRAW_RE.test(text)) {
+  // Card Draw — must have at least one draw clause that is NOT explicitly
+  // an opponent recipient. (Dewdrop Cure's Gift reminder text reads
+  // "you may promise an opponent a gift ... they draw a card" — that "they"
+  // refers to the opponent and should not count as your draw.)
+  if (hasNonOpponentCardDraw(text)) {
     tags.add("Card Draw");
   }
 
@@ -349,11 +575,16 @@ export function generateTags(card: EnrichedCard): string[] {
     }
   }
 
-  // Board Wipe (check before single-target removal)
+  // Board Wipe (check before single-target removal). Cards on the name
+  // denylist incidentally match BOARD_WIPE_RE via non-permanent text
+  // ("exile all cards from your hand") — skip them entirely.
+  const onBoardWipeDenylist = BOARD_WIPE_NAME_DENYLIST.has(card.name);
   if (
-    BOARD_WIPE_RE.test(text) ||
-    BOARD_WIPE_BOUNCE_RE.test(text) ||
-    BOARD_WIPE_MINUS_RE.test(text)
+    !onBoardWipeDenylist &&
+    (BOARD_WIPE_RE.test(text) ||
+      BOARD_WIPE_BOUNCE_RE.test(text) ||
+      BOARD_WIPE_MINUS_RE.test(text) ||
+      BOARD_WIPE_CONDITIONAL_RE.test(text))
   ) {
     tags.add("Board Wipe");
     tags.add("Removal");
@@ -365,11 +596,16 @@ export function generateTags(card: EnrichedCard): string[] {
     }
   }
 
-  // Single-target Removal
+  // Single-target Removal — destroy/exile target, bounce target, force-sacrifice,
+  // or "deals N damage" combined with a valid (creature/planeswalker/etc.) target.
+  const hasDamageRemoval =
+    REMOVAL_DAMAGE_AMOUNT_RE.test(text) &&
+    REMOVAL_DAMAGE_VALID_TARGET_RE.test(text);
   if (
     REMOVAL_TARGET_RE.test(text) ||
     REMOVAL_BOUNCE_RE.test(text) ||
-    REMOVAL_DAMAGE_RE.test(text)
+    hasDamageRemoval ||
+    REMOVAL_FORCE_SAC_RE.test(text)
   ) {
     tags.add("Removal");
   }
@@ -491,6 +727,7 @@ export function generateTags(card: EnrichedCard): string[] {
   if (
     FULL_MLD_RE.test(text) ||
     SACRIFICE_MLD_RE.test(text) ||
+    MLD_DONT_UNTAP_RE.test(text) ||
     RESOURCE_DENIAL_NAMES.has(card.name)
   ) {
     tags.add("Mass Land Denial");
@@ -585,6 +822,80 @@ export function generateTags(card: EnrichedCard): string[] {
         break;
       }
     }
+  }
+
+  // --- Token Generator (#56 phase 2) ---
+  // Any "create ... token(s)" effect: creature tokens, Treasure, Clue, Food.
+  // The name allow-list covers token-doubler staples (Anointed Procession,
+  // Doubling Season, Parallel Lives, Mondrak, Adrix and Nev) whose oracle
+  // text uses the passive "tokens would be created" wording — that wording
+  // alone is too ambiguous to match by regex without false positives on
+  // token PAYOFF cards.
+  if (
+    TOKEN_GENERATOR_RE.test(text) ||
+    TOKEN_GENERATOR_NAMES.has(card.name)
+  ) {
+    tags.add("Token Generator");
+  }
+
+  // --- Token Multiplier (#56 phase 2) ---
+  // "twice that many tokens" replacement effects, plus a name allow-list of
+  // canonical token-doubler staples.
+  if (
+    TOKEN_MULTIPLIER_RE.test(text) ||
+    TOKEN_MULTIPLIER_NAMES.has(card.name)
+  ) {
+    tags.add("Token Multiplier");
+  }
+
+  // --- Mana Reduction (#56 phase 2) ---
+  // "Pay X life rather than {C}" alternative-cost spells, plus the Defiler
+  // cycle that pays life to discount a colored pip.
+  if (
+    MANA_REDUCTION_RATHER_THAN_RE.test(text) ||
+    MANA_REDUCTION_DEFILER_RE.test(text)
+  ) {
+    tags.add("Mana Reduction");
+  }
+
+  // --- Token Payoff (#56 phase 2) ---
+  // Creature-ETB triggers with a damage / life / token / draw payoff —
+  // synergizes with Token Generator decks that flood the board.
+  if (TOKEN_PAYOFF_RE.test(text)) {
+    tags.add("Token Payoff");
+  }
+
+  // --- Flicker (#56 phase 2) ---
+  // Exile-and-return effects (Cloudshift, Ephemerate, Conjurer's Closet).
+  // Skip if the card has a "When [this] leaves the battlefield" return —
+  // that's exile-removal (Oblivion Ring / Fiend Hunter), not flicker.
+  if (FLICKER_RE.test(text) && !FLICKER_LEAVES_EXCLUSION_RE.test(text)) {
+    tags.add("Flicker");
+  }
+
+  // --- Fog (#56 phase 2) ---
+  // Combat damage prevention (Fog, Holy Day, Constant Mists). Distinct from
+  // single-source prevention spells like Healing Salve.
+  if (FOG_RE.test(text)) {
+    tags.add("Fog");
+  }
+
+  // --- Hatebear / Tax (#56 phase 2) ---
+  // Permanents that tax opponents' resources or restrict their plays.
+  // Combines a generic "spells cost more" / "opponents pay more" regex with
+  // a name allow-list of canonical staples whose text varies.
+  if (HATEBEAR_TAX_RE.test(text) || HATEBEAR_TAX_NAMES.has(card.name)) {
+    tags.add("Hatebear / Tax");
+  }
+
+  // --- Artifact Hate (#56 phase 2) ---
+  // Destroy/exile target artifact(s), plus the artifact-count scaled damage
+  // pattern.
+  if (
+    ARTIFACT_HATE_DESTROY_RE.test(text) ||
+    ARTIFACT_HATE_SCALED_DAMAGE_RE.test(text)
+  ) {
+    tags.add("Artifact Hate");
   }
 
   // --- Secrets of Strixhaven mechanics ---
