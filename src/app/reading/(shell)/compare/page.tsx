@@ -75,7 +75,7 @@ export default function ComparePage() {
         slug="compare"
         runningHead={readingRunningHead(payload.createdAt, deckName)}
         eyebrow="Compare"
-        title="Original vs Modified"
+        title="Current vs Modified"
         tagline="See how your staged swaps change the deck's power level, bracket, hand keepability, and composition."
       />
 
