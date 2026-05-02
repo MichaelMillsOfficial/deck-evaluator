@@ -109,14 +109,11 @@ export function PendingChangesProvider({ children }: { children: ReactNode }) {
     if (needsEnrich.length === 0) return;
 
     for (const add of needsEnrich) {
-      // Mark as in-flight so this effect doesn't re-schedule on the next render
-      // that results from the enrichment itself updating `adds`.
-      // `adds` is intentionally excluded from the dep array to avoid a loop
-      // where every successful enrich triggers another scan of the full list.
-      enrichingRef.current.add(add.name);
+      // enrichAdd self-guards via enrichingRef, so concurrent calls (e.g. from
+      // addCandidate) will no-op rather than racing.
       void enrichAdd(add.name);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `adds` excluded intentionally: including it causes a re-fire loop on every enrichment state update; we use enrichingRef to guard against double-scheduling
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `adds` excluded intentionally: including it causes a re-fire loop on every enrichment state update; enrichAdd self-guards against double-scheduling
   }, [cardMap, synergyAnalysis, deck, adds.map((a) => a.name).join(",")]);
 
   // ---------------------------------------------------------------------------
@@ -125,6 +122,12 @@ export function PendingChangesProvider({ children }: { children: ReactNode }) {
   const enrichAdd = useCallback(
     async (name: string) => {
       if (!cardMap || !synergyAnalysis || !deck) return;
+      // Guard against double-enrich: if another enrich for this name is already
+      // in flight (e.g. the re-enrich effect fires after addCandidate kicks off
+      // its own enrich), bail out so we don't race two fetches and oscillate
+      // the row between error/loading/loaded states.
+      if (enrichingRef.current.has(name)) return;
+      enrichingRef.current.add(name);
 
       // Clear any previous error
       setAdds((prev) =>
@@ -184,6 +187,8 @@ export function PendingChangesProvider({ children }: { children: ReactNode }) {
               : a
           )
         );
+      } finally {
+        enrichingRef.current.delete(name);
       }
     },
     [cardMap, synergyAnalysis, deck]
