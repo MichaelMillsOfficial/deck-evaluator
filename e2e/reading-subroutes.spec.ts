@@ -13,7 +13,7 @@ const SUB_ROUTES: Array<{
   { path: "/reading/goldfish", slug: "goldfish", expectedTitle: /goldfish reading/i },
   { path: "/reading/suggestions", slug: "suggestions", expectedTitle: /what to cut, what to add/i },
   { path: "/reading/add", slug: "add", expectedTitle: /possible additions/i },
-  { path: "/reading/compare", slug: "compare", expectedTitle: /original vs modified/i },
+  { path: "/reading/compare", slug: "compare", expectedTitle: /current vs modified/i },
   { path: "/reading/share", slug: "share", expectedTitle: /take it elsewhere/i },
 ];
 
