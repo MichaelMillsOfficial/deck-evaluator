@@ -155,6 +155,46 @@ Tokens live in `design-system/tokens.css` and are imported via `globals.css`.
   `@media (prefers-reduced-motion: reduce) { transition: none; transform: none }`.
 - MTG symbols: Scryfall CDN SVGs (`https://svgs.scryfall.io/card-symbols/{SYMBOL}.svg`)
 
+### Reuse design-system components — do NOT recreate them
+
+When adding or modifying any UI, **first check `src/components/ui/` and the
+existing `src/components/reading/` chrome for a component that already covers
+the need.** Reuse it. Do not invent a new component, do not inline raw Tailwind
+that duplicates an existing primitive, and do not write bespoke CSS for
+something the system already ships.
+
+Inventory of primitives that must be reused (current as of this writing — run
+`ls src/components/ui/` to confirm latest):
+
+| Need | Use |
+|---|---|
+| Panel / surface / bordered container | `<Card>` from `src/components/ui/Card.tsx` — never raw `rounded-xl border bg-slate-800/50` |
+| Modal / drawer / focus-trapped overlay | `<Sheet>` from `src/components/ui/Sheet.tsx` — never a hand-rolled `<dialog>` |
+| Mono uppercase label / kicker | `<Eyebrow>` from `src/components/ui/Eyebrow.tsx` |
+| Pill / chip / category label | `<Tag>` from `src/components/ui/Tag.tsx` (or `<CardTag>` for card-tag-specific styling) |
+| Button (primary / secondary / ghost) | `<Button>` from `src/components/ui/Button.tsx` |
+| Text input | `<Input>` from `src/components/ui/Input.tsx` |
+| Multi-line text input | `<Textarea>` from `src/components/ui/Textarea.tsx` |
+| Stat tile (label + value pair) | `<StatTile>` from `src/components/ui/StatTile.tsx` |
+| Card autocomplete search | `<CardSearchInput>` from `src/components/CardSearchInput.tsx` |
+| Section opener (eyebrow + title + tagline) | `<SectionHeader>` from `src/components/reading/SectionHeader.tsx` |
+
+If the existing component is missing a feature (e.g. a new variant or a prop),
+**extend the existing component** — add the variant, add the prop, update its
+module.css with new tokens. Do not fork it. The Astral system depends on a
+single source of truth per primitive.
+
+If you genuinely need a new primitive (something the system has never had):
+1. Justify it in your plan / PR description — what existing component did you
+   consider, and why is it not extendable?
+2. Place it in `src/components/ui/` next to its peers, with an accompanying
+   `.module.css` using only semantic tokens.
+3. Export it from `src/components/ui/index.ts` so future authors find it.
+
+**Lint check before opening a PR:** grep your new code for `rgba(`, `#[0-9a-f]`,
+inlined `<dialog>`, raw `<button class="bg-…">`, or hardcoded color
+hex/rgb/hsl values. Each is a smell that you bypassed the system.
+
 ### Component Patterns
 
 - **SectionHeader**: every `/reading/*` sub-route opens with

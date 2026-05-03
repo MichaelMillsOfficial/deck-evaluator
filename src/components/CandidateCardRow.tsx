@@ -6,17 +6,34 @@ import type { CandidateAnalysis } from "@/lib/candidate-analysis";
 import ManaCost from "@/components/ManaCost";
 import CardTags from "@/components/CardTags";
 import { formatUSD } from "@/lib/budget-analysis";
+import PendingChangeRow from "@/components/reading/PendingChangeRow";
+import type { PendingAdd } from "@/contexts/PendingChangesContext";
 
 interface CandidateCardRowProps {
   card: EnrichedCard;
   analysis: CandidateAnalysis | null;
   onRemove: () => void;
+  /** The PendingAdd entry for this card (from context) */
+  add?: PendingAdd;
+  /** Called when user picks a suggestion to pair with */
+  onPickSuggestion?: (cutName: string) => void;
+  /** Called to open the full picker sheet for this card */
+  onOpenPicker?: () => void;
+  /** Called to unpair this card */
+  onUnpair?: () => void;
+  /** Set of cut names already used by other pairs */
+  excludedCutNames?: Set<string>;
 }
 
 export default memo(function CandidateCardRow({
   card,
   analysis,
   onRemove,
+  add,
+  onPickSuggestion,
+  onOpenPicker,
+  onUnpair,
+  excludedCutNames = new Set(),
 }: CandidateCardRowProps) {
   const [open, setOpen] = useState(false);
 
@@ -314,6 +331,20 @@ export default memo(function CandidateCardRow({
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-purple-400" />
             Analyzing...
           </div>
+        </div>
+      )}
+
+      {/* Pairing zone — shown when add+pairing props are provided */}
+      {add !== undefined && onPickSuggestion && onOpenPicker && onUnpair && (
+        <div className="px-3 pb-3 ml-6" data-testid="pending-add-row" data-add-name={card.name}>
+          <PendingChangeRow
+            add={add}
+            suggestions={analysis?.replacements ?? []}
+            excludedCutNames={excludedCutNames}
+            onPickSuggestion={onPickSuggestion}
+            onOpenPicker={onOpenPicker}
+            onUnpair={onUnpair}
+          />
         </div>
       )}
     </div>

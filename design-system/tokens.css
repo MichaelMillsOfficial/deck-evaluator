@@ -178,6 +178,12 @@
   --status-watch: var(--watch-400);
   --status-warn:  var(--warn-400);
 
+  /* ─── SEMANTIC · DELTA / COMPARISON COLORS ─────────────── */
+  /* Use for positive delta (improvement), neutral caution, negative delta (regression) */
+  --color-good:   var(--ok-400);      /* #86efac — emerald-ish; improvements, healthy counts */
+  --color-warn:   var(--watch-400);   /* #fde68a — amber; caution, near-threshold states */
+  --color-danger: var(--warn-400);    /* #ff86a0 — rose-red; regressions, critical states */
+
   --status-ok-soft:    rgba(134, 239, 172, 0.10);
   --status-watch-soft: rgba(253, 230, 138, 0.10);
   --status-warn-soft:  rgba(255, 134, 160, 0.10);

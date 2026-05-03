@@ -5,6 +5,12 @@ import {
   computeTagComparison,
   computeCurveOverlay,
   computeDeckComparison,
+  computeHandKeepabilityComparison,
+  computeBracketComparison,
+  computePowerLevelComparison,
+  computeCompositionComparison,
+  computeManaPressureComparison,
+  computeExtendedDeckComparison,
 } from "../../src/lib/deck-comparison";
 import type { EnrichedCard } from "../../src/lib/types";
 import { makeCard, makeDeck } from "../helpers";
@@ -520,5 +526,458 @@ test.describe("computeDeckComparison", () => {
     // curveOverlay
     expect(result.curveOverlay).toBeInstanceOf(Array);
     expect(result.curveOverlay.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helpers for richer decks (needed for bracket/power/composition)
+// ---------------------------------------------------------------------------
+
+/** Build a minimal but non-trivial EDH deck (36 lands + 63 non-lands + 1 commander). */
+function makeMinimalCommanderDeck() {
+  const mainboard: { name: string; quantity: number }[] = [];
+  for (let i = 0; i < 36; i++) mainboard.push({ name: `Forest${i}`, quantity: 1 });
+  for (let i = 0; i < 63; i++) mainboard.push({ name: `Creature${i}`, quantity: 1 });
+
+  const commanders = [{ name: "Commander", quantity: 1 }];
+
+  const cardMap: Record<string, EnrichedCard> = {};
+  for (let i = 0; i < 36; i++) cardMap[`Forest${i}`] = makeLand(`Forest${i}`);
+  for (let i = 0; i < 63; i++) cardMap[`Creature${i}`] = makeCreature(`Creature${i}`, 3);
+  cardMap["Commander"] = makeCreature("Commander", 4);
+
+  return { deck: makeDeck({ commanders, mainboard }), cardMap };
+}
+
+// ---------------------------------------------------------------------------
+// computeHandKeepabilityComparison
+// ---------------------------------------------------------------------------
+
+test.describe("computeHandKeepabilityComparison", () => {
+  test("returns statsA, statsB, keepRateDelta, avgScoreDelta with valid shapes", () => {
+    const { deck: deckA, cardMap: cardMapA } = makeMinimalCommanderDeck();
+    const { deck: deckB, cardMap: cardMapB } = makeMinimalCommanderDeck();
+
+    const result = computeHandKeepabilityComparison(deckA, cardMapA, deckB, cardMapB);
+
+    expect(result).toHaveProperty("statsA");
+    expect(result).toHaveProperty("statsB");
+    expect(result).toHaveProperty("keepRateDelta");
+    expect(result).toHaveProperty("avgScoreDelta");
+
+    expect(typeof result.keepRateDelta).toBe("number");
+    expect(typeof result.avgScoreDelta).toBe("number");
+
+    // keepRateDelta = statsB.keepableRate - statsA.keepableRate
+    const expectedDelta = result.statsB.keepableRate - result.statsA.keepableRate;
+    expect(result.keepRateDelta).toBeCloseTo(expectedDelta);
+  });
+
+  test("identical decks produce keepRateDelta near 0", () => {
+    const { deck, cardMap } = makeMinimalCommanderDeck();
+    // Use the same deck for both slots
+    const result = computeHandKeepabilityComparison(deck, cardMap, deck, cardMap, 50);
+    // Not necessarily exactly 0 due to simulation randomness, but delta = 0 always
+    expect(result.keepRateDelta).toBe(result.statsB.keepableRate - result.statsA.keepableRate);
+  });
+
+  test("keepableRate is between 0 and 1", () => {
+    const { deck, cardMap } = makeMinimalCommanderDeck();
+    const result = computeHandKeepabilityComparison(deck, cardMap, deck, cardMap, 20);
+    expect(result.statsA.keepableRate).toBeGreaterThanOrEqual(0);
+    expect(result.statsA.keepableRate).toBeLessThanOrEqual(1);
+    expect(result.statsB.keepableRate).toBeGreaterThanOrEqual(0);
+    expect(result.statsB.keepableRate).toBeLessThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeBracketComparison
+// ---------------------------------------------------------------------------
+
+test.describe("computeBracketComparison", () => {
+  test("returns resultA, resultB, bracketDelta with valid shapes", () => {
+    const { deck: deckA, cardMap: cardMapA } = makeMinimalCommanderDeck();
+    const { deck: deckB, cardMap: cardMapB } = makeMinimalCommanderDeck();
+
+    const result = computeBracketComparison(deckA, cardMapA, deckB, cardMapB);
+
+    expect(result).toHaveProperty("resultA");
+    expect(result).toHaveProperty("resultB");
+    expect(result).toHaveProperty("bracketDelta");
+
+    expect(result.resultA.bracket).toBeGreaterThanOrEqual(1);
+    expect(result.resultA.bracket).toBeLessThanOrEqual(5);
+    expect(result.resultB.bracket).toBeGreaterThanOrEqual(1);
+    expect(result.resultB.bracket).toBeLessThanOrEqual(5);
+    expect(result.bracketDelta).toBe(result.resultB.bracket - result.resultA.bracket);
+  });
+
+  test("bracketDelta = resultB.bracket − resultA.bracket invariant", () => {
+    const { deck: deckA, cardMap: cardMapA } = makeMinimalCommanderDeck();
+    const { deck: deckB, cardMap: cardMapB } = makeMinimalCommanderDeck();
+    const result = computeBracketComparison(deckA, cardMapA, deckB, cardMapB);
+    expect(result.bracketDelta).toBe(result.resultB.bracket - result.resultA.bracket);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computePowerLevelComparison
+// ---------------------------------------------------------------------------
+
+test.describe("computePowerLevelComparison", () => {
+  test("returns resultA, resultB, powerLevelDelta, rawScoreDelta with valid shapes", () => {
+    const { deck: deckA, cardMap: cardMapA } = makeMinimalCommanderDeck();
+    const { deck: deckB, cardMap: cardMapB } = makeMinimalCommanderDeck();
+
+    const result = computePowerLevelComparison(deckA, cardMapA, deckB, cardMapB);
+
+    expect(result).toHaveProperty("resultA");
+    expect(result).toHaveProperty("resultB");
+    expect(result).toHaveProperty("powerLevelDelta");
+    expect(result).toHaveProperty("rawScoreDelta");
+
+    expect(result.resultA.powerLevel).toBeGreaterThanOrEqual(1);
+    expect(result.resultA.powerLevel).toBeLessThanOrEqual(10);
+    expect(result.resultB.powerLevel).toBeGreaterThanOrEqual(1);
+    expect(result.resultB.powerLevel).toBeLessThanOrEqual(10);
+    expect(result.powerLevelDelta).toBe(result.resultB.powerLevel - result.resultA.powerLevel);
+    expect(result.rawScoreDelta).toBeCloseTo(
+      result.resultB.rawScore - result.resultA.rawScore
+    );
+  });
+
+  test("identical decks produce powerLevelDelta = 0 and rawScoreDelta = 0", () => {
+    const { deck, cardMap } = makeMinimalCommanderDeck();
+    const result = computePowerLevelComparison(deck, cardMap, deck, cardMap);
+    expect(result.powerLevelDelta).toBe(0);
+    expect(result.rawScoreDelta).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeCompositionComparison
+// ---------------------------------------------------------------------------
+
+test.describe("computeCompositionComparison", () => {
+  test("returns resultA, resultB each with categories array and overallHealth", () => {
+    const { deck: deckA, cardMap: cardMapA } = makeMinimalCommanderDeck();
+    const { deck: deckB, cardMap: cardMapB } = makeMinimalCommanderDeck();
+
+    const result = computeCompositionComparison(deckA, cardMapA, deckB, cardMapB);
+
+    expect(result).toHaveProperty("resultA");
+    expect(result).toHaveProperty("resultB");
+    expect(result.resultA).toHaveProperty("categories");
+    expect(result.resultB).toHaveProperty("categories");
+    expect(result.resultA).toHaveProperty("overallHealth");
+    expect(result.resultB).toHaveProperty("overallHealth");
+
+    expect(result.resultA.categories).toBeInstanceOf(Array);
+    expect(result.resultB.categories).toBeInstanceOf(Array);
+
+    // Each category should have tag, label, count, status
+    for (const cat of result.resultA.categories) {
+      expect(typeof cat.tag).toBe("string");
+      expect(typeof cat.label).toBe("string");
+      expect(typeof cat.count).toBe("number");
+      expect(typeof cat.status).toBe("string");
+    }
+  });
+
+  test("identical decks produce identical category counts", () => {
+    const { deck, cardMap } = makeMinimalCommanderDeck();
+    const result = computeCompositionComparison(deck, cardMap, deck, cardMap);
+
+    for (let i = 0; i < result.resultA.categories.length; i++) {
+      expect(result.resultA.categories[i].count).toBe(
+        result.resultB.categories[i].count
+      );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeExtendedDeckComparison
+// ---------------------------------------------------------------------------
+
+test.describe("computeExtendedDeckComparison", () => {
+  test("includes all base fields plus the four new fields", () => {
+    const { deck: deckA, cardMap: cardMapA } = makeMinimalCommanderDeck();
+    const { deck: deckB, cardMap: cardMapB } = makeMinimalCommanderDeck();
+
+    const result = computeExtendedDeckComparison(deckA, cardMapA, deckB, cardMapB);
+
+    // Base fields
+    expect(result.cardOverlap).toBeDefined();
+    expect(result.metricDiffs).toBeInstanceOf(Array);
+    expect(result.tagComparison).toBeInstanceOf(Array);
+    expect(result.curveOverlay).toBeInstanceOf(Array);
+
+    // New fields
+    expect(result.handKeepability).toBeDefined();
+    expect(result.bracketComparison).toBeDefined();
+    expect(result.powerLevelComparison).toBeDefined();
+    expect(result.compositionComparison).toBeDefined();
+    expect(result.manaPressure).toBeDefined();
+
+    // Spot-check shapes
+    expect(typeof result.handKeepability.keepRateDelta).toBe("number");
+    expect(typeof result.bracketComparison.bracketDelta).toBe("number");
+    expect(typeof result.powerLevelComparison.powerLevelDelta).toBe("number");
+    expect(result.compositionComparison.resultA.categories).toBeInstanceOf(Array);
+    expect(result.manaPressure.byColor).toHaveLength(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeManaPressureComparison
+// ---------------------------------------------------------------------------
+
+function makeRedSpell(name: string, redPips: number, cmc: number): EnrichedCard {
+  const cost = "{R}".repeat(redPips) + (cmc - redPips > 0 ? `{${cmc - redPips}}` : "");
+  return makeCard({
+    name,
+    manaCost: cost,
+    cmc,
+    colorIdentity: ["R"],
+    colors: ["R"],
+    typeLine: "Sorcery",
+    manaPips: { W: 0, U: 0, B: 0, R: redPips, G: 0, C: 0 },
+  });
+}
+
+function makeBasicLand(name: string, color: "W" | "U" | "B" | "R" | "G"): EnrichedCard {
+  const subMap = {
+    W: "Plains",
+    U: "Island",
+    B: "Swamp",
+    R: "Mountain",
+    G: "Forest",
+  } as const;
+  return makeCard({
+    name,
+    typeLine: `Basic Land — ${subMap[color]}`,
+    supertypes: ["Basic"],
+    subtypes: [subMap[color]],
+    producedMana: [color],
+  });
+}
+
+test.describe("computeManaPressureComparison", () => {
+  test("returns one entry per WUBRG color even when deck is empty", () => {
+    const deck = makeDeck({ mainboard: [] });
+    const result = computeManaPressureComparison(deck, {}, deck, {});
+    expect(result.byColor).toHaveLength(5);
+    expect(result.byColor.map((c) => c.color).sort()).toEqual(
+      ["B", "G", "R", "U", "W"]
+    );
+    expect(result.anyPressure).toBe(false);
+    expect(result.worstColor).toBeNull();
+  });
+
+  test("identical decks produce all-neutral verdicts and no pressure", () => {
+    const lightning = makeRedSpell("Lightning Bolt", 1, 1);
+    const mountain = makeBasicLand("Mountain", "R");
+    const cardMap = { "Lightning Bolt": lightning, Mountain: mountain };
+    const deck = makeDeck({
+      mainboard: [
+        { name: "Lightning Bolt", quantity: 4 },
+        { name: "Mountain", quantity: 20 },
+      ],
+    });
+    const result = computeManaPressureComparison(deck, cardMap, deck, cardMap);
+    for (const c of result.byColor) {
+      expect(c.pipsDelta).toBe(0);
+      expect(c.sourcesDelta).toBe(0);
+      expect(c.verdict).toBe("neutral");
+    }
+    expect(result.anyPressure).toBe(false);
+  });
+
+  test("user case: adds add 9 R pips without adding red sources → pressure", () => {
+    // Original deck: 1× Lightning Bolt (1R pip) + 7 Mountains (7 R sources)
+    // Modified: cut a Forest (irrelevant), add 3× spell with 3 R pips each
+    // Net: pipsDelta(R) = +9, sourcesDelta(R) = 0 → pressure on R
+    const lightning = makeRedSpell("Lightning Bolt", 1, 1);
+    const triple = makeRedSpell("Triple Red Spell", 3, 4);
+    const mountain = makeBasicLand("Mountain", "R");
+    const forest = makeBasicLand("Forest", "G");
+
+    const cardMapA: Record<string, EnrichedCard> = {
+      "Lightning Bolt": lightning,
+      Mountain: mountain,
+      Forest: forest,
+    };
+    const deckA = makeDeck({
+      mainboard: [
+        { name: "Lightning Bolt", quantity: 1 },
+        { name: "Mountain", quantity: 7 },
+        { name: "Forest", quantity: 4 },
+      ],
+    });
+
+    const cardMapB: Record<string, EnrichedCard> = {
+      ...cardMapA,
+      "Triple Red Spell": triple,
+    };
+    const deckB = makeDeck({
+      mainboard: [
+        { name: "Lightning Bolt", quantity: 1 },
+        { name: "Triple Red Spell", quantity: 3 },
+        { name: "Mountain", quantity: 7 },
+        { name: "Forest", quantity: 1 }, // 3 cut
+      ],
+    });
+
+    const result = computeManaPressureComparison(deckA, cardMapA, deckB, cardMapB);
+    const r = result.byColor.find((c) => c.color === "R")!;
+    expect(r.pipsA).toBe(1);
+    expect(r.pipsB).toBe(10);
+    expect(r.pipsDelta).toBe(9);
+    expect(r.sourcesA).toBe(7);
+    expect(r.sourcesB).toBe(7);
+    expect(r.sourcesDelta).toBe(0);
+    expect(r.verdict).toBe("pressure");
+    expect(result.anyPressure).toBe(true);
+    expect(result.worstColor).toBe("R");
+  });
+
+  test("adding red lands while keeping pip count constant → improved on R", () => {
+    const lightning = makeRedSpell("Lightning Bolt", 1, 1);
+    const mountain = makeBasicLand("Mountain", "R");
+    const forest = makeBasicLand("Forest", "G");
+
+    const cardMap: Record<string, EnrichedCard> = {
+      "Lightning Bolt": lightning,
+      Mountain: mountain,
+      Forest: forest,
+    };
+    const deckA = makeDeck({
+      mainboard: [
+        { name: "Lightning Bolt", quantity: 4 },
+        { name: "Mountain", quantity: 4 },
+        { name: "Forest", quantity: 8 },
+      ],
+    });
+    const deckB = makeDeck({
+      mainboard: [
+        { name: "Lightning Bolt", quantity: 4 },
+        { name: "Mountain", quantity: 8 },
+        { name: "Forest", quantity: 4 },
+      ],
+    });
+    const result = computeManaPressureComparison(deckA, cardMap, deckB, cardMap);
+    const r = result.byColor.find((c) => c.color === "R")!;
+    expect(r.pipsDelta).toBe(0);
+    expect(r.sourcesDelta).toBe(4);
+    expect(r.verdict).toBe("improved");
+  });
+
+  test("ratio below 0.45 in slot B is flagged underserved", () => {
+    // 12 R pips, 4 R sources → ratio 0.33 — well below the 0.45 floor
+    const triple = makeRedSpell("Triple Red Spell", 3, 4);
+    const mountain = makeBasicLand("Mountain", "R");
+    const forest = makeBasicLand("Forest", "G");
+    const cardMap: Record<string, EnrichedCard> = {
+      "Triple Red Spell": triple,
+      Mountain: mountain,
+      Forest: forest,
+    };
+    const deck = makeDeck({
+      mainboard: [
+        { name: "Triple Red Spell", quantity: 4 },
+        { name: "Mountain", quantity: 4 },
+        { name: "Forest", quantity: 20 },
+      ],
+    });
+    const result = computeManaPressureComparison(deck, cardMap, deck, cardMap);
+    const r = result.byColor.find((c) => c.color === "R")!;
+    expect(r.ratioB).toBeCloseTo(4 / 12, 3);
+    expect(r.verdict).toBe("underserved");
+    expect(result.anyPressure).toBe(true);
+  });
+
+  test("introducing a brand-new color with no sources is flagged pressure", () => {
+    const mountain = makeBasicLand("Mountain", "R");
+    const forest = makeBasicLand("Forest", "G");
+    const blueSpell = makeCard({
+      name: "Counterspell",
+      manaCost: "{U}{U}",
+      cmc: 2,
+      colorIdentity: ["U"],
+      colors: ["U"],
+      typeLine: "Instant",
+      manaPips: { W: 0, U: 2, B: 0, R: 0, G: 0, C: 0 },
+    });
+    const cardMapA: Record<string, EnrichedCard> = {
+      Mountain: mountain,
+      Forest: forest,
+    };
+    const deckA = makeDeck({
+      mainboard: [
+        { name: "Mountain", quantity: 10 },
+        { name: "Forest", quantity: 10 },
+      ],
+    });
+    const cardMapB = { ...cardMapA, Counterspell: blueSpell };
+    const deckB = makeDeck({
+      mainboard: [
+        { name: "Counterspell", quantity: 4 },
+        { name: "Mountain", quantity: 10 },
+        { name: "Forest", quantity: 6 },
+      ],
+    });
+    const result = computeManaPressureComparison(deckA, cardMapA, deckB, cardMapB);
+    const u = result.byColor.find((c) => c.color === "U")!;
+    expect(u.pipsA).toBe(0);
+    expect(u.pipsB).toBe(8);
+    expect(u.sourcesB).toBe(0);
+    expect(u.verdict).toBe("pressure");
+  });
+
+  test("multiple pressured colors → worstColor is the largest regression", () => {
+    // R loses by a hair; B loses dramatically (large pip increase, no sources)
+    const redSpell = makeRedSpell("Bolt", 1, 1);
+    const blackSpell = makeCard({
+      name: "Drain",
+      manaCost: "{B}{B}{B}",
+      cmc: 3,
+      colorIdentity: ["B"],
+      colors: ["B"],
+      typeLine: "Sorcery",
+      manaPips: { W: 0, U: 0, B: 3, R: 0, G: 0, C: 0 },
+    });
+    const mountain = makeBasicLand("Mountain", "R");
+    const swamp = makeBasicLand("Swamp", "B");
+    const forest = makeBasicLand("Forest", "G");
+    const cardMapA: Record<string, EnrichedCard> = {
+      Bolt: redSpell,
+      Mountain: mountain,
+      Swamp: swamp,
+      Forest: forest,
+    };
+    const deckA = makeDeck({
+      mainboard: [
+        { name: "Bolt", quantity: 1 },
+        { name: "Mountain", quantity: 6 },
+        { name: "Swamp", quantity: 6 },
+        { name: "Forest", quantity: 10 },
+      ],
+    });
+    const cardMapB = { ...cardMapA, Drain: blackSpell };
+    const deckB = makeDeck({
+      mainboard: [
+        { name: "Bolt", quantity: 2 }, // +1 R pip
+        { name: "Drain", quantity: 4 }, // +12 B pips, no swamps added
+        { name: "Mountain", quantity: 6 },
+        { name: "Swamp", quantity: 6 },
+        { name: "Forest", quantity: 5 },
+      ],
+    });
+    const result = computeManaPressureComparison(deckA, cardMapA, deckB, cardMapB);
+    expect(result.worstColor).toBe("B");
+    const b = result.byColor.find((c) => c.color === "B")!;
+    expect(b.verdict).toBe("pressure");
   });
 });

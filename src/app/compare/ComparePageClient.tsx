@@ -3,12 +3,17 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import type { DeckData, EnrichedCard } from "@/lib/types";
-import { computeDeckComparison, type DeckComparisonResult } from "@/lib/deck-comparison";
+import {
+  computeDeckComparison,
+  computeManaPressureComparison,
+  type DeckComparisonResult,
+  type ManaPressureComparison,
+} from "@/lib/deck-comparison";
 import CompareImportSlot from "@/components/CompareImportSlot";
 import ComparisonOverview from "@/components/ComparisonOverview";
-import MetricComparisonTable from "@/components/MetricComparisonTable";
-import ManaCurveOverlay from "@/components/ManaCurveOverlay";
-import TagComparisonChart from "@/components/TagComparisonChart";
+import ManaCurveComparison from "@/components/comparison/ManaCurveComparison";
+import ColorAnalysisComparison from "@/components/comparison/ColorAnalysisComparison";
+import ManaBaseComparison from "@/components/comparison/ManaBaseComparison";
 
 interface DeckSlot {
   deck: DeckData;
@@ -30,23 +35,27 @@ export default function ComparePageClient() {
   // Compute comparison only when both decks are enriched
   const comparisonResult = useMemo<{
     comparison: DeckComparisonResult | null;
+    pressure: ManaPressureComparison | null;
     error: string | null;
   }>(() => {
-    if (!slotA || !slotB) return { comparison: null, error: null };
+    if (!slotA || !slotB) return { comparison: null, pressure: null, error: null };
     try {
       return {
         comparison: computeDeckComparison(slotA.deck, slotA.cardMap, slotB.deck, slotB.cardMap),
+        pressure: computeManaPressureComparison(slotA.deck, slotA.cardMap, slotB.deck, slotB.cardMap),
         error: null,
       };
     } catch (err) {
       return {
         comparison: null,
+        pressure: null,
         error: err instanceof Error ? err.message : "Failed to compute comparison",
       };
     }
   }, [slotA, slotB]);
 
   const comparison = comparisonResult.comparison;
+  const pressure = comparisonResult.pressure;
   const comparisonError = comparisonResult.error;
 
   // Headline callouts for meaningful tag diffs
@@ -192,31 +201,28 @@ export default function ComparePageClient() {
               </div>
 
               {/* Metric comparison */}
-              <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
-                <MetricComparisonTable
+              {pressure && (
+                <ManaBaseComparison
                   diffs={comparison.metricDiffs}
+                  pressure={pressure}
                   labelA={labelA}
                   labelB={labelB}
                 />
-              </div>
+              )}
             </div>
 
             {/* Charts — full width */}
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-              <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
-                <ManaCurveOverlay
-                  data={comparison.curveOverlay}
-                  labelA={labelA}
-                  labelB={labelB}
-                />
-              </div>
-              <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
-                <TagComparisonChart
-                  data={comparison.tagComparison}
-                  labelA={labelA}
-                  labelB={labelB}
-                />
-              </div>
+              <ManaCurveComparison
+                data={comparison.curveOverlay}
+                labelA={labelA}
+                labelB={labelB}
+              />
+              <ColorAnalysisComparison
+                data={comparison.tagComparison}
+                labelA={labelA}
+                labelB={labelB}
+              />
             </div>
           </div>
         )}
