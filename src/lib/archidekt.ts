@@ -27,6 +27,9 @@ const SIDEBOARD_CATEGORIES = new Set([
 export async function fetchArchidektDeck(
   deckId: string
 ): Promise<ArchidektApiResponse> {
+  if (!/^\d+$/.test(deckId)) {
+    throw new Error(`Invalid deck ID: ${deckId}`);
+  }
   const res = await fetch(`https://archidekt.com/api/decks/${deckId}/`, {
     headers: { Accept: "application/json" },
     cache: "no-store",
