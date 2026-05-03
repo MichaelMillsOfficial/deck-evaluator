@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useCallback,
   useEffect,
   useId,
   useRef,
@@ -39,12 +38,25 @@ export function Sheet({
   const titleId = useId();
   const restoreRef = useRef<HTMLElement | null>(null);
 
-  const handleKey = useCallback(
-    (e: KeyboardEvent) => {
-      if (!open) return;
+  // Hold the latest onClose in a ref so the lifecycle effect below doesn't
+  // need it as a dependency. Callers commonly pass an inline arrow function
+  // (`onClose={() => setOpen(false)}`); without this, every parent render
+  // would tear down and re-run the effect — re-snapping focus to the first
+  // focusable (the close button) and corrupting the captured `prevOverflow`
+  // when the sheet's own re-render observes body.overflow already "hidden".
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    restoreRef.current = document.activeElement as HTMLElement | null;
+
+    const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key === "Tab" && sheetRef.current) {
@@ -66,13 +78,7 @@ export function Sheet({
           first.focus();
         }
       }
-    },
-    [open, onClose],
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    restoreRef.current = document.activeElement as HTMLElement | null;
+    };
     document.addEventListener("keydown", handleKey);
 
     const prevOverflow = document.body.style.overflow;
@@ -92,7 +98,7 @@ export function Sheet({
       window.clearTimeout(t);
       restoreRef.current?.focus?.();
     };
-  }, [open, handleKey]);
+  }, [open]);
 
   if (!open) return null;
   if (typeof document === "undefined") return null;
