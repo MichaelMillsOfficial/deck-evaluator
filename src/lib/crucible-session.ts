@@ -86,6 +86,30 @@ export function flattenPileParse(parsed: ParseResult): {
   };
 }
 
+const PILE_LINE_RE = /^(\d+)(x?)\s+(.+)$/i;
+
+/**
+ * Append a card chosen from search into raw pile text, for the import form.
+ * The textarea stays the single source of truth: an existing line for the
+ * same name (case-insensitive, `N Name` or `Nx Name`) gets its count bumped
+ * in place; otherwise a `1 Name` line is appended. All other lines are left
+ * exactly as typed.
+ */
+export function appendCardToPileText(text: string, name: string): string {
+  const target = name.trim().toLowerCase();
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].trim().match(PILE_LINE_RE);
+    if (match && match[3].trim().toLowerCase() === target) {
+      const count = Number(match[1]) + 1;
+      lines[i] = lines[i].replace(PILE_LINE_RE, `${count}${match[2]} ${match[3]}`);
+      return lines.join("\n");
+    }
+  }
+  const trimmed = text.replace(/\s+$/, "");
+  return trimmed ? `${trimmed}\n1 ${name}` : `1 ${name}`;
+}
+
 /**
  * Add a card to an existing pile mid-triage. A new name is appended with
  * quantity 1 and status "undecided"; a name already in the pool has its

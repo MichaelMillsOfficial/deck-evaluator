@@ -1,19 +1,28 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import SectionHeader from "@/components/reading/SectionHeader";
+import CardSearchInput from "@/components/CardSearchInput";
 import { Button, Textarea } from "@/components/ui";
 import { useCrucibleSession } from "@/contexts/CrucibleSessionContext";
-import { flattenPileParse } from "@/lib/crucible-session";
+import { appendCardToPileText, flattenPileParse } from "@/lib/crucible-session";
 import type { ParseResult } from "@/lib/decklist-parser";
 import type { DeckData } from "@/lib/types";
 import styles from "./crucible.module.css";
+
+/** The search excludes nothing: re-selecting a name bumps its line's count. */
+const EMPTY_NAME_SET = new Set<string>();
+const EMPTY_CANDIDATES: string[] = [];
 
 export default function CrucibleImport() {
   const { setPile } = useCrucibleSession();
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const addFromSearch = useCallback((name: string) => {
+    setText((prev) => appendCardToPileText(prev, name));
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,6 +75,11 @@ export default function CrucibleImport() {
         tagline="Any number of cards. No structure required. Walk out with a legal hundred."
       />
       <form onSubmit={handleSubmit} className={styles.importForm}>
+        <CardSearchInput
+          deckCardNames={EMPTY_NAME_SET}
+          candidateNames={EMPTY_CANDIDATES}
+          onAddCard={addFromSearch}
+        />
         <label htmlFor="crucible-pile" className={styles.importLabel}>
           Card pile
         </label>

@@ -3,6 +3,7 @@ import {
   createCrucibleSession,
   flattenPileParse,
   addCardToPool,
+  appendCardToPileText,
   setCardStatus,
   setKeptQuantity,
   keptQuantityOf,
@@ -74,6 +75,36 @@ test.describe("flattenPileParse", () => {
     };
     const { pool } = flattenPileParse(parsed);
     expect(pool).toEqual([{ name: "Plains", quantity: 8 }]);
+  });
+});
+
+test.describe("appendCardToPileText", () => {
+  test("empty text becomes a single quantity-1 line", () => {
+    expect(appendCardToPileText("", "Sol Ring")).toBe("1 Sol Ring");
+    expect(appendCardToPileText("   \n", "Sol Ring")).toBe("1 Sol Ring");
+  });
+
+  test("appends a new line after existing entries", () => {
+    expect(appendCardToPileText("1 Sol Ring", "Cultivate")).toBe(
+      "1 Sol Ring\n1 Cultivate"
+    );
+  });
+
+  test("bumps the count of an existing line instead of duplicating it", () => {
+    expect(appendCardToPileText("1 Sol Ring\n3 Forest", "Forest")).toBe(
+      "1 Sol Ring\n4 Forest"
+    );
+  });
+
+  test("preserves the Nx count form and matches names case-insensitively", () => {
+    expect(appendCardToPileText("4x forest", "Forest")).toBe("5x forest");
+  });
+
+  test("leaves untouched lines exactly as typed", () => {
+    const text = "COMMANDER:\n1 Atraxa, Praetors' Voice\n\n1 Sol Ring";
+    expect(appendCardToPileText(text, "Counterspell")).toBe(
+      `${text}\n1 Counterspell`
+    );
   });
 });
 

@@ -49,6 +49,33 @@ export const TRAILING_COMMANDER_PILE = `1 Sol Ring
 1 Ezuri, Stalker of Spheres`;
 
 /**
+ * Mock the card-autocomplete route with a tiny catalog; the real route hits
+ * Scryfall. Used by both the import-screen and workbench search tests.
+ */
+export async function mockAutocomplete(page: Page) {
+  const catalog = ["Birds of Paradise", "Sol Ring", "Tymna the Weaver"];
+  await page.route("**/api/card-autocomplete**", (route) => {
+    const url = new URL(route.request().url());
+    const q = (url.searchParams.get("q") ?? "").toLowerCase();
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        suggestions: catalog.filter((name) => name.toLowerCase().includes(q)),
+      }),
+    });
+  });
+}
+
+/** Type into the card search and pick a suggestion. */
+export async function searchAndAdd(page: Page, query: string, name: string) {
+  await page.locator("#card-search-input").fill(query);
+  const option = page.getByRole("option", { name });
+  await option.waitFor({ timeout: 5_000 });
+  await option.click();
+}
+
+/**
  * Mock GET /api/commander-rules so crucible tests never hit Scryfall.
  * Shape mirrors the real route: banned names + game-changer cards.
  */

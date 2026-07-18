@@ -4,6 +4,8 @@ import {
   SAMPLE_PILE,
   TRAILING_COMMANDER_PILE,
   mockCommanderRules,
+  mockAutocomplete,
+  searchAndAdd,
 } from "./crucible-helpers";
 
 test.describe("Crucible pile import", () => {
@@ -41,6 +43,31 @@ test.describe("Crucible pile import", () => {
     await expect(crucible.keepButton("Sol Ring")).toHaveAttribute("aria-pressed", "false");
     await expect(crucible.cutButton("Sol Ring")).toHaveAttribute("aria-pressed", "false");
     await expect(crucible.keptCount).toContainText("0");
+  });
+
+  test("the import form builds the pile via card search, bumping repeats", async ({ page, crucible }) => {
+    await mockAutocomplete(page);
+    await crucible.goto();
+
+    await searchAndAdd(page, "Sol R", "Sol Ring");
+    await expect(crucible.pileTextarea).toHaveValue("1 Sol Ring");
+
+    await searchAndAdd(page, "Birds", "Birds of Paradise");
+    await expect(crucible.pileTextarea).toHaveValue(
+      "1 Sol Ring\n1 Birds of Paradise"
+    );
+
+    // Selecting the same card again bumps the line instead of duplicating it.
+    await searchAndAdd(page, "Sol R", "Sol Ring");
+    await expect(crucible.pileTextarea).toHaveValue(
+      "2 Sol Ring\n1 Birds of Paradise"
+    );
+
+    // The searched-up pile imports like any pasted list.
+    await crucible.submitButton.click();
+    await crucible.workbench.waitFor({ timeout: 15_000 });
+    await expect(crucible.poolCount).toContainText("3");
+    await expect(crucible.row("Birds of Paradise").first()).toBeVisible();
   });
 
   test("a trailing blank-line group stays in the pool instead of becoming the commander", async ({ crucible }) => {
