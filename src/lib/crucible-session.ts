@@ -181,9 +181,14 @@ export function undecidedCards(payload: CruciblePayload): DeckCard[] {
   return withStatus(payload, "undecided");
 }
 
-/** Total kept quantity (not unique names). Commanders count via their keep status. */
+/** Total kept quantity (not unique names). Commanders count as a single copy
+ * each, matching the one copy the command zone consumes in the final deck. */
 export function keptCount(payload: CruciblePayload): number {
-  return keptCards(payload).reduce((sum, c) => sum + c.quantity, 0);
+  const commanderSet = new Set(payload.commanders);
+  return keptCards(payload).reduce(
+    (sum, c) => sum + (commanderSet.has(c.name) ? 1 : c.quantity),
+    0
+  );
 }
 
 /**
@@ -196,7 +201,11 @@ export function buildFinalDeck(payload: CruciblePayload, name: string): DeckData
   const mainboard: DeckCard[] = [];
   const sideboard: DeckCard[] = [];
   for (const card of payload.pool) {
-    if (commanderSet.has(card.name)) continue;
+    if (commanderSet.has(card.name)) {
+      const surplus = card.quantity - 1;
+      if (surplus > 0) sideboard.push({ name: card.name, quantity: surplus });
+      continue;
+    }
     const status = payload.statuses[card.name] ?? "undecided";
     if (status === "keep") {
       const kept = keptQuantityOf(payload, card);

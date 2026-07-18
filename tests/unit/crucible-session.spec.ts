@@ -177,6 +177,16 @@ test.describe("partitions", () => {
     payload = setCardStatus(payload, "Sol Ring", "keep");
     expect(keptCount(payload)).toBe(13);
   });
+
+  test("keptCount counts a stacked commander as a single copy", () => {
+    let payload = session({
+      pool: [...POOL.slice(0, 3), { name: "Adeline, Resplendent Cathar", quantity: 2 }],
+      commanders: ["Adeline, Resplendent Cathar"],
+    });
+    payload = setCardStatus(payload, "Adeline, Resplendent Cathar", "keep");
+    payload = setCardStatus(payload, "Sol Ring", "keep");
+    expect(keptCount(payload)).toBe(2);
+  });
 });
 
 test.describe("buildFinalDeck", () => {
@@ -207,6 +217,26 @@ test.describe("buildFinalDeck", () => {
     const deck = buildFinalDeck(payload, "Split Stack");
     expect(deck.mainboard).toContainEqual({ name: "Plains", quantity: 5 });
     expect(deck.sideboard).toContainEqual({ name: "Plains", quantity: 7 });
+  });
+
+  test("surplus commander copies land in the sideboard, one copy in the command zone", () => {
+    let payload = session({
+      pool: [...POOL.slice(0, 3), { name: "Adeline, Resplendent Cathar", quantity: 2 }],
+      commanders: ["Adeline, Resplendent Cathar"],
+    });
+    payload = setCardStatus(payload, "Adeline, Resplendent Cathar", "keep");
+
+    const deck = buildFinalDeck(payload, "Double Adeline");
+    expect(deck.commanders).toEqual([
+      { name: "Adeline, Resplendent Cathar", quantity: 1 },
+    ]);
+    expect(deck.mainboard.map((c) => c.name)).not.toContain(
+      "Adeline, Resplendent Cathar"
+    );
+    expect(deck.sideboard).toContainEqual({
+      name: "Adeline, Resplendent Cathar",
+      quantity: 1,
+    });
   });
 });
 

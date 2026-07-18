@@ -169,12 +169,16 @@ function reducer(state: State, action: Action): State {
       };
     case "ENRICH_ERROR":
       return { ...state, enrichLoading: false, enrichError: action.error };
-    case "ENRICH_MERGE":
+    case "ENRICH_MERGE": {
+      const cardMap = { ...(state.cardMap ?? {}), ...action.cardMap };
       return {
         ...state,
-        cardMap: { ...(state.cardMap ?? {}), ...action.cardMap },
-        notFound: [...new Set([...state.notFound, ...action.notFound])],
+        cardMap,
+        notFound: [...new Set([...state.notFound, ...action.notFound])].filter(
+          (name) => !(name in cardMap)
+        ),
       };
+    }
     case "COMBOS_START":
       return { ...state, combosLoading: true };
     case "COMBOS_SUCCESS": {
@@ -594,6 +598,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
   const addCard = useCallback(
     (name: string) => {
       if (!state.payload) return;
+      const wasInPool = state.payload.pool.some((card) => card.name === name);
       const next = addCardToPool(state.payload, name);
       dispatch({ type: "SET_PAYLOAD", payload: next });
 
@@ -626,10 +631,13 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
 
       // Small piles fetch combos once up front, so a mid-triage addition
       // needs an explicit refresh (results merge in the reducer). Large
-      // piles are covered by the keep+undecided subset effect.
-      const uniqueNames = [...new Set(next.pool.map((c) => c.name))];
-      if (uniqueNames.length <= COMBOS_MAX_NAMES) {
-        void fetchCombos(uniqueNames, next.commanders);
+      // piles are covered by the keep+undecided subset effect. A quantity
+      // bump leaves the unique-name set unchanged, so no refetch needed.
+      if (!wasInPool) {
+        const uniqueNames = [...new Set(next.pool.map((c) => c.name))];
+        if (uniqueNames.length <= COMBOS_MAX_NAMES) {
+          void fetchCombos(uniqueNames, next.commanders);
+        }
       }
     },
     [state.payload, state.cardMap, fetchCombos]
