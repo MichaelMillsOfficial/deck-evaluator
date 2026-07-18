@@ -296,6 +296,10 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
   const combosSubsetKeyRef = useRef<string | null>(null);
   const combosDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rulesFetchedRef = useRef(false);
+  const addCardPayloadRef = useRef<CruciblePayload | null>(state.payload);
+  useEffect(() => {
+    addCardPayloadRef.current = state.payload;
+  }, [state.payload]);
 
   // Hydrate from sessionStorage on mount.
   useEffect(() => {
@@ -612,12 +616,15 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
 
   const addCard = useCallback(
     (name: string) => {
-      if (!state.payload) return;
+      const current = addCardPayloadRef.current;
+      if (!current) return;
       const target = name.trim().toLowerCase();
-      const wasInPool = state.payload.pool.some(
+      const wasInPool = current.pool.some(
         (card) => card.name.toLowerCase() === target
       );
       dispatch({ type: "ADD_CARD", name });
+      const next = addCardToPool(current, name);
+      addCardPayloadRef.current = next;
 
       // Enrich the newcomer incrementally; a failure surfaces it as
       // unresolved rather than blocking the whole session.
@@ -651,14 +658,13 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       // piles are covered by the keep+undecided subset effect. A quantity
       // bump leaves the unique-name set unchanged, so no refetch needed.
       if (!wasInPool) {
-        const next = addCardToPool(state.payload, name);
         const uniqueNames = [...new Set(next.pool.map((c) => c.name))];
         if (uniqueNames.length <= COMBOS_MAX_NAMES) {
           void fetchCombos(uniqueNames, next.commanders);
         }
       }
     },
-    [state.payload, state.cardMap, fetchCombos]
+    [state.cardMap, fetchCombos]
   );
 
   const setStatus = useCallback(

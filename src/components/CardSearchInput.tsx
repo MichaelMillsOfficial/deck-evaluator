@@ -78,6 +78,7 @@ export default function CardSearchInput({
     if (val.length < 2) {
       setSuggestions([]);
       setIsOpen(false);
+      setSearchError(false);
       return;
     }
 

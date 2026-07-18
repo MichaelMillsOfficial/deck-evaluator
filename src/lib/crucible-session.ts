@@ -69,7 +69,7 @@ export function flattenPileParse(parsed: ParseResult): {
   pool: DeckCard[];
   warnings: string[];
 } {
-  const merged = new Map<string, number>();
+  const merged = new Map<string, { name: string; quantity: number }>();
   const zones = [
     parsed.deck.commanders,
     parsed.deck.mainboard,
@@ -77,11 +77,16 @@ export function flattenPileParse(parsed: ParseResult): {
   ];
   for (const zone of zones) {
     for (const card of zone) {
-      merged.set(card.name, (merged.get(card.name) ?? 0) + card.quantity);
+      const key = card.name.toLowerCase();
+      const existing = merged.get(key);
+      merged.set(key, {
+        name: existing?.name ?? card.name,
+        quantity: (existing?.quantity ?? 0) + card.quantity,
+      });
     }
   }
   return {
-    pool: Array.from(merged, ([name, quantity]) => ({ name, quantity })),
+    pool: Array.from(merged.values()),
     warnings: parsed.warnings,
   };
 }

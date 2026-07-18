@@ -268,6 +268,25 @@ test.describe("canPairCommanders", () => {
     expect(canPairCommanders(brallin, makeCard({ name: "P", oracleText: PARTNER_REMINDER }))).toBe(false);
   });
 
+  test("restricted-group Partner pairs only within the same group", () => {
+    const alphaOne = makeCard({
+      name: "Alpha One",
+      oracleText: "Partner — Advisors (You can have two commanders if both have partner with the same group.)",
+    });
+    const alphaTwo = makeCard({
+      name: "Alpha Two",
+      oracleText: "Partner — Advisors (You can have two commanders if both have partner with the same group.)",
+    });
+    const betaOne = makeCard({
+      name: "Beta One",
+      oracleText: "Partner — Warlords (You can have two commanders if both have partner with the same group.)",
+    });
+    const plainPartner = makeCard({ name: "Plain", oracleText: PARTNER_REMINDER });
+    expect(canPairCommanders(alphaOne, alphaTwo)).toBe(true);
+    expect(canPairCommanders(alphaOne, betaOne)).toBe(false);
+    expect(canPairCommanders(alphaOne, plainPartner)).toBe(false);
+  });
+
   test("Friends forever on both pairs", () => {
     const a = makeCard({
       name: "Bjorna",

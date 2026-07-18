@@ -64,7 +64,8 @@ export function getMaxQuantity(
   return 1;
 }
 
-const PLAIN_PARTNER_RE = /\bPartner\b(?!\s+with)/;
+const PLAIN_PARTNER_RE = /\bPartner\b(?!\s+with)(?!\s*[-—])/;
+const RESTRICTED_PARTNER_RE = /\bPartner\s*[-—]\s*([^.\n]+)/;
 const FRIENDS_FOREVER_RE = /\bFriends forever\b/i;
 const DOCTORS_COMPANION_RE = /Doctor(?:'|’)s companion/i;
 const CHOOSE_BACKGROUND_RE = /\bChoose a Background\b/i;
@@ -73,11 +74,21 @@ const TIME_LORD_DOCTOR_RE = /\bTime Lord\b.*\bDoctor\b/;
 
 /**
  * Whether two cards form a rules-legal two-commander pairing: both have plain
- * Partner, they mutually "Partner with" each other, both have Friends Forever,
- * a Time Lord Doctor pairs with a Doctor's companion, or a "Choose a
+ * Partner, both have restricted-group Partner ("Partner - <Group>") naming
+ * the same group, they mutually "Partner with" each other, both have Friends
+ * Forever, a Time Lord Doctor pairs with a Doctor's companion, or a "Choose a
  * Background" commander pairs with a Background enchantment.
  */
 export function canPairCommanders(a: EnrichedCard, b: EnrichedCard): boolean {
+  const aRestricted = a.oracleText.match(RESTRICTED_PARTNER_RE);
+  const bRestricted = b.oracleText.match(RESTRICTED_PARTNER_RE);
+  if (aRestricted || bRestricted) {
+    return (
+      aRestricted !== null &&
+      bRestricted !== null &&
+      aRestricted[1].trim().toLowerCase() === bRestricted[1].trim().toLowerCase()
+    );
+  }
   if (PLAIN_PARTNER_RE.test(a.oracleText) && PLAIN_PARTNER_RE.test(b.oracleText)) {
     return true;
   }

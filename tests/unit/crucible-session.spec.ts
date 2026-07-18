@@ -76,6 +76,18 @@ test.describe("flattenPileParse", () => {
     const { pool } = flattenPileParse(parsed);
     expect(pool).toEqual([{ name: "Plains", quantity: 8 }]);
   });
+
+  test("merges duplicate names across zones case-insensitively", () => {
+    const parsed = {
+      deck: makeDeck({
+        mainboard: [{ name: "Sol Ring", quantity: 1 }],
+        sideboard: [{ name: "sol ring", quantity: 1 }],
+      }),
+      warnings: [],
+    };
+    const { pool } = flattenPileParse(parsed);
+    expect(pool).toEqual([{ name: "Sol Ring", quantity: 2 }]);
+  });
 });
 
 test.describe("appendCardToPileText", () => {
