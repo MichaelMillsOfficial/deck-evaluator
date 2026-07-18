@@ -63,7 +63,7 @@ Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred co
 
 ### Phase 1: Core lib (TDD)
 
-- [ ] 1.1 Create `tests/unit/crucible-session.spec.ts`
+- [x] 1.1 Create `tests/unit/crucible-session.spec.ts`
   - Test case: `createCrucibleSession(pool, warnings)` returns payload with all statuses defaulting to "undecided" and a generated id
   - Test case: `setCardStatus(payload, name, status)` returns a new payload (immutability) with the status flipped
   - Test case: `keptCards(payload)` / `cutCards(payload)` / `undecidedCards(payload)` partition the pool correctly, quantity-aware
@@ -71,23 +71,23 @@ Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred co
   - Test case: `buildFinalDeck(payload, name)` produces `DeckData` with commanders, kept mainboard (commanders excluded), cuts as sideboard, source "text"
   - Test case: serialize/deserialize round-trip drops nothing and tolerates corrupt JSON (returns null)
   - Test case: `flattenPileParse(parsed)` folds parser-inferred commanders back into the pool
-- [ ] 1.2 Create `src/lib/crucible-session.ts` implementing the above
+- [x] 1.2 Create `src/lib/crucible-session.ts` implementing the above
   - Follow the codec/guard patterns in `src/lib/deck-session.ts` (SESSION_KEY constant, try/catch storage access)
-- [ ] 1.3 Create `tests/unit/crucible-grouping.spec.ts`
+- [x] 1.3 Create `tests/unit/crucible-grouping.spec.ts`
   - Test case: `groupByCategory` uses tag cache; untagged cards land in an "Uncategorized" group
   - Test case: `groupBySynergyAxis` assigns each card to its strongest axis only; axes below 0.2 pool strength excluded; unaligned bucket collects the rest; `otherAxes` lists secondary homes
   - Test case: `groupByTypeLine` / `groupByManaValue` (buckets 0-1, 2, 3, 4, 5, 6, 7+) / `groupByColorIdentity` bucket correctly, including multicolor and colorless
   - Test case: `gameChangers` filter uses `isGameChanger`
   - Test case: groups are stable-sorted (by kept-relevance desc, then name) so UI order does not jitter on status flips
-- [ ] 1.4 Create `src/lib/crucible-grouping.ts` implementing the above
+- [x] 1.4 Create `src/lib/crucible-grouping.ts` implementing the above
   - Reuse `buildTagCache`/`getTagsCached` from `src/lib/card-tags.ts` and `SYNERGY_AXES` from `src/lib/synergy-axes.ts`
-- [ ] 1.5 Create `tests/unit/cut-suggestions.spec.ts`
+- [x] 1.5 Create `tests/unit/cut-suggestions.spec.ts`
   - Test case: off-identity cards rank as cut suggestions once commanders are set
   - Test case: cards below the weak-synergy threshold rank with reason "low synergy"
   - Test case: overfull categories (kept > target max) suggest their lowest-scoring members with reason "category overfull"
   - Test case: kept commanders and cards already cut are never suggested
   - Test case: dismissed suggestions are excluded
-- [ ] 1.6 Create `src/lib/cut-suggestions.ts` implementing `suggestCuts(payload, cardMap, synergy, scorecard, dismissed): CutSuggestion[]`
+- [x] 1.6 Create `src/lib/cut-suggestions.ts` implementing `suggestCuts(payload, cardMap, synergy, scorecard, dismissed): CutSuggestion[]`
   - Follow the scoring approach in `src/lib/card-suggestions.ts` (`WEAK_CARD_THRESHOLD`) and reuse `analyzeCandidateCard` from `src/lib/candidate-analysis.ts` where applicable
 
 ### Phase 2: Context
