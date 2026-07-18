@@ -93,7 +93,7 @@ test.describe("groupByCategory", () => {
     expect(uncategorized?.cards.map((c) => c.name)).toContain("Grizzly Bears");
   });
 
-  test("cards missing from the cardMap are skipped, group cards sort by name", () => {
+  test("cards missing from the cardMap surface only in Unresolved, group cards sort by name", () => {
     const { cardMap } = pool(SOL_RING, PLAINS);
     const p: DeckCard[] = [
       { name: "Sol Ring", quantity: 1 },
@@ -101,10 +101,13 @@ test.describe("groupByCategory", () => {
       { name: "Plains", quantity: 1 },
     ];
     const groups = groupByCategory(p, cardMap);
-    const all = groups.flatMap((g) => g.cards.map((c) => c.name));
-    expect(all).not.toContain("Unenriched Mystery");
+    const unresolved = groups.find((g) => g.id === UNRESOLVED_GROUP_ID);
+    expect(unresolved?.cards.map((c) => c.name)).toEqual(["Unenriched Mystery"]);
     for (const g of groups) {
       const names = g.cards.map((c) => c.name);
+      if (g.id !== UNRESOLVED_GROUP_ID) {
+        expect(names).not.toContain("Unenriched Mystery");
+      }
       expect(names).toEqual([...names].sort());
     }
   });
