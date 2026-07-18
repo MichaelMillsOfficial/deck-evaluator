@@ -106,6 +106,10 @@ test.describe("appendCardToPileText", () => {
       `${text}\n1 Counterspell`
     );
   });
+
+  test("bumps the count of an indented line instead of silently no-oping", () => {
+    expect(appendCardToPileText("  3 Sol Ring", "Sol Ring")).toBe("4 Sol Ring");
+  });
 });
 
 test.describe("addCardToPool", () => {
@@ -132,6 +136,13 @@ test.describe("addCardToPool", () => {
     const after = addCardToPool(payload, "Plains");
     expect(after.pool.find((c) => c.name === "Plains")?.quantity).toBe(13);
     expect(keptQuantityOf(after, { name: "Plains", quantity: 13 })).toBe(5);
+  });
+
+  test("matches an existing pool entry case-insensitively instead of duplicating it", () => {
+    const before = session();
+    const after = addCardToPool(before, "sol ring");
+    expect(after.pool.filter((c) => c.name.toLowerCase() === "sol ring")).toHaveLength(1);
+    expect(after.pool.find((c) => c.name === "Sol Ring")?.quantity).toBe(2);
   });
 });
 

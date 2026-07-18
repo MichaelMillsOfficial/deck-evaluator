@@ -89,6 +89,7 @@ interface State {
 type Action =
   | { type: "HYDRATE"; payload: CruciblePayload | null }
   | { type: "SET_PAYLOAD"; payload: CruciblePayload }
+  | { type: "ADD_CARD"; name: string }
   | { type: "NEW_PILE"; payload: CruciblePayload }
   | { type: "ENRICH_START"; total: number }
   | { type: "ENRICH_PROGRESS"; done: number }
@@ -135,6 +136,10 @@ function reducer(state: State, action: Action): State {
       };
     case "SET_PAYLOAD":
       return { ...state, hydration: "hydrated", payload: action.payload };
+    case "ADD_CARD":
+      return state.payload
+        ? { ...state, payload: addCardToPool(state.payload, action.name) }
+        : state;
     case "NEW_PILE":
       return {
         ...initialState,
@@ -417,14 +422,14 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (state.hydration !== "hydrated" || !state.payload) return;
-    if (state.combos !== null || combosIdRef.current === state.payload.crucibleId) {
-      return;
-    }
     const uniqueNames = [...new Set(state.payload.pool.map((c) => c.name))];
     if (uniqueNames.length > COMBOS_MAX_NAMES) return;
-    combosIdRef.current = state.payload.crucibleId;
+    const commanderKey = [...state.payload.commanders].sort().join(",");
+    const key = `${state.payload.crucibleId}::${commanderKey}`;
+    if (combosIdRef.current === key) return;
+    combosIdRef.current = key;
     void fetchCombos(uniqueNames, state.payload.commanders);
-  }, [state.hydration, state.payload, state.combos, fetchCombos]);
+  }, [state.hydration, state.payload, fetchCombos]);
 
   // Large piles: combo detection runs over the keep+undecided subset once
   // cuts bring its unique-name count under the cap. First crossing fetches
@@ -444,7 +449,8 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       ),
     ];
     if (subset.length > COMBOS_MAX_NAMES) return;
-    const key = [...subset].sort().join("\n");
+    const commanderKey = [...commanders].sort().join(",");
+    const key = `${[...subset].sort().join("\n")}::${commanderKey}`;
     if (combosSubsetKeyRef.current === key) return;
     const delay =
       combosSubsetKeyRef.current === null ? 0 : COMBOS_REFETCH_DEBOUNCE_MS;
@@ -607,9 +613,11 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
   const addCard = useCallback(
     (name: string) => {
       if (!state.payload) return;
-      const wasInPool = state.payload.pool.some((card) => card.name === name);
-      const next = addCardToPool(state.payload, name);
-      dispatch({ type: "SET_PAYLOAD", payload: next });
+      const target = name.trim().toLowerCase();
+      const wasInPool = state.payload.pool.some(
+        (card) => card.name.toLowerCase() === target
+      );
+      dispatch({ type: "ADD_CARD", name });
 
       // Enrich the newcomer incrementally; a failure surfaces it as
       // unresolved rather than blocking the whole session.
@@ -643,6 +651,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       // piles are covered by the keep+undecided subset effect. A quantity
       // bump leaves the unique-name set unchanged, so no refetch needed.
       if (!wasInPool) {
+        const next = addCardToPool(state.payload, name);
         const uniqueNames = [...new Set(next.pool.map((c) => c.name))];
         if (uniqueNames.length <= COMBOS_MAX_NAMES) {
           void fetchCombos(uniqueNames, next.commanders);

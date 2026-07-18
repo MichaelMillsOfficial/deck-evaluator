@@ -99,10 +99,11 @@ export function appendCardToPileText(text: string, name: string): string {
   const target = name.trim().toLowerCase();
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].trim().match(PILE_LINE_RE);
+    const trimmedLine = lines[i].trim();
+    const match = trimmedLine.match(PILE_LINE_RE);
     if (match && match[3].trim().toLowerCase() === target) {
       const count = Number(match[1]) + 1;
-      lines[i] = lines[i].replace(PILE_LINE_RE, `${count}${match[2]} ${match[3]}`);
+      lines[i] = trimmedLine.replace(PILE_LINE_RE, `${count}${match[2]} ${match[3]}`);
       return lines.join("\n");
     }
   }
@@ -120,12 +121,15 @@ export function addCardToPool(
   name: string,
   quantity = 1
 ): CruciblePayload {
-  const existing = payload.pool.find((card) => card.name === name);
+  const target = name.trim().toLowerCase();
+  const existing = payload.pool.find(
+    (card) => card.name.toLowerCase() === target
+  );
   if (existing) {
     return {
       ...payload,
       pool: payload.pool.map((card) =>
-        card.name === name
+        card.name.toLowerCase() === target
           ? { ...card, quantity: card.quantity + quantity }
           : card
       ),
