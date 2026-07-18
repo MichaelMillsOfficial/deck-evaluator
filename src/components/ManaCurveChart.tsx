@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -11,6 +10,7 @@ import {
   LabelList,
 } from "recharts";
 import ChartContainer from "@/components/ChartContainer";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import type { ManaCurveBucket } from "@/lib/mana-curve";
 
 interface ManaCurveChartProps {
@@ -79,16 +79,7 @@ export default function ManaCurveChart({
   totalSpells,
   mdfcLandCount = 0,
 }: ManaCurveChartProps) {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setPrefersReducedMotion(mql.matches);
-    const handler = (e: MediaQueryListEvent) =>
-      setPrefersReducedMotion(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   return (
     <div>

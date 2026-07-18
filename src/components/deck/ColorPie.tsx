@@ -60,14 +60,18 @@ export function ColorPie({
   const circumference = 2 * Math.PI * radius;
 
   // Precompute segment geometry so nothing is reassigned inside the JSX map.
+  const segments: {
+    key: (typeof ORDER)[number];
+    length: number;
+    offset: number;
+  }[] = [];
   let runningOffset = 0;
-  const segments = entries.map((e) => {
+  for (const e of entries) {
     const fraction = total === 0 ? 0 : e.value / total;
     const length = fraction * circumference;
-    const segment = { key: e.key, length, offset: runningOffset };
+    segments.push({ key: e.key, length, offset: runningOffset });
     runningOffset += length;
-    return segment;
-  });
+  }
 
   return (
     <div className={[styles.wrap, className].filter(Boolean).join(" ")}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   LineChart,
   Line,
@@ -19,6 +19,7 @@ import {
   countCardsByTag,
 } from "@/lib/hypergeometric";
 import ChartContainer from "@/components/ChartContainer";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -112,16 +113,7 @@ export default function HypergeometricCalculator({
   const [minSuccesses, setMinSuccesses] = useState<number>(1);
   const [turnNumber, setTurnNumber] = useState<number>(4);
   const [showCurve, setShowCurve] = useState(false);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setPrefersReducedMotion(mql.matches);
-    const handler = (e: MediaQueryListEvent) =>
-      setPrefersReducedMotion(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const precomputedQueries = useMemo(
     () => computePrecomputedQueries(deck, cardMap),

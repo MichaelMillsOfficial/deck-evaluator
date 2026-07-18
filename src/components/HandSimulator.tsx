@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DeckData, DeckTheme, EnrichedCard } from "@/lib/types";
-import type { DrawnHand, HandEvaluationContext, RankedHand, SimulationStats } from "@/lib/opening-hand";
+import type {
+  DrawnHand,
+  HandCard,
+  HandEvaluationContext,
+  RankedHand,
+  SimulationStats,
+} from "@/lib/opening-hand";
 import {
   buildPool,
   buildCommandZone,
@@ -13,7 +19,11 @@ import {
   findTopHands,
   runSimulation,
 } from "@/lib/opening-hand";
-import { computeColorDistribution, resolveCommanderIdentity } from "@/lib/color-distribution";
+import {
+  computeColorDistribution,
+  resolveCommanderIdentity,
+  type MtgColor,
+} from "@/lib/color-distribution";
 import HandDisplay from "@/components/HandDisplay";
 import HandSimulationStats from "@/components/HandSimulationStats";
 import TopHands from "@/components/TopHands";
@@ -48,9 +58,19 @@ export default function HandSimulator({
 }: HandSimulatorProps) {
   const [currentHand, setCurrentHand] = useState<DrawnHand | null>(null);
   const [mulliganCount, setMulliganCount] = useState(0);
-  const [simStats, setSimStats] = useState<SimulationStats | null>(null);
-  const [topHands, setTopHands] = useState<RankedHand[]>([]);
-  const [simLoading, setSimLoading] = useState(false);
+  // Simulation results are stored together with the inputs they were computed
+  // from, so "loading" is derived (stale result = loading) instead of being
+  // toggled via setState inside the effect.
+  const [simResult, setSimResult] = useState<{
+    inputs: {
+      pool: HandCard[];
+      commanderIdentity: Set<MtgColor>;
+      commandZone: HandCard[];
+      context: HandEvaluationContext | undefined;
+    };
+    stats: SimulationStats;
+    topHands: RankedHand[];
+  } | null>(null);
 
   const pool = useMemo(() => buildPool(deck, cardMap), [deck, cardMap]);
   const commandZone = useMemo(() => buildCommandZone(deck, cardMap), [deck, cardMap]);
@@ -72,17 +92,29 @@ export default function HandSimulator({
 
   useEffect(() => {
     if (!pool.length) return;
-    setSimLoading(true);
     // Defer to next frame to avoid blocking render
     const id = requestAnimationFrame(() => {
       const stats = runSimulation(pool, commanderIdentity, 1000, commandZone, context);
       const top = findTopHands(pool, commanderIdentity, 5, 2000, commandZone, context);
-      setSimStats(stats);
-      setTopHands(top);
-      setSimLoading(false);
+      setSimResult({
+        inputs: { pool, commanderIdentity, commandZone, context },
+        stats,
+        topHands: top,
+      });
     });
     return () => cancelAnimationFrame(id);
   }, [pool, commanderIdentity, commandZone, context]);
+
+  // A result computed from stale inputs means a fresh run is in flight.
+  const simFresh =
+    simResult !== null &&
+    simResult.inputs.pool === pool &&
+    simResult.inputs.commanderIdentity === commanderIdentity &&
+    simResult.inputs.commandZone === commandZone &&
+    simResult.inputs.context === context;
+  const simLoading = pool.length > 0 && !simFresh;
+  const simStats = simFresh ? simResult.stats : null;
+  const topHands = simFresh ? simResult.topHands : [];
 
   const drawNewHand = useCallback(
     (mulliganNumber: number) => {
