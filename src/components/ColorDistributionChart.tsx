@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -11,6 +10,7 @@ import {
   Cell,
 } from "recharts";
 import ChartContainer from "@/components/ChartContainer";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import {
   MTG_COLORS,
   type ColorDistribution,
@@ -80,16 +80,7 @@ export default function ColorDistributionChart({
   showColorless = false,
   onToggleColorless,
 }: ColorDistributionChartProps) {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setPrefersReducedMotion(mql.matches);
-    const handler = (e: MediaQueryListEvent) =>
-      setPrefersReducedMotion(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Filter to commander identity colors (or all 5 if no commander)
   const displayColors =

@@ -682,20 +682,6 @@ function grafdiggersCage(): CardProfile {
   });
 }
 
-/** Drannith Magistrate: "Your opponents can't cast spells from anywhere other than their hands." */
-function drannithMagistrate(): CardProfile {
-  return profile({
-    name: "Drannith Magistrate",
-    typeLine: "Creature — Human Wizard",
-    oracleText:
-      "Your opponents can't cast spells from anywhere other than their hands.",
-    manaCost: "{1}{W}",
-    cmc: 2,
-    power: "1",
-    toughness: "3",
-  });
-}
-
 /** Sun Titan: "Whenever Sun Titan enters the battlefield or attacks, you may return target permanent card with mana value 3 or less from your graveyard to the battlefield." */
 function sunTitan(): CardProfile {
   return profile({
@@ -919,20 +905,6 @@ function reassemblingSkeleton(): CardProfile {
     cmc: 2,
     power: "1",
     toughness: "1",
-  });
-}
-
-/** Pitiless Plunderer: "Whenever another creature you control dies, create a Treasure token." */
-function pitilessPlunderer(): CardProfile {
-  return profile({
-    name: "Pitiless Plunderer",
-    typeLine: "Creature — Human Pirate",
-    oracleText:
-      "Whenever another creature you control dies, create a Treasure token.",
-    manaCost: "{3}{B}",
-    cmc: 4,
-    power: "1",
-    toughness: "4",
   });
 }
 

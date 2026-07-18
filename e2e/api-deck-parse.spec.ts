@@ -79,7 +79,7 @@ test.describe("POST /api/deck-parse", () => {
     expect(response.status()).toBe(400);
   });
 
-  test("returns 400 for invalid JSON body", async ({ request, baseURL }) => {
+  test("returns 400 for invalid JSON body", async ({ baseURL }) => {
     // Use native fetch to send a raw malformed JSON body, since
     // Playwright's request.post auto-serializes objects.
     const response = await fetch(`${baseURL}${API_URL}`, {

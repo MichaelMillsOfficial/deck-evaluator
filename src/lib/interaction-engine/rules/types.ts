@@ -5,7 +5,7 @@
  * modules (stack.ts, layers.ts, state-based.ts).
  */
 
-import type { GameObjectRef, Controller, Zone } from "../game-model";
+import type { GameObjectRef, Controller } from "../game-model";
 
 // ─── Timing & Speed ───
 /** instant: can be played any time you have priority

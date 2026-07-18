@@ -335,11 +335,7 @@ const OFF_IDENTITY_ENRICH_RESPONSE = {
 // ---------------------------------------------------------------------------
 
 async function setupMocks(page: import("@playwright/test").Page) {
-  // Track enrich request count so we can return different responses
-  let enrichCallCount = 0;
-
   await page.route("**/api/deck-enrich", async (route) => {
-    enrichCallCount++;
     const body = await route.request().postDataJSON();
     const names: string[] = body.cardNames ?? [];
 

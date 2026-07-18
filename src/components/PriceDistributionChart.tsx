@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import ChartContainer from "@/components/ChartContainer";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import type { PriceDistributionBucket } from "@/lib/budget-analysis";
 
 interface PriceDistributionChartProps {
@@ -34,16 +34,7 @@ function CustomTooltip({
 export default function PriceDistributionChart({
   data,
 }: PriceDistributionChartProps) {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setPrefersReducedMotion(mql.matches);
-    const handler = (e: MediaQueryListEvent) =>
-      setPrefersReducedMotion(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   return (
     <ChartContainer

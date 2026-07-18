@@ -188,7 +188,6 @@ export default function SuggestionsPanel({
           setFetchStatus("error");
         }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [cacheKey, gaps, colorIdentity, deckCardNames, upgradeCandidates]
   );
 

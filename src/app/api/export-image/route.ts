@@ -6,7 +6,6 @@
 // WASM is initialized once at module scope to avoid re-initialization overhead.
 // ---------------------------------------------------------------------------
 
-import type React from "react";
 import { NextResponse } from "next/server";
 import type { AnalysisSummaryCardProps } from "@/components/AnalysisSummaryCard";
 

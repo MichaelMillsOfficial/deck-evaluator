@@ -1,21 +1,13 @@
 import { test, expect } from "@playwright/test";
 import { makeCard } from "../helpers";
 import {
-  classifyEffectPolarity,
-  inferTargetIntent,
-  categorizeEffect,
-  classifyAbilityEffects,
-} from "../../src/lib/reasoning-engine/effect-classifier";
-import {
   buildCardIntentSummary,
   buildDeckIntentSummaries,
 } from "../../src/lib/reasoning-engine/intent-resolver";
 import {
   analyzeDeckContext,
-  generateIntentOverrides,
   applyDeckContext,
 } from "../../src/lib/reasoning-engine/deck-context";
-import type { AnnotatedEffect } from "../../src/lib/reasoning-engine/types";
 import type { EnrichedCard } from "../../src/lib/types";
 import { analyzeDeckSynergy } from "../../src/lib/synergy-engine";
 
@@ -280,10 +272,7 @@ test.describe("Effect Classifier", () => {
 
       const summary = buildCardIntentSummary(skullclamp);
       // Skullclamp has a mixed stat mod (+1/-1) — the toughness reduction
-      // makes it contextual (beneficial with 1/1 tokens + death triggers)
-      const statEffects = summary.effects.filter(
-        (e) => e.effectCategory === "stat_debuff" || e.effectCategory === "stat_buff"
-      );
+      // makes it contextual (beneficial with 1/1 tokens + death triggers).
       // Should have at least one effect that is contextual or has the stat mod
       const hasContextual = summary.effects.some(
         (e) => e.polarity === "contextual" || e.effectCategory === "stat_debuff"

@@ -1,4 +1,4 @@
-import { test, expect, SAMPLE_DECKLIST } from "./fixtures";
+import { test, expect } from "./fixtures";
 
 test.describe("Tab Navigation", () => {
   test.beforeEach(async ({ deckPage }) => {

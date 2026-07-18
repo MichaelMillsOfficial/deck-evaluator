@@ -488,15 +488,9 @@ test.describe("L3 Judge: Triggers", () => {
     });
     const analysis = findInteractions([sigil, eidolon]);
 
-    // Sigil is an enchantment — when it ETBs, Eidolon should trigger (constellation)
-    // The engine should detect that Sigil's ETB triggers Eidolon
-    const triggers = findByType(
-      analysis,
-      "triggers",
-      "Sigil of the Empty Throne",
-      "Eidolon of Blossoms"
-    );
-    // This may be detected via enables or triggers depending on engine modeling
+    // Sigil is an enchantment — when it ETBs, Eidolon should trigger
+    // (constellation). This may be detected via enables or triggers
+    // depending on engine modeling.
     const anyInteraction = analysis.interactions.filter(
       (i) =>
         i.cards.includes("Sigil of the Empty Throne") &&
@@ -1392,14 +1386,8 @@ test.describe("L3 Judge: Reduces Cost", () => {
     });
     const analysis = findInteractions([warchief, krenko]);
 
-    // Warchief reduces cost for Goblin spells → Krenko is a Goblin
-    const reduces = findDirectional(
-      analysis,
-      "reduces_cost",
-      "Goblin Warchief",
-      "Krenko, Mob Boss"
-    );
-    // Also check for any interaction — the engine might model this differently
+    // Warchief reduces cost for Goblin spells → Krenko is a Goblin.
+    // Check for any interaction — the engine might model this differently.
     const anyInteraction = analysis.interactions.filter(
       (i) =>
         i.cards.includes("Goblin Warchief") &&

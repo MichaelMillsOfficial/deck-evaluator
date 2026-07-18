@@ -133,7 +133,6 @@ const DISCARD_TARGETED_RE = /\btarget (?:player|opponent) discards/i;
 const DISCARD_COST_RE = /[Dd]iscard (?:a|two|three|x|your) (?:cards?|hand)\s*:/;
 const DISCARD_UNLESS_RE =
   /\bunless (?:that player|they|he or she) discards?\b/i;
-const DISCARD_KEYWORDS = new Set(["Madness", "Connive", "Cycling"]);
 
 // --- Keyword Matters ---
 // Keywords that can form a deck strategy when a commander/payoff card cares about them

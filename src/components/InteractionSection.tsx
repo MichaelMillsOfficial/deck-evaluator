@@ -13,7 +13,7 @@ import type {
 } from "@/lib/interaction-engine";
 import { analyzeSatisfiability } from "@/lib/interaction-engine/satisfiability-analyzer";
 import type { AnalysisStep } from "@/hooks/useInteractionAnalysis";
-import { useEffect, useMemo, useState, lazy, Suspense, Component, type ReactNode } from "react";
+import { useMemo, useState, lazy, Suspense, Component, type ReactNode } from "react";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import CentralityRanking from "@/components/CentralityRanking";
 import RemovalImpactFloatingPanel from "@/components/RemovalImpactFloatingPanel";
@@ -1472,17 +1472,28 @@ function InteractionSectionInner({
     });
   }, [analysis, activeTypes, minStrength, cardSearch]);
 
-  // Reset pagination when filters change (moved out of useMemo to avoid side effects)
-  useEffect(() => {
+  // Reset pagination when filters change. Adjusted during render (with
+  // previous-value state) rather than in an effect, per the React
+  // "adjusting state when props change" pattern.
+  const [prevFilterDeps, setPrevFilterDeps] = useState({
+    activeTypes,
+    minStrength,
+    cardSearch,
+  });
+  if (
+    prevFilterDeps.activeTypes !== activeTypes ||
+    prevFilterDeps.minStrength !== minStrength ||
+    prevFilterDeps.cardSearch !== cardSearch
+  ) {
+    setPrevFilterDeps({ activeTypes, minStrength, cardSearch });
     setGroupPages({});
-  }, [activeTypes, minStrength, cardSearch]);
+  }
 
-  // Close the floating panel when the Card Centrality section is collapsed
-  useEffect(() => {
-    if (!expandedSections.has("ie-centrality")) {
-      setSelectedCard(null);
-    }
-  }, [expandedSections]);
+  // Close the floating panel when the Card Centrality section is collapsed.
+  // Guarded render adjustment; converges after one re-render.
+  if (!expandedSections.has("ie-centrality") && selectedCard !== null) {
+    setSelectedCard(null);
+  }
 
   // Apply rollup to filtered interactions
   const rolledUpItems = useMemo(

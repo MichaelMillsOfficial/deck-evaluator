@@ -7,7 +7,6 @@ import {
   getAllKeywordNames,
   KEYWORD_DATABASE,
 } from "../../src/lib/interaction-engine/keyword-database";
-import type { AbilityNode } from "../../src/lib/interaction-engine/types";
 
 // ═══════════════════════════════════════════════════════════════════
 // lookupKeyword

@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -11,6 +10,7 @@ import {
   Legend,
 } from "recharts";
 import ChartContainer from "@/components/ChartContainer";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import type { TagComparison } from "@/lib/deck-comparison";
 
 interface TagComparisonChartProps {
@@ -56,15 +56,7 @@ function CustomTooltip({
 }
 
 export default function TagComparisonChart({ data, labelA, labelB }: TagComparisonChartProps) {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setPrefersReducedMotion(mql.matches);
-    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Show only tags whose counts actually changed between the two decks.
   // Same-count tags are noise — a comparison view should surface deltas, not

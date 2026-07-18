@@ -32,22 +32,6 @@ const RHYSTIC_STUDY = makeCard({
     "Whenever an opponent casts a spell, you may pay {1}. If you don't, draw a card.",
 });
 
-// Card Advantage (look/reveal into hand — not draw)
-const SENSEI_DIVINING = makeCard({
-  name: "Sensei's Divining Top",
-  typeLine: "Artifact",
-  oracleText:
-    "Look at the top three cards of your library, then put them back in any order.",
-});
-
-// Card Advantage that merges into Card Draw bucket
-const SCROLL_RACK = makeCard({
-  name: "Scroll Rack",
-  typeLine: "Artifact",
-  oracleText:
-    "Reveal any number of cards from your hand. For each card revealed this way, look at the top card of your library; you may put that card into your hand and put the revealed card on top of your library.",
-});
-
 // Removal (single target)
 const SWORDS_TO_PLOWSHARES = makeCard({
   name: "Swords to Plowshares",

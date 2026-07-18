@@ -272,33 +272,6 @@ MAINBOARD:
 1 Swords to Plowshares
 1 Counterspell`;
 
-/** Navigate to Hands tab with enrichment loaded */
-async function setupHandsTab(deckPage: Awaited<ReturnType<typeof test["info"]> extends never ? never : any>) {
-  const { page } = deckPage;
-  await page.route("**/api/deck-enrich", (route: any) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(MOCK_ENRICH_RESPONSE),
-    })
-  );
-
-  await deckPage.goto();
-  await deckPage.fillDecklist(DECKLIST);
-  await deckPage.submitImport();
-  await deckPage.waitForDeckDisplay();
-
-  // Wait for enrichment
-  await page
-    .locator('[aria-label="Mana cost: 1 generic"]')
-    .first()
-    .waitFor({ timeout: 10_000 });
-
-  // Navigate to Hands tab
-  await deckPage.selectDeckViewTab("Hands");
-  await deckPage.waitForHandsPanel();
-}
-
 test.describe("Top 5 Best Hands", () => {
   test.beforeEach(async ({ deckPage }) => {
     const { page } = deckPage;

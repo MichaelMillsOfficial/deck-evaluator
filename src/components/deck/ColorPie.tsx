@@ -59,7 +59,19 @@ export function ColorPie({
   const cy = 50;
   const circumference = 2 * Math.PI * radius;
 
-  let offset = 0;
+  // Precompute segment geometry so nothing is reassigned inside the JSX map.
+  const segments: {
+    key: (typeof ORDER)[number];
+    length: number;
+    offset: number;
+  }[] = [];
+  let runningOffset = 0;
+  for (const e of entries) {
+    const fraction = total === 0 ? 0 : e.value / total;
+    const length = fraction * circumference;
+    segments.push({ key: e.key, length, offset: runningOffset });
+    runningOffset += length;
+  }
 
   return (
     <div className={[styles.wrap, className].filter(Boolean).join(" ")}>
@@ -82,27 +94,21 @@ export function ColorPie({
           stroke="var(--border)"
           strokeWidth={stroke}
         />
-        {entries.map((e) => {
-          const fraction = total === 0 ? 0 : e.value / total;
-          const length = fraction * circumference;
-          const seg = (
-            <circle
-              key={e.key}
-              data-segment={e.key}
-              cx={cx}
-              cy={cy}
-              r={radius}
-              fill="none"
-              stroke={COLOR_VAR[e.key]}
-              strokeWidth={stroke}
-              strokeDasharray={`${length} ${circumference - length}`}
-              strokeDashoffset={-offset}
-              transform={`rotate(-90 ${cx} ${cy})`}
-            />
-          );
-          offset += length;
-          return seg;
-        })}
+        {segments.map((s) => (
+          <circle
+            key={s.key}
+            data-segment={s.key}
+            cx={cx}
+            cy={cy}
+            r={radius}
+            fill="none"
+            stroke={COLOR_VAR[s.key]}
+            strokeWidth={stroke}
+            strokeDasharray={`${s.length} ${circumference - s.length}`}
+            strokeDashoffset={-s.offset}
+            transform={`rotate(-90 ${cx} ${cy})`}
+          />
+        ))}
       </svg>
       {showLegend && entries.length > 0 ? (
         <ul className={styles.legend}>

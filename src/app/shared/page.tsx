@@ -93,10 +93,7 @@ function SharedDeckContent() {
   );
 
   useEffect(() => {
-    if (!d) {
-      setDecodeError("No deck data provided");
-      return;
-    }
+    if (!d) return;
 
     void (async () => {
       try {
@@ -168,14 +165,17 @@ function SharedDeckContent() {
     })();
   }, [d, enrichByName, handoff]);
 
-  if (decodeError) {
+  // A missing payload is knowable at render time; no effect needed.
+  const shownDecodeError = d ? decodeError : "No deck data provided";
+
+  if (shownDecodeError) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-12">
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-8 text-center">
           <h1 className="text-xl font-bold text-white mb-2">
             Unable to Load Deck
           </h1>
-          <p className="text-sm text-red-400 mb-4">{decodeError}</p>
+          <p className="text-sm text-red-400 mb-4">{shownDecodeError}</p>
           <Link
             href="/"
             className="inline-block rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"

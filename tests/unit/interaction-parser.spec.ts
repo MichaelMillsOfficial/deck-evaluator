@@ -20,13 +20,7 @@ import type {
   StaticAbility,
   ReplacementAbility,
   SpellEffect,
-  Effect,
-  Cost,
   SacrificeCost,
-  DiscardCost,
-  ExileCost,
-  PayLifeCost,
-  CastingCost,
 } from "../../src/lib/interaction-engine/types";
 
 // ═══════════════════════════════════════════════════════════════

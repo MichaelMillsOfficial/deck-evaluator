@@ -453,7 +453,8 @@ test.describe("Card Lookup — Zone Header Help", () => {
   });
 
   test("zone format guide is visible on manual tab", async ({
-    deckPage,
+    // The deckPage fixture is activated for its route mocks.
+    deckPage: _deckPage,
     page,
   }) => {
     const guide = page.getByTestId("zone-format-guide");
@@ -461,7 +462,8 @@ test.describe("Card Lookup — Zone Header Help", () => {
   });
 
   test("zone format guide lists supported zone headers", async ({
-    deckPage,
+    // The deckPage fixture is activated for its route mocks.
+    deckPage: _deckPage,
     page,
   }) => {
     const guide = page.getByTestId("zone-format-guide");

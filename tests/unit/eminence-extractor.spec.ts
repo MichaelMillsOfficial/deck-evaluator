@@ -13,7 +13,6 @@ import {
   parseCompanionRestriction,
   profileCard,
 } from "../../src/lib/interaction-engine";
-import type { AbilityNode } from "../../src/lib/interaction-engine/types";
 
 // ═══════════════════════════════════════════════════════════════
 // EMINENCE COMMANDERS

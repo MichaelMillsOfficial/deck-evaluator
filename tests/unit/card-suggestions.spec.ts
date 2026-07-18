@@ -11,8 +11,6 @@ import {
   UPGRADE_SCORE_MAX,
   MAX_UPGRADE_CANDIDATES,
   MAX_QUERY_EXCLUSIONS,
-  THEME_STRENGTH_THRESHOLD,
-  AXIS_RELEVANCE_THRESHOLD,
 } from "../../src/lib/card-suggestions";
 import type { DeckData, EnrichedCard, CardSynergyScore, DeckTheme } from "../../src/lib/types";
 import type { CompositionScorecardResult, CategoryResult } from "../../src/lib/deck-composition";

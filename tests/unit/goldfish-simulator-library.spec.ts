@@ -18,7 +18,6 @@ import {
 import type {
   GoldfishCard,
   GoldfishGameState,
-  LibraryAction,
 } from "../../src/lib/goldfish-simulator";
 import { makeCard } from "../helpers";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { GoldfishResult, GoldfishAggregateStats } from "@/lib/goldfish-simulator";
+import type { GoldfishResult } from "@/lib/goldfish-simulator";
 import { compareGoldfishResults } from "@/lib/goldfish-comparison";
 import type { MetricDiff } from "@/lib/deck-comparison";
 import MetricComparisonTable from "@/components/MetricComparisonTable";

@@ -1,7 +1,6 @@
 import { test, expect } from "@playwright/test";
 import {
   compareGoldfishResults,
-  type GoldfishComparison,
 } from "../../src/lib/goldfish-comparison";
 import type { GoldfishResult, GoldfishAggregateStats } from "../../src/lib/goldfish-simulator";
 

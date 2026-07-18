@@ -3,7 +3,6 @@ import {
   buildGraphData,
   buildHeatmapData,
 } from "../../src/lib/interaction-graph-data";
-import type { GraphNode, GraphEdge } from "../../src/lib/interaction-graph-data";
 import type { InteractionAnalysis } from "../../src/lib/interaction-engine/types";
 import type { CentralityResult } from "../../src/lib/interaction-centrality";
 

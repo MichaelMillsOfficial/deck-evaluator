@@ -258,15 +258,6 @@ export default function InteractionHeatmap({
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
   // ─── Build per-card interaction summaries ──────────────────────────────────
-  const interactionCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const interaction of analysis.interactions) {
-      counts.set(interaction.cards[0], (counts.get(interaction.cards[0]) ?? 0) + 1);
-      counts.set(interaction.cards[1], (counts.get(interaction.cards[1]) ?? 0) + 1);
-    }
-    return counts;
-  }, [analysis.interactions]);
-
   const cardSummaries = useMemo(() => {
     // Collect all participating cards
     const participatingCards = new Set<string>();
@@ -372,7 +363,22 @@ export default function InteractionHeatmap({
     ? sortedCards.slice(clampedPage * pageSize, (clampedPage + 1) * pageSize)
     : sortedCards;
 
-  useEffect(() => { setPage(0); }, [sortMode, selectedTypes, pageSize]);
+  // Reset to the first page when sorting, filtering, or page size change.
+  // Adjusted during render (with previous-value state) rather than in an
+  // effect, per the React "adjusting state when props change" pattern.
+  const [prevPageDeps, setPrevPageDeps] = useState({
+    sortMode,
+    selectedTypes,
+    pageSize,
+  });
+  if (
+    prevPageDeps.sortMode !== sortMode ||
+    prevPageDeps.selectedTypes !== selectedTypes ||
+    prevPageDeps.pageSize !== pageSize
+  ) {
+    setPrevPageDeps({ sortMode, selectedTypes, pageSize });
+    setPage(0);
+  }
 
   // ─── Search matching ───────────────────────────────────────────────────────
   const searchQuery = (cardSearch ?? "").trim().toLowerCase();
@@ -394,12 +400,15 @@ export default function InteractionHeatmap({
     return result;
   }, [searchQuery, sortedCards]);
 
-  // Auto-expand search matches
-  useEffect(() => {
+  // Auto-expand search matches. Adjusted during render (with previous-value
+  // state) rather than in an effect to avoid a cascading re-render.
+  const [prevMatches, setPrevMatches] = useState<Set<string>>(() => new Set());
+  if (prevMatches !== matchingCardNames) {
+    setPrevMatches(matchingCardNames);
     if (matchingCardNames.size > 0) {
       setExpandedCards(new Set(matchingCardNames));
     }
-  }, [matchingCardNames]);
+  }
 
   const hasSearch = searchQuery.length > 0;
 

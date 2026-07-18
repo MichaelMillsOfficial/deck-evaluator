@@ -140,7 +140,7 @@ export default function PreviewPage() {
                   defaultValue="not-a-real-url"
                   invalid
                 />
-                <div className={styles.errorHint}>That URL doesn't parse.</div>
+                <div className={styles.errorHint}>That URL doesn&apos;t parse.</div>
               </div>
               <Input placeholder="Disabled" disabled />
               <Textarea placeholder="Paste a decklist…" mono />
@@ -159,11 +159,11 @@ export default function PreviewPage() {
           </div>
           <div className={styles.grid3}>
             <Card eyebrow="SURFACE-1" title="Default">
-              The baseline panel — everything sits in one of these unless it's
+              The baseline panel — everything sits in one of these unless it&apos;s
               hero or accent-soft.
             </Card>
             <Card variant="accent" eyebrow="ACCENT-SOFT" title="Highlight">
-              For "the reading" callouts, primary recommendations, hero blocks.
+              For &quot;the reading&quot; callouts, primary recommendations, hero blocks.
             </Card>
             <Card variant="outline" eyebrow="OUTLINE" title="Quiet">
               For grouping without weight. Used sparingly.
@@ -392,7 +392,7 @@ export default function PreviewPage() {
                 borderRadius: "var(--radius-sm)",
               }}
             >
-              "You may play lands from your graveyard."
+              &quot;You may play lands from your graveyard.&quot;
             </p>
             <div className={styles.grid3}>
               <StatTile label="CENTRALITY" value="#2" accent />

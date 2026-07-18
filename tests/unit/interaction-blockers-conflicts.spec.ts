@@ -840,10 +840,6 @@ test.describe("cross-cutting blocker scenarios", () => {
       (b) => b.blocker === "Null Rod"
     );
     if (rodBlockers.length > 0) {
-      // Should reference both Sol Ring and Sensei's Divining Top as blocked
-      const blockedNames = rodBlockers[0].blockedInteractions.map((i) =>
-        i.cards.find((c) => c !== "Null Rod")
-      );
       // At minimum, the blocker entry should exist
       expect(rodBlockers[0].description.length).toBeGreaterThan(0);
     }

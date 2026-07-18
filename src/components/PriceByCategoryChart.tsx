@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import ChartContainer from "@/components/ChartContainer";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import type { TypePriceSummary, RolePriceSummary } from "@/lib/budget-analysis";
 import { formatUSD } from "@/lib/budget-analysis";
 
@@ -35,16 +35,7 @@ export default function PriceByCategoryChart({
   byType,
   byRole,
 }: PriceByCategoryChartProps) {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setPrefersReducedMotion(mql.matches);
-    const handler = (e: MediaQueryListEvent) =>
-      setPrefersReducedMotion(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const typeData = byType.map((t) => ({ name: t.type, totalCost: t.totalCost }));
   const roleData = byRole.map((r) => ({ name: r.tag, totalCost: r.totalCost }));

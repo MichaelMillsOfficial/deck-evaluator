@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { CandidateAnalysis } from "@/lib/candidate-analysis";
 import { analyzeCandidateCard } from "@/lib/candidate-analysis";
@@ -33,19 +33,17 @@ export function useCandidateCards(
     Record<string, string>
   >({});
 
-  // Reset candidate state when deck or cardMap changes (new import)
-  const prevDeckRef = useRef(deck);
-  const prevCardMapRef = useRef(cardMap);
-  useEffect(() => {
-    if (deck !== prevDeckRef.current || cardMap !== prevCardMapRef.current) {
-      prevDeckRef.current = deck;
-      prevCardMapRef.current = cardMap;
-      setCandidates([]);
-      setCandidateCardMap({});
-      setCandidateAnalyses({});
-      setCandidateErrors({});
-    }
-  }, [deck, cardMap]);
+  // Reset candidate state when deck or cardMap changes (new import).
+  // Adjusted during render (with previous-value state) rather than in an
+  // effect, per the React "adjusting state when props change" pattern.
+  const [prevInputs, setPrevInputs] = useState({ deck, cardMap });
+  if (deck !== prevInputs.deck || cardMap !== prevInputs.cardMap) {
+    setPrevInputs({ deck, cardMap });
+    setCandidates([]);
+    setCandidateCardMap({});
+    setCandidateAnalyses({});
+    setCandidateErrors({});
+  }
 
   // Compute deck card names for filtering autocomplete
   const deckCardNames = useMemo(() => {

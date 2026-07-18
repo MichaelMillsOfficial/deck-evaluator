@@ -367,7 +367,7 @@ export async function decodeDeckPayload(
 
 function tuplesToDeckCards(
   tuples: [string, string, number][],
-  cardMap: Record<string, EnrichedCard>,
+  _cardMap: Record<string, EnrichedCard>,
   setNumberIndex: Map<string, string>
 ): { name: string; quantity: number }[] {
   return tuples.map(([set, numOrName, qty]) => {

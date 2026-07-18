@@ -78,15 +78,21 @@ export function useInteractionAnalysis(
     if (computedForRef.current === cardMap) return;
 
     cancelledRef.current = false;
-    setLoading(true);
-    setError(null);
-    setSteps(INITIAL_STEPS.map((s) => ({ ...s })));
-    setProgress(0);
 
     const yield_ = () =>
       new Promise<void>((resolve) => setTimeout(resolve, 0));
 
     const run = async () => {
+      // Reset progress state on a microtask so the effect body itself never
+      // sets state synchronously (avoids cascading-render re-renders); the
+      // microtask still runs before the browser paints.
+      await Promise.resolve();
+      if (cancelledRef.current) return;
+      setLoading(true);
+      setError(null);
+      setSteps(INITIAL_STEPS.map((s) => ({ ...s })));
+      setProgress(0);
+
       try {
         const cacheKey = deckCacheKey(cardMap);
 

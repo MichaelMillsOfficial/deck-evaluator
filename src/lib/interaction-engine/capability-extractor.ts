@@ -55,7 +55,7 @@ import type {
 import type { Speed, Layer } from "./rules/types";
 import { tokenize } from "./lexer";
 import { parseAbilities, parseSagaChapters, parseClassLevels } from "./parser";
-import { expandKeyword, lookupKeyword } from "./keyword-database";
+import { expandKeyword } from "./keyword-database";
 import {
   extractEminenceAbilities,
   parsePartnerInfo,
@@ -588,7 +588,7 @@ function extractGrants(
   for (const ability of abilities) {
     if (ability.abilityType === "static") {
       const staticAbility = ability as StaticAbility;
-      let affectedObjects = staticAbility.affectedObjects;
+      const affectedObjects = staticAbility.affectedObjects;
 
       for (const effect of staticAbility.effects) {
         // If the affectedObjects doesn't have a controller set,
@@ -932,7 +932,7 @@ function extractZoneAbilities(
  */
 function detectOracleTokenCreation(
   oracleText: string,
-  existingProduces: (PlayerResource | ObjectAttribute | CreateTokenEffect)[]
+  _existingProduces: (PlayerResource | ObjectAttribute | CreateTokenEffect)[]
 ): CreateTokenEffect[] {
   const tokens: CreateTokenEffect[] = [];
 

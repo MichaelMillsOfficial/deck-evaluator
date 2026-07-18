@@ -43,17 +43,6 @@ function findByType(
   });
 }
 
-function findDirectional(
-  analysis: InteractionAnalysis,
-  type: InteractionType,
-  from: string,
-  to: string
-): Interaction[] {
-  return analysis.interactions.filter(
-    (i) => i.type === type && i.cards[0] === from && i.cards[1] === to
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════
 // CARD PROFILES — Real cards with accurate oracle text
 // ═══════════════════════════════════════════════════════════════
