@@ -33,8 +33,8 @@ export default function RitualPage() {
     enrichError,
   } = useDeckSession();
 
-  /** Locked at first render so a re-render mid-loop doesn't reset the floor. */
-  const startedAtRef = useRef<number>(Date.now());
+  /** Locked at mount so a re-render mid-loop doesn't reset the floor. */
+  const startedAtRef = useRef<number | null>(null);
 
   // No session → bounce back to the import screen.
   useEffect(() => {
@@ -47,6 +47,11 @@ export default function RitualPage() {
   // has elapsed, forward to /reading. The session provider keeps running so
   // /reading sees fresh state on arrival.
   useEffect(() => {
+    // Lock the floor start on the first effect run (mount) only.
+    if (startedAtRef.current === null) {
+      startedAtRef.current = Date.now();
+    }
+
     if (hydration !== "hydrated" || !payload) return;
 
     const enrichmentTerminal =

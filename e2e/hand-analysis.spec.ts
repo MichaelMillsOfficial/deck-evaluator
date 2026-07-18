@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, DeckPage } from "./fixtures";
 
 // Reuse the same mock enrichment from opening-hand-ui tests with enough cards
 // to form meaningful hands
@@ -273,9 +273,9 @@ MAINBOARD:
 1 Counterspell`;
 
 /** Navigate to Hands tab with enrichment loaded */
-async function setupHandsTab(deckPage: Awaited<ReturnType<typeof test["info"]> extends never ? never : any>) {
+async function setupHandsTab(deckPage: DeckPage) {
   const { page } = deckPage;
-  await page.route("**/api/deck-enrich", (route: any) =>
+  await page.route("**/api/deck-enrich", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",

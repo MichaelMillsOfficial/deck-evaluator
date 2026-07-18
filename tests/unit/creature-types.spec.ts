@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { makeCard } from "../helpers";
+import type { EnrichedCard } from "../../src/lib/types";
 import {
   COMMON_CREATURE_TYPES,
   isChangeling,
@@ -209,7 +210,7 @@ test.describe("identifyTribalAnchors", () => {
       subtypes: ["Human", "Warrior"],
       oracleText: "Whenever a Warrior attacks, you may have its controller create a 1/1 white Warrior creature token that's tapped and attacking.",
     });
-    const cardMap: Record<string, any> = {
+    const cardMap: Record<string, EnrichedCard> = {
       "Najeela, the Blade-Blossom": commander,
       "Warrior A": makeCard({ subtypes: ["Warrior"], typeLine: "Creature — Warrior" }),
       "Warrior B": makeCard({ subtypes: ["Warrior"], typeLine: "Creature — Warrior" }),
@@ -230,7 +231,7 @@ test.describe("identifyTribalAnchors", () => {
       subtypes: ["Elf", "Druid"],
       oracleText: "Other Elf creatures you control get +1/+1.\n{T}: Add {G} for each Elf you control.",
     });
-    const cardMap: Record<string, any> = {
+    const cardMap: Record<string, EnrichedCard> = {
       "Elvish Archdruid": archdruid,
       "Llanowar Elves": makeCard({ subtypes: ["Elf", "Druid"], typeLine: "Creature — Elf Druid" }),
       "Elvish Mystic": makeCard({ subtypes: ["Elf", "Druid"], typeLine: "Creature — Elf Druid" }),
@@ -246,7 +247,7 @@ test.describe("identifyTribalAnchors", () => {
   });
 
   test("returns empty for deck with no tribal focus", () => {
-    const cardMap: Record<string, any> = {
+    const cardMap: Record<string, EnrichedCard> = {
       "Sol Ring": makeCard({ typeLine: "Artifact", subtypes: [] }),
       "Lightning Bolt": makeCard({ typeLine: "Instant", subtypes: [] }),
     };

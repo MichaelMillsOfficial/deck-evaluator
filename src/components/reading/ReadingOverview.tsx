@@ -101,7 +101,7 @@ export default function ReadingOverview() {
         />
       )}
 
-      <span className={styles.gridLabel}>What's Inside</span>
+      <span className={styles.gridLabel}>What&apos;s Inside</span>
 
       <div data-testid="reading-section-grid" className={styles.grid}>
         {SECTION_TILES.map((tile) => {

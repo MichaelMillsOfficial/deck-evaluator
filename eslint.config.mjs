@@ -22,6 +22,14 @@ const eslintConfig = defineConfig([
     ".claude/**",
     ".claire/**",
   ]),
+  {
+    // Playwright test code is not React code. The react-hooks plugin
+    // misidentifies Playwright's fixture `use` callback as a hook call.
+    files: ["e2e/**", "tests/**"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

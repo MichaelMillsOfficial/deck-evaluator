@@ -4,6 +4,7 @@ import {
   deserializePayload,
   buildCompactPayload,
   serializeCompactPayload,
+  buildDeckFromCompactPayload,
 } from "../../src/lib/deck-codec";
 import { reconstructDecklist } from "../../src/lib/decklist-parser";
 import { parseDecklist } from "../../src/lib/decklist-parser";
@@ -295,7 +296,6 @@ test.describe("deserializePayload v1/v2 detection", () => {
 });
 
 test.describe("buildDeckFromCompactPayload", () => {
-  const { buildDeckFromCompactPayload } = require("../../src/lib/deck-codec");
 
   test("resolves cards by set+collectorNumber via index", () => {
     const cardMap: Record<string, EnrichedCard> = {
