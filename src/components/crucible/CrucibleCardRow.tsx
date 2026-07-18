@@ -62,7 +62,6 @@ export default function CrucibleCardRow({
             className={styles.preview}
           >
             {enriched.imageUris ? (
-              // eslint-disable-next-line @next/next/no-img-element -- Scryfall CDN art, sized by CSS
               <img
                 src={enriched.imageUris.normal}
                 alt={`${card.name} card`}
