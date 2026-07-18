@@ -167,7 +167,7 @@ The workbench header hosts a `CardSearchInput` so cards can be searched up and a
 | `src/lib/cut-suggestions.ts` | Create | Ranked cut recommender |
 | `src/contexts/CrucibleSessionContext.tsx` | Create | Hydration, chunked enrichment, combos fetch, derived state |
 | `src/app/crucible/page.tsx` | Create | Route: import form -> loader -> workbench |
-| `src/components/crucible/CrucibleImport.tsx` | Create | Pile paste form |
+| `src/components/crucible/CrucibleImport.tsx` | Create | Pile paste form + `CardSearchInput` to build the pile by search |
 | `src/components/crucible/CrucibleWorkbench.tsx` | Create | Three-pane workbench shell |
 | `src/components/crucible/LensSwitcher.tsx` | Create | Lens/filter sidebar |
 | `src/components/crucible/CrucibleCardRow.tsx` | Create | Triage row with preview + disclosure |
