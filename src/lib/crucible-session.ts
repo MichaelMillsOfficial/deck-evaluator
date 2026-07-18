@@ -86,6 +86,34 @@ export function flattenPileParse(parsed: ParseResult): {
   };
 }
 
+/**
+ * Add a card to an existing pile mid-triage. A new name is appended with
+ * quantity 1 and status "undecided"; a name already in the pool has its
+ * quantity bumped, leaving its triage status (and any partial keep) intact.
+ */
+export function addCardToPool(
+  payload: CruciblePayload,
+  name: string,
+  quantity = 1
+): CruciblePayload {
+  const existing = payload.pool.find((card) => card.name === name);
+  if (existing) {
+    return {
+      ...payload,
+      pool: payload.pool.map((card) =>
+        card.name === name
+          ? { ...card, quantity: card.quantity + quantity }
+          : card
+      ),
+    };
+  }
+  return {
+    ...payload,
+    pool: [...payload.pool, { name, quantity }],
+    statuses: { ...payload.statuses, [name]: "undecided" },
+  };
+}
+
 export function setCardStatus(
   payload: CruciblePayload,
   name: string,

@@ -29,6 +29,7 @@ import {
   loadCrucibleSession,
   saveCrucibleSession,
   clearCrucibleSession,
+  addCardToPool,
   setCardStatus,
   setKeptQuantity as setKeptQuantityOnPayload,
   keptCards,
@@ -99,6 +100,11 @@ type Action =
       notFound: string[];
     }
   | { type: "ENRICH_ERROR"; error: string }
+  | {
+      type: "ENRICH_MERGE";
+      cardMap: Record<string, EnrichedCard>;
+      notFound: string[];
+    }
   | { type: "COMBOS_START" }
   | { type: "COMBOS_SUCCESS"; combos: CrucibleCombos }
   | { type: "COMBOS_ERROR" }
@@ -163,6 +169,12 @@ function reducer(state: State, action: Action): State {
       };
     case "ENRICH_ERROR":
       return { ...state, enrichLoading: false, enrichError: action.error };
+    case "ENRICH_MERGE":
+      return {
+        ...state,
+        cardMap: { ...(state.cardMap ?? {}), ...action.cardMap },
+        notFound: [...new Set([...state.notFound, ...action.notFound])],
+      };
     case "COMBOS_START":
       return { ...state, combosLoading: true };
     case "COMBOS_SUCCESS": {
@@ -239,6 +251,10 @@ interface CrucibleSessionContextValue {
   /** Start a fresh crucible from an imported pile. Persists and triggers
    * enrichment + combo fetches in the background. */
   setPile: (pool: DeckCard[], warnings: string[]) => void;
+  /** Add a single card to the pile mid-triage (new name arrives undecided;
+   * an existing name gets a quantity bump). Enriches it incrementally and
+   * refreshes combo detection where the pile size allows. */
+  addCard: (name: string) => void;
   setStatus: (name: string, status: CrucibleCardStatus) => void;
   /** Keep a partial count of a stacked card. Zero returns it to undecided. */
   setKeptQuantity: (name: string, count: number) => void;
@@ -575,6 +591,50 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "NEW_PILE", payload });
   }, []);
 
+  const addCard = useCallback(
+    (name: string) => {
+      if (!state.payload) return;
+      const next = addCardToPool(state.payload, name);
+      dispatch({ type: "SET_PAYLOAD", payload: next });
+
+      // Enrich the newcomer incrementally; a failure surfaces it as
+      // unresolved rather than blocking the whole session.
+      if (!state.cardMap || !(name in state.cardMap)) {
+        void (async () => {
+          try {
+            const res = await fetch("/api/deck-enrich", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ cardNames: [name] }),
+              signal: AbortSignal.timeout(30_000),
+            });
+            if (!res.ok) {
+              dispatch({ type: "ENRICH_MERGE", cardMap: {}, notFound: [name] });
+              return;
+            }
+            const json = await res.json();
+            dispatch({
+              type: "ENRICH_MERGE",
+              cardMap: (json.cards as Record<string, EnrichedCard>) ?? {},
+              notFound: (json.notFound as string[] | undefined) ?? [],
+            });
+          } catch {
+            dispatch({ type: "ENRICH_MERGE", cardMap: {}, notFound: [name] });
+          }
+        })();
+      }
+
+      // Small piles fetch combos once up front, so a mid-triage addition
+      // needs an explicit refresh (results merge in the reducer). Large
+      // piles are covered by the keep+undecided subset effect.
+      const uniqueNames = [...new Set(next.pool.map((c) => c.name))];
+      if (uniqueNames.length <= COMBOS_MAX_NAMES) {
+        void fetchCombos(uniqueNames, next.commanders);
+      }
+    },
+    [state.payload, state.cardMap, fetchCombos]
+  );
+
   const setStatus = useCallback(
     (name: string, status: CrucibleCardStatus) => {
       if (!state.payload) return;
@@ -670,6 +730,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       cutSuggestions,
       keptTotal,
       setPile,
+      addCard,
       setStatus,
       setKeptQuantity,
       setCommanders,
@@ -698,6 +759,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       cutSuggestions,
       keptTotal,
       setPile,
+      addCard,
       setStatus,
       setKeptQuantity,
       setCommanders,

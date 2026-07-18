@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import {
   createCrucibleSession,
   flattenPileParse,
+  addCardToPool,
   setCardStatus,
   setKeptQuantity,
   keptQuantityOf,
@@ -73,6 +74,33 @@ test.describe("flattenPileParse", () => {
     };
     const { pool } = flattenPileParse(parsed);
     expect(pool).toEqual([{ name: "Plains", quantity: 8 }]);
+  });
+});
+
+test.describe("addCardToPool", () => {
+  test("appends a new card as quantity 1 with undecided status (immutable)", () => {
+    const before = session();
+    const after = addCardToPool(before, "Birds of Paradise");
+    expect(after).not.toBe(before);
+    expect(after.pool).toContainEqual({ name: "Birds of Paradise", quantity: 1 });
+    expect(after.statuses["Birds of Paradise"]).toBe("undecided");
+    expect(before.pool.find((c) => c.name === "Birds of Paradise")).toBeUndefined();
+  });
+
+  test("bumps quantity for a name already in the pool, preserving its status", () => {
+    let payload = session();
+    payload = setCardStatus(payload, "Sol Ring", "keep");
+    const after = addCardToPool(payload, "Sol Ring");
+    expect(after.pool.find((c) => c.name === "Sol Ring")?.quantity).toBe(2);
+    expect(after.statuses["Sol Ring"]).toBe("keep");
+  });
+
+  test("preserves a partial keep count when bumping a stacked card", () => {
+    let payload = session();
+    payload = setKeptQuantity(payload, "Plains", 5);
+    const after = addCardToPool(payload, "Plains");
+    expect(after.pool.find((c) => c.name === "Plains")?.quantity).toBe(13);
+    expect(keptQuantityOf(after, { name: "Plains", quantity: 13 })).toBe(5);
   });
 });
 

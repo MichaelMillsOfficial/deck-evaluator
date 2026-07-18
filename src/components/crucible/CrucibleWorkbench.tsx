@@ -15,6 +15,7 @@ import { TEMPLATE_COMMAND_ZONE } from "@/lib/deck-composition";
 import { keptQuantityOf } from "@/lib/crucible-session";
 import type { DeckCard } from "@/lib/types";
 import { Button } from "@/components/ui";
+import CardSearchInput from "@/components/CardSearchInput";
 import LensSwitcher, { type CrucibleLens } from "./LensSwitcher";
 import CrucibleCardRow from "./CrucibleCardRow";
 import CommanderPicker from "./CommanderPicker";
@@ -28,6 +29,13 @@ import styles from "./crucible.module.css";
 /** Rows rendered per group before the "Show all" expansion. Keeps huge piles
  * responsive without a virtualization library. */
 const ROWS_PER_GROUP = 60;
+
+/** Nothing is excluded from the add-card search: re-adding a name already in
+ * the pile bumps its quantity (useful for basics), and singleton legality
+ * flags any illegal duplicates. Stable references keep the input's exclusion
+ * effect from re-running per render. */
+const EMPTY_NAME_SET = new Set<string>();
+const EMPTY_CANDIDATES: string[] = [];
 
 interface RenderGroup {
   id: string;
@@ -43,6 +51,7 @@ export default function CrucibleWorkbench() {
     notFound,
     tagCache,
     synergy,
+    addCard,
     setStatus,
     setKeptQuantity,
   } = useCrucibleSession();
@@ -177,6 +186,13 @@ export default function CrucibleWorkbench() {
           </p>
         </div>
         <CommanderPicker />
+        <div className={styles.addSearch}>
+          <CardSearchInput
+            deckCardNames={EMPTY_NAME_SET}
+            candidateNames={EMPTY_CANDIDATES}
+            onAddCard={addCard}
+          />
+        </div>
       </header>
 
       {notFound.length > 0 && !notFoundDismissed ? (

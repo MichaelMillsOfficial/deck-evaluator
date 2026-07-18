@@ -827,3 +827,9 @@
     transition: none;
   }
 }
+
+/* ─── Add-card search ────────────────────────────────────────── */
+.addSearch {
+  flex: 0 1 280px;
+  min-width: 200px;
+}
