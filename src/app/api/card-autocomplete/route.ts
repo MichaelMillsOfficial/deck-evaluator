@@ -1,3 +1,5 @@
+import { SCRYFALL_REQUEST_HEADERS } from "@/lib/scryfall";
+
 const SCRYFALL_AUTOCOMPLETE = "https://api.scryfall.com/cards/autocomplete";
 
 export async function GET(request: Request): Promise<Response> {
@@ -15,7 +17,7 @@ export async function GET(request: Request): Promise<Response> {
     const res = await fetch(
       `${SCRYFALL_AUTOCOMPLETE}?q=${encodeURIComponent(q)}`,
       {
-        headers: { Accept: "application/json" },
+        headers: SCRYFALL_REQUEST_HEADERS,
         signal: AbortSignal.timeout(10_000),
       }
     );
