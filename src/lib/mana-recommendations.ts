@@ -4,7 +4,6 @@ import {
   computeManaBaseMetrics,
   resolveCommanderIdentity,
   MTG_COLORS,
-  type MtgColor,
 } from "./color-distribution";
 import { computeUntappedRatio, computeManaFixingQuality } from "./land-base-efficiency";
 import { getTagsCached } from "./card-tags";
@@ -54,14 +53,6 @@ const COLOR_NAMES: Record<string, string> = {
 };
 
 const BASIC_LAND_TYPES = ["Plains", "Island", "Swamp", "Mountain", "Forest"] as const;
-
-const LAND_TYPE_TO_COLOR: Record<string, string> = {
-  Plains: "white",
-  Island: "blue",
-  Swamp: "black",
-  Mountain: "red",
-  Forest: "green",
-};
 
 const SEVERITY_ORDER: Record<RecommendationSeverity, number> = {
   critical: 0,
@@ -516,7 +507,7 @@ function checkRampCompatibility(
   }
 
   // Rule 6b: Type fetchers with no/few typed targets
-  for (const [landType, fetcherCount] of rampAnalysis.typeFetchers) {
+  for (const [landType, _fetcherCount] of rampAnalysis.typeFetchers) {
     const targetCount = typedLandCounts.get(landType) ?? 0;
     if (targetCount === 0) {
       recommendations.push({

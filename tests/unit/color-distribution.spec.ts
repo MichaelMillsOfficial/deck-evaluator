@@ -3,7 +3,6 @@ import {
   computeColorDistribution,
   computeManaBaseMetrics,
   resolveCommanderIdentity,
-  MTG_COLORS,
 } from "../../src/lib/color-distribution";
 import type { EnrichedCard } from "../../src/lib/types";
 import { makeCard, makeDeck } from "../helpers";

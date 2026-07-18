@@ -118,7 +118,7 @@ export default function ComboAssemblyChart({ comboStats }: ComboAssemblyChartPro
           />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(148, 163, 184, 0.1)" }} />
           <Bar dataKey="probability" radius={[2, 2, 0, 0]}>
-            {chartData.map((entry, index) => (
+            {chartData.map((_entry, index) => (
               <Cell
                 key={`cell-${index}`}
                 fill={

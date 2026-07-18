@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { makeCard, makeDeck } from "../helpers";
-import type { EnrichedCard, DeckData, DeckSynergyAnalysis } from "../../src/lib/types";
+import type { EnrichedCard, DeckData } from "../../src/lib/types";
 
 // We'll import these once implemented
 import {
@@ -8,10 +8,6 @@ import {
   computeCmcImpact,
   computeManaBaseImpact,
   findReplacementCandidates,
-  type CandidateAnalysis,
-  type CmcImpact,
-  type ManaBaseImpact,
-  type ReplacementCandidate,
 } from "../../src/lib/candidate-analysis";
 import { analyzeDeckSynergy } from "../../src/lib/synergy-engine";
 
@@ -573,10 +569,6 @@ test.describe("findReplacementCandidates", () => {
       synergyAnalysis
     );
 
-    // Should have some Tier 2 "Lowest synergy in deck" candidates
-    const tier2 = result.filter((r) =>
-      r.reason.includes("Lowest synergy")
-    );
     // Either all are tier1 (shared tags) or some are backfilled from tier2
     expect(result.length).toBeGreaterThan(0);
     expect(result.length).toBeLessThanOrEqual(5);

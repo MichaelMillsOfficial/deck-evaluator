@@ -13,7 +13,7 @@ import type {
 } from "@/lib/interaction-engine";
 import { analyzeSatisfiability } from "@/lib/interaction-engine/satisfiability-analyzer";
 import type { AnalysisStep } from "@/hooks/useInteractionAnalysis";
-import { useEffect, useMemo, useState, lazy, Suspense, Component, type ReactNode } from "react";
+import { useMemo, useState, lazy, Suspense, Component, type ReactNode } from "react";
 import CollapsiblePanel from "@/components/CollapsiblePanel";
 import CentralityRanking from "@/components/CentralityRanking";
 import RemovalImpactFloatingPanel from "@/components/RemovalImpactFloatingPanel";

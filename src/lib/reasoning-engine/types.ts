@@ -5,7 +5,7 @@
  * and deck context override types for the synergy reasoning layer.
  */
 
-import type { AbilityNode, Effect } from "../interaction-engine/types";
+import type { Effect } from "../interaction-engine/types";
 
 // ─── Effect Polarity ───
 // Whether an effect is good or bad for the target's controller

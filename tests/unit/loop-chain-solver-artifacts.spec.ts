@@ -12,7 +12,6 @@ import { profileCard } from "../../src/lib/interaction-engine";
 import {
   extractLoopSteps,
   solveChain,
-  canSatisfyRequirements,
 } from "../../src/lib/interaction-engine/loop-chain-solver";
 
 function profile(overrides: Parameters<typeof makeCard>[0]): CardProfile {
@@ -34,10 +33,6 @@ function hasReq(step: LoopStep, token: string): boolean {
 
 function hasProd(step: LoopStep, token: string): boolean {
   return step.produces.some((p) => p.token === token);
-}
-
-function hasBlocking(step: LoopStep, token: string): boolean {
-  return step.blocking.some((b) => b.token === token);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -454,7 +449,7 @@ test.describe("integration — KCI + Nim Deathmantle combos", () => {
       source: "structured",
     });
 
-    const chains = solveChain(allSteps);
+    solveChain(allSteps);
     // This is a known artifact combo — KCI sacs Wurmcoil for {C}{C}{C}{C},
     // Deathmantle triggers, pay {4}, Wurmcoil returns, repeat
     // If the solver can detect this, great. If not, we verify steps are present.
@@ -854,7 +849,7 @@ test.describe("integration — KCI + Nim Deathmantle + Wurmcoil with token mana"
     expect(tokenStep).toBeDefined();
 
     // The implicit steps should convert ETB_ARTIFACT → ARTIFACT_ON_BF for KCI to sacrifice
-    const chains = solveChain(allSteps);
+    solveChain(allSteps);
     // We expect the solver to find loops involving these token-generated resources
     expect(allSteps.filter((s) => hasProd(s, "etb:artifact")).length).toBeGreaterThan(0);
   });

@@ -102,7 +102,7 @@ test.describe("POST /api/deck-enrich", () => {
     expect(body.error).toContain("cardNames");
   });
 
-  test("returns 400 for invalid JSON body", async ({ request, baseURL }) => {
+  test("returns 400 for invalid JSON body", async ({ baseURL }) => {
     const response = await fetch(`${baseURL}${API_URL}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

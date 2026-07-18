@@ -483,12 +483,8 @@ test.describe("Additions pairing: pairing flow", () => {
       timeout: 5_000,
     });
 
-    // Click "Use a suggestion" to pair with one of the inline suggestions
-    // The inline suggestions should include deck cards like Sol Ring
-    const useButton = panel
-      .getByRole("button", { name: /Sol Ring/ })
-      .first();
-    // If no Sol Ring button, use any "Use" or pairing button
+    // Click "Use a suggestion" to pair with one of the inline suggestions.
+    // Use any "Use" or pairing button if present.
     const suggestionButtons = panel.locator("[data-testid='use-suggestion']");
     if (await suggestionButtons.count() > 0) {
       await suggestionButtons.first().click();

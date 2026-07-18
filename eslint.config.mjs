@@ -30,6 +30,27 @@ const eslintConfig = defineConfig([
       "react-hooks/rules-of-hooks": "off",
     },
   },
+  {
+    // A leading underscore marks a deliberately unused binding (exhaustive
+    // switch checks, fixture activation, discarded destructure slots).
+    rules: {
+      // Card and mana-symbol images are served from the Scryfall CDN as
+      // plain <img> by design (see CLAUDE.md, ManaSymbol pattern);
+      // next/image adds no value for these small, already-optimized assets.
+      "@next/next/no-img-element": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          args: "all",
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

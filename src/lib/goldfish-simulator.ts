@@ -936,15 +936,6 @@ function untapAll(state: GoldfishGameState): void {
 }
 
 /**
- * Draw one card from the library.
- */
-function drawCard(state: GoldfishGameState): void {
-  if (state.library.length > 0) {
-    state.hand.push(state.library.shift()!);
-  }
-}
-
-/**
  * Draw one card and return its info for tracking.
  */
 function drawCardTracked(
@@ -1363,10 +1354,6 @@ export function executeTurn(state: GoldfishGameState, config: GoldfishConfig): G
       cardsDrawn.push({ ...drawn, source: "draw-step" });
     }
   }
-
-  // Compute mana available for this turn
-  const manaPool = computeAvailableMana(state);
-  const manaAvailable = sumManaPool(manaPool);
 
   // Play land (one per turn)
   let landPlayed: string | null = null;

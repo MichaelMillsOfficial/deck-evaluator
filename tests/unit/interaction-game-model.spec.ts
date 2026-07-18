@@ -5,7 +5,6 @@ import {
   matchesCompositeType,
   PERMANENT_TYPES,
   ZONE_PROPERTIES,
-  COMPOSITE_TYPES,
 } from "../../src/lib/interaction-engine/game-model";
 import type {
   CardType,

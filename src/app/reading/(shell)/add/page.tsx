@@ -99,7 +99,7 @@ export default function AddPage() {
         sub: errorCount > 0 ? `${errorCount} err` : "score / 10",
       },
     ];
-  }, [adds, confirmedCount]);
+  }, [adds, confirmedCount, unpairedCount]);
 
   const candidates = useMemo(() => adds.map((a) => a.name), [adds]);
   const candidateCardMap = useMemo(

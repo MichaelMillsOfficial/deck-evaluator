@@ -258,15 +258,6 @@ export default function InteractionHeatmap({
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
   // ─── Build per-card interaction summaries ──────────────────────────────────
-  const interactionCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const interaction of analysis.interactions) {
-      counts.set(interaction.cards[0], (counts.get(interaction.cards[0]) ?? 0) + 1);
-      counts.set(interaction.cards[1], (counts.get(interaction.cards[1]) ?? 0) + 1);
-    }
-    return counts;
-  }, [analysis.interactions]);
-
   const cardSummaries = useMemo(() => {
     // Collect all participating cards
     const participatingCards = new Set<string>();

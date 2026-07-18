@@ -17,7 +17,6 @@ import type {
   Cost,
   GameObjectRef,
   StatModification,
-  KeywordGrant,
 } from "../interaction-engine/types";
 import type {
   EffectPolarity,

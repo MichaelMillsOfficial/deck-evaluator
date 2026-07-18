@@ -45,7 +45,6 @@ export default function AdditionsPanel({
   mainboard = [],
   commanders = [],
   adds: addsProp = [],
-  addNames = new Set(),
 }: AdditionsPanelProps) {
   // Build a lookup map from name → PendingAdd for quick access
   const addsMap = new Map(addsProp.map((a) => [a.name, a]));

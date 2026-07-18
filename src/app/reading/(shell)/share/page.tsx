@@ -59,7 +59,7 @@ export default function SharePage() {
 
   if (!payload?.cardMap || !analysisResults) return null;
 
-  const { deck, cardMap } = payload;
+  const { deck } = payload;
 
   const ping = (channel: Channel, message: string) => {
     setFeedback((prev) => ({ ...prev, [channel]: message }));

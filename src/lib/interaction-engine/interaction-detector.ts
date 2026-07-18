@@ -1062,7 +1062,7 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function cardTriggersOnSubtypeAttack(card: CardProfile, oracle: string, attackerSubtypes: Subtype[]): boolean {
+function cardTriggersOnSubtypeAttack(_card: CardProfile, oracle: string, attackerSubtypes: Subtype[]): boolean {
   if (!attackerSubtypes || attackerSubtypes.length === 0) return false;
   // Check for oracle text pattern "whenever a [subtype] attacks"
   for (const subtype of attackerSubtypes) {
@@ -1108,7 +1108,7 @@ function cardUntapsNonlands(_card: CardProfile, oracle: string): boolean {
     /untap each nonland permanent/i.test(oracle);
 }
 
-function cardGrantsUndyingOrPersist(granter: CardProfile, oracle: string, target: CardProfile): boolean {
+function cardGrantsUndyingOrPersist(_granter: CardProfile, oracle: string, target: CardProfile): boolean {
   // Match "have undying" anywhere in a sentence about "creatures you control"
   // e.g., "Other non-Human creatures you control get +1/+1 and have undying."
   const undyingMatch = oracle.match(/(?:other )?(.+?)creatures? you control .+?(?:have|gain) undying/i)
@@ -1204,7 +1204,7 @@ function describeTriggerInteraction(
   a: CardProfile,
   b: CardProfile,
   caused: GameEvent,
-  trigger: GameEvent
+  _trigger: GameEvent
 ): string {
   if (caused.kind === "zone_transition") {
     if (caused.from === "battlefield" && caused.to === "graveyard") {
@@ -1941,18 +1941,6 @@ function isSearchEffect(effect: Effect): boolean {
     }
   }
   return false;
-}
-
-/**
- * Get the target types for a search effect.
- */
-function getSearchTarget(effect: Effect): GameObjectRef | undefined {
-  if (effect.target) return effect.target;
-  if (effect.zoneTransition?.object) return effect.zoneTransition.object;
-  if (effect.gameEffect?.category === "return") {
-    return effect.gameEffect.target;
-  }
-  return undefined;
 }
 
 // ═══════════════════════════════════════════════════════════════

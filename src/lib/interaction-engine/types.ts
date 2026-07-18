@@ -12,8 +12,6 @@ import type {
   Controller,
   Zone,
   GameObjectRef,
-  RefModifier,
-  AttachmentType,
 } from "./game-model";
 import type { Speed, Layer, Phase, Step } from "./rules/types";
 

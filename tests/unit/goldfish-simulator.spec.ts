@@ -1,13 +1,10 @@
 import { test, expect } from "@playwright/test";
 import type { EnrichedCard } from "../../src/lib/types";
 import {
-  initializeGame,
   chooseLandToPlay,
   chooseSpellToCast,
-  chooseDiscard,
   computeAvailableMana,
   executeTurn,
-  runGoldfishGame,
   runGoldfishSimulation,
   replayGoldfishGame,
   computeAggregateStats,

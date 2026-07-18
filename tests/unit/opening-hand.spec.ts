@@ -20,7 +20,7 @@ import {
   computePipWeights,
   projectManaByTurn,
 } from "../../src/lib/opening-hand";
-import type { HandCard, HandEvaluationContext, PipRequirement } from "../../src/lib/opening-hand";
+import type { HandCard, HandEvaluationContext } from "../../src/lib/opening-hand";
 import type { EnrichedCard, DeckTheme } from "../../src/lib/types";
 import { makeCard, makeDeck } from "../helpers";
 
@@ -1793,9 +1793,9 @@ test.describe("backward compatibility", () => {
 
     // Without context — original 4-factor
     const resultWithout = evaluateHandQuality(hand, 0, new Set(["G"]));
-    // With context — 7-factor
+    // With context — 7-factor (smoke check: must not throw)
     const context: HandEvaluationContext = { deckThemes: [] };
-    const resultWith = evaluateHandQuality(hand, 0, new Set(["G"]), [], context);
+    evaluateHandQuality(hand, 0, new Set(["G"]), [], context);
 
     // Without context should use original weights (35/30/20/15)
     // Factors should be unchanged

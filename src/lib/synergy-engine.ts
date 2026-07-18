@@ -547,7 +547,6 @@ function boostSupertypeScores(
   const anchors = identifySupertypeAnchors(commanders, cardNames, cardMap);
   if (anchors.length === 0) return anchors;
 
-  const anchorSet = new Set(anchors);
   const supertypeAxis = axisMap.get("supertypeMatter");
   if (!supertypeAxis) return anchors;
 

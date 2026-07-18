@@ -31,7 +31,7 @@ export interface CommanderValidationResult {
  */
 export function isSingletonExempt(
   cardName: string,
-  cardMap: Record<string, EnrichedCard>,
+  _cardMap: Record<string, EnrichedCard>,
   gameChangerNames: Set<string>
 ): boolean {
   if (BASIC_LAND_NAMES.has(cardName)) return true;
@@ -152,7 +152,7 @@ export function isLegalCommander(card: EnrichedCard): boolean {
  */
 export function validateCommanderSelection(
   names: string[],
-  deckCardNames: string[]
+  _deckCardNames: string[]
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 

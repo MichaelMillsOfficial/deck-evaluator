@@ -2,9 +2,6 @@ import { test, expect } from "@playwright/test";
 import type { EnrichedCard } from "../../src/lib/types";
 import {
   ComboAssemblyTracker,
-  type ComboPieceStatus,
-  type ComboAssemblySnapshot,
-  type ComboAssemblyStats,
 } from "../../src/lib/combo-assembly-tracker";
 import type { GoldfishGameState } from "../../src/lib/goldfish-simulator";
 import { makeCard } from "../helpers";

@@ -2,7 +2,6 @@ import { test, expect } from "@playwright/test";
 import {
   detectMilestones,
   captureSnapshotsAtTurns,
-  type BoardMilestone,
 } from "../../src/lib/goldfish-milestones";
 import type { GoldfishGameLog, GoldfishTurnLog } from "../../src/lib/goldfish-simulator";
 

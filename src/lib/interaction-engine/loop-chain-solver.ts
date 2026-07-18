@@ -516,7 +516,6 @@ export function extractLoopSteps(profile: CardProfile): LoopStep[] {
   // --- Artifact structured extraction (Epic 2.4) ---
 
   const isArtifact = types.some((t) => /artifact/i.test(t));
-  const isArtifactCreature = isArtifact && types.some((t) => /creature/i.test(t));
 
   // 10. Artifact sacrifice outlets
   for (const cost of profile.consumes) {
@@ -1213,40 +1212,6 @@ export function canSatisfyRequirements(
 // ═══════════════════════════════════════════════════════════════
 // FILTER VALIDATION
 // ═══════════════════════════════════════════════════════════════
-
-/**
- * Check if a step's filter constraints are compatible with the providing step.
- * Returns false if a strict filter is violated.
- */
-function checkFilterCompatibility(
-  consumerStep: LoopStep,
-  requirement: ResourceRequirement,
-  producerStep: LoopStep
-): boolean {
-  if (!requirement.filter) return true;
-
-  // self: false means the consumer can't be satisfied by the same card
-  if (requirement.filter.self === false && producerStep.card === consumerStep.card) {
-    return false;
-  }
-
-  // isToken: false means tokens can't satisfy this
-  if (requirement.filter.isToken === false && producerStep.card === "(Treasure)") {
-    return false;
-  }
-
-  // supertypeExcludes: check if the producer card has excluded subtypes
-  if (requirement.filter.supertypeExcludes?.length) {
-    const producerSubtypes = producerStep.cardSubtypes ?? [];
-    for (const excluded of requirement.filter.supertypeExcludes) {
-      if (producerSubtypes.some((s) => s.toLowerCase() === excluded.toLowerCase())) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
 
 /**
  * Validate that all filter constraints in a step subset are satisfiable.

@@ -2,46 +2,17 @@ import { test, expect } from "@playwright/test";
 import {
   computeManaBaseRecommendations,
   type ManaRecommendation,
-  type ManaBaseRecommendationsResult,
 } from "../../src/lib/mana-recommendations";
-import type { DeckData, EnrichedCard, ManaPips } from "../../src/lib/types";
+import type { EnrichedCard, ManaPips } from "../../src/lib/types";
 import { makeCard, makeDeck } from "../helpers";
 
 const ZERO_PIPS: ManaPips = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
-
-/** Build a simple commander deck with lands and non-land cards */
-function buildDeck(opts: {
-  commander?: { name: string; colorIdentity: string[] };
-  lands?: { name: string; quantity: number }[];
-  spells?: { name: string; quantity: number }[];
-}): { deck: DeckData; cardMap: Record<string, EnrichedCard> } {
-  const deck = makeDeck({
-    commanders: opts.commander
-      ? [{ name: opts.commander.name, quantity: 1 }]
-      : [],
-    mainboard: [
-      ...(opts.lands ?? []).map((l) => ({ name: l.name, quantity: l.quantity })),
-      ...(opts.spells ?? []).map((s) => ({
-        name: s.name,
-        quantity: s.quantity,
-      })),
-    ],
-  });
-  return { deck, cardMap: {} };
-}
 
 function findByCategory(
   recs: ManaRecommendation[],
   category: string
 ): ManaRecommendation[] {
   return recs.filter((r) => r.category === category);
-}
-
-function findByCategoryFirst(
-  recs: ManaRecommendation[],
-  category: string
-): ManaRecommendation | undefined {
-  return recs.find((r) => r.category === category);
 }
 
 // ---------------------------------------------------------------------------

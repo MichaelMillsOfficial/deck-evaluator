@@ -16,7 +16,6 @@ import {
   rollUpInteractions,
   classifyTargets,
   type RolledUpGroup,
-  type IndividualInteraction,
 } from "../../src/lib/interaction-rollup";
 
 // ═══════════════════════════════════════════════════════════════

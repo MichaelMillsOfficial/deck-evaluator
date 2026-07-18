@@ -1,4 +1,4 @@
-import { test, expect, DeckPage } from "./fixtures";
+import { test, expect } from "./fixtures";
 
 // Reuse the same mock enrichment from opening-hand-ui tests with enough cards
 // to form meaningful hands
@@ -271,33 +271,6 @@ MAINBOARD:
 1 Arcane Signet
 1 Swords to Plowshares
 1 Counterspell`;
-
-/** Navigate to Hands tab with enrichment loaded */
-async function setupHandsTab(deckPage: DeckPage) {
-  const { page } = deckPage;
-  await page.route("**/api/deck-enrich", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(MOCK_ENRICH_RESPONSE),
-    })
-  );
-
-  await deckPage.goto();
-  await deckPage.fillDecklist(DECKLIST);
-  await deckPage.submitImport();
-  await deckPage.waitForDeckDisplay();
-
-  // Wait for enrichment
-  await page
-    .locator('[aria-label="Mana cost: 1 generic"]')
-    .first()
-    .waitFor({ timeout: 10_000 });
-
-  // Navigate to Hands tab
-  await deckPage.selectDeckViewTab("Hands");
-  await deckPage.waitForHandsPanel();
-}
 
 test.describe("Top 5 Best Hands", () => {
   test.beforeEach(async ({ deckPage }) => {

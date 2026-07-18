@@ -25,9 +25,7 @@ import type {
   PlayerAction,
   GameEvent,
   Cost,
-  RestrictionEffect,
   StatModification,
-  KeywordGrant,
 } from "../../src/lib/interaction-engine/types";
 
 // Import the function under test -- will fail until capability-extractor.ts is created

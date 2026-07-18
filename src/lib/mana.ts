@@ -43,18 +43,6 @@ const SUPERTYPES = new Set([
   "Host",
 ]);
 
-const CARD_TYPES = new Set([
-  "Creature",
-  "Artifact",
-  "Enchantment",
-  "Land",
-  "Instant",
-  "Sorcery",
-  "Planeswalker",
-  "Battle",
-  "Kindred",
-]);
-
 /**
  * Parses a Scryfall type_line string into supertypes, card type, and subtypes.
  * Type line format: "[Supertypes] <Card Type(s)> [— Subtypes]"

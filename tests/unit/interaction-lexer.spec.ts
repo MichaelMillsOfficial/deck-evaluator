@@ -13,11 +13,6 @@ function types(tokens: Token[]): string[] {
   return tokens.map((t) => t.type);
 }
 
-// Helper: extract normalized values (or raw values) from tokens
-function norms(tokens: Token[]): string[] {
-  return tokens.map((t) => t.normalized ?? t.value);
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // splitAbilityBlocks
 // ═══════════════════════════════════════════════════════════════════

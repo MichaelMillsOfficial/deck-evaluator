@@ -55,7 +55,7 @@ import type {
 import type { Speed, Layer } from "./rules/types";
 import { tokenize } from "./lexer";
 import { parseAbilities, parseSagaChapters, parseClassLevels } from "./parser";
-import { expandKeyword, lookupKeyword } from "./keyword-database";
+import { expandKeyword } from "./keyword-database";
 import {
   extractEminenceAbilities,
   parsePartnerInfo,
@@ -932,7 +932,7 @@ function extractZoneAbilities(
  */
 function detectOracleTokenCreation(
   oracleText: string,
-  existingProduces: (PlayerResource | ObjectAttribute | CreateTokenEffect)[]
+  _existingProduces: (PlayerResource | ObjectAttribute | CreateTokenEffect)[]
 ): CreateTokenEffect[] {
   const tokens: CreateTokenEffect[] = [];
 

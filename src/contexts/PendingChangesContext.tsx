@@ -11,7 +11,6 @@ import {
   type ReactNode,
 } from "react";
 import type { EnrichedCard } from "@/lib/types";
-import type { CandidateAnalysis } from "@/lib/candidate-analysis";
 import { analyzeCandidateCard } from "@/lib/candidate-analysis";
 import {
   type PendingAdd,
