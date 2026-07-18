@@ -42,9 +42,14 @@ import {
 const ENRICH_CHUNK_SIZE = 250;
 
 /** /api/deck-combos rejects requests above this many unique names. Combos
- * cannot be chunked without missing cross-chunk pairs, so larger piles get an
- * explicit "unavailable" state instead of a doomed request. */
+ * cannot be chunked without missing cross-chunk pairs, so for larger piles
+ * detection runs over the keep+undecided subset once cuts bring it under the
+ * cap — until then the UI shows how many more unique cuts are needed. */
 const COMBOS_MAX_NAMES = 250;
+
+/** Debounce for combo refetches after the first threshold crossing, so triage
+ * clicks never fire a request each. */
+const COMBOS_REFETCH_DEBOUNCE_MS = 1500;
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -78,7 +83,6 @@ interface State {
   enrichProgress: EnrichProgress;
   combos: CrucibleCombos | null;
   combosLoading: boolean;
-  combosUnavailable: boolean;
   rules: CommanderRules | null;
   dismissedSuggestions: string[];
 }
@@ -98,7 +102,6 @@ type Action =
   | { type: "COMBOS_START" }
   | { type: "COMBOS_SUCCESS"; combos: CrucibleCombos }
   | { type: "COMBOS_ERROR" }
-  | { type: "COMBOS_UNAVAILABLE" }
   | { type: "RULES_SUCCESS"; rules: CommanderRules }
   | { type: "DISMISS_SUGGESTION"; name: string }
   | { type: "DISMISS_ENRICH_ERROR" }
@@ -114,7 +117,6 @@ const initialState: State = {
   enrichProgress: { done: 0, total: 0 },
   combos: null,
   combosLoading: false,
-  combosUnavailable: false,
   rules: null,
   dismissedSuggestions: [],
 };
@@ -163,16 +165,31 @@ function reducer(state: State, action: Action): State {
       return { ...state, enrichLoading: false, enrichError: action.error };
     case "COMBOS_START":
       return { ...state, combosLoading: true };
-    case "COMBOS_SUCCESS":
-      return { ...state, combosLoading: false, combos: action.combos };
+    case "COMBOS_SUCCESS": {
+      const prev = state.combos;
+      if (!prev) {
+        return { ...state, combosLoading: false, combos: action.combos };
+      }
+      const exactById = new Map(prev.exactCombos.map((c) => [c.id, c]));
+      for (const combo of action.combos.exactCombos) exactById.set(combo.id, combo);
+      const nearById = new Map(prev.nearCombos.map((c) => [c.id, c]));
+      for (const combo of action.combos.nearCombos) nearById.set(combo.id, combo);
+      for (const id of exactById.keys()) nearById.delete(id);
+      return {
+        ...state,
+        combosLoading: false,
+        combos: {
+          exactCombos: [...exactById.values()],
+          nearCombos: [...nearById.values()],
+        },
+      };
+    }
     case "COMBOS_ERROR":
       return {
         ...state,
         combosLoading: false,
         combos: state.combos ?? { exactCombos: [], nearCombos: [] },
       };
-    case "COMBOS_UNAVAILABLE":
-      return { ...state, combosLoading: false, combosUnavailable: true };
     case "RULES_SUCCESS":
       return { ...state, rules: action.rules };
     case "DISMISS_SUGGESTION":
@@ -203,9 +220,10 @@ interface CrucibleSessionContextValue {
   enrichProgress: EnrichProgress;
   combos: CrucibleCombos | null;
   combosLoading: boolean;
-  /** True when the pile exceeds the combo lookup's unique-name cap, so combo
-   * detection cannot run at all. */
-  combosUnavailable: boolean;
+  /** How many unique keep/undecided cards over the combo lookup's cap the
+   * pile currently is. Zero means combo detection is available; positive
+   * means "cut this many more unique cards" to unlock it. */
+  combosOverBy: number;
   /** Tag cache over the enriched pool. Null until enrichment completes. */
   tagCache: Map<string, string[]> | null;
   /** Synergy over the whole pool (synthetic deck: commanders + pool). */
@@ -255,6 +273,8 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
   const combosAbortRef = useRef<AbortController | null>(null);
   const enrichedIdRef = useRef<string | null>(null);
   const combosIdRef = useRef<string | null>(null);
+  const combosSubsetKeyRef = useRef<string | null>(null);
+  const combosDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rulesFetchedRef = useRef(false);
 
   // Hydrate from sessionStorage on mount.
@@ -322,14 +342,8 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const fetchCombos = useCallback(async (payload: CruciblePayload) => {
-    const uniqueNames = [...new Set(payload.pool.map((c) => c.name))];
-    if (uniqueNames.length === 0) return;
-
-    if (uniqueNames.length > COMBOS_MAX_NAMES) {
-      dispatch({ type: "COMBOS_UNAVAILABLE" });
-      return;
-    }
+  const fetchCombos = useCallback(async (cardNames: string[], commanders: string[]) => {
+    if (cardNames.length === 0 || cardNames.length > COMBOS_MAX_NAMES) return;
 
     combosAbortRef.current?.abort();
     const controller = new AbortController();
@@ -342,8 +356,8 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cardNames: uniqueNames,
-          commanders: payload.commanders,
+          cardNames,
+          commanders,
         }),
         signal: AbortSignal.any([
           controller.signal,
@@ -380,11 +394,46 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (state.hydration !== "hydrated" || !state.payload) return;
-    if (state.combos === null && combosIdRef.current !== state.payload.crucibleId) {
-      combosIdRef.current = state.payload.crucibleId;
-      void fetchCombos(state.payload);
+    if (state.combos !== null || combosIdRef.current === state.payload.crucibleId) {
+      return;
     }
+    const uniqueNames = [...new Set(state.payload.pool.map((c) => c.name))];
+    if (uniqueNames.length > COMBOS_MAX_NAMES) return;
+    combosIdRef.current = state.payload.crucibleId;
+    void fetchCombos(uniqueNames, state.payload.commanders);
   }, [state.hydration, state.payload, state.combos, fetchCombos]);
+
+  // Large piles: combo detection runs over the keep+undecided subset once
+  // cuts bring its unique-name count under the cap. First crossing fetches
+  // immediately; later subset changes are debounced so individual triage
+  // clicks never fire a request each. Results merge in the reducer so combos
+  // whose pieces are later cut keep rendering as Broken.
+  useEffect(() => {
+    if (state.hydration !== "hydrated" || !state.payload) return;
+    const { pool, statuses, commanders } = state.payload;
+    const poolUnique = new Set(pool.map((c) => c.name));
+    if (poolUnique.size <= COMBOS_MAX_NAMES) return;
+    const subset = [
+      ...new Set(
+        pool
+          .filter((c) => (statuses[c.name] ?? "undecided") !== "cut")
+          .map((c) => c.name)
+      ),
+    ];
+    if (subset.length > COMBOS_MAX_NAMES) return;
+    const key = [...subset].sort().join("\n");
+    if (combosSubsetKeyRef.current === key) return;
+    const delay =
+      combosSubsetKeyRef.current === null ? 0 : COMBOS_REFETCH_DEBOUNCE_MS;
+    if (combosDebounceRef.current) clearTimeout(combosDebounceRef.current);
+    combosDebounceRef.current = setTimeout(() => {
+      combosSubsetKeyRef.current = key;
+      void fetchCombos(subset, commanders);
+    }, delay);
+    return () => {
+      if (combosDebounceRef.current) clearTimeout(combosDebounceRef.current);
+    };
+  }, [state.hydration, state.payload, fetchCombos]);
 
   // Banned list + game changers, fetched once per provider lifetime. The
   // effect re-runs on every payload change, so it must NOT abort in its
@@ -497,6 +546,19 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     [state.payload]
   );
 
+  const combosOverBy = useMemo(() => {
+    if (!state.payload) return 0;
+    const { pool: fullPool, statuses } = state.payload;
+    const poolUnique = new Set(fullPool.map((c) => c.name));
+    if (poolUnique.size <= COMBOS_MAX_NAMES) return 0;
+    const subsetUnique = new Set(
+      fullPool
+        .filter((c) => (statuses[c.name] ?? "undecided") !== "cut")
+        .map((c) => c.name)
+    );
+    return Math.max(0, subsetUnique.size - COMBOS_MAX_NAMES);
+  }, [state.payload]);
+
   // ------------------------------------------------------------------
   // Actions
   // ------------------------------------------------------------------
@@ -504,8 +566,10 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
   const setPile = useCallback((pool: DeckCard[], warnings: string[]) => {
     enrichAbortRef.current?.abort();
     combosAbortRef.current?.abort();
+    if (combosDebounceRef.current) clearTimeout(combosDebounceRef.current);
     enrichedIdRef.current = null;
     combosIdRef.current = null;
+    combosSubsetKeyRef.current = null;
     const payload = createCrucibleSession(pool, warnings);
     saveCrucibleSession(payload);
     dispatch({ type: "NEW_PILE", payload });
@@ -579,8 +643,10 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
   const clearCrucible = useCallback(() => {
     enrichAbortRef.current?.abort();
     combosAbortRef.current?.abort();
+    if (combosDebounceRef.current) clearTimeout(combosDebounceRef.current);
     enrichedIdRef.current = null;
     combosIdRef.current = null;
+    combosSubsetKeyRef.current = null;
     clearCrucibleSession();
     dispatch({ type: "CLEAR" });
   }, []);
@@ -596,7 +662,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       enrichProgress: state.enrichProgress,
       combos: state.combos,
       combosLoading: state.combosLoading,
-      combosUnavailable: state.combosUnavailable,
+      combosOverBy,
       tagCache,
       synergy,
       keptScorecard,
@@ -624,7 +690,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       state.enrichProgress,
       state.combos,
       state.combosLoading,
-      state.combosUnavailable,
+      combosOverBy,
       tagCache,
       synergy,
       keptScorecard,

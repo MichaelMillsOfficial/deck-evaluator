@@ -357,6 +357,40 @@ const FIXTURES: PartialEnrichedCard[] = [
     rarity: "mythic",
     manaPips: { G: 1, U: 1 },
   },
+  {
+    name: "Thrasios, Triton Hero",
+    manaCost: "{G}{U}",
+    cmc: 2,
+    colorIdentity: ["G", "U"],
+    colors: ["G", "U"],
+    typeLine: "Legendary Creature — Merfolk Wizard",
+    supertypes: ["Legendary"],
+    subtypes: ["Merfolk", "Wizard"],
+    oracleText:
+      "{4}: Scry 1, then reveal the top card of your library. If it's a land card, put it onto the battlefield tapped. Otherwise, draw a card.\nPartner (You can have two commanders if both have partner.)",
+    keywords: ["Partner"],
+    power: "1",
+    toughness: "3",
+    rarity: "mythic",
+    manaPips: { G: 1, U: 1 },
+  },
+  {
+    name: "Tymna the Weaver",
+    manaCost: "{1}{W}{B}",
+    cmc: 3,
+    colorIdentity: ["W", "B"],
+    colors: ["W", "B"],
+    typeLine: "Legendary Creature — Human Cleric",
+    supertypes: ["Legendary"],
+    subtypes: ["Human", "Cleric"],
+    oracleText:
+      "Lifelink\nAt the beginning of your postcombat main phase, you may pay X life, where X is the number of opponents that were dealt combat damage this turn. If you do, draw X cards.\nPartner (You can have two commanders if both have partner.)",
+    keywords: ["Lifelink", "Partner"],
+    power: "2",
+    toughness: "2",
+    rarity: "mythic",
+    manaPips: { W: 1, B: 1 },
+  },
 
   // ─── Basic + dual lands ─────────────────────────────────────────────────
   {

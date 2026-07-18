@@ -21,6 +21,7 @@ function TrackerContent() {
     keptScorecard,
     legality,
     combos,
+    combosOverBy,
     finalize,
     clearCrucible,
   } = useCrucibleSession();
@@ -99,7 +100,15 @@ function TrackerContent() {
         </div>
       ) : null}
 
-      {comboSummary ? (
+      {combosOverBy > 0 ? (
+        <div className={styles.trackerSection}>
+          <p className={styles.trackerEyebrow}>Combos</p>
+          <p className={styles.trackerLine}>
+            Cut {combosOverBy} more unique {combosOverBy === 1 ? "card" : "cards"} to
+            enable combo detection
+          </p>
+        </div>
+      ) : comboSummary ? (
         <div className={styles.trackerSection}>
           <p className={styles.trackerEyebrow}>Combos</p>
           <p className={styles.trackerLine}>✓ {comboSummary.intact} intact in kept</p>

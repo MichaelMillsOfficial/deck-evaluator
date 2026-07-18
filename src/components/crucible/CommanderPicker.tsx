@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useCrucibleSession } from "@/contexts/CrucibleSessionContext";
-import { isLegalCommander } from "@/lib/commander-validation";
+import { isLegalCommander, canPairCommanders } from "@/lib/commander-validation";
 import { Button, Tag } from "@/components/ui";
 import styles from "./crucible.module.css";
 
@@ -22,13 +22,23 @@ export default function CommanderPicker() {
       .map((card) => card.name);
   }, [payload, cardMap]);
 
+  const partnerCandidates = useMemo(() => {
+    if (!payload || !cardMap || payload.commanders.length !== 1) return [];
+    const chosen = cardMap[payload.commanders[0]];
+    if (!chosen) return [];
+    return candidates.filter((name) => {
+      const enriched = cardMap[name];
+      return enriched ? canPairCommanders(chosen, enriched) : false;
+    });
+  }, [payload, cardMap, candidates]);
+
   if (!payload) return null;
 
   const commanders = payload.commanders;
 
-  const candidateButtons = (label: string) => (
+  const candidateButtons = (names: string[], label: string) => (
     <span className={styles.commanderCandidates}>
-      {candidates.slice(0, MAX_CANDIDATES_SHOWN).map((name) => (
+      {names.slice(0, MAX_CANDIDATES_SHOWN).map((name) => (
         <Button
           key={name}
           variant="secondary"
@@ -39,9 +49,9 @@ export default function CommanderPicker() {
           {name}
         </Button>
       ))}
-      {candidates.length > MAX_CANDIDATES_SHOWN ? (
+      {names.length > MAX_CANDIDATES_SHOWN ? (
         <span className={styles.commanderMore}>
-          +{candidates.length - MAX_CANDIDATES_SHOWN} more {label} in the pile
+          +{names.length - MAX_CANDIDATES_SHOWN} more {label} in the pile
         </span>
       ) : null}
     </span>
@@ -66,10 +76,10 @@ export default function CommanderPicker() {
             </Button>
           </span>
         ))}
-        {commanders.length === 1 && candidates.length > 0 ? (
+        {commanders.length === 1 && partnerCandidates.length > 0 ? (
           <>
             <span className={styles.commanderMore}>Add a partner:</span>
-            {candidateButtons("legendaries")}
+            {candidateButtons(partnerCandidates, "legal partners")}
           </>
         ) : null}
       </div>
@@ -82,7 +92,7 @@ export default function CommanderPicker() {
       {candidates.length === 0 ? (
         <Tag variant="watch">No legal commanders in the pile</Tag>
       ) : (
-        candidateButtons("legendaries")
+        candidateButtons(candidates, "legendaries")
       )}
     </div>
   );

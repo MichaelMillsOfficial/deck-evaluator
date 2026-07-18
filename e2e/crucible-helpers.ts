@@ -28,6 +28,12 @@ export const HUNDRED_PILE = `1 Atraxa, Praetors' Voice
 59 Forest
 40 Island`;
 
+/** SAMPLE_PILE plus the Thrasios/Tymna Partner pair, for two-commander
+ * selection tests. Atraxa and Ezuri stay in as non-partner legendaries. */
+export const PARTNER_PILE = `${SAMPLE_PILE}
+1 Thrasios, Triton Hero
+1 Tymna the Weaver`;
+
 /** A pile whose trailing blank-line group would trigger the parser's
  * commander-inference heuristic if the Crucible didn't flatten it. */
 export const TRAILING_COMMANDER_PILE = `1 Sol Ring

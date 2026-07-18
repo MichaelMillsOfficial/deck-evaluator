@@ -3,6 +3,7 @@ import {
   expect,
   SAMPLE_PILE,
   HUNDRED_PILE,
+  PARTNER_PILE,
   mockCommanderRules,
 } from "./crucible-helpers";
 
@@ -109,21 +110,42 @@ test.describe("Crucible triage", () => {
     await expect(crucible.keptCount).toContainText("1");
   });
 
-  test("a second commander can be added and removed", async ({ page, crucible }) => {
+  test("a legal Partner pair can be selected and removed; non-partners are not offered", async ({ page, crucible }) => {
+    await crucible.importPile(PARTNER_PILE);
+
+    await crucible.chooseCommander("Thrasios, Triton Hero");
+    await expect(crucible.commanderPicker).toContainText("Add a partner");
+    await expect(
+      page.getByRole("button", { name: "Choose Tymna the Weaver" })
+    ).toBeVisible();
+    // Atraxa and Ezuri are legal solo commanders but have no Partner ability,
+    // so they must not be offered as a second commander.
+    await expect(
+      page.getByRole("button", { name: "Choose Atraxa, Praetors' Voice" })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Choose Ezuri, Stalker of Spheres" })
+    ).toHaveCount(0);
+
+    await crucible.chooseCommander("Tymna the Weaver");
+    await expect(crucible.commanderPicker).toContainText("Thrasios, Triton Hero");
+    await expect(crucible.commanderPicker).toContainText("Tymna the Weaver");
+
+    await page.getByRole("button", { name: "Remove Tymna the Weaver" }).click();
+    await expect(
+      page.getByRole("button", { name: "Remove Tymna the Weaver" })
+    ).toHaveCount(0);
+    await expect(crucible.commanderPicker).toContainText("Thrasios, Triton Hero");
+  });
+
+  test("a non-partner second commander cannot be chosen from the picker", async ({ page, crucible }) => {
     await crucible.importPile(SAMPLE_PILE);
 
     await crucible.chooseCommander("Atraxa, Praetors' Voice");
-    await crucible.chooseCommander("Ezuri, Stalker of Spheres");
-    await expect(crucible.commanderPicker).toContainText("Atraxa, Praetors' Voice");
-    await expect(crucible.commanderPicker).toContainText("Ezuri, Stalker of Spheres");
-
-    await page
-      .getByRole("button", { name: "Remove Ezuri, Stalker of Spheres" })
-      .click();
+    await expect(crucible.commanderPicker).not.toContainText("Add a partner");
     await expect(
-      page.getByRole("button", { name: "Remove Ezuri, Stalker of Spheres" })
+      page.getByRole("button", { name: "Choose Ezuri, Stalker of Spheres" })
     ).toHaveCount(0);
-    await expect(crucible.commanderPicker).toContainText("Atraxa, Praetors' Voice");
   });
 
   test("reloading mid-triage restores statuses from sessionStorage", async ({ page, crucible }) => {
