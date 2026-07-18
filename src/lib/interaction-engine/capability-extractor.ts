@@ -588,7 +588,7 @@ function extractGrants(
   for (const ability of abilities) {
     if (ability.abilityType === "static") {
       const staticAbility = ability as StaticAbility;
-      let affectedObjects = staticAbility.affectedObjects;
+      const affectedObjects = staticAbility.affectedObjects;
 
       for (const effect of staticAbility.effects) {
         // If the affectedObjects doesn't have a controller set,

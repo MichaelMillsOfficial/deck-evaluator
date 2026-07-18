@@ -431,7 +431,6 @@ export const test = base.extend<{ deckPage: DeckPage }>({
         if (!isFixtured(name)) {
           // Surface this in test output so missing fixtures are easy to
           // notice and add. Tests aren't failed by it.
-          // eslint-disable-next-line no-console
           console.warn(`[e2e] enrichment fixture missing for: ${name}`);
         }
       }
