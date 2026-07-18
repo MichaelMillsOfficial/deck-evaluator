@@ -34,6 +34,12 @@ export const PARTNER_PILE = `${SAMPLE_PILE}
 1 Thrasios, Triton Hero
 1 Tymna the Weaver`;
 
+/** A Choose-a-Background commander, its Background, and 98 basics — pairable
+ * in the picker and sealable as a legal hundred. */
+export const BACKGROUND_PILE = `1 Wilson, Refined Grizzly
+1 Raised by Giants
+98 Forest`;
+
 /** A pile whose trailing blank-line group would trigger the parser's
  * commander-inference heuristic if the Crucible didn't flatten it. */
 export const TRAILING_COMMANDER_PILE = `1 Sol Ring

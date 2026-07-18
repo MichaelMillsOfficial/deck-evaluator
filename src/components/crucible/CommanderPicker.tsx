@@ -26,11 +26,14 @@ export default function CommanderPicker() {
     if (!payload || !cardMap || payload.commanders.length !== 1) return [];
     const chosen = cardMap[payload.commanders[0]];
     if (!chosen) return [];
-    return candidates.filter((name) => {
-      const enriched = cardMap[name];
-      return enriched ? canPairCommanders(chosen, enriched) : false;
-    });
-  }, [payload, cardMap, candidates]);
+    return payload.pool
+      .filter((card) => {
+        if (payload.commanders.includes(card.name)) return false;
+        const enriched = cardMap[card.name];
+        return enriched ? canPairCommanders(chosen, enriched) : false;
+      })
+      .map((card) => card.name);
+  }, [payload, cardMap]);
 
   if (!payload) return null;
 

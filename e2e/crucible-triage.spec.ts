@@ -4,6 +4,7 @@ import {
   SAMPLE_PILE,
   HUNDRED_PILE,
   PARTNER_PILE,
+  BACKGROUND_PILE,
   mockCommanderRules,
 } from "./crucible-helpers";
 
@@ -146,6 +147,28 @@ test.describe("Crucible triage", () => {
     await expect(
       page.getByRole("button", { name: "Choose Ezuri, Stalker of Spheres" })
     ).toHaveCount(0);
+  });
+
+  test("a Background pairs with its Choose-a-Background commander and seals legal", async ({ page, crucible }) => {
+    await crucible.importPile(BACKGROUND_PILE);
+
+    // A Background is never offered as a solo commander.
+    await expect(
+      page.getByRole("button", { name: "Choose Wilson, Refined Grizzly" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Choose Raised by Giants" })
+    ).toHaveCount(0);
+
+    await crucible.chooseCommander("Wilson, Refined Grizzly");
+    await expect(crucible.commanderPicker).toContainText("Add a partner");
+    await crucible.chooseCommander("Raised by Giants");
+    await expect(crucible.commanderPicker).toContainText("Wilson, Refined Grizzly");
+    await expect(crucible.commanderPicker).toContainText("Raised by Giants");
+
+    await crucible.keepButton("Forest").click();
+    await expect(crucible.keptCount).toContainText("100");
+    await expect(crucible.sealButton).toBeEnabled();
   });
 
   test("reloading mid-triage restores statuses from sessionStorage", async ({ page, crucible }) => {

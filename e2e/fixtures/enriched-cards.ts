@@ -391,6 +391,38 @@ const FIXTURES: PartialEnrichedCard[] = [
     rarity: "mythic",
     manaPips: { W: 1, B: 1 },
   },
+  {
+    name: "Wilson, Refined Grizzly",
+    manaCost: "{1}{G}",
+    cmc: 2,
+    colorIdentity: ["G"],
+    colors: ["G"],
+    typeLine: "Legendary Creature — Bear",
+    supertypes: ["Legendary"],
+    subtypes: ["Bear"],
+    oracleText:
+      "Vigilance, reach, ward {2}\nChoose a Background (You can have a Background as a second commander.)",
+    keywords: ["Vigilance", "Reach", "Ward"],
+    power: "4",
+    toughness: "4",
+    rarity: "uncommon",
+    manaPips: { G: 1 },
+  },
+  {
+    name: "Raised by Giants",
+    manaCost: "{2}{G}",
+    cmc: 3,
+    colorIdentity: ["G"],
+    colors: ["G"],
+    typeLine: "Legendary Enchantment — Background",
+    supertypes: ["Legendary"],
+    subtypes: ["Background"],
+    oracleText:
+      "Commander creatures you own have base power and toughness 10/10 and have trample.",
+    keywords: ["Trample"],
+    rarity: "rare",
+    manaPips: { G: 1 },
+  },
 
   // ─── Basic + dual lands ─────────────────────────────────────────────────
   {
