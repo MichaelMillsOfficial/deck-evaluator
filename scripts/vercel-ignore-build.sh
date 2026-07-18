@@ -38,20 +38,34 @@ APP_PATHS=(
 # Use Vercel-provided previous SHA, fall back to merge base with master
 PREVIOUS_SHA="${VERCEL_GIT_PREVIOUS_SHA:-}"
 if [ -z "$PREVIOUS_SHA" ]; then
-  # On first push of a branch, compare against the merge base with master
-  # so we see ALL changes in the branch, not just the last commit
+  # Vercel's checkout is shallow, so origin/master usually isn't present yet.
+  # Deepen the clone before asking for a merge-base, so this doesn't silently
+  # degrade to comparing only the last commit (which drops earlier commits'
+  # changes whenever several commits land in one push, e.g. from the
+  # no-mistakes gate).
+  echo "  VERCEL_GIT_PREVIOUS_SHA not set, deriving merge-base with master"
+  git fetch --unshallow origin 2>/dev/null || true
+  # Explicit refspec: a single-branch clone (what Vercel uses) only writes
+  # FETCH_HEAD on a plain "git fetch origin master", not the origin/master
+  # remote-tracking ref that merge-base needs below.
+  git fetch origin +master:refs/remotes/origin/master 2>/dev/null || true
   MERGE_BASE=$(git merge-base origin/master HEAD 2>/dev/null || true)
   if [ -n "$MERGE_BASE" ]; then
-    echo "  VERCEL_GIT_PREVIOUS_SHA not set, using merge-base with master ($MERGE_BASE)"
+    echo "  Using merge-base with master ($MERGE_BASE)"
     PREVIOUS_SHA="$MERGE_BASE"
   else
-    echo "  VERCEL_GIT_PREVIOUS_SHA not set, using HEAD^"
-    PREVIOUS_SHA="HEAD^"
+    echo "  Could not determine merge-base with master - proceeding with build (fail open)"
+    exit 1
   fi
 fi
 
-# Get list of changed files
-CHANGED_FILES=$(git diff --name-only "$PREVIOUS_SHA" HEAD 2>/dev/null || true)
+# Get list of changed files. A failed diff is treated as "unknown" rather
+# than "nothing changed" - fail open so we never silently skip a build.
+if ! CHANGED_FILES=$(git diff --name-only "$PREVIOUS_SHA" HEAD 2>&1); then
+  echo "  git diff against $PREVIOUS_SHA failed - proceeding with build (fail open)"
+  echo "$CHANGED_FILES"
+  exit 1
+fi
 
 if [ -z "$CHANGED_FILES" ]; then
   echo "  No changed files detected — skipping build"
