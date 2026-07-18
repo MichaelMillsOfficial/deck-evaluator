@@ -153,6 +153,9 @@ Tokens live in `design-system/tokens.css` and are imported via `globals.css`.
   **9, 11, 13, 15… are NOT defined** — using them silently drops the value.
 - **Reduced motion** — every animated component must gate with
   `@media (prefers-reduced-motion: reduce) { transition: none; transform: none }`.
+  When the preference is needed in JS (e.g. chart animations), use the shared
+  `usePrefersReducedMotion()` hook from `src/hooks/usePrefersReducedMotion.ts`
+  instead of rolling a per-component `matchMedia` listener.
 - MTG symbols: Scryfall CDN SVGs (`https://svgs.scryfall.io/card-symbols/{SYMBOL}.svg`)
 
 ### Reuse design-system components — do NOT recreate them
