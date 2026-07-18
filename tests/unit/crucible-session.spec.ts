@@ -253,4 +253,16 @@ test.describe("parseCruciblePayload", () => {
     expect(parseCruciblePayload(JSON.stringify({ hello: "world" }))).toBeNull();
     expect(parseCruciblePayload(null)).toBeNull();
   });
+
+  test("defaults missing commanders, parseWarnings, and keptQuantities", () => {
+    const { commanders, parseWarnings, keptQuantities, ...partial } = session();
+    void commanders;
+    void parseWarnings;
+    void keptQuantities;
+    const restored = parseCruciblePayload(JSON.stringify(partial));
+    expect(restored).not.toBeNull();
+    expect(restored?.commanders).toEqual([]);
+    expect(restored?.parseWarnings).toEqual([]);
+    expect(restored?.keptQuantities).toEqual({});
+  });
 });

@@ -69,6 +69,33 @@ test.describe("Crucible insight panels", () => {
     await expect(combos).not.toContainText(/broken/i);
   });
 
+  test("Keep all flips every undecided combo piece to keep in one click", async ({ page, crucible }) => {
+    await page.route("**/api/deck-combos", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          exactCombos: [
+            {
+              ...FAKE_COMBO,
+              cards: ["Sol Ring", "Counterspell", "Arcane Signet"],
+            },
+          ],
+          nearCombos: [],
+        }),
+      })
+    );
+
+    await crucible.importPile(SAMPLE_PILE);
+    await crucible.selectLens("Combos in Pile");
+
+    const combos = page.getByTestId("crucible-combos");
+    await combos.getByRole("button", { name: "Keep all 3" }).click();
+
+    await expect(combos).toContainText(/intact/i);
+    await expect(crucible.keptCount).toContainText("3");
+  });
+
   test("Suggested Cuts ranks off-identity cards with reasons; accepting cuts, dismissing hides", async ({ page, crucible }) => {
     await crucible.importPile(SAMPLE_PILE);
     await crucible.chooseCommander("Atraxa, Praetors' Voice");

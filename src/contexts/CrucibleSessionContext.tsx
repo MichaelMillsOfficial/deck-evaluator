@@ -38,9 +38,7 @@ import {
   type CruciblePayload,
   type CrucibleCardStatus,
 } from "@/lib/crucible-session";
-
-/** /api/deck-enrich rejects requests above this many unique names. */
-const ENRICH_CHUNK_SIZE = 250;
+import { ENRICH_CHUNK_SIZE, chunk } from "@/lib/enrich-chunking";
 
 /** /api/deck-combos rejects requests above this many unique names. Combos
  * cannot be chunked without missing cross-chunk pairs, so for larger piles
@@ -260,6 +258,9 @@ interface CrucibleSessionContextValue {
    * refreshes combo detection where the pile size allows. */
   addCard: (name: string) => void;
   setStatus: (name: string, status: CrucibleCardStatus) => void;
+  /** Flip every listed card to "keep" in a single update, so one click can
+   * keep all of a combo's pieces without dispatches overwriting each other. */
+  keepAll: (names: string[]) => void;
   /** Keep a partial count of a stacked card. Zero returns it to undecided. */
   setKeptQuantity: (name: string, count: number) => void;
   /** Choose commanders (0-2 names from the pool). Chosen names are forced to
@@ -280,12 +281,6 @@ const CrucibleSessionContext = createContext<CrucibleSessionContextValue | null>
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
-}
 
 export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -362,45 +357,53 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const fetchCombos = useCallback(async (cardNames: string[], commanders: string[]) => {
-    if (cardNames.length === 0 || cardNames.length > COMBOS_MAX_NAMES) return;
-
-    combosAbortRef.current?.abort();
-    const controller = new AbortController();
-    combosAbortRef.current = controller;
-
-    dispatch({ type: "COMBOS_START" });
-
-    try {
-      const res = await fetch("/api/deck-combos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cardNames,
-          commanders,
-        }),
-        signal: AbortSignal.any([
-          controller.signal,
-          AbortSignal.timeout(20_000),
-        ]),
-      });
-      if (!res.ok) {
-        dispatch({ type: "COMBOS_ERROR" });
-        return;
+  const fetchCombos = useCallback(
+    async (cardNames: string[], commanders: string[]): Promise<boolean> => {
+      if (cardNames.length === 0 || cardNames.length > COMBOS_MAX_NAMES) {
+        return false;
       }
-      const json = await res.json();
-      dispatch({
-        type: "COMBOS_SUCCESS",
-        combos: {
-          exactCombos: json.exactCombos ?? [],
-          nearCombos: json.nearCombos ?? [],
-        },
-      });
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      dispatch({ type: "COMBOS_ERROR" });
-    }
-  }, []);
+
+      combosAbortRef.current?.abort();
+      const controller = new AbortController();
+      combosAbortRef.current = controller;
+
+      dispatch({ type: "COMBOS_START" });
+
+      try {
+        const res = await fetch("/api/deck-combos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cardNames,
+            commanders,
+          }),
+          signal: AbortSignal.any([
+            controller.signal,
+            AbortSignal.timeout(20_000),
+          ]),
+        });
+        if (!res.ok) {
+          dispatch({ type: "COMBOS_ERROR" });
+          return false;
+        }
+        const json = await res.json();
+        dispatch({
+          type: "COMBOS_SUCCESS",
+          combos: {
+            exactCombos: json.exactCombos ?? [],
+            nearCombos: json.nearCombos ?? [],
+          },
+        });
+        return true;
+      } catch (err) {
+        // A superseding fetch owns the state now; don't report failure.
+        if (err instanceof DOMException && err.name === "AbortError") return true;
+        dispatch({ type: "COMBOS_ERROR" });
+        return false;
+      }
+    },
+    []
+  );
 
   // After hydration, kick off enrichment + combos when missing.
   useEffect(() => {
@@ -448,7 +451,13 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     if (combosDebounceRef.current) clearTimeout(combosDebounceRef.current);
     combosDebounceRef.current = setTimeout(() => {
       combosSubsetKeyRef.current = key;
-      void fetchCombos(subset, commanders);
+      void fetchCombos(subset, commanders).then((ok) => {
+        // Failed fetches release the key so the next payload change retries,
+        // matching the rules fetch's clear-flag-on-failure behavior.
+        if (!ok && combosSubsetKeyRef.current === key) {
+          combosSubsetKeyRef.current = null;
+        }
+      });
     }, delay);
     return () => {
       if (combosDebounceRef.current) clearTimeout(combosDebounceRef.current);
@@ -656,6 +665,20 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     [state.payload]
   );
 
+  const keepAll = useCallback(
+    (names: string[]) => {
+      if (!state.payload) return;
+      let next = state.payload;
+      for (const name of names) {
+        if (next.commanders.includes(name)) continue;
+        next = setCardStatus(next, name, "keep");
+      }
+      if (next === state.payload) return;
+      dispatch({ type: "SET_PAYLOAD", payload: next });
+    },
+    [state.payload]
+  );
+
   const setKeptQuantity = useCallback(
     (name: string, count: number) => {
       if (!state.payload) return;
@@ -740,6 +763,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       setPile,
       addCard,
       setStatus,
+      keepAll,
       setKeptQuantity,
       setCommanders,
       restore,
@@ -769,6 +793,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       setPile,
       addCard,
       setStatus,
+      keepAll,
       setKeptQuantity,
       setCommanders,
       restore,

@@ -4,8 +4,9 @@ import {
   normalizeToEnrichedCard,
 } from "@/lib/scryfall";
 import type { EnrichedCard } from "@/lib/types";
+import { ENRICH_CHUNK_SIZE } from "@/lib/enrich-chunking";
 
-const MAX_UNIQUE_NAMES = 250;
+const MAX_UNIQUE_NAMES = ENRICH_CHUNK_SIZE;
 const MAX_NAME_LENGTH = 200;
 const MAX_IDENTIFIERS = 250;
 

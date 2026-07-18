@@ -23,6 +23,7 @@ import {
   clearDeckSession,
   type DeckSessionPayload,
 } from "@/lib/deck-session";
+import { ENRICH_CHUNK_SIZE, chunk } from "@/lib/enrich-chunking";
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -164,16 +165,6 @@ const DeckSessionContext = createContext<DeckSessionContextValue | null>(null);
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
-
-/** /api/deck-enrich rejects requests above this many unique names, so large
- * decks (e.g. a Crucible handoff with a big sideboard) enrich in batches. */
-const ENRICH_CHUNK_SIZE = 250;
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
-}
 
 export function DeckSessionProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);

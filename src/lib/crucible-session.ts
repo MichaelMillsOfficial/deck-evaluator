@@ -234,7 +234,12 @@ export function parseCruciblePayload(raw: string | null): CruciblePayload | null
     if (!parsed?.crucibleId || !Array.isArray(parsed.pool) || !parsed.statuses) {
       return null;
     }
-    return { ...parsed, keptQuantities: parsed.keptQuantities ?? {} };
+    return {
+      ...parsed,
+      keptQuantities: parsed.keptQuantities ?? {},
+      commanders: parsed.commanders ?? [],
+      parseWarnings: parsed.parseWarnings ?? [],
+    };
   } catch {
     return null;
   }

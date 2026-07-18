@@ -60,7 +60,9 @@ export default function CrucibleWorkbench() {
   const [undecidedOnly, setUndecidedOnly] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [notFoundDismissed, setNotFoundDismissed] = useState(false);
+  const [dismissedNotFound, setDismissedNotFound] = useState<Set<string>>(
+    () => new Set()
+  );
 
   const commanderIdentity = useMemo<Set<string> | null>(() => {
     if (!payload || !cardMap || payload.commanders.length === 0) return null;
@@ -195,7 +197,7 @@ export default function CrucibleWorkbench() {
         </div>
       </header>
 
-      {notFound.length > 0 && !notFoundDismissed ? (
+      {notFound.some((name) => !dismissedNotFound.has(name)) ? (
         <div
           role="alert"
           data-testid="crucible-notfound-banner"
@@ -212,7 +214,7 @@ export default function CrucibleWorkbench() {
             variant="ghost"
             size="sm"
             aria-label="Dismiss unresolved-names warning"
-            onClick={() => setNotFoundDismissed(true)}
+            onClick={() => setDismissedNotFound(new Set(notFound))}
           >
             Dismiss
           </Button>

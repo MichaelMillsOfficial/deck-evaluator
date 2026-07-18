@@ -28,7 +28,7 @@ const STATE_TAG: Record<ComboState, { variant: "ok" | "watch" | "warn"; label: s
 };
 
 export default function CrucibleCombos() {
-  const { payload, combos, combosLoading, combosOverBy, setStatus, restore } =
+  const { payload, combos, combosLoading, combosOverBy, keepAll, restore } =
     useCrucibleSession();
 
   if (!payload) return null;
@@ -78,9 +78,7 @@ export default function CrucibleCombos() {
                   <button
                     type="button"
                     className={styles.comboAction}
-                    onClick={() => {
-                      for (const piece of undecidedPieces) setStatus(piece, "keep");
-                    }}
+                    onClick={() => keepAll(undecidedPieces)}
                   >
                     Keep all {combo.cards.length}
                   </button>
