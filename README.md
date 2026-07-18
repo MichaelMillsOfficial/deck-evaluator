@@ -4,6 +4,8 @@ A web application for importing and analyzing Magic: The Gathering decklists. Bu
 
 Import a deck (paste, Moxfield export, or Archidekt URL) and the app walks you through a four-stage **journey** — *import → ritual → reading → sub-route*. The reading lands on a verdict hero (bracket, power level, top theme), then fans out across ten sub-routes for cards, composition, synergy, interactions, opening hands, goldfish simulation, suggestions, candidate finder, deck-vs-deck compare, and share/export. Cards are automatically enriched via Scryfall (mana costs as official MTG symbols, oracle text with inline symbols, heuristic tags), and combos are detected via Commander Spellbook.
 
+Don't have a finished deck yet? **The Crucible** (`/crucible`) is a deck-building workbench: pour in any pile of cards, organize it through lenses (category, synergy axis, type line, mana value, color identity, game changers), triage each card as keep/cut/undecided with an explicit commander pick, and seal a legal 100-card Commander deck that flows straight into the reading journey (cuts are kept as sideboard candidates).
+
 See [Promises to You](./PROMISES.md) for how this tool handles your data and what drives the analysis.
 
 ## Getting Started
@@ -66,10 +68,11 @@ docker compose logs -f         # Tail logs
 | `/reading/compare` | Deck-vs-deck redirect to `/compare` |
 | `/reading/share` | Share URL · PNG · Discord · Markdown · JSON |
 | `/shared` | Decode share URL → forward to `/reading` |
+| `/crucible` | The Crucible: pile triage workbench → seal a legal EDH deck |
 | `/compare` | Standalone two-deck comparison |
 | `/preview` | Design-system component preview |
 
-State flows through `DeckSessionContext` (sessionStorage-backed) so navigation between sub-routes does not refetch the deck or re-enrich cards. `CandidatesContext` is mounted at the `/reading/(shell)` layout so candidate state on `/reading/add` survives tab switches.
+State flows through `DeckSessionContext` (sessionStorage-backed) so navigation between sub-routes does not refetch the deck or re-enrich cards. `CandidatesContext` is mounted at the `/reading/(shell)` layout so candidate state on `/reading/add` survives tab switches. The Crucible keeps its own `CrucibleSessionContext` under a separate sessionStorage key, so a pile in progress coexists with a reading session.
 
 ## Project Structure
 
@@ -86,11 +89,13 @@ src/
 │   │       ├── layout.tsx
 │   │       └── <slug>/page.tsx     # 10 sub-routes
 │   ├── shared/page.tsx             # Decode share URL → /reading
+│   ├── crucible/                   # The Crucible pile triage workbench
 │   ├── compare/                    # Standalone two-deck compare
 │   ├── preview/                    # Design-system component preview
 │   └── api/                        # /deck, /deck-parse, /deck-enrich, /deck-combos, ...
 ├── components/
 │   ├── reading/                    # Shell, hero, overview, section header
+│   ├── crucible/                   # Workbench, lenses, triage rows, tracker rail
 │   ├── ritual/CosmicLoader.tsx
 │   ├── shell/                      # Top nav, cosmos background
 │   ├── DeckSidebar.tsx             # Route-aware nav
@@ -99,6 +104,7 @@ src/
 │   └── ManaCost.tsx · ManaSymbol.tsx · OracleText.tsx · CardTags.tsx
 ├── contexts/
 │   ├── DeckSessionContext.tsx      # sessionStorage-backed deck + enrichment
+│   ├── CrucibleSessionContext.tsx  # /crucible pile triage state
 │   └── CandidatesContext.tsx       # /reading/add candidate state
 └── lib/
     ├── types.ts                    # DeckData, DeckCard, EnrichedCard

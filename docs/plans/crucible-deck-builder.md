@@ -8,8 +8,8 @@ The Crucible is a new top-level route (`/crucible`) that accepts any number of c
 
 Scope decisions, locked during plan review:
 
-- **In:** pile import (paste), chunked enrichment with the CosmicLoader ritual treatment, explicit commander picker, lenses (By Category, By Synergy Axis, By Type Line, By Mana Value, By Color Identity, Flat List, Game Changers), Insight panels (Charts, Combos in Pile, Suggested Cuts, Cut Pile), tracker rail (kept count, category health, combo status, legality checklist), collapsible/sticky category groups with row virtualization, hover/tap card image previews, "Seal the Deck" handoff.
-- **Out (fast-follows, not v1):** share-a-pile URL, price/budget lens, Scryfall-backed "fill this gap" suggestions inside the Crucible, non-EDH formats.
+- **In:** pile import (paste), chunked enrichment with the CosmicLoader ritual treatment, explicit commander picker, lenses (By Category, By Synergy Axis, By Type Line, By Mana Value, By Color Identity, Flat List, Game Changers), Insight panels (Charts, Combos in Pile, Suggested Cuts, Cut Pile), tracker rail (kept count, category health, combo status, legality checklist), collapsible/sticky category groups with capped rendering ("Show all N" expansion), hover/tap card image previews, "Seal the Deck" handoff.
+- **Out (fast-follows, not v1):** share-a-pile URL, price/budget lens, Scryfall-backed "fill this gap" suggestions inside the Crucible, non-EDH formats, a deck-name input at seal (v1 uses the default name "Forged in the Crucible"), external card search in the commander picker (v1 only lists legal commanders found in the pool), true row virtualization (v1 caps rendered rows per group and offers "Show all N").
 
 ## Design Decisions
 
@@ -40,7 +40,7 @@ Runtime-only state in the context (not persisted): `cardMap: Record<string, Enri
 A cut row stays in place, dimmed, in whatever lens is active, and also collects in the Cut Pile lens where one click restores it. Finalize stores cuts as the sideboard so `/reading` and `/reading/add` still see them as candidates.
 
 ### Pile parsing
-Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred commanders back into the pool: its "trailing 1-2 cards are the commander" heuristic misfires on plain piles. Commander choice is explicit in the workbench via a picker that lists legal commanders detected in the pool (`isLegalCommander`) with a `CardSearchInput` fallback.
+Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred commanders back into the pool: its "trailing 1-2 cards are the commander" heuristic misfires on plain piles. Commander choice is explicit in the workbench via a picker that lists legal commanders detected in the pool (`isLegalCommander`); an external `CardSearchInput` fallback is a fast-follow (see Out list above).
 
 ### Enrichment
 `POST /api/deck-enrich` rejects more than 250 unique names per request. The context chunks the pool into batches of at most 250 names, issues them sequentially, and merges `cards`/`notFound`. While enrichment runs, the Crucible plays the same `CosmicLoader` ritual treatment as a normal reading, with chunk progress feeding the incantation line.
@@ -49,11 +49,11 @@ Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred co
 `analyzeDeckSynergy` takes a `DeckData`; the Crucible feeds it a synthetic one (chosen commanders + pool as mainboard). Before a commander is chosen, per-card axis scores still work (each axis `detect(card)` is commander-independent); anchor boosts and off-identity flagging activate after the pick via `resolveCommanderIdentity` + per-card `colorIdentity`.
 
 ### Lens grouping rules
-- **By Category:** tag-driven groups from `computeCompositionScorecard` against `TEMPLATE_COMMAND_ZONE` over the kept subset; groups show candidates/kept/target with a health bar. Groups at target auto-collapse; headers stick on scroll; rows virtualize past ~200 cards.
+- **By Category:** tag-driven groups from `computeCompositionScorecard` against `TEMPLATE_COMMAND_ZONE` over the kept subset; groups show candidates/kept/target with a health bar. Groups at target auto-collapse; headers stick on scroll; groups cap rendered rows (60) with a "Show all N" expansion.
 - **By Synergy Axis:** axes sorted by pool-wide strength; only axes with strength >= 0.2 get a group; each card appears once under its strongest axis with a "+N axes" badge for its other homes; an "Unaligned" group gathers cards with no axis >= 0.2 (prime cut candidates).
 - **Game Changers:** cards flagged `isGameChanger` (list served by `/api/commander-rules`), with kept count shown against the deck's bracket allowance.
 - **Charts:** mana curve and color pip coverage over the kept subset via existing `computeManaCurve` / `computeColorDistribution` / `computeManaBaseMetrics` and the `CurveConstellation` / `ColorPie` components, with a kept-vs-pool toggle.
-- **Combos in Pile:** `/api/deck-combos` runs once over the full pool; each combo derives a live state from triage statuses: intact (all pieces kept), possible (pieces undecided/in pool), broken (a piece cut, with restore affordance). Cutting a combo piece warns inline in any lens.
+- **Combos in Pile:** `/api/deck-combos` runs once over the full pool when its unique-name count is under the API cap; for larger piles the lookup runs over the keep+undecided subset once cuts bring it under the cap (debounced, results merged so broken combos keep rendering). Each combo derives a live state from triage statuses: intact (all pieces kept), possible (pieces undecided/in pool), broken (a piece cut, with restore affordance). Cutting a combo piece warns inline in any lens.
 - **Suggested Cuts:** ranked list with reason chips (low synergy score, off-identity, category overfull, curve glut), following the weak-card scoring approach of `card-suggestions.ts` (`WEAK_CARD_THRESHOLD`) and `analyzeCandidateCard`. Suggestions only mark status; nothing is cut without a click.
 
 ### Legality gate
@@ -94,7 +94,7 @@ Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred co
 
 - [x] 2.1 Create `src/contexts/CrucibleSessionContext.tsx`
   - Hydration lifecycle `pending -> hydrated / absent` mirroring `DeckSessionContext`
-  - `setPile(pool, warnings)` persists and kicks off chunked enrichment (batches of <= 250 unique names against `POST /api/deck-enrich`, merged results, progress state for the loader) and a single `POST /api/deck-combos` over the full pool
+  - `setPile(pool, warnings)` persists and kicks off chunked enrichment (batches of <= 250 unique names against `POST /api/deck-enrich`, merged results, progress state for the loader) and `POST /api/deck-combos` (full pool when under the API cap; large piles refetch over the keep+undecided subset once it fits)
   - `setStatus(name, status)`, `setCommanders(names)`, `restore(name)`, `finalize()` helpers
   - Memoized derived state: tag cache, per-lens groupings, kept-subset scorecard (`computeCompositionScorecard` with `TEMPLATE_COMMAND_ZONE`), legality (`validateCommanderDeck` fed by `/api/commander-rules`), cut suggestions
 
@@ -121,7 +121,7 @@ Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred co
   - Test case: hovering a card name reveals its image preview (aria-safe)
 - [x] 4.2 Create `src/components/crucible/CrucibleWorkbench.tsx`, `LensSwitcher.tsx`, `CrucibleCardRow.tsx`, `CommanderPicker.tsx`, `CutPile.tsx`
   - `CrucibleCardRow` wraps the disclosure/a11y patterns of `EnrichedCardRow` and adds the triage buttons and image preview (from `EnrichedCard.imageUris`; `Sheet` on touch)
-  - Collapsible groups with sticky headers; virtualize rows past ~200 cards
+  - Collapsible groups with sticky headers; cap rendered rows per group with a "Show all N" expansion
   - All styling via semantic tokens; reduced-motion gates on any transition
 
 ### Phase 5: Insight panels
@@ -172,6 +172,8 @@ Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred co
 | `src/components/crucible/SuggestedCuts.tsx` | Create | Ranked cut suggestions panel |
 | `src/components/crucible/TrackerRail.tsx` | Create | Count, health, legality, seal button |
 | `src/components/shell/` (top nav) | Modify | Add Crucible nav entry |
+| `src/contexts/DeckSessionContext.tsx` | Modify | Chunk enrichment requests so sealed decks over the 250-name API cap (kept + cuts) enrich in batches |
+| `src/lib/commander-validation.ts` | Modify | Add `canPairCommanders` two-commander pairing legality |
 | `tests/unit/crucible-session.spec.ts` | Create | Phase 1 unit tests |
 | `tests/unit/crucible-grouping.spec.ts` | Create | Phase 1 unit tests |
 | `tests/unit/cut-suggestions.spec.ts` | Create | Phase 1 unit tests |
@@ -181,7 +183,7 @@ Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred co
 | `e2e/crucible-legality.spec.ts` | Create | Phase 6 e2e |
 | `e2e/crucible-handoff.spec.ts` | Create | Phase 7 e2e |
 
-No changes to: `src/app/reading/**`, `src/contexts/DeckSessionContext.tsx`, `src/contexts/PendingChangesContext.tsx`, `src/lib/deck-session.ts`, `src/lib/view-tabs.ts`, existing API routes, `design-system/tokens.css`.
+No changes to: `src/app/reading/**`, `src/contexts/PendingChangesContext.tsx`, `src/lib/deck-session.ts`, `src/lib/view-tabs.ts`, existing API routes, `design-system/tokens.css`. (`src/contexts/DeckSessionContext.tsx` gained request chunking during review so a sealed deck larger than the enrich API's 250-name cap still enriches; the reading journey's behavior is otherwise untouched.)
 
 ## Verification
 
