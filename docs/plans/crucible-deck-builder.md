@@ -100,56 +100,56 @@ Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred co
 
 ### Phase 3: Route and import
 
-- [ ] 3.1 Create `e2e/crucible-import.spec.ts` (failing first)
+- [x] 3.1 Create `e2e/crucible-import.spec.ts` (failing first)
   - Test case: `/crucible` renders the pile import form with the sacred eyebrow pattern
   - Test case: pasting a pile and submitting shows the CosmicLoader treatment, then the workbench with the full pool as undecided
   - Test case: a pile whose trailing card would be commander-inferred still lands fully in the pool
   - Test case: reloading mid-triage restores statuses from sessionStorage
-- [ ] 3.2 Create `src/app/crucible/page.tsx` + `src/components/crucible/CrucibleImport.tsx`
+- [x] 3.2 Create `src/app/crucible/page.tsx` + `src/components/crucible/CrucibleImport.tsx`
   - Reuse `Textarea`, `Button`, `Card`, `SectionHeader` patterns; parse via `POST /api/deck-parse` then `flattenPileParse`
   - Reuse `CosmicLoader` during enrichment with chunk progress in the incantation line
-- [ ] 3.3 Add a Crucible entry to the top nav in `src/components/shell/`
+- [x] 3.3 Add a Crucible entry to the top nav in `src/components/shell/`
 
 ### Phase 4: Workbench
 
-- [ ] 4.1 Create `e2e/crucible-triage.spec.ts` (failing first)
+- [x] 4.1 Create `e2e/crucible-triage.spec.ts` (failing first)
   - Test case: keep/cut/undecided toggles update the row state and the kept counter
   - Test case: cut rows stay visible dimmed; Cut Pile lens lists them; restore flips them back
   - Test case: lens switching regroups without losing statuses
   - Test case: category groups collapse/expand; at-target groups start collapsed; "Undecided only" filter hides decided rows
   - Test case: commander picker lists legal commanders from the pool; picking one flags off-identity cards
   - Test case: hovering a card name reveals its image preview (aria-safe)
-- [ ] 4.2 Create `src/components/crucible/CrucibleWorkbench.tsx`, `LensSwitcher.tsx`, `CrucibleCardRow.tsx`, `CommanderPicker.tsx`, `CutPile.tsx`
+- [x] 4.2 Create `src/components/crucible/CrucibleWorkbench.tsx`, `LensSwitcher.tsx`, `CrucibleCardRow.tsx`, `CommanderPicker.tsx`, `CutPile.tsx`
   - `CrucibleCardRow` wraps the disclosure/a11y patterns of `EnrichedCardRow` and adds the triage buttons and image preview (from `EnrichedCard.imageUris`; `Sheet` on touch)
   - Collapsible groups with sticky headers; virtualize rows past ~200 cards
   - All styling via semantic tokens; reduced-motion gates on any transition
 
 ### Phase 5: Insight panels
 
-- [ ] 5.1 Create `e2e/crucible-insight.spec.ts` (failing first)
+- [x] 5.1 Create `e2e/crucible-insight.spec.ts` (failing first)
   - Test case: Charts lens renders curve and pip coverage for the kept subset and toggles to pool
   - Test case: Combos lens shows intact/possible/broken states that react to triage flips
   - Test case: cutting a combo piece surfaces the broken warning; restore clears it
   - Test case: Suggested Cuts lists ranked reasons; accepting marks the card cut; dismissing hides the suggestion
   - Test case: Game Changers lens lists flagged cards with kept count vs bracket allowance
-- [ ] 5.2 Create `src/components/crucible/CrucibleCharts.tsx`, `CrucibleCombos.tsx`, `SuggestedCuts.tsx`
+- [x] 5.2 Create `src/components/crucible/CrucibleCharts.tsx`, `CrucibleCombos.tsx`, `SuggestedCuts.tsx`
   - Charts reuse `CurveConstellation` / `ColorPie` / `computeManaCurve` / `computeColorDistribution` / `computeManaBaseMetrics`
 
 ### Phase 6: Tracker and gate
 
-- [ ] 6.1 Create `e2e/crucible-legality.spec.ts` (failing first)
+- [x] 6.1 Create `e2e/crucible-legality.spec.ts` (failing first)
   - Test case: rail shows kept count, category health bars, combo status, legality checklist
   - Test case: "Seal the Deck" stays disabled until `validateCommanderDeck` passes over commanders + kept
   - Test case: below 768px the rail renders inside the `Sheet` drawer
-- [ ] 6.2 Create `src/components/crucible/TrackerRail.tsx`
+- [x] 6.2 Create `src/components/crucible/TrackerRail.tsx`
   - Reuse `StatTile`, `Tag`, `Sheet`; legality via `validateCommanderDeck` + `/api/commander-rules`
 
 ### Phase 7: Handoff
 
-- [ ] 7.1 Create `e2e/crucible-handoff.spec.ts` (failing first)
+- [x] 7.1 Create `e2e/crucible-handoff.spec.ts` (failing first)
   - Test case: sealing builds the DeckData (kept mainboard, cuts sideboard), sets the reading payload, and lands on `/reading` via `/ritual` (use `window.__SKIP_RITUAL_FLOOR__`)
   - Test case: the reading session reflects the sealed deck; `/reading/add` sees cuts as sideboard
-- [ ] 7.2 Wire `finalize()` in `CrucibleWorkbench` to `buildFinalDeck` + `setPayload` + router push; no reading-side changes
+- [x] 7.2 Wire `finalize()` in `CrucibleWorkbench` to `buildFinalDeck` + `setPayload` + router push; no reading-side changes
 
 ## Files to Create/Modify
 
