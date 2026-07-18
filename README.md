@@ -4,7 +4,7 @@ A web application for importing and analyzing Magic: The Gathering decklists. Bu
 
 Import a deck (paste, Moxfield export, or Archidekt URL) and the app walks you through a four-stage **journey** — *import → ritual → reading → sub-route*. The reading lands on a verdict hero (bracket, power level, top theme), then fans out across ten sub-routes for cards, composition, synergy, interactions, opening hands, goldfish simulation, suggestions, candidate finder, deck-vs-deck compare, and share/export. Cards are automatically enriched via Scryfall (mana costs as official MTG symbols, oracle text with inline symbols, heuristic tags), and combos are detected via Commander Spellbook.
 
-Don't have a finished deck yet? **The Crucible** (`/crucible`) is a deck-building workbench: pour in any pile of cards, organize it through lenses (category, synergy axis, type line, mana value, color identity, game changers), triage each card as keep/cut/undecided with an explicit commander pick, and seal a legal 100-card Commander deck that flows straight into the reading journey (cuts are kept as sideboard candidates).
+Don't have a finished deck yet? **The Crucible** (`/crucible`) is a deck-building workbench: pour in any pile of cards, organize it through lenses (category, synergy axis, type line, mana value, color identity, game changers), triage each card as keep/cut/undecided with an explicit commander pick, search up and add more cards mid-triage, and seal a legal 100-card Commander deck that flows straight into the reading journey (cuts are kept as sideboard candidates).
 
 See [Promises to You](./PROMISES.md) for how this tool handles your data and what drives the analysis.
 

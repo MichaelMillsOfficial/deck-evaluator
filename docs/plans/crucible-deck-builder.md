@@ -8,7 +8,7 @@ The Crucible is a new top-level route (`/crucible`) that accepts any number of c
 
 Scope decisions, locked during plan review:
 
-- **In:** pile import (paste), chunked enrichment with the CosmicLoader ritual treatment, explicit commander picker, lenses (By Category, By Synergy Axis, By Type Line, By Mana Value, By Color Identity, Flat List, Game Changers), Insight panels (Charts, Combos in Pile, Suggested Cuts, Cut Pile), tracker rail (kept count, category health, combo status, legality checklist), collapsible/sticky category groups with capped rendering ("Show all N" expansion), hover/tap card image previews, "Seal the Deck" handoff.
+- **In:** pile import (paste), chunked enrichment with the CosmicLoader ritual treatment, explicit commander picker, lenses (By Category, By Synergy Axis, By Type Line, By Mana Value, By Color Identity, Flat List, Game Changers), Insight panels (Charts, Combos in Pile, Suggested Cuts, Cut Pile), tracker rail (kept count, category health, combo status, legality checklist), collapsible/sticky category groups with capped rendering ("Show all N" expansion), hover/tap card image previews, mid-triage card search (added at user direction after the initial review; see "Adding cards mid-triage" below), "Seal the Deck" handoff.
 - **Out (fast-follows, not v1):** share-a-pile URL, price/budget lens, Scryfall-backed "fill this gap" suggestions inside the Crucible, non-EDH formats, a deck-name input at seal (v1 uses the default name "Forged in the Crucible"), external card search in the commander picker (v1 only lists legal commanders found in the pool), true row virtualization (v1 caps rendered rows per group and offers "Show all N").
 
 ## Design Decisions
@@ -24,15 +24,18 @@ Core state:
 ```ts
 export type CrucibleCardStatus = "keep" | "cut" | "undecided";
 
-export interface CrucibleSessionPayload {
+export interface CruciblePayload {
   crucibleId: string;
   pool: DeckCard[];                                  // every imported card, quantity-aware
   statuses: Record<string, CrucibleCardStatus>;      // keyed by card name; default "undecided"
+  keptQuantities: Record<string, number>;            // partial keeps for stacked cards
   commanders: string[];                              // 0-2, chosen in the workbench
   parseWarnings: string[];
   createdAt: number;
 }
 ```
+
+The authoritative shape lives in `src/lib/crucible-session.ts` (`CruciblePayload`).
 
 Runtime-only state in the context (not persisted): `cardMap: Record<string, EnrichedCard> | null`, `notFound: string[]`, `combos` (from `/api/deck-combos`), plus memoized derived data (tag cache via `buildTagCache`, per-lens groupings, kept-subset scorecard, legality result, cut suggestions). Persistence key: `astral.crucible-session.v1`, separate from the reading session so both coexist in one tab.
 
@@ -41,6 +44,9 @@ A cut row stays in place, dimmed, in whatever lens is active, and also collects 
 
 ### Pile parsing
 Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred commanders back into the pool: its "trailing 1-2 cards are the commander" heuristic misfires on plain piles. Commander choice is explicit in the workbench via a picker that lists legal commanders detected in the pool (`isLegalCommander`); an external `CardSearchInput` fallback is a fast-follow (see Out list above).
+
+### Adding cards mid-triage
+The workbench header hosts a `CardSearchInput` so cards can be searched up and added to the pile during triage (`addCard` on the context, `addCardToPool` in `src/lib/crucible-session.ts`). A found card lands as undecided; an existing name gets a quantity bump that preserves its status and partial keeps. The new card enriches incrementally via a single-name `/api/deck-enrich` merge, and combo detection refreshes where the pile size allows (a pure quantity bump skips the redundant refetch). The search deliberately excludes nothing so basics can be stacked; singleton legality flags illegal duplicates.
 
 ### Enrichment
 `POST /api/deck-enrich` rejects more than 250 unique names per request. The context chunks the pool into batches of at most 250 names, issues them sequentially, and merges `cards`/`notFound`. While enrichment runs, the Crucible plays the same `CosmicLoader` ritual treatment as a normal reading, with chunk progress feeding the incantation line.
@@ -95,7 +101,7 @@ Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred co
 - [x] 2.1 Create `src/contexts/CrucibleSessionContext.tsx`
   - Hydration lifecycle `pending -> hydrated / absent` mirroring `DeckSessionContext`
   - `setPile(pool, warnings)` persists and kicks off chunked enrichment (batches of <= 250 unique names against `POST /api/deck-enrich`, merged results, progress state for the loader) and `POST /api/deck-combos` (full pool when under the API cap; large piles refetch over the keep+undecided subset once it fits)
-  - `setStatus(name, status)`, `setCommanders(names)`, `restore(name)`, `finalize()` helpers
+  - `setStatus(name, status)`, `setKeptQuantity(name, count)`, `setCommanders(names)`, `restore(name)`, `addCard(name)`, `finalize()` helpers
   - Memoized derived state: tag cache, per-lens groupings, kept-subset scorecard (`computeCompositionScorecard` with `TEMPLATE_COMMAND_ZONE`), legality (`validateCommanderDeck` fed by `/api/commander-rules`), cut suggestions
 
 ### Phase 3: Route and import
@@ -174,6 +180,8 @@ Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred co
 | `src/components/shell/` (top nav) | Modify | Add Crucible nav entry |
 | `src/contexts/DeckSessionContext.tsx` | Modify | Chunk enrichment requests so sealed decks over the 250-name API cap (kept + cuts) enrich in batches |
 | `src/lib/commander-validation.ts` | Modify | Add `canPairCommanders` two-commander pairing legality |
+| `src/lib/enrich-chunking.ts` | Create | Shared `ENRICH_CHUNK_SIZE` + `chunk` helper used by both contexts and the enrich route |
+| `src/app/api/deck-enrich/route.ts` | Modify | Derive `MAX_UNIQUE_NAMES` from `ENRICH_CHUNK_SIZE` (no behavior change) |
 | `tests/unit/crucible-session.spec.ts` | Create | Phase 1 unit tests |
 | `tests/unit/crucible-grouping.spec.ts` | Create | Phase 1 unit tests |
 | `tests/unit/cut-suggestions.spec.ts` | Create | Phase 1 unit tests |
@@ -182,8 +190,9 @@ Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred co
 | `e2e/crucible-insight.spec.ts` | Create | Phase 5 e2e |
 | `e2e/crucible-legality.spec.ts` | Create | Phase 6 e2e |
 | `e2e/crucible-handoff.spec.ts` | Create | Phase 7 e2e |
+| `e2e/crucible-add.spec.ts` | Create | Mid-triage search-and-add e2e |
 
-No changes to: `src/app/reading/**`, `src/contexts/PendingChangesContext.tsx`, `src/lib/deck-session.ts`, `src/lib/view-tabs.ts`, existing API routes, `design-system/tokens.css`. (`src/contexts/DeckSessionContext.tsx` gained request chunking during review so a sealed deck larger than the enrich API's 250-name cap still enriches; the reading journey's behavior is otherwise untouched.)
+No changes to: `src/app/reading/**`, `src/contexts/PendingChangesContext.tsx`, `src/lib/deck-session.ts`, `src/lib/view-tabs.ts`, `design-system/tokens.css`. (`src/contexts/DeckSessionContext.tsx` gained request chunking during review so a sealed deck larger than the enrich API's 250-name cap still enriches, and `/api/deck-enrich` now derives its cap constant from the shared `src/lib/enrich-chunking.ts`; the reading journey's behavior and the API contract are otherwise untouched.)
 
 ## Verification
 
