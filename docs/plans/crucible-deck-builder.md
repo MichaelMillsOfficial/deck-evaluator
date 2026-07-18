@@ -92,7 +92,7 @@ Reuse `parseDecklist` (`src/lib/decklist-parser.ts`) but flatten its inferred co
 
 ### Phase 2: Context
 
-- [ ] 2.1 Create `src/contexts/CrucibleSessionContext.tsx`
+- [x] 2.1 Create `src/contexts/CrucibleSessionContext.tsx`
   - Hydration lifecycle `pending -> hydrated / absent` mirroring `DeckSessionContext`
   - `setPile(pool, warnings)` persists and kicks off chunked enrichment (batches of <= 250 unique names against `POST /api/deck-enrich`, merged results, progress state for the loader) and a single `POST /api/deck-combos` over the full pool
   - `setStatus(name, status)`, `setCommanders(names)`, `restore(name)`, `finalize()` helpers
