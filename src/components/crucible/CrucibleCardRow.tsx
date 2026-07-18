@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { DeckCard, EnrichedCard } from "@/lib/types";
 import type { CrucibleCardStatus } from "@/lib/crucible-session";
 import ManaCost from "@/components/ManaCost";
-import { Tag } from "@/components/ui";
+import { Input, Tag } from "@/components/ui";
 import styles from "./crucible.module.css";
 
 export interface CrucibleCardRowProps {
@@ -15,8 +15,14 @@ export interface CrucibleCardRowProps {
   synergyScore?: number;
   /** Optional lens-specific annotation, e.g. "+2 axes" in the axis lens. */
   badge?: string;
+  /** Commanders are forced to "keep"; their triage controls are disabled. */
+  locked?: boolean;
+  /** Currently kept copies (partial-keep aware). Drives the stepper shown on
+   * stacked rows when onSetKeptQuantity is provided. */
+  keptQuantity?: number;
   onKeep: () => void;
   onCut: () => void;
+  onSetKeptQuantity?: (count: number) => void;
 }
 
 export default function CrucibleCardRow({
@@ -26,8 +32,11 @@ export default function CrucibleCardRow({
   offIdentity,
   synergyScore,
   badge,
+  locked,
+  keptQuantity,
   onKeep,
   onCut,
+  onSetKeptQuantity,
 }: CrucibleCardRowProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -88,11 +97,28 @@ export default function CrucibleCardRow({
         </span>
       ) : null}
       <span className={styles.rowTriage}>
+        {card.quantity > 1 && onSetKeptQuantity ? (
+          <Input
+            type="number"
+            mono
+            min={0}
+            max={card.quantity}
+            value={keptQuantity ?? 0}
+            disabled={locked}
+            aria-label={`Kept copies of ${card.name}`}
+            className={styles.rowKeptQty}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              if (Number.isFinite(next)) onSetKeptQuantity(next);
+            }}
+          />
+        ) : null}
         <button
           type="button"
           className={`${styles.triageButton} ${status === "keep" ? styles.triageKeepOn : ""}`}
           aria-pressed={status === "keep"}
           aria-label={`Keep ${card.name}`}
+          disabled={locked}
           onClick={onKeep}
         >
           ✓
@@ -102,6 +128,7 @@ export default function CrucibleCardRow({
           className={`${styles.triageButton} ${status === "cut" ? styles.triageCutOn : ""}`}
           aria-pressed={status === "cut"}
           aria-label={`Cut ${card.name}`}
+          disabled={locked}
           onClick={onCut}
         >
           ✕

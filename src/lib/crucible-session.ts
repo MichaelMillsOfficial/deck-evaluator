@@ -21,6 +21,9 @@ export interface CruciblePayload {
   pool: DeckCard[];
   /** Triage status per card name. Every pool name has an entry. */
   statuses: Record<string, CrucibleCardStatus>;
+  /** Partial keeps for stacked cards: kept copies per name. Only present for
+   * kept cards keeping fewer than their full pool quantity. */
+  keptQuantities: Record<string, number>;
   /** Chosen commander names (0-2). Must be names present in the pool. */
   commanders: string[];
   /** Non-fatal parse warnings from the pile import. */
@@ -49,6 +52,7 @@ export function createCrucibleSession(
     crucibleId: generateCrucibleId(),
     pool,
     statuses,
+    keptQuantities: {},
     commanders: [],
     parseWarnings,
     createdAt: Date.now(),
@@ -88,7 +92,46 @@ export function setCardStatus(
   status: CrucibleCardStatus
 ): CruciblePayload {
   if (!(name in payload.statuses)) return payload;
-  return { ...payload, statuses: { ...payload.statuses, [name]: status } };
+  const next: CruciblePayload = {
+    ...payload,
+    statuses: { ...payload.statuses, [name]: status },
+  };
+  if (payload.keptQuantities && name in payload.keptQuantities) {
+    const keptQuantities = { ...payload.keptQuantities };
+    delete keptQuantities[name];
+    next.keptQuantities = keptQuantities;
+  }
+  return next;
+}
+
+/**
+ * Keep a partial count of a stacked card (e.g. 30 of 59 Forest). Clamped to
+ * [0, pool quantity]. Zero returns the card to undecided; the full quantity
+ * is a plain keep with no partial entry.
+ */
+export function setKeptQuantity(
+  payload: CruciblePayload,
+  name: string,
+  count: number
+): CruciblePayload {
+  const poolCard = payload.pool.find((card) => card.name === name);
+  if (!poolCard) return payload;
+  const clamped = Math.max(0, Math.min(Math.floor(count), poolCard.quantity));
+  if (clamped === 0) return setCardStatus(payload, name, "undecided");
+  const kept = setCardStatus(payload, name, "keep");
+  if (clamped >= poolCard.quantity) return kept;
+  return {
+    ...kept,
+    keptQuantities: { ...kept.keptQuantities, [name]: clamped },
+  };
+}
+
+/** Kept copies of a pool card: full quantity for a plain keep, the partial
+ * count when one is set, zero when the card is not kept. */
+export function keptQuantityOf(payload: CruciblePayload, card: DeckCard): number {
+  if ((payload.statuses[card.name] ?? "undecided") !== "keep") return 0;
+  const partial = payload.keptQuantities?.[card.name];
+  return partial === undefined ? card.quantity : Math.min(partial, card.quantity);
 }
 
 function withStatus(payload: CruciblePayload, status: CrucibleCardStatus): DeckCard[] {
@@ -96,7 +139,10 @@ function withStatus(payload: CruciblePayload, status: CrucibleCardStatus): DeckC
 }
 
 export function keptCards(payload: CruciblePayload): DeckCard[] {
-  return withStatus(payload, "keep");
+  return withStatus(payload, "keep").map((card) => ({
+    ...card,
+    quantity: keptQuantityOf(payload, card),
+  }));
 }
 
 export function cutCards(payload: CruciblePayload): DeckCard[] {
@@ -124,8 +170,14 @@ export function buildFinalDeck(payload: CruciblePayload, name: string): DeckData
   for (const card of payload.pool) {
     if (commanderSet.has(card.name)) continue;
     const status = payload.statuses[card.name] ?? "undecided";
-    if (status === "keep") mainboard.push(card);
-    else sideboard.push(card);
+    if (status === "keep") {
+      const kept = keptQuantityOf(payload, card);
+      if (kept > 0) mainboard.push({ name: card.name, quantity: kept });
+      const remainder = card.quantity - kept;
+      if (remainder > 0) sideboard.push({ name: card.name, quantity: remainder });
+    } else {
+      sideboard.push(card);
+    }
   }
   return {
     name,
@@ -145,7 +197,7 @@ export function parseCruciblePayload(raw: string | null): CruciblePayload | null
     if (!parsed?.crucibleId || !Array.isArray(parsed.pool) || !parsed.statuses) {
       return null;
     }
-    return parsed;
+    return { ...parsed, keptQuantities: parsed.keptQuantities ?? {} };
   } catch {
     return null;
   }

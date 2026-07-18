@@ -28,7 +28,8 @@ const STATE_TAG: Record<ComboState, { variant: "ok" | "watch" | "warn"; label: s
 };
 
 export default function CrucibleCombos() {
-  const { payload, combos, combosLoading, setStatus, restore } = useCrucibleSession();
+  const { payload, combos, combosLoading, combosUnavailable, setStatus, restore } =
+    useCrucibleSession();
 
   if (!payload) return null;
 
@@ -40,7 +41,13 @@ export default function CrucibleCombos() {
   return (
     <section data-testid="crucible-combos" aria-label="Combos in pile" className={styles.panel}>
       <h2 className={styles.panelTitle}>Combos in Pile</h2>
-      {combosLoading ? (
+      {combosUnavailable ? (
+        <p className={styles.panelMuted}>
+          Combo detection is unavailable for piles this large — the Spellbook
+          lookup caps out at 250 unique cards. Cut the pile down and combos
+          will appear on your next visit here.
+        </p>
+      ) : combosLoading ? (
         <p className={styles.panelMuted}>Consulting the Spellbook…</p>
       ) : allCombos.length === 0 ? (
         <p className={styles.panelMuted}>No known combos detected in this pile.</p>

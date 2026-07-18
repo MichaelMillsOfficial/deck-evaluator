@@ -2,6 +2,7 @@ import {
   test,
   expect,
   SAMPLE_PILE,
+  HUNDRED_PILE,
   mockCommanderRules,
 } from "./crucible-helpers";
 
@@ -79,6 +80,50 @@ test.describe("Crucible triage", () => {
     await expect(crucible.commanderPicker).toContainText("Atraxa, Praetors' Voice");
     // Lightning Bolt (R) is outside Atraxa's WUBG identity.
     await expect(crucible.row("Lightning Bolt").first()).toContainText(/off-identity/i);
+  });
+
+  test("stacked rows keep a partial count via the kept-copies input", async ({ page, crucible }) => {
+    await crucible.importPile(HUNDRED_PILE);
+
+    await page.getByLabel("Kept copies of Forest").fill("30");
+    await expect(crucible.keptCount).toContainText("30");
+    await expect(crucible.keepButton("Forest")).toHaveAttribute("aria-pressed", "true");
+
+    // The all-or-nothing buttons still work as shortcuts: toggling keep off
+    // and on again snaps back to the full stack.
+    await crucible.keepButton("Forest").click();
+    await expect(crucible.keptCount).toContainText("0");
+    await crucible.keepButton("Forest").click();
+    await expect(crucible.keptCount).toContainText("59");
+  });
+
+  test("a chosen commander is locked to keep", async ({ crucible }) => {
+    await crucible.importPile(SAMPLE_PILE);
+
+    await crucible.chooseCommander("Atraxa, Praetors' Voice");
+    await expect(crucible.keepButton("Atraxa, Praetors' Voice").first()).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    await expect(crucible.cutButton("Atraxa, Praetors' Voice").first()).toBeDisabled();
+    await expect(crucible.keptCount).toContainText("1");
+  });
+
+  test("a second commander can be added and removed", async ({ page, crucible }) => {
+    await crucible.importPile(SAMPLE_PILE);
+
+    await crucible.chooseCommander("Atraxa, Praetors' Voice");
+    await crucible.chooseCommander("Ezuri, Stalker of Spheres");
+    await expect(crucible.commanderPicker).toContainText("Atraxa, Praetors' Voice");
+    await expect(crucible.commanderPicker).toContainText("Ezuri, Stalker of Spheres");
+
+    await page
+      .getByRole("button", { name: "Remove Ezuri, Stalker of Spheres" })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Remove Ezuri, Stalker of Spheres" })
+    ).toHaveCount(0);
+    await expect(crucible.commanderPicker).toContainText("Atraxa, Praetors' Voice");
   });
 
   test("reloading mid-triage restores statuses from sessionStorage", async ({ page, crucible }) => {

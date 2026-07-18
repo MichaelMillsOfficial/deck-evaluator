@@ -8,6 +8,8 @@ import {
   gameChangers,
   UNCATEGORIZED_LABEL,
   UNALIGNED_AXIS_ID,
+  UNRESOLVED_LABEL,
+  UNRESOLVED_GROUP_ID,
   AXIS_RELEVANCE_MIN,
 } from "../../src/lib/crucible-grouping";
 import { makeCard } from "../helpers";
@@ -190,5 +192,44 @@ test.describe("gameChangers", () => {
   test("filters cards flagged isGameChanger", () => {
     const { pool: p, cardMap } = pool(SOL_RING, VANILLA);
     expect(gameChangers(p, cardMap)).toEqual([{ name: "Sol Ring", quantity: 1 }]);
+  });
+});
+
+test.describe("unresolved cards", () => {
+  const TYPO = { name: "Lighming Bolt", quantity: 2 };
+
+  test("collect in a trailing Unresolved group so counts add up", () => {
+    const { pool: p, cardMap } = pool(SOL_RING, PLAINS);
+    for (const grouper of [
+      groupByCategory,
+      groupByTypeLine,
+      groupByManaValue,
+      groupByColorIdentity,
+    ]) {
+      const groups = grouper([...p, TYPO], cardMap);
+      const unresolved = groups[groups.length - 1];
+      expect(unresolved.id).toBe(UNRESOLVED_GROUP_ID);
+      expect(unresolved.label).toBe(UNRESOLVED_LABEL);
+      expect(unresolved.cards).toEqual([TYPO]);
+      const grouped = groups.flatMap((g) => g.cards.map((c) => c.name));
+      expect(new Set(grouped)).toEqual(
+        new Set([...p.map((c) => c.name), TYPO.name])
+      );
+    }
+  });
+
+  test("appear as a trailing axis group in the synergy lens", () => {
+    const { pool: p, cardMap } = pool(SOL_RING, TOKEN_MAKER);
+    const groups = groupBySynergyAxis([...p, TYPO], cardMap);
+    const last = groups[groups.length - 1];
+    expect(last.axisId).toBe(UNRESOLVED_GROUP_ID);
+    expect(last.axisName).toBe(UNRESOLVED_LABEL);
+    expect(last.cards).toEqual([{ ...TYPO, relevance: 0, otherAxes: [] }]);
+  });
+
+  test("no Unresolved group when every card enriched", () => {
+    const { pool: p, cardMap } = pool(SOL_RING, PLAINS);
+    const groups = groupByCategory(p, cardMap);
+    expect(groups.some((g) => g.id === UNRESOLVED_GROUP_ID)).toBe(false);
   });
 });

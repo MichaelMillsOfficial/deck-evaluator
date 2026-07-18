@@ -7,6 +7,8 @@ import { TEMPLATE_COMMAND_ZONE } from "@/lib/deck-composition";
 export const UNCATEGORIZED_LABEL = "Uncategorized";
 export const LANDS_LABEL = "Lands";
 export const UNALIGNED_AXIS_ID = "unaligned";
+export const UNRESOLVED_LABEL = "Unresolved";
+export const UNRESOLVED_GROUP_ID = "unresolved";
 
 /** Minimum axis relevance for a card to be considered aligned to that axis. */
 export const AXIS_RELEVANCE_MIN = 0.2;
@@ -40,6 +42,31 @@ function isLand(typeLine: string): boolean {
 
 function byName(a: DeckCard, b: DeckCard): number {
   return a.name.localeCompare(b.name);
+}
+
+function unresolvedCards(
+  pool: DeckCard[],
+  cardMap: Record<string, EnrichedCard>
+): DeckCard[] {
+  return pool.filter((card) => !cardMap[card.name]).sort(byName);
+}
+
+/** Append an "Unresolved" group for names enrichment could not resolve, so
+ * every grouped lens accounts for the full pool. */
+function withUnresolved(
+  groups: CrucibleGroup[],
+  pool: DeckCard[],
+  cardMap: Record<string, EnrichedCard>
+): CrucibleGroup[] {
+  const unresolved = unresolvedCards(pool, cardMap);
+  if (unresolved.length > 0) {
+    groups.push({
+      id: UNRESOLVED_GROUP_ID,
+      label: UNRESOLVED_LABEL,
+      cards: unresolved,
+    });
+  }
+  return groups;
 }
 
 /**
@@ -104,7 +131,7 @@ export function groupByCategory(
       cards: untagged.sort(byName),
     });
   }
-  return groups;
+  return withUnresolved(groups, pool, cardMap);
 }
 
 /**
@@ -184,6 +211,16 @@ export function groupBySynergyAxis(
       cards: unaligned.sort(byRelevance),
     });
   }
+
+  const unresolved = unresolvedCards(pool, cardMap);
+  if (unresolved.length > 0) {
+    groups.push({
+      axisId: UNRESOLVED_GROUP_ID,
+      axisName: UNRESOLVED_LABEL,
+      strength: 0,
+      cards: unresolved.map((card) => ({ ...card, relevance: 0, otherAxes: [] })),
+    });
+  }
   return groups;
 }
 
@@ -203,11 +240,12 @@ export function groupByTypeLine(
     if (existing) existing.push(card);
     else buckets.set(label, [card]);
   }
-  return Array.from(buckets, ([label, cards]) => ({
+  const groups = Array.from(buckets, ([label, cards]) => ({
     id: `type:${label}`,
     label,
     cards: cards.sort(byName),
   })).sort((a, b) => b.cards.length - a.cards.length || a.label.localeCompare(b.label));
+  return withUnresolved(groups, pool, cardMap);
 }
 
 const MV_BUCKETS = ["0–1", "2", "3", "4", "5", "6", "7+"] as const;
@@ -233,13 +271,14 @@ export function groupByManaValue(
     else buckets.set(label, [card]);
   }
   const order: string[] = [...MV_BUCKETS, LANDS_LABEL];
-  return order
+  const groups = order
     .filter((label) => buckets.has(label))
     .map((label) => ({
       id: `mv:${label}`,
       label,
       cards: buckets.get(label)!.sort(byName),
     }));
+  return withUnresolved(groups, pool, cardMap);
 }
 
 const COLOR_LABELS: Record<string, string> = {
@@ -271,13 +310,14 @@ export function groupByColorIdentity(
     else buckets.set(label, [card]);
   }
   const order = ["White", "Blue", "Black", "Red", "Green", "Multicolor", "Colorless"];
-  return order
+  const groups = order
     .filter((label) => buckets.has(label))
     .map((label) => ({
       id: `color:${label}`,
       label,
       cards: buckets.get(label)!.sort(byName),
     }));
+  return withUnresolved(groups, pool, cardMap);
 }
 
 /** Cards flagged as game changers (bracket-relevant). */

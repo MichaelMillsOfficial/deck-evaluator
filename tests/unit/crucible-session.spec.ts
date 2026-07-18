@@ -3,6 +3,8 @@ import {
   createCrucibleSession,
   flattenPileParse,
   setCardStatus,
+  setKeptQuantity,
+  keptQuantityOf,
   keptCards,
   cutCards,
   undecidedCards,
@@ -90,6 +92,43 @@ test.describe("setCardStatus", () => {
   });
 });
 
+test.describe("setKeptQuantity", () => {
+  test("keeps a partial count of a stacked card", () => {
+    const payload = setKeptQuantity(session(), "Plains", 5);
+    expect(payload.statuses["Plains"]).toBe("keep");
+    expect(payload.keptQuantities["Plains"]).toBe(5);
+    expect(keptQuantityOf(payload, { name: "Plains", quantity: 12 })).toBe(5);
+    expect(keptCount(payload)).toBe(5);
+  });
+
+  test("clamps to the pool quantity and drops the partial entry at full", () => {
+    const payload = setKeptQuantity(session(), "Plains", 40);
+    expect(payload.statuses["Plains"]).toBe("keep");
+    expect(payload.keptQuantities["Plains"]).toBeUndefined();
+    expect(keptCount(payload)).toBe(12);
+  });
+
+  test("zero returns the card to undecided", () => {
+    let payload = setKeptQuantity(session(), "Plains", 5);
+    payload = setKeptQuantity(payload, "Plains", 0);
+    expect(payload.statuses["Plains"]).toBe("undecided");
+    expect(payload.keptQuantities["Plains"]).toBeUndefined();
+    expect(keptCount(payload)).toBe(0);
+  });
+
+  test("ignores names not in the pool", () => {
+    const before = session();
+    expect(setKeptQuantity(before, "Black Lotus", 3)).toBe(before);
+  });
+
+  test("the all-or-nothing shortcut clears a partial keep", () => {
+    let payload = setKeptQuantity(session(), "Plains", 5);
+    payload = setCardStatus(payload, "Plains", "keep");
+    expect(payload.keptQuantities["Plains"]).toBeUndefined();
+    expect(keptCount(payload)).toBe(12);
+  });
+});
+
 test.describe("partitions", () => {
   test("kept / cut / undecided partition the pool, quantity-aware", () => {
     let payload = session();
@@ -131,6 +170,15 @@ test.describe("buildFinalDeck", () => {
       "Cultivate",
       "Plains",
     ]);
+  });
+
+  test("a partial keep splits the stack: kept portion mainboard, remainder sideboard", () => {
+    let payload = session();
+    payload = setKeptQuantity(payload, "Plains", 5);
+
+    const deck = buildFinalDeck(payload, "Split Stack");
+    expect(deck.mainboard).toContainEqual({ name: "Plains", quantity: 5 });
+    expect(deck.sideboard).toContainEqual({ name: "Plains", quantity: 7 });
   });
 });
 

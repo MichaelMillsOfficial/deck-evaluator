@@ -12,7 +12,9 @@ import {
   UNALIGNED_AXIS_ID,
 } from "@/lib/crucible-grouping";
 import { TEMPLATE_COMMAND_ZONE } from "@/lib/deck-composition";
+import { keptQuantityOf } from "@/lib/crucible-session";
 import type { DeckCard } from "@/lib/types";
+import { Button } from "@/components/ui";
 import LensSwitcher, { type CrucibleLens } from "./LensSwitcher";
 import CrucibleCardRow from "./CrucibleCardRow";
 import CommanderPicker from "./CommanderPicker";
@@ -38,15 +40,18 @@ export default function CrucibleWorkbench() {
   const {
     payload,
     cardMap,
+    notFound,
     tagCache,
     synergy,
     setStatus,
+    setKeptQuantity,
   } = useCrucibleSession();
 
   const [lens, setLens] = useState<CrucibleLens>("category");
   const [undecidedOnly, setUndecidedOnly] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [notFoundDismissed, setNotFoundDismissed] = useState(false);
 
   const commanderIdentity = useMemo<Set<string> | null>(() => {
     if (!payload || !cardMap || payload.commanders.length === 0) return null;
@@ -74,7 +79,7 @@ export default function CrucibleWorkbench() {
         return groupByCategory(pool, cardMap, tagCache ?? undefined).map((group) => {
           const target = targetByLabel.get(group.label);
           const kept = group.cards.reduce(
-            (sum, c) => (payload.statuses[c.name] === "keep" ? sum + c.quantity : sum),
+            (sum, c) => sum + keptQuantityOf(payload, c),
             0
           );
           return {
@@ -174,6 +179,30 @@ export default function CrucibleWorkbench() {
         <CommanderPicker />
       </header>
 
+      {notFound.length > 0 && !notFoundDismissed ? (
+        <div
+          role="alert"
+          data-testid="crucible-notfound-banner"
+          className={styles.notFoundBanner}
+        >
+          <span>
+            {notFound.length} {notFound.length === 1 ? "name" : "names"} could
+            not be resolved and {notFound.length === 1 ? "appears" : "appear"}{" "}
+            under &ldquo;Unresolved&rdquo;:{" "}
+            {notFound.slice(0, 8).join(", ")}
+            {notFound.length > 8 ? ` and ${notFound.length - 8} more` : ""}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Dismiss unresolved-names warning"
+            onClick={() => setNotFoundDismissed(true)}
+          >
+            Dismiss
+          </Button>
+        </div>
+      ) : null}
+
       <div className={styles.workbenchGrid}>
         <LensSwitcher
           active={lens}
@@ -228,6 +257,11 @@ export default function CrucibleWorkbench() {
                             card={card}
                             enriched={cardMap[card.name]}
                             status={payload.statuses[card.name] ?? "undecided"}
+                            locked={payload.commanders.includes(card.name)}
+                            keptQuantity={keptQuantityOf(payload, card)}
+                            onSetKeptQuantity={(count) =>
+                              setKeptQuantity(card.name, count)
+                            }
                             offIdentity={
                               commanderIdentity !== null &&
                               (cardMap[card.name]?.colorIdentity ?? []).some(

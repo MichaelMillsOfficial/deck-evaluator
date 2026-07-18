@@ -30,6 +30,7 @@ import {
   saveCrucibleSession,
   clearCrucibleSession,
   setCardStatus,
+  setKeptQuantity as setKeptQuantityOnPayload,
   keptCards,
   keptCount,
   buildFinalDeck,
@@ -39,6 +40,11 @@ import {
 
 /** /api/deck-enrich rejects requests above this many unique names. */
 const ENRICH_CHUNK_SIZE = 250;
+
+/** /api/deck-combos rejects requests above this many unique names. Combos
+ * cannot be chunked without missing cross-chunk pairs, so larger piles get an
+ * explicit "unavailable" state instead of a doomed request. */
+const COMBOS_MAX_NAMES = 250;
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -72,6 +78,7 @@ interface State {
   enrichProgress: EnrichProgress;
   combos: CrucibleCombos | null;
   combosLoading: boolean;
+  combosUnavailable: boolean;
   rules: CommanderRules | null;
   dismissedSuggestions: string[];
 }
@@ -79,6 +86,7 @@ interface State {
 type Action =
   | { type: "HYDRATE"; payload: CruciblePayload | null }
   | { type: "SET_PAYLOAD"; payload: CruciblePayload }
+  | { type: "NEW_PILE"; payload: CruciblePayload }
   | { type: "ENRICH_START"; total: number }
   | { type: "ENRICH_PROGRESS"; done: number }
   | {
@@ -90,6 +98,7 @@ type Action =
   | { type: "COMBOS_START" }
   | { type: "COMBOS_SUCCESS"; combos: CrucibleCombos }
   | { type: "COMBOS_ERROR" }
+  | { type: "COMBOS_UNAVAILABLE" }
   | { type: "RULES_SUCCESS"; rules: CommanderRules }
   | { type: "DISMISS_SUGGESTION"; name: string }
   | { type: "DISMISS_ENRICH_ERROR" }
@@ -105,6 +114,7 @@ const initialState: State = {
   enrichProgress: { done: 0, total: 0 },
   combos: null,
   combosLoading: false,
+  combosUnavailable: false,
   rules: null,
   dismissedSuggestions: [],
 };
@@ -119,6 +129,13 @@ function reducer(state: State, action: Action): State {
       };
     case "SET_PAYLOAD":
       return { ...state, hydration: "hydrated", payload: action.payload };
+    case "NEW_PILE":
+      return {
+        ...initialState,
+        hydration: "hydrated",
+        payload: action.payload,
+        rules: state.rules,
+      };
     case "ENRICH_START":
       return {
         ...state,
@@ -154,6 +171,8 @@ function reducer(state: State, action: Action): State {
         combosLoading: false,
         combos: state.combos ?? { exactCombos: [], nearCombos: [] },
       };
+    case "COMBOS_UNAVAILABLE":
+      return { ...state, combosLoading: false, combosUnavailable: true };
     case "RULES_SUCCESS":
       return { ...state, rules: action.rules };
     case "DISMISS_SUGGESTION":
@@ -184,6 +203,9 @@ interface CrucibleSessionContextValue {
   enrichProgress: EnrichProgress;
   combos: CrucibleCombos | null;
   combosLoading: boolean;
+  /** True when the pile exceeds the combo lookup's unique-name cap, so combo
+   * detection cannot run at all. */
+  combosUnavailable: boolean;
   /** Tag cache over the enriched pool. Null until enrichment completes. */
   tagCache: Map<string, string[]> | null;
   /** Synergy over the whole pool (synthetic deck: commanders + pool). */
@@ -200,6 +222,8 @@ interface CrucibleSessionContextValue {
    * enrichment + combo fetches in the background. */
   setPile: (pool: DeckCard[], warnings: string[]) => void;
   setStatus: (name: string, status: CrucibleCardStatus) => void;
+  /** Keep a partial count of a stacked card. Zero returns it to undecided. */
+  setKeptQuantity: (name: string, count: number) => void;
   /** Choose commanders (0-2 names from the pool). Chosen names are forced to
    * "keep" so they count toward the 100. */
   setCommanders: (names: string[]) => void;
@@ -302,6 +326,11 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     const uniqueNames = [...new Set(payload.pool.map((c) => c.name))];
     if (uniqueNames.length === 0) return;
 
+    if (uniqueNames.length > COMBOS_MAX_NAMES) {
+      dispatch({ type: "COMBOS_UNAVAILABLE" });
+      return;
+    }
+
     combosAbortRef.current?.abort();
     const controller = new AbortController();
     combosAbortRef.current = controller;
@@ -357,19 +386,29 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     }
   }, [state.hydration, state.payload, state.combos, fetchCombos]);
 
-  // Banned list + game changers, fetched once per provider lifetime.
+  // Banned list + game changers, fetched once per provider lifetime. The
+  // effect re-runs on every payload change, so it must NOT abort in its
+  // cleanup — a triage click mid-fetch would kill the request and leave
+  // legality null forever. Abort only on provider unmount, and clear the
+  // fetched flag on failure so a later payload change retries.
+  const rulesAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => rulesAbortRef.current?.abort(), []);
   useEffect(() => {
     if (state.hydration !== "hydrated" || !state.payload || rulesFetchedRef.current) {
       return;
     }
     rulesFetchedRef.current = true;
     const controller = new AbortController();
+    rulesAbortRef.current = controller;
     void (async () => {
       try {
         const res = await fetch("/api/commander-rules", {
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]),
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          rulesFetchedRef.current = false;
+          return;
+        }
         const json = await res.json();
         dispatch({
           type: "RULES_SUCCESS",
@@ -381,10 +420,10 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
           },
         });
       } catch {
-        // Legality stays null; the gate simply cannot open without rules.
+        // Legality stays null for now; allow a retry on the next change.
+        rulesFetchedRef.current = false;
       }
     })();
-    return () => controller.abort();
   }, [state.hydration, state.payload]);
 
   // ------------------------------------------------------------------
@@ -396,19 +435,23 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     [state.cardMap]
   );
 
+  // Keyed on pool + commanders (stable across triage clicks), NOT the whole
+  // payload — the O(n²) synergy engine must not re-run on every keep/cut.
+  const pool = state.payload?.pool ?? null;
+  const commanders = state.payload?.commanders ?? null;
   const synergy = useMemo<DeckSynergyAnalysis | null>(() => {
-    if (!state.payload || !state.cardMap) return null;
-    const commanderSet = new Set(state.payload.commanders);
+    if (!pool || !commanders || !state.cardMap) return null;
+    const commanderSet = new Set(commanders);
     const syntheticDeck: DeckData = {
       name: "Crucible Pool",
       source: "text",
       url: "",
-      commanders: state.payload.commanders.map((n) => ({ name: n, quantity: 1 })),
-      mainboard: state.payload.pool.filter((c) => !commanderSet.has(c.name)),
+      commanders: commanders.map((n) => ({ name: n, quantity: 1 })),
+      mainboard: pool.filter((c) => !commanderSet.has(c.name)),
       sideboard: [],
     };
     return analyzeDeckSynergy(syntheticDeck, state.cardMap, tagCache ?? undefined);
-  }, [state.payload, state.cardMap, tagCache]);
+  }, [pool, commanders, state.cardMap, tagCache]);
 
   const keptDeck = useMemo<DeckData | null>(() => {
     if (!state.payload) return null;
@@ -465,15 +508,29 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     combosIdRef.current = null;
     const payload = createCrucibleSession(pool, warnings);
     saveCrucibleSession(payload);
-    dispatch({ type: "SET_PAYLOAD", payload });
+    dispatch({ type: "NEW_PILE", payload });
   }, []);
 
   const setStatus = useCallback(
     (name: string, status: CrucibleCardStatus) => {
       if (!state.payload) return;
+      // Commanders are forced to "keep"; triage cannot move them.
+      if (state.payload.commanders.includes(name)) return;
       dispatch({
         type: "SET_PAYLOAD",
         payload: setCardStatus(state.payload, name, status),
+      });
+    },
+    [state.payload]
+  );
+
+  const setKeptQuantity = useCallback(
+    (name: string, count: number) => {
+      if (!state.payload) return;
+      if (state.payload.commanders.includes(name)) return;
+      dispatch({
+        type: "SET_PAYLOAD",
+        payload: setKeptQuantityOnPayload(state.payload, name, count),
       });
     },
     [state.payload]
@@ -539,6 +596,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       enrichProgress: state.enrichProgress,
       combos: state.combos,
       combosLoading: state.combosLoading,
+      combosUnavailable: state.combosUnavailable,
       tagCache,
       synergy,
       keptScorecard,
@@ -547,6 +605,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       keptTotal,
       setPile,
       setStatus,
+      setKeptQuantity,
       setCommanders,
       restore,
       dismissSuggestion,
@@ -565,6 +624,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       state.enrichProgress,
       state.combos,
       state.combosLoading,
+      state.combosUnavailable,
       tagCache,
       synergy,
       keptScorecard,
@@ -573,6 +633,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       keptTotal,
       setPile,
       setStatus,
+      setKeptQuantity,
       setCommanders,
       restore,
       dismissSuggestion,

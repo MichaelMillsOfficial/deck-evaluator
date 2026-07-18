@@ -165,6 +165,16 @@ const DeckSessionContext = createContext<DeckSessionContextValue | null>(null);
 // Provider
 // ---------------------------------------------------------------------------
 
+/** /api/deck-enrich rejects requests above this many unique names, so large
+ * decks (e.g. a Crucible handoff with a big sideboard) enrich in batches. */
+const ENRICH_CHUNK_SIZE = 250;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
 export function DeckSessionProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const enrichAbortRef = useRef<AbortController | null>(null);
@@ -198,34 +208,38 @@ export function DeckSessionProvider({ children }: { children: ReactNode }) {
 
     dispatch({ type: "ENRICH_START" });
 
-    try {
-      const res = await fetch("/api/deck-enrich", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cardNames: uniqueNames }),
-        signal: AbortSignal.any([
-          controller.signal,
-          AbortSignal.timeout(30_000),
-        ]),
-      });
+    const cardMap: Record<string, EnrichedCard> = {};
+    let notFoundCount = 0;
 
-      if (!res.ok) {
-        dispatch({
-          type: "ENRICH_ERROR",
-          error:
-            res.status === 502
-              ? "Card data service temporarily unavailable"
-              : "Could not load card details",
+    try {
+      for (const names of chunk(uniqueNames, ENRICH_CHUNK_SIZE)) {
+        const res = await fetch("/api/deck-enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cardNames: names }),
+          signal: AbortSignal.any([
+            controller.signal,
+            AbortSignal.timeout(30_000),
+          ]),
         });
-        return;
+
+        if (!res.ok) {
+          dispatch({
+            type: "ENRICH_ERROR",
+            error:
+              res.status === 502
+                ? "Card data service temporarily unavailable"
+                : "Could not load card details",
+          });
+          return;
+        }
+
+        const json = await res.json();
+        Object.assign(cardMap, json.cards as Record<string, EnrichedCard>);
+        notFoundCount += json.notFound?.length ?? 0;
       }
 
-      const json = await res.json();
-      dispatch({
-        type: "ENRICH_SUCCESS",
-        cardMap: json.cards as Record<string, EnrichedCard>,
-        notFoundCount: json.notFound?.length ?? 0,
-      });
+      dispatch({ type: "ENRICH_SUCCESS", cardMap, notFoundCount });
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       dispatch({
