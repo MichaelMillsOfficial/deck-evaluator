@@ -46,9 +46,11 @@ docker compose logs -f         # Tail logs
 | `npm run build` | Production build |
 | `npm run start` | Run production server |
 | `npm run lint` | Run ESLint |
-| `npm test` | Run Playwright E2E tests (headless) |
-| `npm run test:headed` | Run tests with visible browser |
-| `npm run test:ui` | Open Playwright interactive UI |
+| `npm test` | Run all tests (e2e + unit, headless) |
+| `npm run test:e2e` | Run only browser/API e2e tests |
+| `npm run test:unit` | Run only pure function unit tests (fast, no dev server) |
+| `npm run test:headed` | Run e2e tests with visible browser |
+| `npm run test:ui` | Open Playwright interactive e2e UI |
 
 ## Routes
 
@@ -117,50 +119,20 @@ src/
 
 ## Testing
 
-This project uses [Playwright](https://playwright.dev/) for end-to-end testing. Tests live in the `e2e/` directory and run against the Next.js dev server (started automatically via `webServer` in `playwright.config.ts`).
+This project uses [Playwright](https://playwright.dev/) for two test suites: browser/API e2e tests in `e2e/` (run against the Next.js dev server, started automatically via `webServer` in `playwright.config.ts`) and pure function unit tests in `tests/unit/` (no browser, no dev server, run under `playwright.unit.config.ts`).
 
 ### Running Tests
 
 ```bash
-npm test                                          # Run all tests headless
-npm run test:headed                               # Run with a visible browser
-npm run test:ui                                   # Open Playwright interactive UI
-npx playwright test e2e/deck-import.spec.ts       # Run a single test file
+npm test                                          # Run all tests (e2e + unit) headless
+npm run test:e2e                                  # Run only browser/API e2e tests
+npm run test:unit                                 # Run only pure function unit tests (fast)
+npm run test:headed                               # Run e2e tests with a visible browser
+npm run test:ui                                   # Open Playwright interactive e2e UI
+npx playwright test --config playwright.config.ts e2e/deck-import.spec.ts  # Single e2e file
 ```
 
-### Test Structure
-
-```
-e2e/
-├── fixtures.ts                 # DeckPage page-object, sample decklists, custom test export
-├── deck-import.spec.ts         # Manual decklist import user flows
-├── tab-navigation.spec.ts      # Tab switching, Load Example, form state persistence
-├── deck-display.spec.ts        # Rendered deck sections, card counts, source label
-├── api-deck-parse.spec.ts      # POST /api/deck-parse API contract tests
-├── api-deck-enrich.spec.ts     # POST /api/deck-enrich API contract tests
-├── deck-enrichment.spec.ts     # Enriched card UI: symbols, chevrons, expand/collapse
-├── card-tags.spec.ts           # Heuristic card tag rendering
-├── mana-parsers.spec.ts        # Unit tests for mana cost parsing
-└── oracle-parser.spec.ts       # Unit tests for oracle text tokenizer
-```
-
-### Writing Tests
-
-- Import `test` and `expect` from `./fixtures` (not from `@playwright/test` directly) to get the `deckPage` fixture automatically.
-- Use `deckPage` methods (`goto()`, `fillDecklist()`, `submitImport()`, `waitForDeckDisplay()`) to express tests as user intent.
-- Use `deckPage.deckDisplay` to scope assertions to the rendered deck panel.
-- Add new page-object methods to `DeckPage` in `fixtures.ts` when new UI elements are introduced.
-- API tests can use Playwright's `request` fixture directly with `@playwright/test` imports.
-- Focus on functional behavior, not styling or visual assertions.
-
-### TDD Workflow
-
-All new features follow test-driven development:
-
-1. **Write failing tests first** -- add tests in `e2e/` that describe the expected behavior. Run `npm test` to confirm they fail.
-2. **Implement the feature** -- write the minimum code to make the tests pass.
-3. **Refactor** -- clean up while keeping tests green.
-4. **All tests must pass before committing** -- run `npm test` and verify 0 failures.
+For the full test structure, conventions for writing tests, and the TDD workflow, see the Testing section of [CLAUDE.md](./CLAUDE.md).
 
 ## Tech Stack
 
