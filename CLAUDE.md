@@ -70,6 +70,7 @@ src/
 │       ├── deck-parse/            # POST — text decklist parser
 │       ├── deck-enrich/           # POST — Scryfall enrichment
 │       ├── deck-combos/           # POST — Commander Spellbook lookup
+│       ├── deck-meta/             # POST — EDHREC stock↔spicy meta read
 │       ├── card-autocomplete/
 │       ├── card-suggestions/
 │       ├── commander-rules/
@@ -141,6 +142,7 @@ Design details: `docs/plans/crucible-deck-builder.md`.
 - `POST /api/deck-parse` — raw text → `DeckData`
 - `POST /api/deck-enrich` — card names → `EnrichedCard` map (Scryfall)
 - `POST /api/deck-combos` — card names → Commander Spellbook combos
+- `POST /api/deck-meta` — commander name(s) → EDHREC inclusion envelope (stock↔spicy)
 - `GET  /api/card-autocomplete` — typeahead for `/reading/add`
 - `GET  /api/card-suggestions` — themed candidate suggestions
 
