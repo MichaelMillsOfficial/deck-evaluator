@@ -215,9 +215,6 @@
   --sheet-border:      var(--border-accent);
   --sheet-shadow:      0 -20px 60px rgba(0,0,0,0.6);
 
-  /* Popover (anchored, non-modal dropdown) */
-  --popover-shadow:    0 18px 50px rgba(0, 0, 0, 0.55);
-
   /* Tags / chips */
   --tag-radius:        var(--radius-pill);
   --tag-padding-y:     var(--space-1);

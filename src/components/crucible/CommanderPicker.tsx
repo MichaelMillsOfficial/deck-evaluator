@@ -12,6 +12,39 @@ export default function CommanderPicker() {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const anchorRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // Roving-focus keyboard nav over the option buttons, mirroring the
+  // combobox pattern in CardSearchInput. Options stay real <button>s (so
+  // Enter/Space select natively and each keeps a "Choose <name>" label);
+  // arrow keys just move focus between them and back up to the filter.
+  const optionButtons = () =>
+    Array.from(
+      listRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? []
+    );
+
+  const onFilterKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      optionButtons()[0]?.focus();
+    }
+  };
+
+  const onListKeyDown = (e: React.KeyboardEvent<HTMLUListElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const buttons = optionButtons();
+    if (buttons.length === 0) return;
+    e.preventDefault();
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === "ArrowDown") {
+      buttons[index < 0 ? 0 : (index + 1) % buttons.length].focus();
+    } else if (index <= 0) {
+      inputRef.current?.focus();
+    } else {
+      buttons[index - 1].focus();
+    }
+  };
 
   const candidates = useMemo(() => {
     if (!payload || !cardMap) return [];
@@ -128,13 +161,15 @@ export default function CommanderPicker() {
       >
         <div className={styles.commanderFilter}>
           <Input
+            ref={inputRef}
             aria-label="Filter commander candidates"
             placeholder="Filter legendaries…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
+            onKeyDown={onFilterKeyDown}
           />
         </div>
-        <ul className={styles.commanderOptions}>
+        <ul className={styles.commanderOptions} ref={listRef} onKeyDown={onListKeyDown}>
           {filtered.map((name) => (
             <li key={name}>
               <button

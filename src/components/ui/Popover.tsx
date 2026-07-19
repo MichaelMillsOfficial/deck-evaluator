@@ -43,6 +43,7 @@ export function Popover({
 }: PopoverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
+  const restoreFocusRef = useRef(true);
 
   // Same latest-callback pattern as Sheet: callers pass inline closures, and
   // re-running the open effect per parent render would re-snap focus.
@@ -54,6 +55,7 @@ export function Popover({
   useEffect(() => {
     if (!open) return;
     restoreRef.current = document.activeElement as HTMLElement | null;
+    restoreFocusRef.current = true;
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -64,6 +66,7 @@ export function Popover({
     const handleMouseDown = (e: MouseEvent) => {
       const anchor = anchorRef.current;
       if (anchor && !anchor.contains(e.target as Node)) {
+        restoreFocusRef.current = false;
         onCloseRef.current();
       }
     };
@@ -81,7 +84,9 @@ export function Popover({
       document.removeEventListener("keydown", handleKey);
       document.removeEventListener("mousedown", handleMouseDown);
       window.clearTimeout(t);
-      restoreRef.current?.focus?.();
+      if (restoreFocusRef.current) {
+        restoreRef.current?.focus?.();
+      }
     };
   }, [open, anchorRef]);
 
