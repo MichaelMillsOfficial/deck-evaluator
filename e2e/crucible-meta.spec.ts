@@ -1,7 +1,20 @@
 import { test, CruciblePage, SAMPLE_PILE } from "./crucible-helpers";
-import { expect } from "./fixtures";
+import { expect, DEFAULT_META_ENVELOPE } from "./fixtures";
 
 const META_LENS = "By Meta";
+
+/** Override the default (empty) /api/deck-meta mock with the rich Atraxa
+ * envelope so the meta lens has inclusion data to group by. */
+async function mockRichMeta(crucible: CruciblePage) {
+  await crucible.page.unroute("**/api/deck-meta");
+  await crucible.page.route("**/api/deck-meta", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(DEFAULT_META_ENVELOPE),
+    })
+  );
+}
 
 function groupHeader(crucible: CruciblePage, label: string) {
   return crucible.page.getByRole("button", { name: `${label} group` });
@@ -26,6 +39,7 @@ test.describe("Crucible — Meta (Stock ↔ Spicy) lens", () => {
   });
 
   test("with a commander, it regroups into Staples / Flex / Spice", async ({ crucible }) => {
+    await mockRichMeta(crucible);
     await crucible.importPile(SAMPLE_PILE);
     await crucible.chooseCommander("Atraxa, Praetors' Voice");
     await crucible.selectLens(META_LENS);

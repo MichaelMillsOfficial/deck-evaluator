@@ -502,15 +502,21 @@ export const test = base.extend<{ deckPage: DeckPage }>({
       })
     );
 
-    // Default mock for /api/deck-meta: a canned EDHREC inclusion envelope
-    // covering the sample Atraxa deck, spanning all bands (staple → spice).
-    // Tests exercising failure states override this via deckPage.mockMeta(),
-    // and live-data tests opt out via deckPage.useLiveMeta().
+    // Default mock for /api/deck-meta: an EMPTY envelope, so the meta feature
+    // stays dormant (no-data) across the suite and doesn't inject a second copy
+    // of the card list onto /reading/cards for unrelated tests. Meta tests opt
+    // into real data via deckPage.mockMeta(DEFAULT_META_ENVELOPE); live-data
+    // tests opt out via deckPage.useLiveMeta().
     await page.route("**/api/deck-meta", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(DEFAULT_META_ENVELOPE),
+        body: JSON.stringify({
+          source: null,
+          commanderLabel: "",
+          potentialDecks: 0,
+          inclusionMap: {},
+        }),
       })
     );
 

@@ -1,8 +1,9 @@
-import { test, expect, SAMPLE_DECKLIST } from "./fixtures";
+import { test, expect, SAMPLE_DECKLIST, DEFAULT_META_ENVELOPE } from "./fixtures";
 
-/** Import the sample deck and land on the /reading overview. */
+/** Import the sample deck with the rich meta envelope and land on /reading. */
 async function importSample(deckPage: import("./fixtures").DeckPage) {
   await deckPage.goto();
+  await deckPage.mockMeta(DEFAULT_META_ENVELOPE);
   await deckPage.fillDecklist(SAMPLE_DECKLIST);
   await deckPage.submitImport();
   await deckPage.page.waitForURL(/\/reading(\/|$|\?)/, { timeout: 15_000 });
