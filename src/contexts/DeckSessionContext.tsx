@@ -12,6 +12,7 @@ import {
 } from "react";
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { SpellbookCombo } from "@/lib/commander-spellbook";
+import { computeDeckMeta, type DeckMetaResult, type MetaSource } from "@/lib/edhrec-meta";
 import { validateCommanderLegality } from "@/lib/commander-validation";
 import {
   computeAllAnalyses,
@@ -37,6 +38,7 @@ interface State {
   enrichLoading: boolean;
   enrichError: string | null;
   spellbookLoading: boolean;
+  metaLoading: boolean;
   commanderWarning: string | null;
 }
 
@@ -56,6 +58,9 @@ type Action =
       combos: { exactCombos: SpellbookCombo[]; nearCombos: SpellbookCombo[] };
     }
   | { type: "SPELLBOOK_ERROR" }
+  | { type: "META_START" }
+  | { type: "META_SUCCESS"; result: DeckMetaResult }
+  | { type: "META_ERROR"; result: DeckMetaResult }
   | { type: "SET_COMMANDER_WARNING"; warning: string | null }
   | { type: "DISMISS_ENRICH_ERROR" }
   | { type: "DISMISS_NOT_FOUND" }
@@ -67,8 +72,26 @@ const initialState: State = {
   enrichLoading: false,
   enrichError: null,
   spellbookLoading: false,
+  metaLoading: false,
   commanderWarning: null,
 };
+
+/** A minimal DeckMetaResult standing in for a failed EDHREC fetch, so the UI
+ * can render the error state uniformly. */
+function errorMeta(commanders: string[], label?: string): DeckMetaResult {
+  return {
+    status: "error",
+    source: null,
+    commanderLabel: label ?? commanders.join(" + "),
+    potentialDecks: 0,
+    cards: [],
+    coverage: { pct: 0, have: 0, of: 0 },
+    spiceCount: 0,
+    meanInclusion: 0,
+    fieldPercentile: 0,
+    bandCounts: { staple: 0, standard: 0, niche: 0, spice: 0 },
+  };
+}
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -117,6 +140,15 @@ function reducer(state: State, action: Action): State {
           },
         },
       };
+    case "META_START":
+      return { ...state, metaLoading: true };
+    case "META_SUCCESS":
+    case "META_ERROR":
+      return {
+        ...state,
+        metaLoading: false,
+        payload: state.payload && { ...state.payload, deckMeta: action.result },
+      };
     case "SET_COMMANDER_WARNING":
       return { ...state, commanderWarning: action.warning };
     case "DISMISS_ENRICH_ERROR":
@@ -147,6 +179,7 @@ interface DeckSessionContextValue {
   enrichLoading: boolean;
   enrichError: string | null;
   spellbookLoading: boolean;
+  metaLoading: boolean;
   commanderWarning: string | null;
   analysisResults: DeckAnalysisResults | null;
   /** Set or replace the active deck session. Persists to sessionStorage and
@@ -154,6 +187,7 @@ interface DeckSessionContextValue {
    * import form to seed a fresh reading before navigating to /ritual. */
   setPayload: (payload: DeckSessionPayload) => void;
   retryEnrichment: () => void;
+  retryMeta: () => void;
   dismissEnrichError: () => void;
   dismissNotFound: () => void;
   dismissCommanderWarning: () => void;
@@ -170,6 +204,7 @@ export function DeckSessionProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const enrichAbortRef = useRef<AbortController | null>(null);
   const spellbookAbortRef = useRef<AbortController | null>(null);
+  const metaAbortRef = useRef<AbortController | null>(null);
 
   // Hydrate from sessionStorage on mount.
   useEffect(() => {
@@ -287,10 +322,60 @@ export function DeckSessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const fetchMeta = useCallback(async (deck: DeckData) => {
+    metaAbortRef.current?.abort();
+    const controller = new AbortController();
+    metaAbortRef.current = controller;
+
+    dispatch({ type: "META_START" });
+
+    const commanders = deck.commanders.map((c) => c.name);
+
+    try {
+      const res = await fetch("/api/deck-meta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commanders }),
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+      });
+
+      if (!res.ok) {
+        dispatch({ type: "META_ERROR", result: errorMeta(commanders) });
+        return;
+      }
+
+      const json = (await res.json()) as {
+        source: MetaSource | null;
+        commanderLabel: string;
+        inclusionMap: Record<string, number>;
+        potentialDecks: number;
+        error?: string;
+      };
+
+      if (json.error) {
+        dispatch({ type: "META_ERROR", result: errorMeta(commanders, json.commanderLabel) });
+        return;
+      }
+
+      const result = computeDeckMeta(
+        deck,
+        json.inclusionMap,
+        json.potentialDecks,
+        json.source ?? "primary",
+        json.commanderLabel
+      );
+      dispatch({ type: "META_SUCCESS", result });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      dispatch({ type: "META_ERROR", result: errorMeta(commanders) });
+    }
+  }, []);
+
   // After hydration, kick off enrichment + combos if missing.
   // Track which deckId we've fetched for so we don't refetch on every render.
   const enrichedDeckIdRef = useRef<string | null>(null);
   const combosDeckIdRef = useRef<string | null>(null);
+  const metaDeckIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (state.hydration !== "hydrated" || !state.payload) return;
@@ -311,6 +396,16 @@ export function DeckSessionProvider({ children }: { children: ReactNode }) {
       void fetchCombos(deck);
     }
   }, [state.hydration, state.payload, fetchCombos]);
+
+  useEffect(() => {
+    if (state.hydration !== "hydrated" || !state.payload) return;
+    const { deckId, deck, deckMeta } = state.payload;
+
+    if (deckMeta === null && metaDeckIdRef.current !== deckId) {
+      metaDeckIdRef.current = deckId;
+      void fetchMeta(deck);
+    }
+  }, [state.hydration, state.payload, fetchMeta]);
 
   // Commander legality check — runs after enrichment completes.
   useEffect(() => {
@@ -344,8 +439,10 @@ export function DeckSessionProvider({ children }: { children: ReactNode }) {
   const setPayload = useCallback((next: DeckSessionPayload) => {
     enrichAbortRef.current?.abort();
     spellbookAbortRef.current?.abort();
+    metaAbortRef.current?.abort();
     enrichedDeckIdRef.current = null;
     combosDeckIdRef.current = null;
+    metaDeckIdRef.current = null;
     saveDeckSession(next);
     dispatch({ type: "SET_PAYLOAD", payload: next });
   }, []);
@@ -356,6 +453,13 @@ export function DeckSessionProvider({ children }: { children: ReactNode }) {
       void enrich(state.payload.deck);
     }
   }, [state.payload, enrich]);
+
+  const retryMeta = useCallback(() => {
+    if (state.payload) {
+      metaDeckIdRef.current = null;
+      void fetchMeta(state.payload.deck);
+    }
+  }, [state.payload, fetchMeta]);
 
   const dismissEnrichError = useCallback(() => {
     dispatch({ type: "DISMISS_ENRICH_ERROR" });
@@ -372,8 +476,10 @@ export function DeckSessionProvider({ children }: { children: ReactNode }) {
   const clearSession = useCallback(() => {
     enrichAbortRef.current?.abort();
     spellbookAbortRef.current?.abort();
+    metaAbortRef.current?.abort();
     enrichedDeckIdRef.current = null;
     combosDeckIdRef.current = null;
+    metaDeckIdRef.current = null;
     clearDeckSession();
     dispatch({ type: "CLEAR" });
   }, []);
@@ -385,10 +491,12 @@ export function DeckSessionProvider({ children }: { children: ReactNode }) {
       enrichLoading: state.enrichLoading,
       enrichError: state.enrichError,
       spellbookLoading: state.spellbookLoading,
+      metaLoading: state.metaLoading,
       commanderWarning: state.commanderWarning,
       analysisResults,
       setPayload,
       retryEnrichment,
+      retryMeta,
       dismissEnrichError,
       dismissNotFound,
       dismissCommanderWarning,
@@ -400,10 +508,12 @@ export function DeckSessionProvider({ children }: { children: ReactNode }) {
       state.enrichLoading,
       state.enrichError,
       state.spellbookLoading,
+      state.metaLoading,
       state.commanderWarning,
       analysisResults,
       setPayload,
       retryEnrichment,
+      retryMeta,
       dismissEnrichError,
       dismissNotFound,
       dismissCommanderWarning,
