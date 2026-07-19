@@ -8,6 +8,7 @@ import {
   useMemo,
   useReducer,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
 import type { DeckCard, DeckData, DeckSynergyAnalysis, EnrichedCard } from "@/lib/types";
@@ -26,6 +27,7 @@ import {
 import { suggestCuts, type CutSuggestion } from "@/lib/cut-suggestions";
 import {
   createCrucibleSession,
+  generateCrucibleId,
   loadCrucibleSession,
   saveCrucibleSession,
   clearCrucibleSession,
@@ -43,7 +45,7 @@ import { ENRICH_CHUNK_SIZE, chunk } from "@/lib/enrich-chunking";
 /** /api/deck-combos rejects requests above this many unique names. Combos
  * cannot be chunked without missing cross-chunk pairs, so for larger piles
  * detection runs over the keep+undecided subset once cuts bring it under the
- * cap — until then the UI shows how many more unique cuts are needed. */
+ * cap - until then the UI shows how many more unique cuts are needed. */
 const COMBOS_MAX_NAMES = 250;
 
 /** Debounce for combo refetches after the first threshold crossing, so triage
@@ -255,9 +257,17 @@ interface CrucibleSessionContextValue {
   /** Ranked cut suggestions, minus dismissed ones. */
   cutSuggestions: CutSuggestion[];
   keptTotal: number;
+  /** Builder-chosen deck name, shared across the tracker rail and its mobile
+   * sheet. Transient (not persisted); blank falls back to a default at seal. */
+  deckName: string;
+  setDeckName: (name: string) => void;
   /** Start a fresh crucible from an imported pile. Persists and triggers
    * enrichment + combo fetches in the background. */
   setPile: (pool: DeckCard[], warnings: string[]) => void;
+  /** Load a decoded shared pile (pool + triage state) into a FRESH session.
+   * Preserves statuses/keptQuantities/commanders but stamps a new id, so a
+   * shared link opens as a brand-new crucible. */
+  loadPile: (incoming: CruciblePayload) => void;
   /** Add a single card to the pile mid-triage (new name arrives undecided;
    * an existing name gets a quantity bump). Enriches it incrementally and
    * refreshes combo detection where the pile size allows. */
@@ -289,6 +299,9 @@ const CrucibleSessionContext = createContext<CrucibleSessionContextValue | null>
 
 export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  // Transient builder-chosen deck name. Lives outside the reducer/session
+  // payload because it doesn't need persistence - it's only read at seal.
+  const [deckName, setDeckName] = useState("");
   const enrichAbortRef = useRef<AbortController | null>(null);
   const combosAbortRef = useRef<AbortController | null>(null);
   const enrichedIdRef = useRef<string | null>(null);
@@ -360,7 +373,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
         type: "ENRICH_ERROR",
         error:
           err instanceof TypeError
-            ? "Network error — could not reach card data service"
+            ? "Network error - could not reach card data service"
             : "Could not load card details",
       });
     }
@@ -476,7 +489,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
 
   // Banned list + game changers, fetched once per provider lifetime. The
   // effect re-runs on every payload change, so it must NOT abort in its
-  // cleanup — a triage click mid-fetch would kill the request and leave
+  // cleanup - a triage click mid-fetch would kill the request and leave
   // legality null forever. Abort only on provider unmount, and clear the
   // fetched flag on failure so a later payload change retries.
   const rulesAbortRef = useRef<AbortController | null>(null);
@@ -524,7 +537,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
   );
 
   // Keyed on pool + commanders (stable across triage clicks), NOT the whole
-  // payload — the O(n²) synergy engine must not re-run on every keep/cut.
+  // payload - the O(n²) synergy engine must not re-run on every keep/cut.
   const pool = state.payload?.pool ?? null;
   const commanders = state.payload?.commanders ?? null;
   const synergy = useMemo<DeckSynergyAnalysis | null>(() => {
@@ -611,6 +624,24 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     combosSubsetKeyRef.current = null;
     const payload = createCrucibleSession(pool, warnings);
     saveCrucibleSession(payload);
+    setDeckName("");
+    dispatch({ type: "NEW_PILE", payload });
+  }, []);
+
+  const loadPile = useCallback((incoming: CruciblePayload) => {
+    enrichAbortRef.current?.abort();
+    combosAbortRef.current?.abort();
+    if (combosDebounceRef.current) clearTimeout(combosDebounceRef.current);
+    enrichedIdRef.current = null;
+    combosIdRef.current = null;
+    combosSubsetKeyRef.current = null;
+    const payload: CruciblePayload = {
+      ...incoming,
+      crucibleId: generateCrucibleId(),
+      createdAt: Date.now(),
+    };
+    saveCrucibleSession(payload);
+    setDeckName("");
     dispatch({ type: "NEW_PILE", payload });
   }, []);
 
@@ -754,6 +785,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     combosIdRef.current = null;
     combosSubsetKeyRef.current = null;
     clearCrucibleSession();
+    setDeckName("");
     dispatch({ type: "CLEAR" });
   }, []);
 
@@ -775,7 +807,10 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       legality,
       cutSuggestions,
       keptTotal,
+      deckName,
+      setDeckName,
       setPile,
+      loadPile,
       addCard,
       setStatus,
       keepAll,
@@ -805,7 +840,9 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       legality,
       cutSuggestions,
       keptTotal,
+      deckName,
       setPile,
+      loadPile,
       addCard,
       setStatus,
       keepAll,

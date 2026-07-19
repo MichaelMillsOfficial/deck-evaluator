@@ -1,4 +1,4 @@
-/* The Crucible — shared styles for the deck-building workbench. */
+/* The Crucible - shared styles for the deck-building workbench. */
 
 /* ─── Import ─────────────────────────────────────────────────── */
 .importMain {
@@ -164,19 +164,27 @@
 }
 
 /* ─── Groups ─────────────────────────────────────────────────── */
-.group {
-  margin-bottom: var(--space-10);
+/* The groups list is a window-virtualized flat list of headers + rows. Its
+ * height is driven inline by the virtualizer's total size, and each item is
+ * absolutely positioned via .vItem, so only the on-screen window mounts. */
+.groups {
+  position: relative;
+  width: 100%;
+}
+
+.vItem {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
 }
 
 .groupHead {
-  position: sticky;
-  top: 0;
-  z-index: 2;
   display: flex;
   align-items: baseline;
   gap: var(--space-5);
   width: 100%;
-  padding: var(--space-4) var(--space-2);
+  padding: var(--space-6) var(--space-2) var(--space-4);
   border: none;
   background: var(--bg-base);
   color: inherit;
@@ -204,17 +212,6 @@
   color: var(--ink-tertiary);
   min-width: 0;
   overflow-wrap: anywhere;
-}
-
-.groupShowAll {
-  margin: var(--space-2) 0 0;
-  padding: var(--space-3) var(--space-6);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
-  color: var(--ink-secondary);
-  font-size: var(--text-sm);
-  cursor: pointer;
 }
 
 /* ─── Card rows ──────────────────────────────────────────────── */
@@ -811,9 +808,18 @@
   color: var(--status-warn);
 }
 
+.deckNameField {
+  margin-top: var(--space-8);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 .sealButton {
   width: 100%;
-  margin-top: var(--space-8);
+  margin-top: var(--space-6);
 }
 
 .trackerToggle {
@@ -884,4 +890,21 @@
 .addSearch {
   flex: 0 1 280px;
   min-width: 200px;
+}
+
+/* ─── Share actions ──────────────────────────────────────────── */
+.shareActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.shareStatus {
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--accent);
+  min-width: 4ch;
 }

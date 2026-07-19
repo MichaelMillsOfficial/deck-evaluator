@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { test as deckTest, expect } from "./fixtures";
 
 // ---------------------------------------------------------------------------
-// Sample piles — all names exist in the enriched-cards fixture bank so the
+// Sample piles - all names exist in the enriched-cards fixture bank so the
 // default /api/deck-enrich mock returns realistic data.
 // ---------------------------------------------------------------------------
 
@@ -28,13 +28,26 @@ export const HUNDRED_PILE = `1 Atraxa, Praetors' Voice
 59 Forest
 40 Island`;
 
+/** Number of unique synthetic rows in LARGE_PILE. Chosen large enough that
+ * only a virtualized window of rows can be present in the DOM at once. */
+export const LARGE_PILE_SIZE = 180;
+
+/** A deliberately huge pile of unique synthetic names ("Relic 001" ..
+ * "Relic 180"). None are in the fixture bank, so each synthesizes as a plain
+ * colorless artifact and lands in a single "All Cards" group under the Flat
+ * List lens - the ideal shape for exercising row virtualization. */
+export const LARGE_PILE = Array.from(
+  { length: LARGE_PILE_SIZE },
+  (_, i) => `1 Relic ${String(i + 1).padStart(3, "0")}`
+).join("\n");
+
 /** SAMPLE_PILE plus the Thrasios/Tymna Partner pair, for two-commander
  * selection tests. Atraxa and Ezuri stay in as non-partner legendaries. */
 export const PARTNER_PILE = `${SAMPLE_PILE}
 1 Thrasios, Triton Hero
 1 Tymna the Weaver`;
 
-/** A Choose-a-Background commander, its Background, and 98 basics — pairable
+/** A Choose-a-Background commander, its Background, and 98 basics - pairable
  * in the picker and sealable as a legal hundred. */
 export const BACKGROUND_PILE = `1 Wilson, Refined Grizzly
 1 Raised by Giants
@@ -169,7 +182,7 @@ export class CruciblePage {
       .click();
   }
 
-  /** The collapsed control that opens the candidate popover — either the
+  /** The collapsed control that opens the candidate popover - either the
    * initial "Choose from N candidates" button or the "Add a partner" button
    * once a first commander is locked in. */
   get commanderTrigger() {
@@ -200,7 +213,7 @@ export class CruciblePage {
 /**
  * Crucible test fixture. Depends on `deckPage` so the base fixture's route
  * mocks (/api/deck-enrich fixture bank, empty /api/deck-combos) and the
- * ritual-floor skip are active — Playwright fixtures are lazy, so a test
+ * ritual-floor skip are active - Playwright fixtures are lazy, so a test
  * that only destructures `page` would otherwise hit the live APIs.
  */
 export const test = deckTest.extend<{ crucible: CruciblePage }>({
