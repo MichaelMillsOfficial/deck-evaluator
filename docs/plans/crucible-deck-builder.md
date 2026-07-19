@@ -171,7 +171,8 @@ The workbench header hosts a `CardSearchInput` so cards can be searched up and a
 | `src/components/crucible/CrucibleWorkbench.tsx` | Create | Three-pane workbench shell |
 | `src/components/crucible/LensSwitcher.tsx` | Create | Lens/filter sidebar |
 | `src/components/crucible/CrucibleCardRow.tsx` | Create | Triage row with preview + disclosure |
-| `src/components/crucible/CommanderPicker.tsx` | Create | Legal-commander picker + search fallback |
+| `src/components/crucible/CommanderPicker.tsx` | Create | Legal-commander picker; fixed-height trigger opens a filterable `Popover` listing every candidate |
+| `src/components/ui/Popover.tsx` | Create | Anchored, non-modal filterable dropdown (Escape + outside-click dismissal, focus restore) |
 | `src/components/crucible/CutPile.tsx` | Create | Cut list with restore |
 | `src/components/crucible/CrucibleCharts.tsx` | Create | Curve + pip coverage panel |
 | `src/components/crucible/CrucibleCombos.tsx` | Create | Combo states panel |

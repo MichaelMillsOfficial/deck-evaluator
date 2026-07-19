@@ -189,6 +189,7 @@ Inventory of primitives that must be reused (current as of this writing — run
 |---|---|
 | Panel / surface / bordered container | `<Card>` from `src/components/ui/Card.tsx` — never raw `rounded-xl border bg-slate-800/50` |
 | Modal / drawer / focus-trapped overlay | `<Sheet>` from `src/components/ui/Sheet.tsx` — never a hand-rolled `<dialog>` |
+| Anchored, non-modal dropdown / filterable list popover | `<Popover>` from `src/components/ui/Popover.tsx` — never a hand-rolled absolutely-positioned dropdown |
 | Mono uppercase label / kicker | `<Eyebrow>` from `src/components/ui/Eyebrow.tsx` |
 | Pill / chip / category label | `<Tag>` from `src/components/ui/Tag.tsx` (or `<CardTag>` for card-tag-specific styling) |
 | Button (primary / secondary / ghost) | `<Button>` from `src/components/ui/Button.tsx` |
