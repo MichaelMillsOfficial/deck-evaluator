@@ -205,12 +205,15 @@ export default function CrucibleWorkbench() {
   }, [groups, collapsed, undecidedOnly, statuses]);
 
   // Window virtualizer preserves the whole-page scroll UX (no inner
-  // fixed-height scrollbox). scrollMargin is the list's offset from the top of
-  // the document, captured via a callback ref (runs at commit, not during
-  // render) so the virtualizer's scroll math lines up with the page scroll.
-  // A ResizeObserver keeps it fresh when layout above the list changes height
-  // after mount (e.g. dismissing the not-found banner shifts the list up);
-  // its callback fires asynchronously, so it does not trip set-state-in-effect.
+  // fixed-height scrollbox). scrollMargin is the list's offset measured from
+  // the document top via getBoundingClientRect().top + window.scrollY (not
+  // offsetTop, which is relative to the nearest positioned ancestor below the
+  // sticky nav and under-reports by the nav height), captured via a callback
+  // ref (runs at commit, not during render) so the virtualizer's scroll math
+  // lines up with the page scroll. A ResizeObserver keeps it fresh when layout
+  // above the list changes height after mount (e.g. dismissing the not-found
+  // banner shifts the list up); its callback fires asynchronously, so it does
+  // not trip set-state-in-effect.
   const [scrollMargin, setScrollMargin] = useState(0);
   const scrollMarginObserverRef = useRef<ResizeObserver | null>(null);
   const setListRef = useCallback((node: HTMLDivElement | null) => {
@@ -218,7 +221,7 @@ export default function CrucibleWorkbench() {
     scrollMarginObserverRef.current = null;
     if (!node) return;
     const measure = () => {
-      const top = node.offsetTop;
+      const top = node.getBoundingClientRect().top + window.scrollY;
       setScrollMargin((prev) => (prev === top ? prev : top));
     };
     measure();

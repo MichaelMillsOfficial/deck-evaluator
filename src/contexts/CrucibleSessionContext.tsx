@@ -624,6 +624,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     combosSubsetKeyRef.current = null;
     const payload = createCrucibleSession(pool, warnings);
     saveCrucibleSession(payload);
+    setDeckName("");
     dispatch({ type: "NEW_PILE", payload });
   }, []);
 
@@ -640,6 +641,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       createdAt: Date.now(),
     };
     saveCrucibleSession(payload);
+    setDeckName("");
     dispatch({ type: "NEW_PILE", payload });
   }, []);
 
@@ -783,6 +785,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     combosIdRef.current = null;
     combosSubsetKeyRef.current = null;
     clearCrucibleSession();
+    setDeckName("");
     dispatch({ type: "CLEAR" });
   }, []);
 
