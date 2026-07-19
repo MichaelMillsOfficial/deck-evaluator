@@ -27,6 +27,15 @@ interface CacheEntry extends SlugData {
 
 const cache = new Map<string, CacheEntry>();
 
+/**
+ * A resolvable EDHREC slug is lowercase alphanumerics and hyphens only. This is
+ * already guaranteed by `commanderSlug`, but validating again at the fetch
+ * boundary keeps a user-derived slug from ever influencing the request URL's
+ * structure (path traversal, host injection) — the value can only select a page
+ * under the fixed EDHREC commander path.
+ */
+const SLUG_RE = /^[a-z0-9-]+$/;
+
 export interface EdhrecMetaEnvelope {
   source: MetaSource | null;
   commanderLabel: string;
@@ -39,12 +48,18 @@ export interface EdhrecMetaEnvelope {
 /** Fetch + parse a single slug, with a 24h cache. Returns an empty map (not an
  * error) when EDHREC has no page for the slug. Throws only on transport error. */
 async function fetchSlug(slug: string): Promise<SlugData> {
+  // Reject anything that isn't a plain commander slug before it can reach the
+  // request URL — an unresolvable slug is a no-data outcome, not a fetch.
+  if (!SLUG_RE.test(slug)) {
+    return { inclusionMap: {}, potentialDecks: 0 };
+  }
+
   const cached = cache.get(slug);
   if (cached && cached.expires > Date.now()) {
     return { inclusionMap: cached.inclusionMap, potentialDecks: cached.potentialDecks };
   }
 
-  const res = await fetch(`${EDHREC_BASE}/${slug}.json`, {
+  const res = await fetch(`${EDHREC_BASE}/${encodeURIComponent(slug)}.json`, {
     headers: REQUEST_HEADERS,
     cache: "no-store",
     signal: AbortSignal.timeout(10_000),
