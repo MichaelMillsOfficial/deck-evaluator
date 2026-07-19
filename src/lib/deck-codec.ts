@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Deck Codec — serialize/deserialize deck payloads for share URLs
+// Deck Codec - serialize/deserialize deck payloads for share URLs
 // Uses CompressionStream (browser API) for gzip compression
 // ---------------------------------------------------------------------------
 
@@ -216,7 +216,7 @@ export async function encodeCompactDeckPayloadV3(
     if (result.length <= 1800) {
       return result;
     }
-    // Summary makes URL too long — fall back to without summary
+    // Summary makes URL too long - fall back to without summary
   }
 
   // Encode without summary (compatible with v2 format but using v3 version field)
@@ -291,23 +291,44 @@ async function compressGzip(data: Uint8Array): Promise<Uint8Array> {
   }
 }
 
+/** Hard cap on gzip-decompressed bytes, to defuse decompression bombs in a
+ * crafted `?d=` share link. A real deck encodes to well under this. */
+const MAX_DECODED_BYTES = 1_000_000;
+
 async function decompressGzip(data: Uint8Array): Promise<Uint8Array> {
   try {
     const ds = new DecompressionStream("gzip");
     const writer = ds.writable.getWriter();
     const copy = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
-    writer.write(new Uint8Array(copy));
-    writer.close();
+    // Swallow the write/close promises so throwing mid-read can't surface an
+    // unhandled rejection when the stream tears down.
+    const pump = writer
+      .write(new Uint8Array(copy))
+      .then(() => writer.close())
+      .catch(() => {});
 
     const chunks: Uint8Array[] = [];
     const reader = ds.readable.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
+    let totalLen = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalLen += value.length;
+        // Bail out mid-stream once output blows past the cap, so a tiny gzip
+        // bomb cannot inflate into a memory-exhausting buffer.
+        if (totalLen > MAX_DECODED_BYTES) {
+          throw new Error("decompressed payload exceeds maximum size");
+        }
+        chunks.push(value);
+      }
+    } finally {
+      // Cancel to release stream backpressure so the (swallowed) close settles;
+      // both are caught so a mid-read throw never leaks an unhandled rejection.
+      await reader.cancel().catch(() => {});
+      await pump;
     }
 
-    const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
     const decompressed = new Uint8Array(totalLen);
     let offset = 0;
     for (const chunk of chunks) {
@@ -372,7 +393,7 @@ function tuplesToDeckCards(
 ): { name: string; quantity: number }[] {
   return tuples.map(([set, numOrName, qty]) => {
     if (set === "_") {
-      // Fallback tuple — numOrName is the card name
+      // Fallback tuple - numOrName is the card name
       return { name: numOrName, quantity: qty };
     }
     // O(1) lookup by set+collectorNumber
@@ -380,7 +401,7 @@ function tuplesToDeckCards(
     if (name) {
       return { name, quantity: qty };
     }
-    // Card not found in map — use a placeholder
+    // Card not found in map - use a placeholder
     return { name: `${set}/${numOrName}`, quantity: qty };
   });
 }
