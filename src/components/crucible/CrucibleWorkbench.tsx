@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useCrucibleSession } from "@/contexts/CrucibleSessionContext";
 import {
   groupByCategory,
@@ -26,9 +27,15 @@ import SuggestedCuts from "./SuggestedCuts";
 import CutPile from "./CutPile";
 import styles from "./crucible.module.css";
 
-/** Rows rendered per group before the "Show all" expansion. Keeps huge piles
- * responsive without a virtualization library. */
-const ROWS_PER_GROUP = 60;
+/** Estimated pixel heights for the window virtualizer. The real heights are
+ * measured after mount via `measureElement`; these only seed the first paint
+ * and the scroll-range math for offscreen rows. */
+const ROW_ESTIMATE = 64;
+const HEADER_ESTIMATE = 52;
+
+/** Extra rows rendered beyond the viewport on each side. Small piles fall well
+ * under this window, so every row stays mounted and directly scroll-to-able. */
+const OVERSCAN = 12;
 
 /** Nothing is excluded from the add-card search: re-adding a name already in
  * the pile bumps its quantity (useful for basics), and singleton legality
@@ -43,6 +50,13 @@ interface RenderGroup {
   meta?: string;
   cards: { card: DeckCard; badge?: string }[];
 }
+
+/** A single virtualized item: either a group header or a card row. The visible
+ * (non-collapsed, filtered) groups are flattened into one list of these so a
+ * single window virtualizer can span every group. */
+type FlatItem =
+  | { kind: "header"; group: RenderGroup; collapsed: boolean }
+  | { kind: "row"; groupId: string; card: DeckCard; badge?: string };
 
 export default function CrucibleWorkbench() {
   const {
@@ -59,7 +73,6 @@ export default function CrucibleWorkbench() {
   const [lens, setLens] = useState<CrucibleLens>("category");
   const [undecidedOnly, setUndecidedOnly] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [dismissedNotFound, setDismissedNotFound] = useState<Set<string>>(
     () => new Set()
   );
@@ -164,6 +177,55 @@ export default function CrucibleWorkbench() {
     }
   }, [payload, cardMap, tagCache, lens, targetByLabel]);
 
+  const statuses = payload?.statuses;
+
+  // Flatten the visible groups (respecting collapse + the undecided filter)
+  // into a single item list so one window virtualizer can span every group.
+  const flatItems = useMemo<FlatItem[]>(() => {
+    const items: FlatItem[] = [];
+    for (const group of groups) {
+      const isCollapsed = collapsed.has(group.id);
+      items.push({ kind: "header", group, collapsed: isCollapsed });
+      if (isCollapsed) continue;
+      for (const { card, badge } of group.cards) {
+        if (
+          undecidedOnly &&
+          (statuses?.[card.name] ?? "undecided") !== "undecided"
+        ) {
+          continue;
+        }
+        items.push({ kind: "row", groupId: group.id, card, badge });
+      }
+    }
+    return items;
+  }, [groups, collapsed, undecidedOnly, statuses]);
+
+  // Window virtualizer preserves the whole-page scroll UX (no inner
+  // fixed-height scrollbox). scrollMargin is the list's offset from the top of
+  // the document, captured via a callback ref (runs at commit, not during
+  // render) so the virtualizer's scroll math lines up with the page scroll.
+  const [scrollMargin, setScrollMargin] = useState(0);
+  const setListRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      const top = node.offsetTop;
+      setScrollMargin((prev) => (prev === top ? prev : top));
+    }
+  }, []);
+
+  const virtualizer = useWindowVirtualizer({
+    count: flatItems.length,
+    estimateSize: (index) =>
+      flatItems[index]?.kind === "header" ? HEADER_ESTIMATE : ROW_ESTIMATE,
+    overscan: OVERSCAN,
+    scrollMargin,
+    getItemKey: (index) => {
+      const item = flatItems[index];
+      return item.kind === "header"
+        ? `header:${item.group.id}`
+        : `row:${item.groupId}:${item.card.name}`;
+    },
+  });
+
   if (!payload || !cardMap) return null;
 
   const poolTotal = payload.pool.reduce((sum, c) => sum + c.quantity, 0);
@@ -238,87 +300,83 @@ export default function CrucibleWorkbench() {
           {lens === "cuts" ? <SuggestedCuts /> : null}
           {lens === "cutpile" ? <CutPile /> : null}
           {!isInsight ? (
-            <div data-testid="crucible-groups">
-              {groups.map((group) => {
-                const isCollapsed = collapsed.has(group.id);
-                const visibleCards = undecidedOnly
-                  ? group.cards.filter(
-                      ({ card }) =>
-                        (payload.statuses[card.name] ?? "undecided") === "undecided"
-                    )
-                  : group.cards;
-                const isExpanded = expandedGroups.has(group.id);
-                const shownCards = isExpanded
-                  ? visibleCards
-                  : visibleCards.slice(0, ROWS_PER_GROUP);
+            <div
+              ref={setListRef}
+              data-testid="crucible-groups"
+              className={styles.groups}
+              style={{ height: virtualizer.getTotalSize() }}
+            >
+              {virtualizer.getVirtualItems().map((virtualItem) => {
+                const item = flatItems[virtualItem.index];
                 return (
-                  <section key={group.id} className={styles.group}>
-                    <button
-                      type="button"
-                      className={styles.groupHead}
-                      aria-expanded={!isCollapsed}
-                      aria-label={`${group.label} group`}
-                      onClick={() => toggleCollapsed(group.id)}
-                    >
-                      <span className={styles.groupChevron} aria-hidden="true">
-                        {isCollapsed ? "▸" : "▾"}
-                      </span>
-                      <span className={styles.groupLabel}>{group.label}</span>
-                      {group.meta ? (
-                        <span className={styles.groupMeta}>{group.meta}</span>
-                      ) : null}
-                    </button>
-                    {!isCollapsed
-                      ? shownCards.map(({ card, badge }) => (
-                          <CrucibleCardRow
-                            key={card.name}
-                            card={card}
-                            enriched={cardMap[card.name]}
-                            status={payload.statuses[card.name] ?? "undecided"}
-                            locked={payload.commanders.includes(card.name)}
-                            keptQuantity={keptQuantityOf(payload, card)}
-                            onSetKeptQuantity={(count) =>
-                              setKeptQuantity(card.name, count)
-                            }
-                            offIdentity={
-                              commanderIdentity !== null &&
-                              (cardMap[card.name]?.colorIdentity ?? []).some(
-                                (color) => !commanderIdentity.has(color)
-                              )
-                            }
-                            synergyScore={synergy?.cardScores[card.name]?.score}
-                            badge={badge}
-                            onKeep={() =>
-                              setStatus(
-                                card.name,
-                                payload.statuses[card.name] === "keep"
-                                  ? "undecided"
-                                  : "keep"
-                              )
-                            }
-                            onCut={() =>
-                              setStatus(
-                                card.name,
-                                payload.statuses[card.name] === "cut"
-                                  ? "undecided"
-                                  : "cut"
-                              )
-                            }
-                          />
-                        ))
-                      : null}
-                    {!isCollapsed && visibleCards.length > shownCards.length ? (
+                  <div
+                    key={virtualItem.key}
+                    data-index={virtualItem.index}
+                    ref={virtualizer.measureElement}
+                    className={styles.vItem}
+                    style={{
+                      transform: `translateY(${
+                        virtualItem.start - virtualizer.options.scrollMargin
+                      }px)`,
+                    }}
+                  >
+                    {item.kind === "header" ? (
                       <button
                         type="button"
-                        className={styles.groupShowAll}
-                        onClick={() =>
-                          setExpandedGroups((prev) => new Set(prev).add(group.id))
-                        }
+                        className={styles.groupHead}
+                        aria-expanded={!item.collapsed}
+                        aria-label={`${item.group.label} group`}
+                        onClick={() => toggleCollapsed(item.group.id)}
                       >
-                        Show all {visibleCards.length}
+                        <span className={styles.groupChevron} aria-hidden="true">
+                          {item.collapsed ? "▸" : "▾"}
+                        </span>
+                        <span className={styles.groupLabel}>
+                          {item.group.label}
+                        </span>
+                        {item.group.meta ? (
+                          <span className={styles.groupMeta}>
+                            {item.group.meta}
+                          </span>
+                        ) : null}
                       </button>
-                    ) : null}
-                  </section>
+                    ) : (
+                      <CrucibleCardRow
+                        card={item.card}
+                        enriched={cardMap[item.card.name]}
+                        status={payload.statuses[item.card.name] ?? "undecided"}
+                        locked={payload.commanders.includes(item.card.name)}
+                        keptQuantity={keptQuantityOf(payload, item.card)}
+                        onSetKeptQuantity={(count) =>
+                          setKeptQuantity(item.card.name, count)
+                        }
+                        offIdentity={
+                          commanderIdentity !== null &&
+                          (cardMap[item.card.name]?.colorIdentity ?? []).some(
+                            (color) => !commanderIdentity.has(color)
+                          )
+                        }
+                        synergyScore={synergy?.cardScores[item.card.name]?.score}
+                        badge={item.badge}
+                        onKeep={() =>
+                          setStatus(
+                            item.card.name,
+                            payload.statuses[item.card.name] === "keep"
+                              ? "undecided"
+                              : "keep"
+                          )
+                        }
+                        onCut={() =>
+                          setStatus(
+                            item.card.name,
+                            payload.statuses[item.card.name] === "cut"
+                              ? "undecided"
+                              : "cut"
+                          )
+                        }
+                      />
+                    )}
+                  </div>
                 );
               })}
             </div>

@@ -28,6 +28,19 @@ export const HUNDRED_PILE = `1 Atraxa, Praetors' Voice
 59 Forest
 40 Island`;
 
+/** Number of unique synthetic rows in LARGE_PILE. Chosen large enough that
+ * only a virtualized window of rows can be present in the DOM at once. */
+export const LARGE_PILE_SIZE = 180;
+
+/** A deliberately huge pile of unique synthetic names ("Relic 001" ..
+ * "Relic 180"). None are in the fixture bank, so each synthesizes as a plain
+ * colorless artifact and lands in a single "All Cards" group under the Flat
+ * List lens - the ideal shape for exercising row virtualization. */
+export const LARGE_PILE = Array.from(
+  { length: LARGE_PILE_SIZE },
+  (_, i) => `1 Relic ${String(i + 1).padStart(3, "0")}`
+).join("\n");
+
 /** SAMPLE_PILE plus the Thrasios/Tymna Partner pair, for two-commander
  * selection tests. Atraxa and Ezuri stay in as non-partner legendaries. */
 export const PARTNER_PILE = `${SAMPLE_PILE}
