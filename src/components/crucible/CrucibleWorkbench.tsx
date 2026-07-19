@@ -150,8 +150,10 @@ export default function CrucibleWorkbench() {
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((json: { inclusionMap?: Record<string, number>; error?: string }) => {
         if (cancelled) return;
-        if (json.error) metaDispatch({ type: "ERROR" });
-        else metaDispatch({ type: "SUCCESS", inclusion: json.inclusionMap ?? {} });
+        if (json.error) {
+          metaKeyRef.current = null; // allow a retry on re-select
+          metaDispatch({ type: "ERROR" });
+        } else metaDispatch({ type: "SUCCESS", inclusion: json.inclusionMap ?? {} });
       })
       .catch(() => {
         if (cancelled) return;
