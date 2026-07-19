@@ -169,7 +169,28 @@ export class CruciblePage {
       .click();
   }
 
+  /** The collapsed control that opens the candidate popover — either the
+   * initial "Choose from N candidates" button or the "Add a partner" button
+   * once a first commander is locked in. */
+  get commanderTrigger() {
+    return this.commanderPicker.getByRole("button", {
+      name: /^(Choose from \d+ candidates?|Add a partner)$/,
+    });
+  }
+
+  get commanderPopover() {
+    return this.page.getByTestId("crucible-commander-popover");
+  }
+
+  /** Open the commander/partner candidate popover if it isn't already open. */
+  async openCommanderPopover() {
+    if (!(await this.commanderPopover.isVisible())) {
+      await this.commanderTrigger.click();
+    }
+  }
+
   async chooseCommander(name: string) {
+    await this.openCommanderPopover();
     await this.page
       .getByRole("button", { name: `Choose ${name}`, exact: true })
       .click();

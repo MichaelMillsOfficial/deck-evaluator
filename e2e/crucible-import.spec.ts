@@ -74,6 +74,7 @@ test.describe("Crucible pile import", () => {
     await crucible.importPile(TRAILING_COMMANDER_PILE);
 
     await expect(crucible.row("Ezuri, Stalker of Spheres")).toBeVisible();
-    await expect(crucible.commanderPicker).toContainText(/choose a commander/i);
+    // Ezuri is offered as a candidate, not silently promoted to commander.
+    await expect(crucible.commanderTrigger).toContainText(/choose from 1 candidate/i);
   });
 });

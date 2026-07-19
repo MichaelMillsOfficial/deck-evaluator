@@ -68,9 +68,17 @@ test.describe("Crucible triage", () => {
     await expect(crucible.row("Sol Ring").first()).toBeVisible();
   });
 
-  test("commander picker lists legal commanders and flags off-identity cards", async ({ page, crucible }) => {
+  test("commander candidates live in a popover, not inline in the header", async ({ page, crucible }) => {
     await crucible.importPile(SAMPLE_PILE);
 
+    // Candidates are collapsed behind a fixed-height trigger — nothing
+    // renders inline in the header until the popover opens.
+    await expect(
+      page.getByRole("button", { name: "Choose Atraxa, Praetors' Voice" })
+    ).toHaveCount(0);
+    await expect(crucible.commanderTrigger).toContainText(/choose from 2 candidates/i);
+
+    await crucible.openCommanderPopover();
     await expect(
       page.getByRole("button", { name: "Choose Atraxa, Praetors' Voice" })
     ).toBeVisible();
@@ -79,9 +87,32 @@ test.describe("Crucible triage", () => {
     ).toBeVisible();
 
     await crucible.chooseCommander("Atraxa, Praetors' Voice");
+    await expect(crucible.commanderPopover).toHaveCount(0);
     await expect(crucible.commanderPicker).toContainText("Atraxa, Praetors' Voice");
     // Lightning Bolt (R) is outside Atraxa's WUBG identity.
     await expect(crucible.row("Lightning Bolt").first()).toContainText(/off-identity/i);
+  });
+
+  test("the commander popover filters candidates and closes on Escape", async ({ page, crucible }) => {
+    await crucible.importPile(SAMPLE_PILE);
+
+    await crucible.openCommanderPopover();
+    await page.getByLabel("Filter commander candidates").fill("ezuri");
+    await expect(
+      page.getByRole("button", { name: "Choose Atraxa, Praetors' Voice" })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Choose Ezuri, Stalker of Spheres" })
+    ).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(crucible.commanderPopover).toHaveCount(0);
+
+    // Reopening starts from a clean, unfiltered list.
+    await crucible.openCommanderPopover();
+    await expect(
+      page.getByRole("button", { name: "Choose Atraxa, Praetors' Voice" })
+    ).toBeVisible();
   });
 
   test("stacked rows keep a partial count via the kept-copies input", async ({ page, crucible }) => {
@@ -116,6 +147,7 @@ test.describe("Crucible triage", () => {
 
     await crucible.chooseCommander("Thrasios, Triton Hero");
     await expect(crucible.commanderPicker).toContainText("Add a partner");
+    await crucible.openCommanderPopover();
     await expect(
       page.getByRole("button", { name: "Choose Tymna the Weaver" })
     ).toBeVisible();
@@ -153,6 +185,7 @@ test.describe("Crucible triage", () => {
     await crucible.importPile(BACKGROUND_PILE);
 
     // A Background is never offered as a solo commander.
+    await crucible.openCommanderPopover();
     await expect(
       page.getByRole("button", { name: "Choose Wilson, Refined Grizzly" })
     ).toBeVisible();

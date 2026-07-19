@@ -59,9 +59,11 @@ test.describe("Crucible add cards mid-triage", () => {
     await crucible.importPile(SAMPLE_PILE);
 
     await searchAndAdd(page, "Tymna", "Tymna the Weaver");
+    await crucible.openCommanderPopover();
     await expect(
       page.getByRole("button", { name: "Choose Tymna the Weaver" })
     ).toBeVisible();
+    await page.keyboard.press("Escape");
 
     await page.reload();
     await crucible.workbench.waitFor({ timeout: 15_000 });
