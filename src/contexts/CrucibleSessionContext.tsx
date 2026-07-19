@@ -27,6 +27,7 @@ import {
 import { suggestCuts, type CutSuggestion } from "@/lib/cut-suggestions";
 import {
   createCrucibleSession,
+  generateCrucibleId,
   loadCrucibleSession,
   saveCrucibleSession,
   clearCrucibleSession,
@@ -263,6 +264,10 @@ interface CrucibleSessionContextValue {
   /** Start a fresh crucible from an imported pile. Persists and triggers
    * enrichment + combo fetches in the background. */
   setPile: (pool: DeckCard[], warnings: string[]) => void;
+  /** Load a decoded shared pile (pool + triage state) into a FRESH session.
+   * Preserves statuses/keptQuantities/commanders but stamps a new id, so a
+   * shared link opens as a brand-new crucible. */
+  loadPile: (incoming: CruciblePayload) => void;
   /** Add a single card to the pile mid-triage (new name arrives undecided;
    * an existing name gets a quantity bump). Enriches it incrementally and
    * refreshes combo detection where the pile size allows. */
@@ -622,6 +627,22 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "NEW_PILE", payload });
   }, []);
 
+  const loadPile = useCallback((incoming: CruciblePayload) => {
+    enrichAbortRef.current?.abort();
+    combosAbortRef.current?.abort();
+    if (combosDebounceRef.current) clearTimeout(combosDebounceRef.current);
+    enrichedIdRef.current = null;
+    combosIdRef.current = null;
+    combosSubsetKeyRef.current = null;
+    const payload: CruciblePayload = {
+      ...incoming,
+      crucibleId: generateCrucibleId(),
+      createdAt: Date.now(),
+    };
+    saveCrucibleSession(payload);
+    dispatch({ type: "NEW_PILE", payload });
+  }, []);
+
   const addCard = useCallback(
     (name: string) => {
       const current = addCardPayloadRef.current;
@@ -786,6 +807,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       deckName,
       setDeckName,
       setPile,
+      loadPile,
       addCard,
       setStatus,
       keepAll,
@@ -817,6 +839,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       keptTotal,
       deckName,
       setPile,
+      loadPile,
       addCard,
       setStatus,
       keepAll,

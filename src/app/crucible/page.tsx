@@ -1,12 +1,15 @@
 "use client";
 
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCrucibleSession } from "@/contexts/CrucibleSessionContext";
+import { decodeCruciblePile } from "@/lib/crucible-share";
 import CosmicLoader from "@/components/ritual/CosmicLoader";
 import CrucibleImport from "@/components/crucible/CrucibleImport";
 import CrucibleWorkbench from "@/components/crucible/CrucibleWorkbench";
 import { Button, Card } from "@/components/ui";
 
-export default function CruciblePage() {
+function CruciblePageContent() {
   const {
     hydration,
     payload,
@@ -15,12 +18,64 @@ export default function CruciblePage() {
     enrichProgress,
     retryEnrichment,
     clearCrucible,
+    loadPile,
   } = useCrucibleSession();
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const sharedParam = searchParams.get("p");
+
+  // Decode a `?p=` shared pile once, then strip the param and load it into a
+  // fresh session. Corrupt/foreign links fall back to the import screen with a
+  // non-fatal notice.
+  const consumedShareRef = useRef(false);
+  const [shareState, setShareState] = useState<"idle" | "loading" | "error">(
+    sharedParam ? "loading" : "idle"
+  );
+
+  useEffect(() => {
+    if (!sharedParam || consumedShareRef.current) return;
+    consumedShareRef.current = true;
+    void (async () => {
+      const decoded = await decodeCruciblePile(sharedParam);
+      router.replace("/crucible");
+      if (!decoded) {
+        setShareState("error");
+        return;
+      }
+      loadPile(decoded);
+      setShareState("idle");
+    })();
+  }, [sharedParam, router, loadPile]);
+
+  if (shareState === "loading") {
+    return <CosmicLoader tagline="Unsealing the shared pile." />;
+  }
 
   if (hydration === "pending") return null;
 
   if (!payload) {
-    return <CrucibleImport />;
+    return (
+      <>
+        {shareState === "error" ? (
+          <div
+            role="status"
+            data-testid="crucible-share-notice"
+            style={{
+              maxWidth: 720,
+              margin: "0 auto",
+              padding: "var(--space-8) var(--space-12) 0",
+              color: "var(--status-warn)",
+              fontSize: "var(--text-sm)",
+            }}
+          >
+            That shared pile link was invalid or corrupted. Import a pile to
+            begin.
+          </div>
+        ) : null}
+        <CrucibleImport />
+      </>
+    );
   }
 
   if (enrichError) {
@@ -57,4 +112,12 @@ export default function CruciblePage() {
   }
 
   return <CrucibleWorkbench />;
+}
+
+export default function CruciblePage() {
+  return (
+    <Suspense fallback={null}>
+      <CruciblePageContent />
+    </Suspense>
+  );
 }

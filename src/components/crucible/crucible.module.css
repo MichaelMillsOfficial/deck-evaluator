@@ -891,3 +891,20 @@
   flex: 0 1 280px;
   min-width: 200px;
 }
+
+/* ─── Share actions ──────────────────────────────────────────── */
+.shareActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.shareStatus {
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--accent);
+  min-width: 4ch;
+}

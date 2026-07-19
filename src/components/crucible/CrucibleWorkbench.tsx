@@ -14,6 +14,7 @@ import {
 } from "@/lib/crucible-grouping";
 import { TEMPLATE_COMMAND_ZONE } from "@/lib/deck-composition";
 import { keptQuantityOf } from "@/lib/crucible-session";
+import { encodeCruciblePile, serializePileToDck } from "@/lib/crucible-share";
 import type { DeckCard } from "@/lib/types";
 import { Button } from "@/components/ui";
 import CardSearchInput from "@/components/CardSearchInput";
@@ -76,6 +77,8 @@ export default function CrucibleWorkbench() {
   const [dismissedNotFound, setDismissedNotFound] = useState<Set<string>>(
     () => new Set()
   );
+  const [shareCopied, setShareCopied] = useState(false);
+  const [shareError, setShareError] = useState(false);
 
   const commanderIdentity = useMemo<Set<string> | null>(() => {
     if (!payload || !cardMap || payload.commanders.length === 0) return null;
@@ -228,6 +231,36 @@ export default function CrucibleWorkbench() {
 
   if (!payload || !cardMap) return null;
 
+  const sharedPayload = payload;
+
+  const handleSharePile = async () => {
+    try {
+      const encoded = await encodeCruciblePile(sharedPayload);
+      const url = `${window.location.origin}/crucible?p=${encoded}`;
+      await navigator.clipboard.writeText(url);
+      setShareError(false);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      setShareCopied(false);
+      setShareError(true);
+      window.setTimeout(() => setShareError(false), 4000);
+    }
+  };
+
+  const handleDownloadDck = () => {
+    const dck = serializePileToDck(sharedPayload, "Crucible Pile");
+    const blob = new Blob([dck], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "crucible-pile.dck";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const poolTotal = payload.pool.reduce((sum, c) => sum + c.quantity, 0);
   const isInsight = lens === "charts" || lens === "combos" || lens === "cuts" || lens === "cutpile";
 
@@ -256,6 +289,36 @@ export default function CrucibleWorkbench() {
             candidateNames={EMPTY_CANDIDATES}
             onAddCard={addCard}
           />
+        </div>
+        <div className={styles.shareActions}>
+          <Button
+            variant="secondary"
+            size="sm"
+            data-testid="crucible-share-pile"
+            onClick={handleSharePile}
+          >
+            Share pile
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            data-testid="crucible-download-dck"
+            onClick={handleDownloadDck}
+          >
+            Download .dck
+          </Button>
+          <span
+            role="status"
+            aria-live="polite"
+            data-testid="crucible-share-status"
+            className={styles.shareStatus}
+          >
+            {shareCopied
+              ? "Copied"
+              : shareError
+                ? "Copy failed"
+                : ""}
+          </span>
         </div>
       </header>
 
