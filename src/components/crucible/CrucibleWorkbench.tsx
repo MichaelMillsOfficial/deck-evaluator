@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useCrucibleSession } from "@/contexts/CrucibleSessionContext";
 import {
@@ -69,6 +69,7 @@ export default function CrucibleWorkbench() {
     addCard,
     setStatus,
     setKeptQuantity,
+    deckName,
   } = useCrucibleSession();
 
   const [lens, setLens] = useState<CrucibleLens>("category");
@@ -207,11 +208,24 @@ export default function CrucibleWorkbench() {
   // fixed-height scrollbox). scrollMargin is the list's offset from the top of
   // the document, captured via a callback ref (runs at commit, not during
   // render) so the virtualizer's scroll math lines up with the page scroll.
+  // A ResizeObserver keeps it fresh when layout above the list changes height
+  // after mount (e.g. dismissing the not-found banner shifts the list up);
+  // its callback fires asynchronously, so it does not trip set-state-in-effect.
   const [scrollMargin, setScrollMargin] = useState(0);
+  const scrollMarginObserverRef = useRef<ResizeObserver | null>(null);
   const setListRef = useCallback((node: HTMLDivElement | null) => {
-    if (node) {
+    scrollMarginObserverRef.current?.disconnect();
+    scrollMarginObserverRef.current = null;
+    if (!node) return;
+    const measure = () => {
       const top = node.offsetTop;
       setScrollMargin((prev) => (prev === top ? prev : top));
+    };
+    measure();
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(measure);
+      observer.observe(document.body);
+      scrollMarginObserverRef.current = observer;
     }
   }, []);
 
@@ -249,7 +263,7 @@ export default function CrucibleWorkbench() {
   };
 
   const handleDownloadDck = () => {
-    const dck = serializePileToDck(sharedPayload, "Crucible Pile");
+    const dck = serializePileToDck(sharedPayload, deckName);
     const blob = new Blob([dck], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");

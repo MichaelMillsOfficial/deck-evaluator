@@ -266,7 +266,11 @@ export function serializePileToDck(
   }
   lines.push("");
   lines.push("[Main]");
+  // Commanders live in payload.pool but belong only in the command zone;
+  // emitting them in [Main] too would double-count them on re-import.
+  const commanders = new Set(payload.commanders);
   for (const card of payload.pool) {
+    if (commanders.has(card.name)) continue;
     lines.push(`${card.quantity} ${card.name}`);
   }
   return lines.join("\n") + "\n";

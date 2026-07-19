@@ -140,13 +140,23 @@ test.describe("serializePileToDck", () => {
     expect(commanderSection).toContain("1 Atraxa, Praetors' Voice");
   });
 
-  test("lists every pool card as `<qty> <name>` in [Main]", () => {
+  test("lists non-commander pool cards as `<qty> <name>` in [Main]", () => {
     const dck = serializePileToDck(makePayload());
     const mainSection = dck.slice(dck.indexOf("[Main]"));
     expect(mainSection).toContain("1 Sol Ring");
     expect(mainSection).toContain("3 Forest");
     expect(mainSection).toContain("2 Island");
-    expect(mainSection).toContain("1 Atraxa, Praetors' Voice");
+  });
+
+  test("does not duplicate the commander in [Main] (command zone only)", () => {
+    const dck = serializePileToDck(makePayload());
+    const commanderSection = dck.slice(
+      dck.indexOf("[Commander]"),
+      dck.indexOf("[Main]")
+    );
+    const mainSection = dck.slice(dck.indexOf("[Main]"));
+    expect(commanderSection).toContain("1 Atraxa, Praetors' Voice");
+    expect(mainSection).not.toContain("Atraxa, Praetors' Voice");
   });
 
   test("falls back to a default name when none is provided", () => {
