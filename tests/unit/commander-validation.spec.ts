@@ -3,6 +3,7 @@ import {
   isSingletonExempt,
   getMaxQuantity,
   validateCommanderDeck,
+  canPairCommanders,
   isLegalCommander,
   validateCommanderSelection,
   validateCommanderLegality,
@@ -172,6 +173,166 @@ test.describe("validateCommanderDeck", () => {
     const result = validateCommanderDeck(deck, {}, bannedSet, gameChangerNames);
     // Should be valid (100 cards total, no singleton violations)
     expect(result.isValid).toBe(true);
+  });
+
+  const PARTNER_REMINDER =
+    "Partner (You can have two commanders if both have partner.)";
+
+  function twoCommanderDeck(a: string, b: string) {
+    const commanders = [
+      { name: a, quantity: 1 },
+      { name: b, quantity: 1 },
+    ];
+    const mainboard = Array.from({ length: 98 }, (_, i) => ({
+      name: `Card ${i + 1}`,
+      quantity: 1,
+    }));
+    return makeDeck({ commanders, mainboard });
+  }
+
+  test("two commanders that both have Partner validate", () => {
+    const cardMap: Record<string, EnrichedCard> = {
+      "Thrasios, Triton Hero": makeCard({
+        name: "Thrasios, Triton Hero",
+        typeLine: "Legendary Creature — Merfolk Wizard",
+        supertypes: ["Legendary"],
+        oracleText: `{4}: Scry 1.\n${PARTNER_REMINDER}`,
+      }),
+      "Tymna the Weaver": makeCard({
+        name: "Tymna the Weaver",
+        typeLine: "Legendary Creature — Human Cleric",
+        supertypes: ["Legendary"],
+        oracleText: `Lifelink\n${PARTNER_REMINDER}`,
+      }),
+    };
+    const deck = twoCommanderDeck("Thrasios, Triton Hero", "Tymna the Weaver");
+    const result = validateCommanderDeck(deck, cardMap, bannedSet, gameChangerNames);
+    expect(result.isValid).toBe(true);
+  });
+
+  test("two commanders without a legal pairing produce a validation error", () => {
+    const cardMap: Record<string, EnrichedCard> = {
+      "Atraxa, Praetors' Voice": makeCard({
+        name: "Atraxa, Praetors' Voice",
+        typeLine: "Legendary Creature — Phyrexian Angel Horror",
+        supertypes: ["Legendary"],
+        oracleText: "Flying, vigilance, deathtouch, lifelink",
+      }),
+      "Ezuri, Stalker of Spheres": makeCard({
+        name: "Ezuri, Stalker of Spheres",
+        typeLine: "Legendary Creature — Phyrexian Elf",
+        supertypes: ["Legendary"],
+        oracleText: "Whenever you cast a noncreature spell, draw a card.",
+      }),
+    };
+    const deck = twoCommanderDeck(
+      "Atraxa, Praetors' Voice",
+      "Ezuri, Stalker of Spheres"
+    );
+    const result = validateCommanderDeck(deck, cardMap, bannedSet, gameChangerNames);
+    expect(result.isValid).toBe(false);
+    expect(result.errors.some((e) => /cannot be paired/i.test(e.message))).toBe(true);
+  });
+});
+
+// --- canPairCommanders ---
+
+test.describe("canPairCommanders", () => {
+  const PARTNER_REMINDER =
+    "Partner (You can have two commanders if both have partner.)";
+
+  test("both plain Partner pair; one-sided Partner does not", () => {
+    const a = makeCard({ name: "A", oracleText: `Vigilance\n${PARTNER_REMINDER}` });
+    const b = makeCard({ name: "B", oracleText: `Flying\n${PARTNER_REMINDER}` });
+    const c = makeCard({ name: "C", oracleText: "Flying" });
+    expect(canPairCommanders(a, b)).toBe(true);
+    expect(canPairCommanders(a, c)).toBe(false);
+  });
+
+  test("mutual 'Partner with' pairs; naming a different card does not", () => {
+    const brallin = makeCard({
+      name: "Brallin, Skyshark Rider",
+      oracleText: "Partner with Shabraz, the Skyshark",
+    });
+    const shabraz = makeCard({
+      name: "Shabraz, the Skyshark",
+      oracleText: "Partner with Brallin, Skyshark Rider",
+    });
+    const stranger = makeCard({
+      name: "Stranger",
+      oracleText: "Partner with Someone Else",
+    });
+    expect(canPairCommanders(brallin, shabraz)).toBe(true);
+    expect(canPairCommanders(brallin, stranger)).toBe(false);
+    // "Partner with" is not plain Partner.
+    expect(canPairCommanders(brallin, makeCard({ name: "P", oracleText: PARTNER_REMINDER }))).toBe(false);
+  });
+
+  test("restricted-group Partner pairs only within the same group", () => {
+    const alphaOne = makeCard({
+      name: "Alpha One",
+      oracleText: "Partner — Advisors (You can have two commanders if both have partner with the same group.)",
+    });
+    const alphaTwo = makeCard({
+      name: "Alpha Two",
+      oracleText: "Partner — Advisors (You can have two commanders if both have partner with the same group.)",
+    });
+    const betaOne = makeCard({
+      name: "Beta One",
+      oracleText: "Partner — Warlords (You can have two commanders if both have partner with the same group.)",
+    });
+    const plainPartner = makeCard({ name: "Plain", oracleText: PARTNER_REMINDER });
+    expect(canPairCommanders(alphaOne, alphaTwo)).toBe(true);
+    expect(canPairCommanders(alphaOne, betaOne)).toBe(false);
+    expect(canPairCommanders(alphaOne, plainPartner)).toBe(false);
+  });
+
+  test("Friends forever on both pairs", () => {
+    const a = makeCard({
+      name: "Bjorna",
+      oracleText: "Friends forever (You can have two commanders if both have friends forever.)",
+    });
+    const b = makeCard({
+      name: "Elmar",
+      oracleText: "Friends forever (You can have two commanders if both have friends forever.)",
+    });
+    expect(canPairCommanders(a, b)).toBe(true);
+    expect(canPairCommanders(a, makeCard({ name: "C", oracleText: "" }))).toBe(false);
+  });
+
+  test("Choose a Background pairs with a Background enchantment, either order", () => {
+    const wilson = makeCard({
+      name: "Wilson, Refined Grizzly",
+      typeLine: "Legendary Creature — Bear",
+      oracleText: "Choose a Background (You can have a Background as a second commander.)",
+    });
+    const background = makeCard({
+      name: "Raised by Giants",
+      typeLine: "Legendary Enchantment — Background",
+      oracleText: "Commander creatures you own have base power and toughness 10/10.",
+    });
+    expect(canPairCommanders(wilson, background)).toBe(true);
+    expect(canPairCommanders(background, wilson)).toBe(true);
+    expect(
+      canPairCommanders(background, makeCard({ name: "C", oracleText: "" }))
+    ).toBe(false);
+  });
+
+  test("a Time Lord Doctor pairs with a Doctor's companion", () => {
+    const doctor = makeCard({
+      name: "The Tenth Doctor",
+      typeLine: "Legendary Creature — Time Lord Doctor",
+      oracleText: "Allons-y!",
+    });
+    const companion = makeCard({
+      name: "Rose Tyler",
+      typeLine: "Legendary Creature — Human",
+      oracleText:
+        "Doctor's companion (You can have two commanders if the other is the Doctor.)",
+    });
+    expect(canPairCommanders(doctor, companion)).toBe(true);
+    expect(canPairCommanders(companion, doctor)).toBe(true);
+    expect(canPairCommanders(doctor, makeCard({ name: "C", oracleText: "" }))).toBe(false);
   });
 });
 

@@ -1,14 +1,20 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Probe Scryfall reachability so we can skip network-dependent tests
- * when the API is unreachable (sandboxed CI, offline dev).
+ * Probe Scryfall reachability so we can skip network-dependent tests when
+ * the API is unreachable (sandboxed CI, offline dev). The probe must hit
+ * Scryfall DIRECTLY, not our own route: probing through /api/card-autocomplete
+ * made a broken route indistinguishable from an offline network, so a real
+ * regression (the missing User-Agent header) skipped instead of failing.
  */
 let scryfallReachable = true;
 
 test.beforeAll(async ({ request }) => {
   try {
-    const res = await request.get("/api/card-autocomplete?q=Sol+Ring");
+    const res = await request.get(
+      "https://api.scryfall.com/cards/autocomplete?q=sol",
+      { headers: { "User-Agent": "DeckEvaluator/1.0", Accept: "application/json" } }
+    );
     if (!res.ok()) {
       scryfallReachable = false;
     }

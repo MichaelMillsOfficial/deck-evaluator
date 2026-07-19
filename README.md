@@ -4,6 +4,8 @@ A web application for importing and analyzing Magic: The Gathering decklists. Bu
 
 Import a deck (paste, Moxfield export, or Archidekt URL) and the app walks you through a four-stage **journey** — *import → ritual → reading → sub-route*. The reading lands on a verdict hero (bracket, power level, top theme), then fans out across ten sub-routes for cards, composition, synergy, interactions, opening hands, goldfish simulation, suggestions, candidate finder, deck-vs-deck compare, and share/export. Cards are automatically enriched via Scryfall (mana costs as official MTG symbols, oracle text with inline symbols, heuristic tags), and combos are detected via Commander Spellbook.
 
+Don't have a finished deck yet? **The Crucible** (`/crucible`) is a deck-building workbench: pour in any pile of cards, organize it through lenses (category, synergy axis, type line, mana value, color identity, game changers), triage each card as keep/cut/undecided with an explicit commander pick, search up and add more cards mid-triage, and seal a legal 100-card Commander deck that flows straight into the reading journey (cuts are kept as sideboard candidates).
+
 See [Promises to You](./PROMISES.md) for how this tool handles your data and what drives the analysis.
 
 ## Getting Started
@@ -44,9 +46,11 @@ docker compose logs -f         # Tail logs
 | `npm run build` | Production build |
 | `npm run start` | Run production server |
 | `npm run lint` | Run ESLint |
-| `npm test` | Run Playwright E2E tests (headless) |
-| `npm run test:headed` | Run tests with visible browser |
-| `npm run test:ui` | Open Playwright interactive UI |
+| `npm test` | Run all tests (e2e + unit, headless) |
+| `npm run test:e2e` | Run only browser/API e2e tests |
+| `npm run test:unit` | Run only pure function unit tests (fast, no dev server) |
+| `npm run test:headed` | Run e2e tests with visible browser |
+| `npm run test:ui` | Open Playwright interactive e2e UI |
 
 ## Routes
 
@@ -66,10 +70,11 @@ docker compose logs -f         # Tail logs
 | `/reading/compare` | Deck-vs-deck redirect to `/compare` |
 | `/reading/share` | Share URL · PNG · Discord · Markdown · JSON |
 | `/shared` | Decode share URL → forward to `/reading` |
+| `/crucible` | The Crucible: pile triage workbench → seal a legal EDH deck |
 | `/compare` | Standalone two-deck comparison |
 | `/preview` | Design-system component preview |
 
-State flows through `DeckSessionContext` (sessionStorage-backed) so navigation between sub-routes does not refetch the deck or re-enrich cards. `CandidatesContext` is mounted at the `/reading/(shell)` layout so candidate state on `/reading/add` survives tab switches.
+State flows through `DeckSessionContext` (sessionStorage-backed) so navigation between sub-routes does not refetch the deck or re-enrich cards. `CandidatesContext` is mounted at the `/reading/(shell)` layout so candidate state on `/reading/add` survives tab switches. The Crucible keeps its own `CrucibleSessionContext` under a separate sessionStorage key, so a pile in progress coexists with a reading session.
 
 ## Project Structure
 
@@ -86,11 +91,13 @@ src/
 │   │       ├── layout.tsx
 │   │       └── <slug>/page.tsx     # 10 sub-routes
 │   ├── shared/page.tsx             # Decode share URL → /reading
+│   ├── crucible/                   # The Crucible pile triage workbench
 │   ├── compare/                    # Standalone two-deck compare
 │   ├── preview/                    # Design-system component preview
 │   └── api/                        # /deck, /deck-parse, /deck-enrich, /deck-combos, ...
 ├── components/
 │   ├── reading/                    # Shell, hero, overview, section header
+│   ├── crucible/                   # Workbench, lenses, triage rows, tracker rail
 │   ├── ritual/CosmicLoader.tsx
 │   ├── shell/                      # Top nav, cosmos background
 │   ├── DeckSidebar.tsx             # Route-aware nav
@@ -99,6 +106,7 @@ src/
 │   └── ManaCost.tsx · ManaSymbol.tsx · OracleText.tsx · CardTags.tsx
 ├── contexts/
 │   ├── DeckSessionContext.tsx      # sessionStorage-backed deck + enrichment
+│   ├── CrucibleSessionContext.tsx  # /crucible pile triage state
 │   └── CandidatesContext.tsx       # /reading/add candidate state
 └── lib/
     ├── types.ts                    # DeckData, DeckCard, EnrichedCard
@@ -111,50 +119,20 @@ src/
 
 ## Testing
 
-This project uses [Playwright](https://playwright.dev/) for end-to-end testing. Tests live in the `e2e/` directory and run against the Next.js dev server (started automatically via `webServer` in `playwright.config.ts`).
+This project uses [Playwright](https://playwright.dev/) for two test suites: browser/API e2e tests in `e2e/` (run against the Next.js dev server, started automatically via `webServer` in `playwright.config.ts`) and pure function unit tests in `tests/unit/` (no browser, no dev server, run under `playwright.unit.config.ts`).
 
 ### Running Tests
 
 ```bash
-npm test                                          # Run all tests headless
-npm run test:headed                               # Run with a visible browser
-npm run test:ui                                   # Open Playwright interactive UI
-npx playwright test e2e/deck-import.spec.ts       # Run a single test file
+npm test                                          # Run all tests (e2e + unit) headless
+npm run test:e2e                                  # Run only browser/API e2e tests
+npm run test:unit                                 # Run only pure function unit tests (fast)
+npm run test:headed                               # Run e2e tests with a visible browser
+npm run test:ui                                   # Open Playwright interactive e2e UI
+npx playwright test --config playwright.config.ts e2e/deck-import.spec.ts  # Single e2e file
 ```
 
-### Test Structure
-
-```
-e2e/
-├── fixtures.ts                 # DeckPage page-object, sample decklists, custom test export
-├── deck-import.spec.ts         # Manual decklist import user flows
-├── tab-navigation.spec.ts      # Tab switching, Load Example, form state persistence
-├── deck-display.spec.ts        # Rendered deck sections, card counts, source label
-├── api-deck-parse.spec.ts      # POST /api/deck-parse API contract tests
-├── api-deck-enrich.spec.ts     # POST /api/deck-enrich API contract tests
-├── deck-enrichment.spec.ts     # Enriched card UI: symbols, chevrons, expand/collapse
-├── card-tags.spec.ts           # Heuristic card tag rendering
-├── mana-parsers.spec.ts        # Unit tests for mana cost parsing
-└── oracle-parser.spec.ts       # Unit tests for oracle text tokenizer
-```
-
-### Writing Tests
-
-- Import `test` and `expect` from `./fixtures` (not from `@playwright/test` directly) to get the `deckPage` fixture automatically.
-- Use `deckPage` methods (`goto()`, `fillDecklist()`, `submitImport()`, `waitForDeckDisplay()`) to express tests as user intent.
-- Use `deckPage.deckDisplay` to scope assertions to the rendered deck panel.
-- Add new page-object methods to `DeckPage` in `fixtures.ts` when new UI elements are introduced.
-- API tests can use Playwright's `request` fixture directly with `@playwright/test` imports.
-- Focus on functional behavior, not styling or visual assertions.
-
-### TDD Workflow
-
-All new features follow test-driven development:
-
-1. **Write failing tests first** -- add tests in `e2e/` that describe the expected behavior. Run `npm test` to confirm they fail.
-2. **Implement the feature** -- write the minimum code to make the tests pass.
-3. **Refactor** -- clean up while keeping tests green.
-4. **All tests must pass before committing** -- run `npm test` and verify 0 failures.
+For the full test structure, conventions for writing tests, and the TDD workflow, see the Testing section of [CLAUDE.md](./CLAUDE.md).
 
 ## Tech Stack
 

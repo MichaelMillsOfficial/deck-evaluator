@@ -64,6 +64,49 @@ export function getMaxQuantity(
   return 1;
 }
 
+const PLAIN_PARTNER_RE = /\bPartner\b(?!\s+with)(?!\s*[-—])/;
+const RESTRICTED_PARTNER_RE = /\bPartner\s*[-—]\s*([^.\n]+)/;
+const FRIENDS_FOREVER_RE = /\bFriends forever\b/i;
+const DOCTORS_COMPANION_RE = /Doctor(?:'|’)s companion/i;
+const CHOOSE_BACKGROUND_RE = /\bChoose a Background\b/i;
+const BACKGROUND_TYPE_RE = /\bBackground\b/;
+const TIME_LORD_DOCTOR_RE = /\bTime Lord\b.*\bDoctor\b/;
+
+/**
+ * Whether two cards form a rules-legal two-commander pairing: both have plain
+ * Partner, both have restricted-group Partner ("Partner - <Group>") naming
+ * the same group, they mutually "Partner with" each other, both have Friends
+ * Forever, a Time Lord Doctor pairs with a Doctor's companion, or a "Choose a
+ * Background" commander pairs with a Background enchantment.
+ */
+export function canPairCommanders(a: EnrichedCard, b: EnrichedCard): boolean {
+  const aRestricted = a.oracleText.match(RESTRICTED_PARTNER_RE);
+  const bRestricted = b.oracleText.match(RESTRICTED_PARTNER_RE);
+  if (aRestricted || bRestricted) {
+    return (
+      aRestricted !== null &&
+      bRestricted !== null &&
+      aRestricted[1].trim().toLowerCase() === bRestricted[1].trim().toLowerCase()
+    );
+  }
+  if (PLAIN_PARTNER_RE.test(a.oracleText) && PLAIN_PARTNER_RE.test(b.oracleText)) {
+    return true;
+  }
+  if (
+    a.oracleText.includes(`Partner with ${b.name}`) &&
+    b.oracleText.includes(`Partner with ${a.name}`)
+  ) {
+    return true;
+  }
+  if (FRIENDS_FOREVER_RE.test(a.oracleText) && FRIENDS_FOREVER_RE.test(b.oracleText)) {
+    return true;
+  }
+  const pairsOneWay = (x: EnrichedCard, y: EnrichedCard): boolean =>
+    (CHOOSE_BACKGROUND_RE.test(x.oracleText) && BACKGROUND_TYPE_RE.test(y.typeLine)) ||
+    (TIME_LORD_DOCTOR_RE.test(x.typeLine) && DOCTORS_COMPANION_RE.test(y.oracleText));
+  return pairsOneWay(a, b) || pairsOneWay(b, a);
+}
+
 /**
  * Validate a deck against Commander format rules.
  */
@@ -80,6 +123,16 @@ export function validateCommanderDeck(
   if (!hasCommander) {
     errors.push({ message: "No commander detected in this deck." });
     return { hasCommander, isValid: false, errors, commanderNames };
+  }
+
+  if (deck.commanders.length === 2) {
+    const [first, second] = commanderNames.map((name) => cardMap[name]);
+    if (first && second && !canPairCommanders(first, second)) {
+      errors.push({
+        message: `${commanderNames[0]} and ${commanderNames[1]} cannot be paired — two commanders need Partner, "Partner with" each other, Friends Forever, a Doctor's companion, or a Background pairing.`,
+        cards: commanderNames,
+      });
+    }
   }
 
   // Total card count (commanders + mainboard)

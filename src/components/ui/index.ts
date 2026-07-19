@@ -15,3 +15,5 @@ export { StatTile } from "./StatTile";
 export type { StatTileProps } from "./StatTile";
 export { Sheet } from "./Sheet";
 export type { SheetProps } from "./Sheet";
+export { Popover } from "./Popover";
+export type { PopoverProps } from "./Popover";

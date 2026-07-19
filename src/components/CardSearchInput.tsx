@@ -20,6 +20,7 @@ export default function CardSearchInput({
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
@@ -41,6 +42,7 @@ export default function CardSearchInput({
     abortRef.current = controller;
 
     setLoading(true);
+    setSearchError(false);
     try {
       const res = await fetch(
         `/api/card-autocomplete?q=${encodeURIComponent(q)}`,
@@ -48,6 +50,7 @@ export default function CardSearchInput({
       );
       if (!res.ok) {
         setSuggestions([]);
+        setSearchError(true);
         return;
       }
       const json = (await res.json()) as { suggestions: string[] };
@@ -60,6 +63,7 @@ export default function CardSearchInput({
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setSuggestions([]);
+      setSearchError(true);
     } finally {
       setLoading(false);
     }
@@ -74,6 +78,7 @@ export default function CardSearchInput({
     if (val.length < 2) {
       setSuggestions([]);
       setIsOpen(false);
+      setSearchError(false);
       return;
     }
 
@@ -183,6 +188,16 @@ export default function CardSearchInput({
           <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-purple-400" />
           </div>
+        )}
+
+        {searchError && (
+          <p
+            role="alert"
+            data-testid="card-search-error"
+            className="mt-1 text-xs text-rose-300"
+          >
+            Card search is unavailable right now — try again in a moment.
+          </p>
         )}
 
         {isOpen && suggestions.length > 0 && (

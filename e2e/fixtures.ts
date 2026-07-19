@@ -58,7 +58,16 @@ export class DeckPage {
 
   /** Click a specific import tab by label text */
   async selectTab(tab: "Manual Import" | "Moxfield" | "Archidekt") {
-    await this.page.getByRole("tab", { name: tab }).click();
+    // Under full-suite load the first click can land before React hydration
+    // attaches the handler, silently doing nothing. Re-click until the tab
+    // actually reports selected instead of trusting a single click.
+    const tabButton = this.page.getByRole("tab", { name: tab });
+    await expect(async () => {
+      await tabButton.click();
+      await expect(tabButton).toHaveAttribute("aria-selected", "true", {
+        timeout: 1_000,
+      });
+    }).toPass({ timeout: 15_000 });
   }
 
   // ---------------------------------------------------------------------------

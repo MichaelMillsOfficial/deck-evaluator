@@ -6,7 +6,10 @@ import styles from "./TopNav.module.css";
 
 type Tab = { href: string; label: string };
 
-const TABS: Tab[] = [{ href: "/compare", label: "Compare Decks" }];
+const TABS: Tab[] = [
+  { href: "/crucible", label: "The Crucible" },
+  { href: "/compare", label: "Compare Decks" },
+];
 
 export function TopNav() {
   const pathname = usePathname();

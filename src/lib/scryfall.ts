@@ -5,6 +5,16 @@ const SCRYFALL_API_BASE = "https://api.scryfall.com";
 const BATCH_SIZE = 75;
 const BATCH_DELAY_MS = 100;
 
+/**
+ * Scryfall rejects HTTP clients that send no User-Agent (Node's fetch sends
+ * none by default, yielding 400s), so every server-side Scryfall request must
+ * carry these headers. Matches the UA already used by /api/commander-rules.
+ */
+export const SCRYFALL_REQUEST_HEADERS = {
+  Accept: "application/json",
+  "User-Agent": "DeckEvaluator/1.0",
+} as const;
+
 export interface ScryfallCardFace {
   name?: string;
   mana_cost?: string;
@@ -56,7 +66,7 @@ export async function fetchCardByName(
   const res = await fetch(
     `${SCRYFALL_API_BASE}/cards/named?exact=${encodeURIComponent(name)}`,
     {
-      headers: { Accept: "application/json" },
+      headers: SCRYFALL_REQUEST_HEADERS,
       cache: "no-store",
       signal: AbortSignal.timeout(10_000),
     }
@@ -196,7 +206,7 @@ export async function fetchScryfallSearch(
 
   for (let attempt = 0; attempt <= 1; attempt++) {
     const res = await fetch(url, {
-      headers: { Accept: "application/json" },
+      headers: SCRYFALL_REQUEST_HEADERS,
       cache: "no-store",
       signal: AbortSignal.timeout(10_000),
     });
@@ -238,8 +248,8 @@ async function fetchBatchWithRetry(
     const res = await fetch(`${SCRYFALL_API_BASE}/cards/collection`, {
       method: "POST",
       headers: {
+        ...SCRYFALL_REQUEST_HEADERS,
         "Content-Type": "application/json",
-        Accept: "application/json",
       },
       body: JSON.stringify({ identifiers }),
       signal: signal ?? AbortSignal.timeout(10_000),

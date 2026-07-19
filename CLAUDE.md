@@ -60,6 +60,9 @@ src/
 │   │       ├── compare/page.tsx
 │   │       └── share/page.tsx
 │   ├── shared/page.tsx            # Decode share URL → setPayload → push /reading
+│   ├── crucible/
+│   │   ├── layout.tsx             # Mounts CrucibleSessionProvider
+│   │   └── page.tsx               # The Crucible: pile import → triage workbench
 │   ├── compare/page.tsx           # Standalone two-deck comparison
 │   ├── preview/page.tsx           # Design-system component preview
 │   └── api/
@@ -78,6 +81,7 @@ src/
 │   │   ├── ReadingHero.tsx        # Hero block (eyebrow + title + tagline + tiles)
 │   │   └── SectionHeader.tsx      # Per-route eyebrow + serif h1 + italic tagline
 │   ├── ritual/CosmicLoader.tsx    # Pulsing orb + incantation phrases
+│   ├── crucible/                  # Workbench, lens switcher, triage rows, tracker rail, insight panels
 │   ├── shell/                     # Top nav + cosmos background
 │   ├── DeckSidebar.tsx            # Route-aware nav (usePathname → activeTab)
 │   ├── DeckMobileTopBar.tsx
@@ -89,6 +93,7 @@ src/
 │   └── ...                        # Analysis components (Synergy, Goldfish, etc.)
 ├── contexts/
 │   ├── DeckSessionContext.tsx     # sessionStorage-backed deck + enrichment state
+│   ├── CrucibleSessionContext.tsx # /crucible pile triage state (own sessionStorage key)
 │   └── CandidatesContext.tsx      # /reading/add candidate state (shell-scoped)
 └── lib/
     ├── types.ts                   # DeckData, DeckCard, EnrichedCard
@@ -98,6 +103,7 @@ src/
     ├── view-tabs.ts               # ViewTab union, TAB_ROUTES, tabFromPathname
     ├── archidekt.ts · moxfield.ts · scryfall.ts
     ├── decklist-parser.ts · mana.ts · oracle.ts · card-tags.ts
+    ├── crucible-session.ts · crucible-grouping.ts · cut-suggestions.ts
     └── ...                        # Synergy, combos, simulation, export
 ```
 
@@ -118,6 +124,16 @@ src/
    `useDeckSession()` and renders its analysis component inside a
    `<SectionHeader>` + `tabpanel` wrapper. Soft `<Link>` navigation
    keeps the shell mounted across switches.
+
+**Alternate entry - The Crucible** (`/crucible`): a deck-building workbench
+that accepts an arbitrary pile of cards (no deck structure), enriches it in
+chunks behind the `CosmicLoader` treatment, and guides keep/cut/undecided
+triage across lenses down to a legal 100-card EDH deck. State lives in
+`CrucibleSessionContext` (its own sessionStorage key, coexisting with the
+reading session). "Seal the Deck" builds a normal `DeckData` (kept cards as
+mainboard, cuts as sideboard so `/reading/add` still sees them), calls
+`setPayload`, and hands off to the untouched `/ritual` → `/reading` journey.
+Design details: `docs/plans/crucible-deck-builder.md`.
 
 ### API endpoints
 
@@ -173,6 +189,7 @@ Inventory of primitives that must be reused (current as of this writing — run
 |---|---|
 | Panel / surface / bordered container | `<Card>` from `src/components/ui/Card.tsx` — never raw `rounded-xl border bg-slate-800/50` |
 | Modal / drawer / focus-trapped overlay | `<Sheet>` from `src/components/ui/Sheet.tsx` — never a hand-rolled `<dialog>` |
+| Anchored, non-modal dropdown / filterable list popover | `<Popover>` from `src/components/ui/Popover.tsx` — never a hand-rolled absolutely-positioned dropdown |
 | Mono uppercase label / kicker | `<Eyebrow>` from `src/components/ui/Eyebrow.tsx` |
 | Pill / chip / category label | `<Tag>` from `src/components/ui/Tag.tsx` (or `<CardTag>` for card-tag-specific styling) |
 | Button (primary / secondary / ghost) | `<Button>` from `src/components/ui/Button.tsx` |
@@ -254,7 +271,11 @@ tests/unit/                         # Pure function tests (no browser, no dev se
 ├── color-distribution.spec.ts      # Color distribution & mana base metrics
 ├── known-combos.spec.ts            # Known combo registry & detection
 ├── synergy-axes.spec.ts            # Synergy axis detectors
-└── synergy-engine.spec.ts          # Synergy engine scoring
+├── synergy-engine.spec.ts          # Synergy engine scoring
+├── crucible-session.spec.ts        # Pile session model, statuses, final-deck builder
+├── crucible-grouping.spec.ts       # Lens grouping functions
+├── cut-suggestions.spec.ts         # Ranked cut recommender
+└── ...
 ```
 
 ### Writing Tests
