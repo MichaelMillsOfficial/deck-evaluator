@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useCrucibleSession } from "@/contexts/CrucibleSessionContext";
 import {
@@ -60,6 +67,30 @@ type FlatItem =
   | { kind: "header"; group: RenderGroup; collapsed: boolean }
   | { kind: "row"; groupId: string; card: DeckCard; badge?: string };
 
+interface MetaLensState {
+  status: "idle" | "loading" | "ready" | "error" | "no-data";
+  inclusion: Record<string, number>;
+}
+
+type MetaLensAction =
+  | { type: "START" }
+  | { type: "SUCCESS"; inclusion: Record<string, number> }
+  | { type: "ERROR" };
+
+function metaReducer(_state: MetaLensState, action: MetaLensAction): MetaLensState {
+  switch (action.type) {
+    case "START":
+      return { status: "loading", inclusion: {} };
+    case "SUCCESS":
+      return {
+        status: Object.keys(action.inclusion).length > 0 ? "ready" : "no-data",
+        inclusion: action.inclusion,
+      };
+    case "ERROR":
+      return { status: "error", inclusion: {} };
+  }
+}
+
 export default function CrucibleWorkbench() {
   const {
     payload,
@@ -77,10 +108,12 @@ export default function CrucibleWorkbench() {
   const [undecidedOnly, setUndecidedOnly] = useState(false);
   // EDHREC meta lens: fetched lazily the first time the lens is opened for the
   // current commander(s). Off by default — nothing fetches until selected.
-  const [metaInclusion, setMetaInclusion] = useState<Record<string, number> | null>(null);
-  const [metaStatus, setMetaStatus] = useState<
-    "idle" | "loading" | "ready" | "error" | "no-data"
-  >("idle");
+  // useReducer (not useState) so the trigger effect dispatches rather than
+  // calling a setter directly.
+  const [metaState, metaDispatch] = useReducer(metaReducer, {
+    status: "idle",
+    inclusion: {},
+  });
   const metaKeyRef = useRef<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dismissedNotFound, setDismissedNotFound] = useState<Set<string>>(
@@ -98,48 +131,37 @@ export default function CrucibleWorkbench() {
     return identity;
   }, [payload, cardMap]);
 
-  // Fetch EDHREC inclusion for a commander set (deduped by key). Lives in a
-  // callback so the trigger effect never calls setState synchronously.
-  const loadMeta = useCallback((commanders: string[]) => {
-    const key = [...commanders].sort().join("|");
-    if (metaKeyRef.current === key) return; // already fetched/fetching for these
+  // Fetch EDHREC inclusion once per commander set, only while the meta lens is
+  // open. Off by default — nothing loads until the lens is selected. Re-runs if
+  // the commander changes while the lens is active.
+  useEffect(() => {
+    if (lens !== "meta" || !payload || payload.commanders.length === 0) return;
+    const key = [...payload.commanders].sort().join("|");
+    if (metaKeyRef.current === key) return;
     metaKeyRef.current = key;
 
-    setMetaStatus("loading");
+    let cancelled = false;
+    metaDispatch({ type: "START" });
     fetch("/api/deck-meta", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ commanders }),
+      body: JSON.stringify({ commanders: payload.commanders }),
     })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((json: { inclusionMap?: Record<string, number>; error?: string }) => {
-        if (metaKeyRef.current !== key) return; // superseded by a newer request
-        if (json.error) {
-          setMetaStatus("error");
-          return;
-        }
-        const map = json.inclusionMap ?? {};
-        setMetaInclusion(map);
-        setMetaStatus(Object.keys(map).length > 0 ? "ready" : "no-data");
+        if (cancelled) return;
+        if (json.error) metaDispatch({ type: "ERROR" });
+        else metaDispatch({ type: "SUCCESS", inclusion: json.inclusionMap ?? {} });
       })
       .catch(() => {
-        if (metaKeyRef.current !== key) return;
+        if (cancelled) return;
         metaKeyRef.current = null; // allow a retry on re-select
-        setMetaStatus("error");
+        metaDispatch({ type: "ERROR" });
       });
-  }, []);
-
-  // Selecting a lens; opening the meta lens triggers its (deduped) fetch. This
-  // is user-driven rather than an effect so nothing loads until it's chosen.
-  const handleSelectLens = useCallback(
-    (next: CrucibleLens) => {
-      setLens(next);
-      if (next === "meta" && payload && payload.commanders.length > 0) {
-        loadMeta(payload.commanders);
-      }
-    },
-    [payload, loadMeta]
-  );
+    return () => {
+      cancelled = true;
+    };
+  }, [lens, payload]);
 
   const targetByLabel = useMemo(() => {
     const map = new Map<string, { min: number; max: number }>();
@@ -208,18 +230,18 @@ export default function CrucibleWorkbench() {
       case "meta": {
         if (payload.commanders.length === 0)
           return [{ id: "meta-empty", label: "No commander yet", meta: "Pick a commander to read stock ↔ spicy.", cards: [] }];
-        if (metaStatus === "loading")
+        if (metaState.status === "loading" || metaState.status === "idle")
           return [{ id: "meta-loading", label: "Reading EDHREC…", meta: "Fetching inclusion data", cards: [] }];
-        if (metaStatus === "error")
+        if (metaState.status === "error")
           return [{ id: "meta-error", label: "Couldn't reach EDHREC", meta: "Switch lenses and back to retry.", cards: [] }];
-        if (metaStatus === "no-data")
+        if (metaState.status === "no-data")
           return [{ id: "meta-nodata", label: "No meta read yet", meta: "EDHREC has no data for this commander.", cards: [] }];
         const metaLabels: Record<string, string> = {
           staples: "safe keeps · ≥50%",
           flex: "real choices · 10–50%",
           spice: "your call · <10%",
         };
-        return groupByMeta(pool, cardMap, metaInclusion ?? {}).map((group) => ({
+        return groupByMeta(pool, cardMap, metaState.inclusion).map((group) => ({
           id: `meta:${group.id}`,
           label: group.label,
           meta: `${group.cards.length} cards${
@@ -253,7 +275,7 @@ export default function CrucibleWorkbench() {
       default:
         return [];
     }
-  }, [payload, cardMap, tagCache, lens, targetByLabel, metaInclusion, metaStatus]);
+  }, [payload, cardMap, tagCache, lens, targetByLabel, metaState]);
 
   const statuses = payload?.statuses;
 
@@ -440,7 +462,7 @@ export default function CrucibleWorkbench() {
       <div className={styles.workbenchGrid}>
         <LensSwitcher
           active={lens}
-          onSelect={handleSelectLens}
+          onSelect={setLens}
           undecidedOnly={undecidedOnly}
           onToggleUndecided={() => setUndecidedOnly((v) => !v)}
           cutCount={

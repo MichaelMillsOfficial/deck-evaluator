@@ -35,6 +35,21 @@ SIDEBOARD:
 
 export const MINIMAL_DECKLIST = "1 Sol Ring";
 
+/** Default EDHREC inclusion envelope for the sample Atraxa deck. Keys are
+ * normalized (lowercase) as the real route produces them. Spans every band. */
+export const DEFAULT_META_ENVELOPE = {
+  source: "primary" as const,
+  commanderLabel: "Atraxa, Praetors' Voice",
+  potentialDecks: 12480,
+  inclusionMap: {
+    "sol ring": 0.96,
+    "command tower": 0.91,
+    "arcane signet": 0.88,
+    "swords to plowshares": 0.4,
+    counterspell: 0.06,
+  },
+};
+
 /** Decklist without a COMMANDER: header — used for commander input tests */
 export const FLAT_DECKLIST = `1 Atraxa, Praetors' Voice
 1 Sol Ring
@@ -355,6 +370,30 @@ export class DeckPage {
   }
 
   /**
+   * Opt out of the default /api/deck-meta mock and route to the live EDHREC
+   * endpoint instead. Rarely needed — meta tests use the fixture envelope.
+   */
+  async useLiveMeta() {
+    await this.page.unroute("**/api/deck-meta");
+  }
+
+  /**
+   * Override the /api/deck-meta response. Pass a full envelope body and an
+   * optional status to exercise the failure states (missing / error / thin).
+   * Call before importing the deck.
+   */
+  async mockMeta(body: unknown, status = 200) {
+    await this.page.unroute("**/api/deck-meta");
+    await this.page.route("**/api/deck-meta", (route) =>
+      route.fulfill({
+        status,
+        contentType: "application/json",
+        body: JSON.stringify(body),
+      })
+    );
+  }
+
+  /**
    * Type a card name into the card lookup input, wait for the autocomplete
    * dropdown to appear, and click the matching suggestion.
    * NOTE: Callers must mock /api/card-autocomplete via page.route() first.
@@ -460,6 +499,18 @@ export const test = base.extend<{ deckPage: DeckPage }>({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({ exactCombos: [], nearCombos: [] }),
+      })
+    );
+
+    // Default mock for /api/deck-meta: a canned EDHREC inclusion envelope
+    // covering the sample Atraxa deck, spanning all bands (staple → spice).
+    // Tests exercising failure states override this via deckPage.mockMeta(),
+    // and live-data tests opt out via deckPage.useLiveMeta().
+    await page.route("**/api/deck-meta", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(DEFAULT_META_ENVELOPE),
       })
     );
 
