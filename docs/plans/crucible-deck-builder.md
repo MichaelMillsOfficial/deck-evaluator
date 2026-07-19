@@ -8,8 +8,9 @@ The Crucible is a new top-level route (`/crucible`) that accepts any number of c
 
 Scope decisions, locked during plan review:
 
-- **In:** pile import (paste), chunked enrichment with the CosmicLoader ritual treatment, explicit commander picker, lenses (By Category, By Synergy Axis, By Type Line, By Mana Value, By Color Identity, Flat List, Game Changers), Insight panels (Charts, Combos in Pile, Suggested Cuts, Cut Pile), tracker rail (kept count, category health, combo status, legality checklist), collapsible/sticky category groups with capped rendering ("Show all N" expansion), hover/tap card image previews, mid-triage card search (added at user direction after the initial review; see "Adding cards mid-triage" below), "Seal the Deck" handoff.
-- **Out (fast-follows, not v1):** share-a-pile URL, price/budget lens, Scryfall-backed "fill this gap" suggestions inside the Crucible, non-EDH formats, a deck-name input at seal (v1 uses the default name "Forged in the Crucible"), external card search in the commander picker (v1 only lists legal commanders found in the pool), true row virtualization (v1 caps rendered rows per group and offers "Show all N").
+- **In:** pile import (paste), chunked enrichment with the CosmicLoader ritual treatment, explicit commander picker, lenses (By Category, By Synergy Axis, By Type Line, By Mana Value, By Color Identity, Flat List, Game Changers), Insight panels (Charts, Combos in Pile, Suggested Cuts, Cut Pile), tracker rail (kept count, category health, combo status, legality checklist), collapsible/sticky category groups with virtualized rows, hover/tap card image previews, mid-triage card search (added at user direction after the initial review; see "Adding cards mid-triage" below), "Seal the Deck" handoff.
+- **Out (fast-follows, not v1):** price/budget lens, Scryfall-backed "fill this gap" suggestions inside the Crucible, non-EDH formats, external card search in the commander picker (v1 only lists legal commanders found in the pool).
+- **Shipped as fast-follows (post-v1):** share-a-pile URL (`/crucible?p=` link plus a Forge-style `.dck` download, see `src/lib/crucible-share.ts`); a deck-name input at seal on the tracker rail (blank falls back to the default name "Forged in the Crucible"); true row virtualization via `@tanstack/react-virtual` (replaces the v1 per-group render cap and "Show all N" expansion).
 
 ## Design Decisions
 
@@ -55,7 +56,7 @@ The workbench header hosts a `CardSearchInput` so cards can be searched up and a
 `analyzeDeckSynergy` takes a `DeckData`; the Crucible feeds it a synthetic one (chosen commanders + pool as mainboard). Before a commander is chosen, per-card axis scores still work (each axis `detect(card)` is commander-independent); anchor boosts and off-identity flagging activate after the pick via `resolveCommanderIdentity` + per-card `colorIdentity`.
 
 ### Lens grouping rules
-- **By Category:** tag-driven groups from `computeCompositionScorecard` against `TEMPLATE_COMMAND_ZONE` over the kept subset; groups show candidates/kept/target with a health bar. Groups at target auto-collapse; headers stick on scroll; groups cap rendered rows (60) with a "Show all N" expansion.
+- **By Category:** tag-driven groups from `computeCompositionScorecard` against `TEMPLATE_COMMAND_ZONE` over the kept subset; groups show candidates/kept/target with a health bar. Groups at target auto-collapse; headers stick on scroll; rows render through a `@tanstack/react-virtual` windowed list rather than a per-group render cap.
 - **By Synergy Axis:** axes sorted by pool-wide strength; only axes with strength >= 0.2 get a group; each card appears once under its strongest axis with a "+N axes" badge for its other homes; an "Unaligned" group gathers cards with no axis >= 0.2 (prime cut candidates).
 - **Game Changers:** cards flagged `isGameChanger` (list served by `/api/commander-rules`), with kept count shown against the deck's bracket allowance.
 - **Charts:** mana curve and color pip coverage over the kept subset via existing `computeManaCurve` / `computeColorDistribution` / `computeManaBaseMetrics` and the `CurveConstellation` / `ColorPie` components, with a kept-vs-pool toggle.
@@ -127,7 +128,7 @@ The workbench header hosts a `CardSearchInput` so cards can be searched up and a
   - Test case: hovering a card name reveals its image preview (aria-safe)
 - [x] 4.2 Create `src/components/crucible/CrucibleWorkbench.tsx`, `LensSwitcher.tsx`, `CrucibleCardRow.tsx`, `CommanderPicker.tsx`, `CutPile.tsx`
   - `CrucibleCardRow` wraps the disclosure/a11y patterns of `EnrichedCardRow` and adds the triage buttons and image preview (from `EnrichedCard.imageUris`; `Sheet` on touch)
-  - Collapsible groups with sticky headers; cap rendered rows per group with a "Show all N" expansion
+  - Collapsible groups with sticky headers; rows render through a `@tanstack/react-virtual` windowed list
   - All styling via semantic tokens; reduced-motion gates on any transition
 
 ### Phase 5: Insight panels
