@@ -107,12 +107,27 @@ test.describe("Crucible triage", () => {
 
     await page.keyboard.press("Escape");
     await expect(crucible.commanderPopover).toHaveCount(0);
+    // Escape is an explicit close, so focus returns to the trigger.
+    await expect(crucible.commanderTrigger).toBeFocused();
 
     // Reopening starts from a clean, unfiltered list.
     await crucible.openCommanderPopover();
     await expect(
       page.getByRole("button", { name: "Choose Atraxa, Praetors' Voice" })
     ).toBeVisible();
+  });
+
+  test("outside-click dismissal does not steal focus back to the trigger", async ({ page, crucible }) => {
+    await crucible.importPile(SAMPLE_PILE);
+
+    await crucible.openCommanderPopover();
+    // Click into another interactive control outside the anchor: the click's
+    // focus must stick rather than being yanked back to the commander trigger.
+    const search = page.getByPlaceholder(/search/i).first();
+    await search.click();
+    await expect(crucible.commanderPopover).toHaveCount(0);
+    await expect(search).toBeFocused();
+    await expect(crucible.commanderTrigger).not.toBeFocused();
   });
 
   test("the commander popover is navigable by arrow keys and Enter selects", async ({ page, crucible }) => {
