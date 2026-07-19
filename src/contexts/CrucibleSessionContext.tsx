@@ -8,6 +8,7 @@ import {
   useMemo,
   useReducer,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
 import type { DeckCard, DeckData, DeckSynergyAnalysis, EnrichedCard } from "@/lib/types";
@@ -255,6 +256,10 @@ interface CrucibleSessionContextValue {
   /** Ranked cut suggestions, minus dismissed ones. */
   cutSuggestions: CutSuggestion[];
   keptTotal: number;
+  /** Builder-chosen deck name, shared across the tracker rail and its mobile
+   * sheet. Transient (not persisted); blank falls back to a default at seal. */
+  deckName: string;
+  setDeckName: (name: string) => void;
   /** Start a fresh crucible from an imported pile. Persists and triggers
    * enrichment + combo fetches in the background. */
   setPile: (pool: DeckCard[], warnings: string[]) => void;
@@ -289,6 +294,9 @@ const CrucibleSessionContext = createContext<CrucibleSessionContextValue | null>
 
 export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  // Transient builder-chosen deck name. Lives outside the reducer/session
+  // payload because it doesn't need persistence — it's only read at seal.
+  const [deckName, setDeckName] = useState("");
   const enrichAbortRef = useRef<AbortController | null>(null);
   const combosAbortRef = useRef<AbortController | null>(null);
   const enrichedIdRef = useRef<string | null>(null);
@@ -775,6 +783,8 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       legality,
       cutSuggestions,
       keptTotal,
+      deckName,
+      setDeckName,
       setPile,
       addCard,
       setStatus,
@@ -805,6 +815,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
       legality,
       cutSuggestions,
       keptTotal,
+      deckName,
       setPile,
       addCard,
       setStatus,

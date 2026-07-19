@@ -1,4 +1,4 @@
-import { test, expect, mockCommanderRules } from "./crucible-helpers";
+import { test, expect, mockCommanderRules, HUNDRED_PILE } from "./crucible-helpers";
 
 /** 101 cards including Sol Ring so one cut leaves a legal 100 with a
  * sideboard entry to verify on the reading side. */
@@ -40,5 +40,29 @@ test.describe("Crucible handoff", () => {
     await expect(display).toContainText("Sideboard");
     await expect(display).toContainText("Sol Ring");
     await expect(display).toContainText("Atraxa, Praetors' Voice");
+  });
+
+  test("a custom deck name typed before sealing flows through to the reading", async ({ page, crucible }) => {
+    const customName = "Praetor's Reckoning";
+
+    await crucible.importPile(HUNDRED_PILE);
+
+    await crucible.chooseCommander("Atraxa, Praetors' Voice");
+    await crucible.keepButton("Forest").click();
+    await crucible.keepButton("Island").click();
+
+    await expect(crucible.keptCount).toContainText("100");
+
+    // Name the deck before sealing. The input is shared between the desktop
+    // rail and the mobile sheet, so filling either instance carries through.
+    await page.getByLabel("Deck name").first().fill(customName);
+
+    await expect(crucible.sealButton).toBeEnabled();
+    await crucible.sealButton.click();
+
+    await page.waitForURL(/\/reading/, { timeout: 15_000 });
+    await expect(page.getByTestId("reading-hero")).toContainText(customName, {
+      timeout: 15_000,
+    });
   });
 });

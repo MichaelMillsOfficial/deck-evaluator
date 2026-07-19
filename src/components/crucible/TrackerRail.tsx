@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCrucibleSession } from "@/contexts/CrucibleSessionContext";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
 import { generateDeckId, type DeckSessionPayload } from "@/lib/deck-session";
-import { Button, Sheet } from "@/components/ui";
+import { Button, Input, Sheet } from "@/components/ui";
 import { comboState } from "./CrucibleCombos";
 import styles from "./crucible.module.css";
 
@@ -22,6 +22,8 @@ function TrackerContent() {
     legality,
     combos,
     combosOverBy,
+    deckName,
+    setDeckName,
     finalize,
     clearCrucible,
   } = useCrucibleSession();
@@ -44,7 +46,8 @@ function TrackerContent() {
   const canSeal = legality?.isValid === true && !sealing;
 
   const handleSeal = () => {
-    const deck = finalize(DEFAULT_DECK_NAME);
+    const trimmed = deckName.trim();
+    const deck = finalize(trimmed.length > 0 ? trimmed : DEFAULT_DECK_NAME);
     if (!deck) return;
     setSealing(true);
     const readingPayload: DeckSessionPayload = {
@@ -132,6 +135,16 @@ function TrackerContent() {
             </p>
           ))
         )}
+      </div>
+
+      <div className={styles.deckNameField}>
+        <p className={styles.trackerEyebrow}>Deck Name</p>
+        <Input
+          aria-label="Deck name"
+          placeholder={DEFAULT_DECK_NAME}
+          value={deckName}
+          onChange={(e) => setDeckName(e.target.value)}
+        />
       </div>
 
       <Button

@@ -811,9 +811,18 @@
   color: var(--status-warn);
 }
 
+.deckNameField {
+  margin-top: var(--space-8);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 .sealButton {
   width: 100%;
-  margin-top: var(--space-8);
+  margin-top: var(--space-6);
 }
 
 .trackerToggle {
