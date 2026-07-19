@@ -115,6 +115,29 @@ test.describe("Crucible triage", () => {
     ).toBeVisible();
   });
 
+  test("the commander popover is navigable by arrow keys and Enter selects", async ({ page, crucible }) => {
+    await crucible.importPile(SAMPLE_PILE);
+
+    await crucible.openCommanderPopover();
+    // The filter input holds focus on open; ArrowDown steps into the list.
+    const firstOption = page.getByRole("button", {
+      name: "Choose Atraxa, Praetors' Voice",
+    });
+    await expect(page.getByLabel("Filter commander candidates")).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(firstOption).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(
+      page.getByRole("button", { name: "Choose Ezuri, Stalker of Spheres" })
+    ).toBeFocused();
+    // ArrowUp returns to the first option, then Enter chooses it.
+    await page.keyboard.press("ArrowUp");
+    await expect(firstOption).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(crucible.commanderPopover).toHaveCount(0);
+    await expect(crucible.commanderPicker).toContainText("Atraxa, Praetors' Voice");
+  });
+
   test("stacked rows keep a partial count via the kept-copies input", async ({ page, crucible }) => {
     await crucible.importPile(HUNDRED_PILE);
 
