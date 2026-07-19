@@ -124,7 +124,7 @@ export default function CrucibleWorkbench() {
           label: group.axisName,
           meta:
             group.axisId === UNALIGNED_AXIS_ID
-              ? `${group.cards.length} cards · no strong theme — prime cut fodder`
+              ? `${group.cards.length} cards · no strong theme - prime cut fodder`
               : `pool strength ${group.strength.toFixed(2)} · ${group.cards.length} cards`,
           cards: group.cards.map((card) => ({
             card,

@@ -106,7 +106,7 @@ function CruciblePageContent() {
     const { done, total } = enrichProgress;
     const tagline =
       total > 1
-        ? `The pile is being weighed — part ${Math.min(done + 1, total)} of ${total}.`
+        ? `The pile is being weighed - part ${Math.min(done + 1, total)} of ${total}.`
         : "The pile is being weighed.";
     return <CosmicLoader tagline={tagline} />;
   }

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Crucible Share Codec — serialize/deserialize an in-progress pile
+// Crucible Share Codec - serialize/deserialize an in-progress pile
 //
 // Two shapes:
 //   1. A shareable URL payload: a compact JSON view of the pile (pool,
@@ -42,7 +42,7 @@ interface CompactPile {
 function statusToCode(status: CrucibleCardStatus): StatusCode | null {
   if (status === "keep") return "k";
   if (status === "cut") return "c";
-  return null; // undecided — omitted
+  return null; // undecided - omitted
 }
 
 function codeToStatus(code: unknown): CrucibleCardStatus {
@@ -118,7 +118,7 @@ function compactToPayload(parsed: unknown): CruciblePayload | null {
 }
 
 // ---------------------------------------------------------------------------
-// Base64url helpers (no +, /, or = padding) — mirrors deck-codec.ts
+// Base64url helpers (no +, /, or = padding) - mirrors deck-codec.ts
 // ---------------------------------------------------------------------------
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -146,7 +146,7 @@ function fromBase64Url(str: string): Uint8Array {
 }
 
 // ---------------------------------------------------------------------------
-// Compression helpers — mirrors deck-codec.ts
+// Compression helpers - mirrors deck-codec.ts
 // ---------------------------------------------------------------------------
 
 async function compressGzip(data: Uint8Array): Promise<Uint8Array> {

@@ -45,7 +45,7 @@ import { ENRICH_CHUNK_SIZE, chunk } from "@/lib/enrich-chunking";
 /** /api/deck-combos rejects requests above this many unique names. Combos
  * cannot be chunked without missing cross-chunk pairs, so for larger piles
  * detection runs over the keep+undecided subset once cuts bring it under the
- * cap — until then the UI shows how many more unique cuts are needed. */
+ * cap - until then the UI shows how many more unique cuts are needed. */
 const COMBOS_MAX_NAMES = 250;
 
 /** Debounce for combo refetches after the first threshold crossing, so triage
@@ -300,7 +300,7 @@ const CrucibleSessionContext = createContext<CrucibleSessionContextValue | null>
 export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   // Transient builder-chosen deck name. Lives outside the reducer/session
-  // payload because it doesn't need persistence — it's only read at seal.
+  // payload because it doesn't need persistence - it's only read at seal.
   const [deckName, setDeckName] = useState("");
   const enrichAbortRef = useRef<AbortController | null>(null);
   const combosAbortRef = useRef<AbortController | null>(null);
@@ -373,7 +373,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
         type: "ENRICH_ERROR",
         error:
           err instanceof TypeError
-            ? "Network error — could not reach card data service"
+            ? "Network error - could not reach card data service"
             : "Could not load card details",
       });
     }
@@ -489,7 +489,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
 
   // Banned list + game changers, fetched once per provider lifetime. The
   // effect re-runs on every payload change, so it must NOT abort in its
-  // cleanup — a triage click mid-fetch would kill the request and leave
+  // cleanup - a triage click mid-fetch would kill the request and leave
   // legality null forever. Abort only on provider unmount, and clear the
   // fetched flag on failure so a later payload change retries.
   const rulesAbortRef = useRef<AbortController | null>(null);
@@ -537,7 +537,7 @@ export function CrucibleSessionProvider({ children }: { children: ReactNode }) {
   );
 
   // Keyed on pool + commanders (stable across triage clicks), NOT the whole
-  // payload — the O(n²) synergy engine must not re-run on every keep/cut.
+  // payload - the O(n²) synergy engine must not re-run on every keep/cut.
   const pool = state.payload?.pool ?? null;
   const commanders = state.payload?.commanders ?? null;
   const synergy = useMemo<DeckSynergyAnalysis | null>(() => {
