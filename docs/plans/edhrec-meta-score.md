@@ -90,7 +90,7 @@ Label copy (pure, for the headline): `coverage` → "{pct}% coverage · {spiceCo
 
 ### Phase 1: Write Tests (TDD)
 
-- [ ] 1.1 Create `tests/unit/edhrec-meta.spec.ts` covering the pure rollup + label helpers (use `makeCard`/`makeDeck` from `tests/helpers.ts`; follow `crucible-grouping.spec.ts` style).
+- [x] 1.1 Create `tests/unit/edhrec-meta.spec.ts` covering the pure rollup + label helpers (use `makeCard`/`makeDeck` from `tests/helpers.ts`; follow `crucible-grouping.spec.ts` style).
   - `computeDeckMeta` excludes basic lands and commander(s) from `scored`.
   - Unknown card (not in EDHREC map) → `inclusion: 0`, `band: "spice"`, counts toward `spiceCount`.
   - Band boundaries: 0.90→staple, 0.899→standard, 0.50→standard, 0.10→niche, 0.099→spice.
@@ -98,12 +98,12 @@ Label copy (pure, for the headline): `coverage` → "{pct}% coverage · {spiceCo
   - `meanInclusion` correct over scored set; empty map → `status: "no-data"`.
   - `potentialDecks: 42` → `status: "thin"`; `12000` → `status: "ok"`.
   - `metaHeadline(result, lens)` returns the right string per lens; `stockSpicyLabel` thresholds.
-- [ ] 1.2 Create `tests/unit/edhrec-slug.spec.ts` for the extracted slugifier + multi-commander resolution planning.
+- [x] 1.2 Create `tests/unit/edhrec-slug.spec.ts` for the extracted slugifier + multi-commander resolution planning.
   - `commanderSlug("Atraxa, Praetors' Voice") === "atraxa-praetors-voice"`.
   - `pairSlug(["Thrasios, Triton Hero","Tymna the Weaver"])` sorted/joined form.
   - `mergeInclusionMaps` uses max of per-commander rates (D8 combine).
-- [ ] 1.3 Create `tests/unit/crucible-grouping-meta.spec.ts` (or extend `crucible-grouping.spec.ts`) for `groupByMeta(pool, cardMap, inclusionMap)` → Staples / Flex / Spice `CrucibleGroup[]`, following the existing `AxisGroup` shape and `withUnresolved` pattern.
-- [ ] 1.4 Add e2e specs `e2e/reading-meta.spec.ts` and `e2e/crucible-meta.spec.ts` (import from `./fixtures`; add a default `/api/deck-meta` mock to `e2e/fixtures.ts`, plus `useLiveMeta()` opt-in mirroring `useLiveCombos`).
+- [x] 1.3 Create `tests/unit/crucible-grouping-meta.spec.ts` (or extend `crucible-grouping.spec.ts`) for `groupByMeta(pool, cardMap, inclusionMap)` → Staples / Flex / Spice `CrucibleGroup[]`, following the existing `AxisGroup` shape and `withUnresolved` pattern.
+- [x] 1.4 Add e2e specs `e2e/reading-meta.spec.ts` and `e2e/crucible-meta.spec.ts` (import from `./fixtures`; add a default `/api/deck-meta` mock to `e2e/fixtures.ts`, plus `useLiveMeta()` opt-in mirroring `useLiveCombos`).
   - Reading hero shows the Stock↔Spicy stat; lens switch updates the readout.
   - `/reading/cards` shows per-card inclusion + sort (spicy→stock) + filter (spice-only).
   - Card art appears on row hover/focus (reuse `crucible-card-preview` testid pattern).
@@ -112,28 +112,28 @@ Label copy (pure, for the headline): `coverage` → "{pct}% coverage · {spiceCo
 
 ### Phase 2: Data layer
 
-- [ ] 2.1 Extract the slugifier from `buildEdhrecUrl` (`src/lib/commander-validation.ts`) into an exported `commanderSlug(name)` / `pairSlug(names)`; keep `buildEdhrecUrl` using it (no behavior change).
-- [ ] 2.2 Create `src/lib/edhrec-meta.ts` — pure module: types above, `computeDeckMeta(deck, inclusionMap, potentialDecks, source)`, `mergeInclusionMaps`, `metaHeadline`, `stockSpicyLabel`, band helpers. No fetch here (keep it unit-testable).
-- [ ] 2.3 Create `src/app/api/deck-meta/route.ts` via the `add-api-route` skill. `POST { commanders: string[] }` → resolves per D8 (pair → combine → primary), fetches `json.edhrec.com`, parses the cardlist into `{ inclusionMap, potentialDecks, source, commanderLabel }`, returns 200 with `{ status, error? }` on failure (never throws). Module-scoped `Map` cache, 24h TTL (D9). Scryfall-style headers + 10s timeout.
+- [x] 2.1 Extract the slugifier from `buildEdhrecUrl` (`src/lib/commander-validation.ts`) into an exported `commanderSlug(name)` / `pairSlug(names)`; keep `buildEdhrecUrl` using it (no behavior change).
+- [x] 2.2 Create `src/lib/edhrec-meta.ts` — pure module: types above, `computeDeckMeta(deck, inclusionMap, potentialDecks, source)`, `mergeInclusionMaps`, `metaHeadline`, `stockSpicyLabel`, band helpers. No fetch here (keep it unit-testable).
+- [x] 2.3 Create `src/app/api/deck-meta/route.ts` via the `add-api-route` skill. `POST { commanders: string[] }` → resolves per D8 (pair → combine → primary), fetches `json.edhrec.com`, parses the cardlist into `{ inclusionMap, potentialDecks, source, commanderLabel }`, returns 200 with `{ status, error? }` on failure (never throws). Module-scoped `Map` cache, 24h TTL (D9). Scryfall-style headers + 10s timeout.
 
 ### Phase 3: Session wiring
 
-- [ ] 3.1 Add a nullable `deckMeta: DeckMetaResult | null` to `DeckSessionPayload` (`src/lib/deck-session.ts`), mirroring `spellbookCombos`; bump/verify the sessionStorage codec tolerates the new optional field.
-- [ ] 3.2 In `src/contexts/DeckSessionContext.tsx`, add an effect + reducer action that calls `/api/deck-meta` after enrichment resolves (parallel to combos), storing the result and a `metaLoading`/`metaError` flag; expose them from `useDeckSession()`.
+- [x] 3.1 Add a nullable `deckMeta: DeckMetaResult | null` to `DeckSessionPayload` (`src/lib/deck-session.ts`), mirroring `spellbookCombos`; bump/verify the sessionStorage codec tolerates the new optional field.
+- [x] 3.2 In `src/contexts/DeckSessionContext.tsx`, add an effect + reducer action that calls `/api/deck-meta` after enrichment resolves (parallel to combos), storing the result and a `metaLoading`/`metaError` flag; expose them from `useDeckSession()`.
 
 ### Phase 4: Reading UI (layers A + C + B)
 
-- [ ] 4.1 Create `src/components/reading/MetaLensSwitcher.tsx` (`coverage`/`percentile`/`mean`) reusing the `Button`/`aria-pressed` pattern from `crucible/LensSwitcher.tsx`; local selected state only.
-- [ ] 4.2 Layer A — add a **Stock ↔ Spicy** `StatTile` to `ReadingHero.tsx` (fed by `deckMeta` + selected lens via 4.1). Handle `no-data`/`error`/`thin` inline (dim + caveat for `thin`). No new gauge component (reuse `StatTile` per design-system rules).
-- [ ] 4.3 Layer C — create `src/components/reading/MetaBands.tsx` (+ `.module.css`, semantic tokens only): the stacked distribution bar with band counts, reusing `Tag`/`Eyebrow`. Render it in `ReadingOverview.tsx` (as a tile or hero-adjacent panel) and add a `SECTION_TILES`-style entry if surfaced as a tile.
-- [ ] 4.4 Layer B — extend `src/components/DeckList.tsx` / `EnrichedCardRow.tsx`: an inclusion cell (bar + %) per row, a sort control (spicy→stock / stock→spicy / name) and a band filter on `cards/page.tsx`, and card art on hover/focus reusing the `CrucibleCardRow` preview pattern (`imageUris.normal`, `role="tooltip"`, testid). Guard everything behind `deckMeta?.status === "ok" | "thin"`.
-- [ ] 4.5 Failure-state components: `src/components/reading/MetaEmptyState.tsx` (`no-data`) and `MetaErrorState.tsx` (`error` + Retry that re-dispatches the context fetch). Reuse `Card`/`Button`.
+- [x] 4.1 Create `src/components/reading/MetaLensSwitcher.tsx` (`coverage`/`percentile`/`mean`) reusing the `Button`/`aria-pressed` pattern from `crucible/LensSwitcher.tsx`; local selected state only.
+- [x] 4.2 Layer A — add a **Stock ↔ Spicy** `StatTile` to `ReadingHero.tsx` (fed by `deckMeta` + selected lens via 4.1). Handle `no-data`/`error`/`thin` inline (dim + caveat for `thin`). No new gauge component (reuse `StatTile` per design-system rules).
+- [x] 4.3 Layer C — create `src/components/reading/MetaBands.tsx` (+ `.module.css`, semantic tokens only): the stacked distribution bar with band counts, reusing `Tag`/`Eyebrow`. Render it in `ReadingOverview.tsx` (as a tile or hero-adjacent panel) and add a `SECTION_TILES`-style entry if surfaced as a tile.
+- [x] 4.4 Layer B — extend `src/components/DeckList.tsx` / `EnrichedCardRow.tsx`: an inclusion cell (bar + %) per row, a sort control (spicy→stock / stock→spicy / name) and a band filter on `cards/page.tsx`, and card art on hover/focus reusing the `CrucibleCardRow` preview pattern (`imageUris.normal`, `role="tooltip"`, testid). Guard everything behind `deckMeta?.status === "ok" | "thin"`.
+- [x] 4.5 Failure-state components: `src/components/reading/MetaEmptyState.tsx` (`no-data`) and `MetaErrorState.tsx` (`error` + Retry that re-dispatches the context fetch). Reuse `Card`/`Button`.
 
 ### Phase 5: Crucible lens
 
-- [ ] 5.1 Add `groupByMeta(pool, cardMap, inclusionMap)` to `src/lib/crucible-grouping.ts` → Staples/Flex/Spice groups (+ unresolved bucket for cards with no enrichment), following `groupBySynergyAxis` conventions.
-- [ ] 5.2 Add a `meta` key to `CrucibleLens` and an entry to the `LENSES` array in `crucible/LensSwitcher.tsx` (off by default — default stays `category`).
-- [ ] 5.3 In `CrucibleWorkbench.tsx`, dispatch `groupByMeta` when `active === "meta"`, fetching/reusing the commander's inclusion map from `/api/deck-meta` (Crucible has its own session; fetch on lens-select, cache in Crucible context). Show the source-provenance badge and the `no-data` state when the pile has no commander yet.
+- [x] 5.1 Add `groupByMeta(pool, cardMap, inclusionMap)` to `src/lib/crucible-grouping.ts` → Staples/Flex/Spice groups (+ unresolved bucket for cards with no enrichment), following `groupBySynergyAxis` conventions.
+- [x] 5.2 Add a `meta` key to `CrucibleLens` and an entry to the `LENSES` array in `crucible/LensSwitcher.tsx` (off by default — default stays `category`).
+- [x] 5.3 In `CrucibleWorkbench.tsx`, dispatch `groupByMeta` when `active === "meta"`, fetching/reusing the commander's inclusion map from `/api/deck-meta` (Crucible has its own session; fetch on lens-select, cache in Crucible context). Show the source-provenance badge and the `no-data` state when the pile has no commander yet.
 
 ## Files to Create/Modify
 
