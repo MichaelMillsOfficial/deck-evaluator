@@ -8,7 +8,7 @@
   background: var(--sheet-bg);
   border: 1px solid var(--sheet-border);
   border-radius: var(--radius-2xl);
-  box-shadow: var(--popover-shadow);
+  box-shadow: var(--shadow-lg);
   backdrop-filter: blur(var(--blur-md));
   -webkit-backdrop-filter: blur(var(--blur-md));
   overflow: hidden;
