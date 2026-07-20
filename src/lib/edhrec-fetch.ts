@@ -27,15 +27,6 @@ interface CacheEntry extends SlugData {
 
 const cache = new Map<string, CacheEntry>();
 
-/**
- * A resolvable EDHREC slug is lowercase alphanumerics and hyphens only. This is
- * already guaranteed by `commanderSlug`, but validating again at the fetch
- * boundary keeps a user-derived slug from ever influencing the request URL's
- * structure (path traversal, host injection) — the value can only select a page
- * under the fixed EDHREC commander path.
- */
-const SLUG_RE = /^[a-z0-9-]+$/;
-
 export interface EdhrecMetaEnvelope {
   source: MetaSource | null;
   commanderLabel: string;
@@ -48,18 +39,23 @@ export interface EdhrecMetaEnvelope {
 /** Fetch + parse a single slug, with a 24h cache. Returns an empty map (not an
  * error) when EDHREC has no page for the slug. Throws only on transport error. */
 async function fetchSlug(slug: string): Promise<SlugData> {
-  // Reject anything that isn't a plain commander slug before it can reach the
-  // request URL — an unresolvable slug is a no-data outcome, not a fetch.
-  if (!SLUG_RE.test(slug)) {
+  // Sanitize to a fresh allowlisted string: strip everything but lowercase
+  // alphanumerics and hyphens. This is the value that reaches the request URL,
+  // so the user-derived name can only ever select a page under the fixed EDHREC
+  // commander path — no host, scheme, or path-traversal injection is possible.
+  // (Also clears the CodeQL SSRF taint, which a boolean guard alone does not.)
+  const safeSlug = slug.replace(/[^a-z0-9-]/g, "");
+  // An empty/unresolvable slug is a no-data outcome, not a fetch.
+  if (!safeSlug) {
     return { inclusionMap: {}, potentialDecks: 0 };
   }
 
-  const cached = cache.get(slug);
+  const cached = cache.get(safeSlug);
   if (cached && cached.expires > Date.now()) {
     return { inclusionMap: cached.inclusionMap, potentialDecks: cached.potentialDecks };
   }
 
-  const res = await fetch(`${EDHREC_BASE}/${encodeURIComponent(slug)}.json`, {
+  const res = await fetch(`${EDHREC_BASE}/${safeSlug}.json`, {
     headers: REQUEST_HEADERS,
     cache: "no-store",
     signal: AbortSignal.timeout(10_000),
@@ -69,7 +65,7 @@ async function fetchSlug(slug: string): Promise<SlugData> {
   // we don't hammer EDHREC for a commander it will never have.
   if (res.status === 404) {
     const empty: SlugData = { inclusionMap: {}, potentialDecks: 0 };
-    cache.set(slug, { ...empty, expires: Date.now() + CACHE_TTL_MS });
+    cache.set(safeSlug, { ...empty, expires: Date.now() + CACHE_TTL_MS });
     return empty;
   }
   if (!res.ok) {
@@ -78,7 +74,7 @@ async function fetchSlug(slug: string): Promise<SlugData> {
 
   const json = await res.json();
   const parsed = parseEdhrecPayload(json);
-  cache.set(slug, { ...parsed, expires: Date.now() + CACHE_TTL_MS });
+  cache.set(safeSlug, { ...parsed, expires: Date.now() + CACHE_TTL_MS });
   return parsed;
 }
 
