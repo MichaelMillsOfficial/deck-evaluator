@@ -85,6 +85,8 @@ function errorMeta(commanders: string[], label?: string): DeckMetaResult {
     commanderLabel: label ?? commanders.join(" + "),
     potentialDecks: 0,
     cards: [],
+    ratedCount: 0,
+    unratedCount: 0,
     coverage: { pct: 0, have: 0, of: 0 },
     spiceCount: 0,
     meanInclusion: 0,

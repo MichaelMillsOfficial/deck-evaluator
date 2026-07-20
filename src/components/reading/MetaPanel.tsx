@@ -19,9 +19,9 @@ const LENSES: Array<{ key: MetaLens; label: string }> = [
 ];
 
 const BANDS: Array<{ key: MetaBand; label: string; seg: string; range: string }> = [
-  { key: "staple", label: "Staple", seg: styles.segStaple, range: "90%+" },
-  { key: "standard", label: "Standard", seg: styles.segStandard, range: "50–90%" },
-  { key: "niche", label: "Niche", seg: styles.segNiche, range: "10–50%" },
+  { key: "staple", label: "Staple", seg: styles.segStaple, range: "60%+" },
+  { key: "standard", label: "Standard", seg: styles.segStandard, range: "30–60%" },
+  { key: "niche", label: "Niche", seg: styles.segNiche, range: "10–30%" },
   { key: "spice", label: "Spice", seg: styles.segSpice, range: "<10%" },
 ];
 
@@ -52,6 +52,22 @@ export default function MetaPanel() {
           <p className={styles.emptyBody}>
             EDHREC has no page for this commander. We&apos;ll show the deck&apos;s spice
             story once enough decks are registered.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  if (meta.status === "insufficient") {
+    return (
+      <section data-testid="meta-panel" className={styles.panel}>
+        <Eyebrow>Stock ↔ Spicy</Eyebrow>
+        <div className={styles.empty} data-testid="meta-insufficient">
+          <p className={styles.emptyTitle}>Not enough EDHREC data</p>
+          <p className={styles.emptyBody}>
+            Only {meta.ratedCount} of your cards are in EDHREC&apos;s data for this
+            commander — too few to read a reliable stock vs. spice picture. EDHREC
+            only tracks a few hundred notable cards per commander.
           </p>
         </div>
       </section>
@@ -93,6 +109,11 @@ export default function MetaPanel() {
           </p>
           <p data-testid="meta-readout" className={styles.readout}>
             {metaHeadline(meta, lens)}
+          </p>
+          <p data-testid="meta-basis" className={styles.basis}>
+            based on {meta.ratedCount} of {meta.ratedCount + meta.unratedCount} cards
+            EDHREC rates
+            {meta.unratedCount > 0 ? ` · ${meta.unratedCount} unrated` : ""}
           </p>
           {meta.source && meta.source !== "pair" && (
             <div className={styles.source}>

@@ -38,8 +38,8 @@ export default function MetaHeatList({ meta, cardMap }: MetaHeatListProps) {
     const q = query.trim().toLowerCase();
     let out = meta.cards.filter((c) => {
       if (q && !c.name.toLowerCase().includes(q)) return false;
-      if (filter === "staple") return c.inclusion >= 0.5;
-      if (filter === "niche") return c.inclusion >= 0.1 && c.inclusion < 0.5;
+      if (filter === "staple") return c.inclusion >= 0.6;
+      if (filter === "niche") return c.inclusion >= 0.1 && c.inclusion < 0.6;
       if (filter === "spice") return c.inclusion < 0.1;
       return true;
     });
@@ -56,6 +56,10 @@ export default function MetaHeatList({ meta, cardMap }: MetaHeatListProps) {
   return (
     <section className={styles.wrap} data-testid="meta-heat-list">
       <Eyebrow>Stock ↔ Spicy · by card</Eyebrow>
+      <p className={styles.basis} data-testid="meta-heat-basis">
+        {meta.ratedCount} of {meta.ratedCount + meta.unratedCount} cards rated by EDHREC
+        {meta.unratedCount > 0 ? ` · ${meta.unratedCount} unrated, not shown` : ""}
+      </p>
 
       <div className={styles.toolbar}>
         <label className={styles.field}>
@@ -80,8 +84,8 @@ export default function MetaHeatList({ meta, cardMap }: MetaHeatListProps) {
             data-testid="meta-filter"
           >
             <option value="all">All cards</option>
-            <option value="staple">Staples (50%+)</option>
-            <option value="niche">Niche (10–50%)</option>
+            <option value="staple">Staples (60%+)</option>
+            <option value="niche">Niche (10–60%)</option>
             <option value="spice">Spice (&lt;10%)</option>
           </select>
         </label>

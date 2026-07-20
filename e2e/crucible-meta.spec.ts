@@ -1,17 +1,35 @@
 import { test, CruciblePage, SAMPLE_PILE } from "./crucible-helpers";
-import { expect, DEFAULT_META_ENVELOPE } from "./fixtures";
+import { expect } from "./fixtures";
 
 const META_LENS = "By Meta";
 
-/** Override the default (empty) /api/deck-meta mock with the rich Atraxa
- * envelope so the meta lens has inclusion data to group by. */
+/** Envelope covering the SAMPLE_PILE across every bucket: staples (≥50%),
+ * flex (10–50%), and spice (<10%). Cards not listed (Ezuri, Path, etc.) fall
+ * into the Unrated group. */
+const PILE_META_ENVELOPE = {
+  source: "primary" as const,
+  commanderLabel: "Atraxa, Praetors' Voice",
+  potentialDecks: 12480,
+  inclusionMap: {
+    "sol ring": 0.85,
+    "command tower": 0.92,
+    "arcane signet": 0.78,
+    "swords to plowshares": 0.62,
+    cultivate: 0.3,
+    "llanowar elves": 0.2,
+    counterspell: 0.06,
+  },
+};
+
+/** Override the default (empty) /api/deck-meta mock so the meta lens has
+ * inclusion data spanning all buckets to group by. */
 async function mockRichMeta(crucible: CruciblePage) {
   await crucible.page.unroute("**/api/deck-meta");
   await crucible.page.route("**/api/deck-meta", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(DEFAULT_META_ENVELOPE),
+      body: JSON.stringify(PILE_META_ENVELOPE),
     })
   );
 }

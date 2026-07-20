@@ -346,6 +346,7 @@ export function groupByMeta(
   const staples: DeckCard[] = [];
   const flex: DeckCard[] = [];
   const spice: DeckCard[] = [];
+  const unrated: DeckCard[] = [];
   const lands: DeckCard[] = [];
 
   for (const card of pool) {
@@ -354,8 +355,11 @@ export function groupByMeta(
       lands.push(card);
       continue;
     }
-    const inclusion = inclusionMap[normalizeCardName(card.name)] ?? 0;
-    if (inclusion >= 0.5) staples.push(card);
+    const inclusion = inclusionMap[normalizeCardName(card.name)];
+    if (typeof inclusion !== "number") {
+      // EDHREC has no data for this card — honest "unrated", not spice.
+      unrated.push(card);
+    } else if (inclusion >= 0.5) staples.push(card);
     else if (inclusion >= 0.1) flex.push(card);
     else spice.push(card);
   }
@@ -364,6 +368,8 @@ export function groupByMeta(
   if (staples.length) groups.push({ id: "staples", label: "Staples", cards: staples.sort(byName) });
   if (flex.length) groups.push({ id: "flex", label: "Flex", cards: flex.sort(byName) });
   if (spice.length) groups.push({ id: "spice", label: "Spice", cards: spice.sort(byName) });
+  if (unrated.length)
+    groups.push({ id: "meta-unrated", label: "Unrated (no EDHREC data)", cards: unrated.sort(byName) });
   if (lands.length) groups.push({ id: "lands", label: LANDS_LABEL, cards: lands.sort(byName) });
 
   return withUnresolved(groups, pool, cardMap);

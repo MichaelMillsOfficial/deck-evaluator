@@ -8,6 +8,7 @@ import {
   parseEdhrecPayload,
   COVERAGE_TOP_N,
   THIN_SAMPLE_THRESHOLD,
+  MIN_RATED_CARDS,
   type DeckMetaResult,
 } from "../../src/lib/edhrec-meta";
 import { makeDeck } from "../helpers";
@@ -25,10 +26,12 @@ function cards(...names: string[]): DeckCard[] {
 }
 
 test.describe("bandFor", () => {
-  test("assigns bands at the documented boundaries", () => {
+  test("assigns bands at the real-inclusion boundaries", () => {
     expect(bandFor(0.9)).toBe("staple");
-    expect(bandFor(0.899)).toBe("standard");
-    expect(bandFor(0.5)).toBe("standard");
+    expect(bandFor(0.6)).toBe("staple");
+    expect(bandFor(0.599)).toBe("standard");
+    expect(bandFor(0.3)).toBe("standard");
+    expect(bandFor(0.299)).toBe("niche");
     expect(bandFor(0.1)).toBe("niche");
     expect(bandFor(0.099)).toBe("spice");
     expect(bandFor(0)).toBe("spice");
@@ -44,66 +47,77 @@ test.describe("normalizeCardName", () => {
 });
 
 test.describe("computeDeckMeta", () => {
+  // 12 rated cards spanning the bands, so a deck running them clears MIN_RATED.
   const inclusionMap = incl([
-    ["Sol Ring", 0.96],
-    ["Command Tower", 0.91],
-    ["Arcane Signet", 0.88],
-    ["Doubling Season", 0.71],
+    ["Sol Ring", 0.85],
+    ["Command Tower", 0.92],
+    ["Arcane Signet", 0.78],
+    ["Swords to Plowshares", 0.62],
+    ["Doubling Season", 0.55],
+    ["Deepglow Skate", 0.44],
     ["Evolution Sage", 0.38],
+    ["Toxic Deluge", 0.33],
+    ["Inexorable Tide", 0.22],
+    ["Flux Channeler", 0.18],
     ["Contentious Plan", 0.06],
+    ["Ichormoon Gauntlet", 0.03],
   ]);
+  const ratedNames = [
+    "Sol Ring", "Command Tower", "Arcane Signet", "Swords to Plowshares",
+    "Doubling Season", "Deepglow Skate", "Evolution Sage", "Toxic Deluge",
+    "Inexorable Tide", "Flux Channeler", "Contentious Plan", "Ichormoon Gauntlet",
+  ];
 
   test("excludes basic lands and commanders from the scored set", () => {
     const deck = makeDeck({
       commanders: cards("Atraxa, Praetors' Voice"),
       mainboard: cards(
         "Atraxa, Praetors' Voice", // commander duplicated in mainboard — excluded
-        "Sol Ring",
-        "Doubling Season",
+        ...ratedNames,
         "Forest", // basic land — excluded
         "Island" // basic land — excluded
       ),
     });
     const r = computeDeckMeta(deck, inclusionMap, 12000, "primary");
-    expect(r.cards.map((c) => c.name).sort()).toEqual(["Doubling Season", "Sol Ring"]);
+    expect(r.cards.map((c) => c.name).sort()).toEqual([...ratedNames].sort());
   });
 
-  test("counts a card EDHREC has never seen as 0% spice", () => {
+  test("excludes a card EDHREC has no data for as unrated, not spice", () => {
     const deck = makeDeck({
-      mainboard: cards("Sol Ring", "My Pet Brew Card"),
+      mainboard: cards(...ratedNames, "My Pet Brew Card"),
     });
     const r = computeDeckMeta(deck, inclusionMap, 12000, "primary");
-    const pet = r.cards.find((c) => c.name === "My Pet Brew Card");
-    expect(pet).toBeTruthy();
-    expect(pet!.inclusion).toBe(0);
-    expect(pet!.band).toBe("spice");
-    expect(r.spiceCount).toBe(1);
+    expect(r.cards.find((c) => c.name === "My Pet Brew Card")).toBeUndefined();
+    expect(r.ratedCount).toBe(ratedNames.length);
+    expect(r.unratedCount).toBe(1);
+    // Only the two genuinely-low rated cards count as spice — not the unrated one.
+    expect(r.spiceCount).toBe(2);
   });
 
   test("coverage measures how many of the top-N staples the deck runs", () => {
-    // Top-N by inclusion from the 6-card map (N caps at map size here).
     const deck = makeDeck({
       mainboard: cards("Sol Ring", "Command Tower", "Doubling Season"),
     });
     const r = computeDeckMeta(deck, inclusionMap, 12000, "primary");
-    expect(r.coverage.of).toBe(Math.min(COVERAGE_TOP_N, 6));
-    // Sol Ring, Command Tower, Doubling Season are all in the top 6.
+    expect(r.coverage.of).toBe(Math.min(COVERAGE_TOP_N, 12));
     expect(r.coverage.have).toBe(3);
-    expect(r.coverage.pct).toBeCloseTo(3 / 6, 5);
+    expect(r.coverage.pct).toBeCloseTo(3 / 12, 5);
   });
 
-  test("meanInclusion averages the scored set", () => {
-    const deck = makeDeck({ mainboard: cards("Sol Ring", "Evolution Sage") });
+  test("meanInclusion averages the rated set only", () => {
+    const deck = makeDeck({ mainboard: cards("Sol Ring", "Evolution Sage", "Unrated Card") });
     const r = computeDeckMeta(deck, inclusionMap, 12000, "primary");
-    expect(r.meanInclusion).toBeCloseTo((0.96 + 0.38) / 2, 5);
+    expect(r.meanInclusion).toBeCloseTo((0.85 + 0.38) / 2, 5);
   });
 
-  test("bandCounts tally the scored cards", () => {
-    const deck = makeDeck({
-      mainboard: cards("Sol Ring", "Doubling Season", "Evolution Sage", "Contentious Plan"),
-    });
+  test("bandCounts tally the rated cards under the tuned thresholds", () => {
+    const deck = makeDeck({ mainboard: cards(...ratedNames) });
     const r = computeDeckMeta(deck, inclusionMap, 12000, "primary");
-    expect(r.bandCounts).toEqual({ staple: 1, standard: 1, niche: 1, spice: 1 });
+    // staple ≥.6: Sol Ring .85, Command Tower .92, Arcane Signet .78, Swords .62 → 4
+    // standard .3–.6: Doubling .55, Deepglow .44, Evolution .38, Toxic .33 → 4
+    // niche .1–.3: Inexorable .22, Flux .18 → 2
+    // spice <.1: Contentious .06, Ichormoon .03 → 2
+    expect(r.bandCounts).toEqual({ staple: 4, standard: 4, niche: 2, spice: 2 });
   });
 
   test("empty inclusion map yields no-data", () => {
@@ -112,14 +126,24 @@ test.describe("computeDeckMeta", () => {
     expect(r.status).toBe("no-data");
   });
 
-  test("thin sample flags low confidence", () => {
-    const deck = makeDeck({ mainboard: cards("Sol Ring") });
+  test("too few rated cards yields insufficient", () => {
+    const deck = makeDeck({
+      mainboard: cards("Sol Ring", "Command Tower", "Unrated A", "Unrated B", "Unrated C"),
+    });
+    const r = computeDeckMeta(deck, inclusionMap, 12000, "primary");
+    expect(r.ratedCount).toBe(2);
+    expect(r.ratedCount).toBeLessThan(MIN_RATED_CARDS);
+    expect(r.status).toBe("insufficient");
+  });
+
+  test("thin sample flags low confidence when there is enough rated data", () => {
+    const deck = makeDeck({ mainboard: cards(...ratedNames) });
     expect(computeDeckMeta(deck, inclusionMap, THIN_SAMPLE_THRESHOLD - 1, "primary").status).toBe("thin");
     expect(computeDeckMeta(deck, inclusionMap, THIN_SAMPLE_THRESHOLD, "primary").status).toBe("ok");
   });
 
   test("carries source and commander sample size through", () => {
-    const deck = makeDeck({ mainboard: cards("Sol Ring") });
+    const deck = makeDeck({ mainboard: cards(...ratedNames) });
     const r = computeDeckMeta(deck, inclusionMap, 4200, "combined");
     expect(r.source).toBe("combined");
     expect(r.potentialDecks).toBe(4200);
@@ -133,6 +157,8 @@ test.describe("metaHeadline", () => {
     commanderLabel: "Atraxa, Praetors' Voice",
     potentialDecks: 12000,
     cards: [],
+    ratedCount: 45,
+    unratedCount: 40,
     coverage: { pct: 0.71, have: 22, of: 31 },
     spiceCount: 3,
     meanInclusion: 0.45,

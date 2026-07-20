@@ -44,17 +44,20 @@ test.describe("groupByMeta", () => {
     expect(byId["unresolved"]).toEqual(["Mystery Card"]);
   });
 
-  test("a card with no EDHREC data falls into Spice", () => {
+  test("a card with no EDHREC data falls into Unrated, not Spice", () => {
     const cardMap = mapOf(makeCard({ name: "Homebrew Engine", typeLine: "Artifact" }));
     const groups = groupByMeta(pool("Homebrew Engine"), cardMap, inclusion);
-    const spice = groups.find((g) => g.id === "spice");
-    expect(spice?.cards.map((c) => c.name)).toEqual(["Homebrew Engine"]);
+    expect(groups.find((g) => g.id === "spice")).toBeUndefined();
+    expect(groups.find((g) => g.id === "meta-unrated")?.cards.map((c) => c.name)).toEqual([
+      "Homebrew Engine",
+    ]);
   });
 
-  test("empty inclusion map returns no bucket groups (only unresolved/lands)", () => {
+  test("empty inclusion map puts everything in Unrated", () => {
     const cardMap = mapOf(makeCard({ name: "Sol Ring", typeLine: "Artifact" }));
     const groups = groupByMeta(pool("Sol Ring"), cardMap, {});
-    // With no data, Sol Ring is inclusion 0 → spice bucket.
-    expect(groups.find((g) => g.id === "spice")?.cards.map((c) => c.name)).toEqual(["Sol Ring"]);
+    expect(groups.find((g) => g.id === "meta-unrated")?.cards.map((c) => c.name)).toEqual([
+      "Sol Ring",
+    ]);
   });
 });

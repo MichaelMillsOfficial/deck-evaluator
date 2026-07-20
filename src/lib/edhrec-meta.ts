@@ -15,12 +15,12 @@ import type { DeckData } from "@/lib/types";
 
 export type MetaBand = "staple" | "standard" | "niche" | "spice";
 export type MetaSource = "pair" | "combined" | "primary";
-export type MetaStatus = "ok" | "thin" | "no-data" | "error";
+export type MetaStatus = "ok" | "thin" | "insufficient" | "no-data" | "error";
 export type MetaLens = "coverage" | "percentile" | "mean";
 
 export interface CardInclusion {
   name: string;
-  /** Inclusion rate 0..1 (0 when EDHREC has never seen the card). */
+  /** Inclusion rate 0..1. */
   inclusion: number;
   band: MetaBand;
 }
@@ -32,13 +32,18 @@ export interface DeckMetaResult {
   commanderLabel: string;
   /** Sample size (potential_decks) — powers the low-confidence gate. */
   potentialDecks: number;
-  /** One entry per scored (non-land, non-commander) deck card. */
+  /** One entry per RATED scored card (a non-land, non-commander card EDHREC
+   * has data for). Unrated cards are excluded rather than treated as spice. */
   cards: CardInclusion[];
+  /** How many scored cards EDHREC actually rates — the basis of the read. */
+  ratedCount: number;
+  /** Scored cards EDHREC has no data for (outside its notable-card list). */
+  unratedCount: number;
   /** Staple coverage: how many of the top-N staples the deck runs. */
   coverage: { pct: number; have: number; of: number };
-  /** Count of scored cards below the spice threshold. */
+  /** Count of rated cards below the spice threshold. */
   spiceCount: number;
-  /** Mean inclusion across the scored set (0..1). */
+  /** Mean inclusion across the rated set (0..1). */
   meanInclusion: number;
   /** Approximate rank vs the commander's inclusion distribution (0..100). */
   fieldPercentile: number;
@@ -49,7 +54,10 @@ export interface DeckMetaResult {
 export const COVERAGE_TOP_N = 30;
 /** Below this `potential_decks`, the read is flagged low-confidence. */
 export const THIN_SAMPLE_THRESHOLD = 100;
-/** Inclusion at or below this is "spice". */
+/** Fewer rated deck cards than this and there's no meaningful basis for a read
+ * (EDHREC only publishes ~300 notable cards, so a deck can land here). */
+export const MIN_RATED_CARDS = 10;
+/** Inclusion below this is "spice". */
 export const SPICE_MAX = 0.1;
 
 const BASIC_LANDS = new Set([
@@ -77,8 +85,11 @@ export function isBasicLandName(name: string): boolean {
 }
 
 export function bandFor(inclusion: number): MetaBand {
-  if (inclusion >= 0.9) return "staple";
-  if (inclusion >= 0.5) return "standard";
+  // Tuned to how EDHREC inclusion actually distributes: even universal staples
+  // rarely clear 90% (Command Tower ~92%, Sol Ring ~85%), so a 90% staple band
+  // sits near-empty for real decks.
+  if (inclusion >= 0.6) return "staple";
+  if (inclusion >= 0.3) return "standard";
   if (inclusion >= 0.1) return "niche";
   return "spice";
 }
@@ -106,30 +117,39 @@ export function computeDeckMeta(
 ): DeckMetaResult {
   const commanderNames = new Set(deck.commanders.map((c) => normalizeCardName(c.name)));
 
-  const scored: CardInclusion[] = [];
+  // Partition scored (non-land, non-commander) cards into rated — the ones
+  // EDHREC actually has data for — and unrated. Only rated cards feed the read;
+  // unrated cards are reported separately, not silently counted as spice.
+  const rated: CardInclusion[] = [];
+  let unratedCount = 0;
+  const scoredKeys = new Set<string>();
   for (const card of deck.mainboard) {
     const key = normalizeCardName(card.name);
     if (isBasicLandName(card.name) || commanderNames.has(key)) continue;
-    const inclusion = inclusionMap[key] ?? 0;
-    scored.push({ name: card.name, inclusion, band: bandFor(inclusion) });
+    scoredKeys.add(key);
+    const inclusion = inclusionMap[key];
+    if (typeof inclusion === "number") {
+      rated.push({ name: card.name, inclusion, band: bandFor(inclusion) });
+    } else {
+      unratedCount += 1;
+    }
   }
 
   const bandCounts: Record<MetaBand, number> = { staple: 0, standard: 0, niche: 0, spice: 0 };
   let inclusionSum = 0;
   let spiceCount = 0;
-  for (const c of scored) {
+  for (const c of rated) {
     bandCounts[c.band] += 1;
     inclusionSum += c.inclusion;
     if (c.inclusion < SPICE_MAX) spiceCount += 1;
   }
-  const meanInclusion = scored.length ? inclusionSum / scored.length : 0;
+  const meanInclusion = rated.length ? inclusionSum / rated.length : 0;
 
   // Coverage: of the commander's top-N cards by inclusion, how many the deck runs.
   const topStaples = Object.entries(inclusionMap)
     .sort((a, b) => b[1] - a[1])
     .slice(0, COVERAGE_TOP_N)
     .map(([name]) => name);
-  const scoredKeys = new Set(scored.map((c) => normalizeCardName(c.name)));
   const have = topStaples.filter((name) => scoredKeys.has(name)).length;
   const of = topStaples.length;
   const coverage = { pct: of ? have / of : 0, have, of };
@@ -142,14 +162,22 @@ export function computeDeckMeta(
     : 0;
 
   const status: MetaStatus =
-    values.length === 0 ? "no-data" : potentialDecks < THIN_SAMPLE_THRESHOLD ? "thin" : "ok";
+    values.length === 0
+      ? "no-data"
+      : rated.length < MIN_RATED_CARDS
+        ? "insufficient"
+        : potentialDecks < THIN_SAMPLE_THRESHOLD
+          ? "thin"
+          : "ok";
 
   return {
     status,
     source,
     commanderLabel,
     potentialDecks,
-    cards: scored,
+    cards: rated,
+    ratedCount: rated.length,
+    unratedCount,
     coverage,
     spiceCount,
     meanInclusion,

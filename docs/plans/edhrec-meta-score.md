@@ -31,6 +31,12 @@ Every non-land, non-commander card is bucketed by inclusion into: **Staple** ≥
 ### D4 — Framing (non-negotiable)
 Neutral **Stock ↔ Spicy** language everywhere. No green-check / red-X, no "score out of 100" phrasing. Field rank reads as "More stock than 63%", not "P63". High is not "good."
 
+### D4b — Rated basis & re-tuned bands (revision, post-live-review)
+Live EDHREC data revealed two problems the mock hid: (1) the commander JSON only publishes ~300 *notable* cards, so most deck cards are **unrated**; the original "unknown = 0% spice" rule dumped them all into spice and washed out the signal. (2) Real inclusion rarely clears 90%, so a 90% "staple" band sits near-empty. Revised:
+- **Unrated cards are excluded** from bands/coverage/spice/mean, not counted as 0% spice. The result carries `ratedCount`/`unratedCount`, surfaced as a "based on N of M cards EDHREC rates" basis line. The Crucible lens gets a dedicated **Unrated** group.
+- **New `insufficient` status** when fewer than `MIN_RATED_CARDS` (10) deck cards are rated — the panel refuses to render a misleading read and explains why.
+- **Bands re-tuned to real inclusion:** Staple ≥60%, Standard 30–60%, Niche 10–30%, Spice <10%.
+
 ### D5 — Exclusions & normalization
 Exclude basic lands and the commander(s) from all rollups. Card-name matching between EDHREC's list and deck names reuses the case-insensitive + DFC-front-face (`" // "` split) + `flavor_name` normalization already used in `deck-enrich/route.ts`. The commander slug reuses the existing slugifier extracted from `buildEdhrecUrl` in `commander-validation.ts` (`atraxa-praetors-voice` form).
 

@@ -35,18 +35,47 @@ SIDEBOARD:
 
 export const MINIMAL_DECKLIST = "1 Sol Ring";
 
-/** Default EDHREC inclusion envelope for the sample Atraxa deck. Keys are
- * normalized (lowercase) as the real route produces them. Spans every band. */
+/** A larger deck for meta-score tests — enough rated cards to clear the
+ * insufficient-data gate. Two "Homebrew" cards stay unrated by the envelope. */
+export const META_DECKLIST = `COMMANDER:
+1 Atraxa, Praetors' Voice
+
+MAINBOARD:
+1 Sol Ring
+1 Command Tower
+1 Arcane Signet
+1 Swords to Plowshares
+1 Doubling Season
+1 Deepglow Skate
+1 Evolution Sage
+1 Toxic Deluge
+1 Inexorable Tide
+1 Flux Channeler
+1 Contentious Plan
+1 Ichormoon Gauntlet
+1 Homebrew Alpha
+1 Homebrew Beta`;
+
+/** EDHREC inclusion envelope covering META_DECKLIST's 12 non-Homebrew cards
+ * (all rated), spanning every tuned band. Keys are normalized (lowercase) as
+ * the real route produces them. The two Homebrew cards are left unrated. */
 export const DEFAULT_META_ENVELOPE = {
   source: "primary" as const,
   commanderLabel: "Atraxa, Praetors' Voice",
   potentialDecks: 12480,
   inclusionMap: {
-    "sol ring": 0.96,
-    "command tower": 0.91,
-    "arcane signet": 0.88,
-    "swords to plowshares": 0.4,
-    counterspell: 0.06,
+    "sol ring": 0.85,
+    "command tower": 0.92,
+    "arcane signet": 0.78,
+    "swords to plowshares": 0.62,
+    "doubling season": 0.55,
+    "deepglow skate": 0.44,
+    "evolution sage": 0.38,
+    "toxic deluge": 0.33,
+    "inexorable tide": 0.22,
+    "flux channeler": 0.18,
+    "contentious plan": 0.06,
+    "ichormoon gauntlet": 0.03,
   },
 };
 

@@ -34,6 +34,12 @@
   margin-top: var(--space-2);
 }
 
+.basis {
+  font-size: var(--text-xs);
+  color: var(--ink-tertiary);
+  margin-top: var(--space-3);
+}
+
 .source {
   margin-top: var(--space-3);
 }

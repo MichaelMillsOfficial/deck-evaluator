@@ -7,6 +7,12 @@
   backdrop-filter: blur(var(--blur-sm));
 }
 
+.basis {
+  font-size: var(--text-xs);
+  color: var(--ink-tertiary);
+  margin-top: var(--space-3);
+}
+
 .toolbar {
   display: flex;
   gap: var(--space-6);
