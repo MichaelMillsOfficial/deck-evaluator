@@ -162,6 +162,7 @@ export default function CrucibleWorkbench() {
       });
     return () => {
       cancelled = true;
+      metaKeyRef.current = null; // allow a re-fetch if the lens is reopened
     };
   }, [lens, payload]);
 

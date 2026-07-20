@@ -26,7 +26,7 @@ export interface MetaHeatListProps {
   cardMap: Record<string, EnrichedCard> | null;
 }
 
-/** The per-card "inclusion heat list" for /reading/cards: every scored card
+/** The per-card "inclusion heat list" for /reading/meta: every scored card
  * with its EDHREC inclusion, sortable spicy→stock and filterable, with card
  * art on hover. Rendered only when meta data is present (ok / thin). */
 export default function MetaHeatList({ meta, cardMap }: MetaHeatListProps) {
