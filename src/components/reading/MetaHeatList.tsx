@@ -124,7 +124,7 @@ function MetaHeatRow({ card, enriched }: { card: CardInclusion; enriched?: Enric
 
   return (
     <CardHoverPreview name={card.name} enriched={enriched} data-testid="meta-card-preview">
-      {({ anchorRef, anchorProps, focusProps, toggle }) => (
+      {({ anchorRef, anchorProps, focusProps }) => (
         <div
           ref={anchorRef}
           className={styles.row}
@@ -136,7 +136,6 @@ function MetaHeatRow({ card, enriched }: { card: CardInclusion; enriched?: Enric
               type="button"
               className={styles.name}
               {...focusProps}
-              onClick={toggle}
               aria-label={`${card.name} card art`}
             >
               {card.name}

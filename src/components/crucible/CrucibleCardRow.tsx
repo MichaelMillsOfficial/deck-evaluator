@@ -46,7 +46,7 @@ export default function CrucibleCardRow({
       enriched={enriched}
       data-testid="crucible-card-preview"
     >
-      {({ anchorRef, anchorProps, focusProps, toggle }) => (
+      {({ anchorRef, anchorProps, focusProps }) => (
         // anchorRef + anchorProps put the hover hit-area on the WHOLE row.
         <div
           ref={anchorRef}
@@ -62,7 +62,6 @@ export default function CrucibleCardRow({
               data-testid="crucible-card-name"
               className={styles.rowName}
               {...focusProps}
-              onClick={toggle}
               aria-label={`${card.name} details`}
             >
               {card.name}
