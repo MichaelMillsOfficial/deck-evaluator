@@ -129,9 +129,19 @@ function IconShareNode() {
   );
 }
 
+function IconGauge() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.5 14a6.5 6.5 0 1113 0" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l3.5-3.5" />
+    </svg>
+  );
+}
+
 const TAB_ICONS: Record<ViewTab, React.ReactNode> = {
   list: <IconList />,
   analysis: <IconChartBar />,
+  meta: <IconGauge />,
   synergy: <IconPuzzle />,
   interactions: <IconBolt />,
   hands: <IconHand />,

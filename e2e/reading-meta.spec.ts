@@ -31,9 +31,22 @@ test.describe("/reading meta panel (Stock ↔ Spicy)", () => {
     await expect(readout).toContainText(/mean inclusion/i);
   });
 
-  test("cards page shows the inclusion heat list with sort and filter", async ({ deckPage }) => {
+  test("has a Meta tab in the reading nav that opens the dedicated page", async ({ deckPage }) => {
     await importMeta(deckPage);
+    // The sidebar lives on the shell sub-routes; from any of them the Meta tab
+    // is the page the user returns to while digging into a reading.
     await deckPage.page.goto("/reading/cards");
+    const tablist = deckPage.page.getByRole("tablist", { name: "Deck view" });
+    await tablist.getByRole("tab", { name: "Meta" }).click();
+    await deckPage.page.waitForURL(/\/reading\/meta(\/|$|\?)/, { timeout: 15_000 });
+    await expect(deckPage.page.getByTestId("section-header-meta")).toBeVisible();
+    await expect(deckPage.page.getByTestId("meta-panel")).toBeVisible();
+    await expect(deckPage.page.getByTestId("meta-heat-list")).toBeVisible();
+  });
+
+  test("meta page shows the inclusion heat list with sort and filter", async ({ deckPage }) => {
+    await importMeta(deckPage);
+    await deckPage.page.goto("/reading/meta");
     const list = deckPage.page.getByTestId("meta-heat-list");
     await expect(list).toBeVisible();
 

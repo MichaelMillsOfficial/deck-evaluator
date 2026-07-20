@@ -8,7 +8,6 @@ import SectionHeader, {
 } from "@/components/reading/SectionHeader";
 import ChapterFooter from "@/components/reading/ChapterFooter";
 import DeckList from "@/components/DeckList";
-import MetaHeatList from "@/components/reading/MetaHeatList";
 
 export default function CardsPage() {
   const { payload, enrichLoading } = useDeckSession();
@@ -73,9 +72,6 @@ export default function CardsPage() {
         cardMap={cardMap}
         enrichLoading={enrichLoading}
       />
-      {payload.deckMeta && (
-        <MetaHeatList meta={payload.deckMeta} cardMap={cardMap} />
-      )}
       <ChapterFooter current="list" />
     </div>
   );
