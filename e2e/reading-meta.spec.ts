@@ -66,7 +66,7 @@ test.describe("/reading meta panel (Stock ↔ Spicy)", () => {
 
   test("hovering a heat-list row reveals its card preview", async ({ deckPage }) => {
     await importMeta(deckPage);
-    await deckPage.page.goto("/reading/cards");
+    await deckPage.page.goto("/reading/meta");
     await expect(deckPage.page.getByTestId("meta-heat-list")).toBeVisible();
 
     await deckPage.page.getByTestId("meta-row-Sol Ring").hover();
