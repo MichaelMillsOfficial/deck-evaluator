@@ -112,6 +112,32 @@ test.describe("Deck Enrichment", () => {
     ).toBeVisible();
   });
 
+  test("hovering an enriched card row reveals its card preview", async ({
+    deckPage,
+  }) => {
+    const { page } = deckPage;
+
+    await page.route("**/api/deck-enrich", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_ENRICH_RESPONSE),
+      })
+    );
+
+    await deckPage.goto();
+    await deckPage.fillDecklist("1 Sol Ring\n1 Command Tower");
+    await deckPage.submitImport();
+    await deckPage.waitForDeckDisplay();
+
+    // Hover the Sol Ring row's name cell → portaled preview appears.
+    await deckPage.deckDisplay.getByRole("button", { name: /Sol Ring/ }).hover();
+    const preview = page.getByTestId("enriched-card-preview");
+    await expect(preview).toBeVisible();
+    // Sol Ring's fixture has no art, so the preview falls back to type text.
+    await expect(preview).toContainText("Artifact");
+  });
+
   // Removed: "basic decklist renders immediately before enrichment"
   // Phase 2 holds the user on /ritual until enrichment terminates, so the
   // deck no longer renders "before" enrichment. The fast-path UX now lives

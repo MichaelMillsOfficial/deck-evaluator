@@ -243,16 +243,28 @@ export function validateCommanderLegality(
 }
 
 /**
+ * Slugify a single commander name into EDHREC's commander-slug form.
+ * e.g. "Atraxa, Praetors' Voice" → "atraxa-praetors-voice".
+ */
+export function commanderSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-");
+}
+
+/**
+ * Slug for a partner/background pair. Sorted so the slug is order-independent
+ * (EDHREC hosts a single combined page regardless of which is "first").
+ */
+export function pairSlug(commanderNames: string[]): string {
+  return commanderNames.map(commanderSlug).sort().join("-");
+}
+
+/**
  * Build an EDHREC URL for the given commander name(s).
  */
 export function buildEdhrecUrl(commanderNames: string[]): string {
-  const slug = commanderNames
-    .map((name) =>
-      name
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-")
-    )
-    .join("-");
+  const slug = commanderNames.map(commanderSlug).join("-");
   return `https://edhrec.com/commanders/${slug}`;
 }

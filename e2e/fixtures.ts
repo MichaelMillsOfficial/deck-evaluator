@@ -35,6 +35,50 @@ SIDEBOARD:
 
 export const MINIMAL_DECKLIST = "1 Sol Ring";
 
+/** A larger deck for meta-score tests — enough rated cards to clear the
+ * insufficient-data gate. Two "Homebrew" cards stay unrated by the envelope. */
+export const META_DECKLIST = `COMMANDER:
+1 Atraxa, Praetors' Voice
+
+MAINBOARD:
+1 Sol Ring
+1 Command Tower
+1 Arcane Signet
+1 Swords to Plowshares
+1 Doubling Season
+1 Deepglow Skate
+1 Evolution Sage
+1 Toxic Deluge
+1 Inexorable Tide
+1 Flux Channeler
+1 Contentious Plan
+1 Ichormoon Gauntlet
+1 Homebrew Alpha
+1 Homebrew Beta`;
+
+/** EDHREC inclusion envelope covering META_DECKLIST's 12 non-Homebrew cards
+ * (all rated), spanning every tuned band. Keys are normalized (lowercase) as
+ * the real route produces them. The two Homebrew cards are left unrated. */
+export const DEFAULT_META_ENVELOPE = {
+  source: "primary" as const,
+  commanderLabel: "Atraxa, Praetors' Voice",
+  potentialDecks: 12480,
+  inclusionMap: {
+    "sol ring": 0.85,
+    "command tower": 0.92,
+    "arcane signet": 0.78,
+    "swords to plowshares": 0.62,
+    "doubling season": 0.55,
+    "deepglow skate": 0.44,
+    "evolution sage": 0.38,
+    "toxic deluge": 0.33,
+    "inexorable tide": 0.22,
+    "flux channeler": 0.18,
+    "contentious plan": 0.06,
+    "ichormoon gauntlet": 0.03,
+  },
+};
+
 /** Decklist without a COMMANDER: header — used for commander input tests */
 export const FLAT_DECKLIST = `1 Atraxa, Praetors' Voice
 1 Sol Ring
@@ -355,6 +399,30 @@ export class DeckPage {
   }
 
   /**
+   * Opt out of the default /api/deck-meta mock and route to the live EDHREC
+   * endpoint instead. Rarely needed — meta tests use the fixture envelope.
+   */
+  async useLiveMeta() {
+    await this.page.unroute("**/api/deck-meta");
+  }
+
+  /**
+   * Override the /api/deck-meta response. Pass a full envelope body and an
+   * optional status to exercise the failure states (missing / error / thin).
+   * Call before importing the deck.
+   */
+  async mockMeta(body: unknown, status = 200) {
+    await this.page.unroute("**/api/deck-meta");
+    await this.page.route("**/api/deck-meta", (route) =>
+      route.fulfill({
+        status,
+        contentType: "application/json",
+        body: JSON.stringify(body),
+      })
+    );
+  }
+
+  /**
    * Type a card name into the card lookup input, wait for the autocomplete
    * dropdown to appear, and click the matching suggestion.
    * NOTE: Callers must mock /api/card-autocomplete via page.route() first.
@@ -460,6 +528,24 @@ export const test = base.extend<{ deckPage: DeckPage }>({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({ exactCombos: [], nearCombos: [] }),
+      })
+    );
+
+    // Default mock for /api/deck-meta: an EMPTY envelope, so the meta feature
+    // stays dormant (no-data) across the suite and doesn't inject a second copy
+    // of the card list onto /reading/cards for unrelated tests. Meta tests opt
+    // into real data via deckPage.mockMeta(DEFAULT_META_ENVELOPE); live-data
+    // tests opt out via deckPage.useLiveMeta().
+    await page.route("**/api/deck-meta", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          source: null,
+          commanderLabel: "",
+          potentialDecks: 0,
+          inclusionMap: {},
+        }),
       })
     );
 

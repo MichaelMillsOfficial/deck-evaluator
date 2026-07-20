@@ -3,6 +3,7 @@ import { getTagsCached } from "@/lib/card-tags";
 import { SYNERGY_AXES } from "@/lib/synergy-axes";
 import { extractCardType } from "@/lib/mana-curve";
 import { TEMPLATE_COMMAND_ZONE } from "@/lib/deck-composition";
+import { isBasicLandName, normalizeCardName } from "@/lib/edhrec-meta";
 
 export const UNCATEGORIZED_LABEL = "Uncategorized";
 export const LANDS_LABEL = "Lands";
@@ -328,4 +329,48 @@ export function gameChangers(
   return pool
     .filter((card) => cardMap[card.name]?.isGameChanger)
     .sort(byName);
+}
+
+/**
+ * Group the pool by EDHREC "stock ↔ spicy" standing for build-time triage:
+ * Staples (inclusion ≥ 50%, safe keeps), Flex (10–50%, real choices), and
+ * Spice (< 10% or unknown, the builder's call). Basic lands get their own
+ * group (no meaningful meta signal); names enrichment could not resolve fall
+ * into Unresolved. Empty groups are omitted.
+ */
+export function groupByMeta(
+  pool: DeckCard[],
+  cardMap: Record<string, EnrichedCard>,
+  inclusionMap: Record<string, number>
+): CrucibleGroup[] {
+  const staples: DeckCard[] = [];
+  const flex: DeckCard[] = [];
+  const spice: DeckCard[] = [];
+  const unrated: DeckCard[] = [];
+  const lands: DeckCard[] = [];
+
+  for (const card of pool) {
+    if (!cardMap[card.name]) continue; // handled by withUnresolved
+    if (isBasicLandName(card.name)) {
+      lands.push(card);
+      continue;
+    }
+    const inclusion = inclusionMap[normalizeCardName(card.name)];
+    if (typeof inclusion !== "number") {
+      // EDHREC has no data for this card — honest "unrated", not spice.
+      unrated.push(card);
+    } else if (inclusion >= 0.5) staples.push(card);
+    else if (inclusion >= 0.1) flex.push(card);
+    else spice.push(card);
+  }
+
+  const groups: CrucibleGroup[] = [];
+  if (staples.length) groups.push({ id: "staples", label: "Staples", cards: staples.sort(byName) });
+  if (flex.length) groups.push({ id: "flex", label: "Flex", cards: flex.sort(byName) });
+  if (spice.length) groups.push({ id: "spice", label: "Spice", cards: spice.sort(byName) });
+  if (unrated.length)
+    groups.push({ id: "meta-unrated", label: "Unrated (no EDHREC data)", cards: unrated.sort(byName) });
+  if (lands.length) groups.push({ id: "lands", label: LANDS_LABEL, cards: lands.sort(byName) });
+
+  return withUnresolved(groups, pool, cardMap);
 }

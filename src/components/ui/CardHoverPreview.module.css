@@ -1,0 +1,68 @@
+/* Portaled card-art preview. Rendered into document.body, so it sits above every
+   stacking context (virtualized rows, sheets). Fixed-positioned from the trigger's
+   rect by CardHoverPreview.tsx. pointer-events:none so it never steals hover. */
+.preview {
+  position: fixed;
+  z-index: 1000;
+  width: 240px;
+  max-width: 70vw;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-xl);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-lg);
+  animation: cardPreviewIn var(--dur-fast) var(--ease-out);
+}
+
+@keyframes cardPreviewIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview {
+    animation: none;
+  }
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-lg);
+}
+
+.fallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.fallbackName {
+  font-family: var(--font-serif);
+  font-size: var(--text-body-lg);
+  color: var(--ink-primary);
+}
+
+.fallbackType {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-wide);
+  color: var(--accent);
+}
+
+.fallbackOracle {
+  font-size: var(--text-sm);
+  color: var(--ink-secondary);
+  white-space: pre-line;
+}

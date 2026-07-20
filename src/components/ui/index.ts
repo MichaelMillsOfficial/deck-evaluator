@@ -17,3 +17,8 @@ export { Sheet } from "./Sheet";
 export type { SheetProps } from "./Sheet";
 export { Popover } from "./Popover";
 export type { PopoverProps } from "./Popover";
+export { CardHoverPreview } from "./CardHoverPreview";
+export type {
+  CardHoverPreviewProps,
+  CardHoverPreviewRenderProps,
+} from "./CardHoverPreview";

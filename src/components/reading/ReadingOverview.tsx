@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDeckSession } from "@/contexts/DeckSessionContext";
 import ReadingHero from "@/components/reading/ReadingHero";
+import MetaPanel from "@/components/reading/MetaPanel";
 import styles from "./ReadingOverview.module.css";
 
 interface SectionTile {
@@ -100,6 +101,8 @@ export default function ReadingOverview() {
           createdAt={payload.createdAt}
         />
       )}
+
+      <MetaPanel />
 
       <span className={styles.gridLabel}>What&apos;s Inside</span>
 
