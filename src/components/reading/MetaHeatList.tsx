@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { EnrichedCard } from "@/lib/types";
-import { Eyebrow, Tag } from "@/components/ui";
+import { CardHoverPreview, Eyebrow, Tag } from "@/components/ui";
 import {
   bandFor,
   type CardInclusion,
@@ -119,52 +119,43 @@ export default function MetaHeatList({ meta, cardMap }: MetaHeatListProps) {
 }
 
 function MetaHeatRow({ card, enriched }: { card: CardInclusion; enriched?: EnrichedCard }) {
-  const [open, setOpen] = useState(false);
   const band = bandFor(card.inclusion);
   const pct = Math.round(card.inclusion * 100);
 
   return (
-    <div className={styles.row} data-testid={`meta-row-${card.name}`}>
-      <span className={styles.nameWrap}>
-        <button
-          type="button"
-          className={styles.name}
-          onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
-          onClick={() => setOpen((o) => !o)}
-          aria-label={`${card.name} card art`}
+    <CardHoverPreview name={card.name} enriched={enriched} data-testid="meta-card-preview">
+      {({ anchorRef, anchorProps, focusProps, toggle }) => (
+        <div
+          ref={anchorRef}
+          className={styles.row}
+          data-testid={`meta-row-${card.name}`}
+          {...anchorProps}
         >
-          {card.name}
-        </button>
-        {band === "spice" ? <Tag variant="warn">Spice</Tag> : null}
-        {open && enriched?.imageUris ? (
-          <span role="tooltip" className={styles.preview} data-testid="meta-card-preview">
-            <img
-              src={enriched.imageUris.normal}
-              alt={`${card.name} card`}
-              className={styles.previewImage}
+          <span className={styles.nameWrap}>
+            <button
+              type="button"
+              className={styles.name}
+              {...focusProps}
+              onClick={toggle}
+              aria-label={`${card.name} card art`}
+            >
+              {card.name}
+            </button>
+            {band === "spice" ? <Tag variant="warn">Spice</Tag> : null}
+          </span>
+          <span className={styles.bar}>
+            <span
+              className={[styles.barFill, BAR_CLASS[band]].join(" ")}
+              style={{ width: `${Math.max(pct, 2)}%` }}
             />
           </span>
-        ) : open && enriched ? (
-          <span role="tooltip" className={styles.preview} data-testid="meta-card-preview">
-            <span className={styles.previewMeta}>
-              <span className={styles.previewName}>{card.name}</span>
-              <span className={styles.previewType}>{enriched.typeLine}</span>
-            </span>
+          <span
+            className={[styles.pct, band === "spice" && styles.pctSpice].filter(Boolean).join(" ")}
+          >
+            {pct}%
           </span>
-        ) : null}
-      </span>
-      <span className={styles.bar}>
-        <span
-          className={[styles.barFill, BAR_CLASS[band]].join(" ")}
-          style={{ width: `${Math.max(pct, 2)}%` }}
-        />
-      </span>
-      <span className={[styles.pct, band === "spice" && styles.pctSpice].filter(Boolean).join(" ")}>
-        {pct}%
-      </span>
-    </div>
+        </div>
+      )}
+    </CardHoverPreview>
   );
 }

@@ -50,6 +50,16 @@ test.describe("/reading meta panel (Stock ↔ Spicy)", () => {
     await deckPage.page.getByTestId("meta-sort").selectOption("stock");
     await expect(deckPage.page.getByTestId("meta-row-Sol Ring")).toBeVisible();
   });
+
+  test("hovering a heat-list row reveals its card preview", async ({ deckPage }) => {
+    await importMeta(deckPage);
+    await deckPage.page.goto("/reading/cards");
+    await expect(deckPage.page.getByTestId("meta-heat-list")).toBeVisible();
+
+    await deckPage.page.getByTestId("meta-row-Sol Ring").hover();
+    const preview = deckPage.page.getByTestId("meta-card-preview");
+    await expect(preview).toBeVisible();
+  });
 });
 
 test.describe("/reading meta panel — failure & low-data states", () => {

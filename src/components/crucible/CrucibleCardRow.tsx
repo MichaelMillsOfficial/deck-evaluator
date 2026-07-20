@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import type { DeckCard, EnrichedCard } from "@/lib/types";
 import type { CrucibleCardStatus } from "@/lib/crucible-session";
 import ManaCost from "@/components/ManaCost";
-import { Input, Tag } from "@/components/ui";
+import { CardHoverPreview, Input, Tag } from "@/components/ui";
 import styles from "./crucible.module.css";
 
 export interface CrucibleCardRowProps {
@@ -38,102 +37,85 @@ export default function CrucibleCardRow({
   onCut,
   onSetKeptQuantity,
 }: CrucibleCardRowProps) {
-  const [previewOpen, setPreviewOpen] = useState(false);
-
   const statusClass =
     status === "cut" ? styles.rowCut : status === "keep" ? styles.rowKept : "";
 
   return (
-    <div
-      data-testid={`crucible-row-${card.name}`}
-      data-status={status}
-      className={`${styles.row} ${statusClass}`}
+    <CardHoverPreview
+      name={card.name}
+      enriched={enriched}
+      data-testid="crucible-card-preview"
     >
-      <span className={styles.rowQty}>{card.quantity}</span>
-      <span className={styles.rowNameWrap}>
-        <button
-          type="button"
-          data-testid="crucible-card-name"
-          className={styles.rowName}
-          onMouseEnter={() => setPreviewOpen(true)}
-          onMouseLeave={() => setPreviewOpen(false)}
-          onFocus={() => setPreviewOpen(true)}
-          onBlur={() => setPreviewOpen(false)}
-          onClick={() => setPreviewOpen((open) => !open)}
-          aria-label={`${card.name} details`}
+      {({ anchorRef, anchorProps, focusProps, toggle }) => (
+        // anchorRef + anchorProps put the hover hit-area on the WHOLE row.
+        <div
+          ref={anchorRef}
+          data-testid={`crucible-row-${card.name}`}
+          data-status={status}
+          className={`${styles.row} ${statusClass}`}
+          {...anchorProps}
         >
-          {card.name}
-        </button>
-        {previewOpen && enriched ? (
-          <span
-            data-testid="crucible-card-preview"
-            role="tooltip"
-            className={styles.preview}
-          >
-            {enriched.imageUris ? (
-              <img
-                src={enriched.imageUris.normal}
-                alt={`${card.name} card`}
-                className={styles.previewImage}
-              />
-            ) : (
-              <>
-                <span className={styles.previewName}>{card.name}</span>
-                <span className={styles.previewType}>{enriched.typeLine}</span>
-                {enriched.oracleText ? (
-                  <span className={styles.previewOracle}>{enriched.oracleText}</span>
-                ) : null}
-              </>
-            )}
+          <span className={styles.rowQty}>{card.quantity}</span>
+          <span className={styles.rowNameWrap}>
+            <button
+              type="button"
+              data-testid="crucible-card-name"
+              className={styles.rowName}
+              {...focusProps}
+              onClick={toggle}
+              aria-label={`${card.name} details`}
+            >
+              {card.name}
+            </button>
           </span>
-        ) : null}
-      </span>
-      {enriched?.manaCost ? <ManaCost cost={enriched.manaCost} /> : null}
-      {badge ? <span className={styles.rowBadge}>{badge}</span> : null}
-      {offIdentity ? <Tag variant="warn">Off-identity</Tag> : null}
-      {synergyScore !== undefined ? (
-        <span className={styles.rowSynergy} aria-label={`Synergy score ${synergyScore}`}>
-          {synergyScore}
-        </span>
-      ) : null}
-      <span className={styles.rowTriage}>
-        {card.quantity > 1 && onSetKeptQuantity ? (
-          <Input
-            type="number"
-            mono
-            min={0}
-            max={card.quantity}
-            value={keptQuantity ?? 0}
-            disabled={locked}
-            aria-label={`Kept copies of ${card.name}`}
-            className={styles.rowKeptQty}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              if (Number.isFinite(next)) onSetKeptQuantity(next);
-            }}
-          />
-        ) : null}
-        <button
-          type="button"
-          className={`${styles.triageButton} ${status === "keep" ? styles.triageKeepOn : ""}`}
-          aria-pressed={status === "keep"}
-          aria-label={`Keep ${card.name}`}
-          disabled={locked}
-          onClick={onKeep}
-        >
-          ✓
-        </button>
-        <button
-          type="button"
-          className={`${styles.triageButton} ${status === "cut" ? styles.triageCutOn : ""}`}
-          aria-pressed={status === "cut"}
-          aria-label={`Cut ${card.name}`}
-          disabled={locked}
-          onClick={onCut}
-        >
-          ✕
-        </button>
-      </span>
-    </div>
+          {enriched?.manaCost ? <ManaCost cost={enriched.manaCost} /> : null}
+          {badge ? <span className={styles.rowBadge}>{badge}</span> : null}
+          {offIdentity ? <Tag variant="warn">Off-identity</Tag> : null}
+          {synergyScore !== undefined ? (
+            <span className={styles.rowSynergy} aria-label={`Synergy score ${synergyScore}`}>
+              {synergyScore}
+            </span>
+          ) : null}
+          <span className={styles.rowTriage}>
+            {card.quantity > 1 && onSetKeptQuantity ? (
+              <Input
+                type="number"
+                mono
+                min={0}
+                max={card.quantity}
+                value={keptQuantity ?? 0}
+                disabled={locked}
+                aria-label={`Kept copies of ${card.name}`}
+                className={styles.rowKeptQty}
+                onChange={(event) => {
+                  const next = Number(event.target.value);
+                  if (Number.isFinite(next)) onSetKeptQuantity(next);
+                }}
+              />
+            ) : null}
+            <button
+              type="button"
+              className={`${styles.triageButton} ${status === "keep" ? styles.triageKeepOn : ""}`}
+              aria-pressed={status === "keep"}
+              aria-label={`Keep ${card.name}`}
+              disabled={locked}
+              onClick={onKeep}
+            >
+              ✓
+            </button>
+            <button
+              type="button"
+              className={`${styles.triageButton} ${status === "cut" ? styles.triageCutOn : ""}`}
+              aria-pressed={status === "cut"}
+              aria-label={`Cut ${card.name}`}
+              disabled={locked}
+              onClick={onCut}
+            >
+              ✕
+            </button>
+          </span>
+        </div>
+      )}
+    </CardHoverPreview>
   );
 }
