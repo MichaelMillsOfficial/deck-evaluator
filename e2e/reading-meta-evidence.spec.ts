@@ -1,7 +1,17 @@
 import { test, expect, META_DECKLIST, DEFAULT_META_ENVELOPE } from "./fixtures";
+import { mkdirSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
-const EVIDENCE_DIR =
-  "/var/folders/5h/xwb2_w856w3fgxszkbhc00r00000gn/T/no-mistakes-evidence/01KXYRK5XTJV2N5MRRQKK7FBEN";
+// Derive the evidence dir from the OS temp dir so it resolves on every
+// platform (macOS `/var/folders/…`, Linux CI `/tmp/…`), and create it up
+// front — Playwright silently swallows a failed recursive mkdir, so an
+// absent parent surfaces later as an ENOENT on screenshot write.
+const EVIDENCE_DIR = join(tmpdir(), "no-mistakes-evidence", "01KXYRK5XTJV2N5MRRQKK7FBEN");
+
+test.beforeAll(() => {
+  mkdirSync(EVIDENCE_DIR, { recursive: true });
+});
 
 async function importMeta(deckPage: import("./fixtures").DeckPage) {
   await deckPage.goto();
