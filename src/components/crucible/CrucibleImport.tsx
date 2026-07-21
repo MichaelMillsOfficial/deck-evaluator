@@ -1,11 +1,18 @@
 "use client";
 
-import { useCallback, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import SectionHeader from "@/components/reading/SectionHeader";
 import CardSearchInput from "@/components/CardSearchInput";
 import { Button, Textarea } from "@/components/ui";
 import { useCrucibleSession } from "@/contexts/CrucibleSessionContext";
 import { appendCardToPileText, flattenPileParse } from "@/lib/crucible-session";
+import { parsePileFromDck } from "@/lib/crucible-share";
 import type { ParseResult } from "@/lib/decklist-parser";
 import type { DeckData } from "@/lib/types";
 import styles from "./crucible.module.css";
@@ -14,15 +21,44 @@ import styles from "./crucible.module.css";
 const EMPTY_NAME_SET = new Set<string>();
 const EMPTY_CANDIDATES: string[] = [];
 
+/** Reject a `.dck` upload larger than this before reading it into memory. */
+const MAX_DCK_FILE_BYTES = 512_000;
+
 export default function CrucibleImport() {
-  const { setPile } = useCrucibleSession();
+  const { setPile, loadPile } = useCrucibleSession();
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addFromSearch = useCallback((name: string) => {
     setText((prev) => appendCardToPileText(prev, name));
   }, []);
+
+  async function handleDckFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Reset so re-selecting the same file still fires onChange.
+    event.target.value = "";
+    if (!file) return;
+    setError(null);
+    if (file.size > MAX_DCK_FILE_BYTES) {
+      setError("That .dck file is too large to import.");
+      return;
+    }
+    let fileText: string;
+    try {
+      fileText = await file.text();
+    } catch {
+      setError("Could not read that file.");
+      return;
+    }
+    const payload = parsePileFromDck(fileText);
+    if (!payload) {
+      setError("That file is not a readable .dck pile.");
+      return;
+    }
+    loadPile(payload);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -37,7 +73,7 @@ export default function CrucibleImport() {
       });
       if (!res.ok) {
         const json = await res.json().catch(() => null);
-        setError(json?.error ?? "Could not read the pile — check the list format.");
+        setError(json?.error ?? "Could not read the pile - check the list format.");
         return;
       }
       // The parse API returns the deck flattened: { ...deck, warnings }.
@@ -60,7 +96,7 @@ export default function CrucibleImport() {
       }
       setPile(pool, warnings);
     } catch {
-      setError("Network error — could not reach the parser.");
+      setError("Network error - could not reach the parser.");
     } finally {
       setSubmitting(false);
     }
@@ -97,6 +133,23 @@ export default function CrucibleImport() {
           </p>
         ) : null}
         <div className={styles.importActions}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".dck,text/plain"
+            aria-hidden="true"
+            tabIndex={-1}
+            className={styles.hiddenFileInput}
+            data-testid="crucible-dck-input"
+            onChange={handleDckFile}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Import a .dck file
+          </Button>
           <Button type="submit" variant="primary" disabled={!text.trim() || submitting}>
             Begin Refinement
           </Button>
