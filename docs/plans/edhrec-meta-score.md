@@ -37,6 +37,9 @@ Live EDHREC data revealed two problems the mock hid: (1) the commander JSON only
 - **New `insufficient` status** when fewer than `MIN_RATED_CARDS` (10) deck cards are rated — the panel refuses to render a misleading read and explains why.
 - **Bands re-tuned to real inclusion:** Staple ≥60%, Standard 30–60%, Niche 10–30%, Spice <10%.
 
+### D4c — Dedicated reading page (revision)
+Live use showed the woven-in placement (overview panel + heat list on `/reading/cards`) gave no way to *return* to the meta read while navigating a reading. Added a first-class **`/reading/meta`** sub-route with a sidebar nav entry ("Meta", Deck group) — the full analysis (panel + bands + heat list) now has a home reachable anytime. The heat list moved off `/reading/cards` (removing the duplicate card listing) onto this page; the overview keeps the glance panel.
+
 ### D5 — Exclusions & normalization
 Exclude basic lands and the commander(s) from all rollups. Card-name matching between EDHREC's list and deck names reuses the case-insensitive + DFC-front-face (`" // "` split) + `flavor_name` normalization already used in `deck-enrich/route.ts`. The commander slug reuses the existing slugifier extracted from `buildEdhrecUrl` in `commander-validation.ts` (`atraxa-praetors-voice` form).
 

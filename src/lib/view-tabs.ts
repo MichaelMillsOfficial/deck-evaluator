@@ -1,6 +1,7 @@
 export type ViewTab =
   | "list"
   | "analysis"
+  | "meta"
   | "synergy"
   | "hands"
   | "additions"
@@ -20,7 +21,7 @@ export const NAV_CATEGORIES: NavCategory[] = [
   {
     id: "deck",
     label: "Deck",
-    items: ["list", "analysis"],
+    items: ["list", "analysis", "meta"],
   },
   {
     id: "mechanics",
@@ -53,6 +54,7 @@ export const ENRICHMENT_REQUIRED_TABS = new Set<ViewTab>([
 export const ALL_TABS: { key: ViewTab; label: string; badge?: string }[] = [
   { key: "list", label: "Deck List" },
   { key: "analysis", label: "Analysis" },
+  { key: "meta", label: "Meta" },
   { key: "synergy", label: "Synergy" },
   { key: "hands", label: "Hands" },
   { key: "additions", label: "Additions" },
@@ -71,6 +73,7 @@ export const ALL_TABS: { key: ViewTab; label: string; badge?: string }[] = [
 export const TAB_ROUTES: Record<ViewTab, string> = {
   list: "/reading/cards",
   analysis: "/reading/composition",
+  meta: "/reading/meta",
   synergy: "/reading/synergy",
   interactions: "/reading/interactions",
   hands: "/reading/hands",
@@ -99,6 +102,7 @@ export function tabFromPathname(pathname: string): ViewTab | null {
 export const READING_ORDER: ViewTab[] = [
   "list",
   "analysis",
+  "meta",
   "synergy",
   "interactions",
   "hands",

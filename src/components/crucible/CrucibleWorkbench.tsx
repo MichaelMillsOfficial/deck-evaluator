@@ -131,24 +131,32 @@ export default function CrucibleWorkbench() {
     return identity;
   }, [payload, cardMap]);
 
+  const metaCommanderKey =
+    lens === "meta" && payload && payload.commanders.length > 0
+      ? [...payload.commanders].sort().join("|")
+      : "";
+
   // Fetch EDHREC inclusion once per commander set, only while the meta lens is
   // open. Off by default — nothing loads until the lens is selected. Re-runs if
-  // the commander changes while the lens is active.
+  // the commander changes while the lens is active. Keyed on the commander set,
+  // not the whole payload, so triage (keep/cut) does not re-fire the fetch.
   useEffect(() => {
-    if (lens !== "meta" || !payload || payload.commanders.length === 0) return;
-    const key = [...payload.commanders].sort().join("|");
-    if (metaKeyRef.current === key) return;
-    metaKeyRef.current = key;
+    if (metaCommanderKey === "") return;
+    if (metaKeyRef.current === metaCommanderKey) return;
+    metaKeyRef.current = metaCommanderKey;
 
     let cancelled = false;
+    let settled = false;
+    const commanders = metaCommanderKey.split("|");
     metaDispatch({ type: "START" });
     fetch("/api/deck-meta", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ commanders: payload.commanders }),
+      body: JSON.stringify({ commanders }),
     })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((json: { inclusionMap?: Record<string, number>; error?: string }) => {
+        settled = true;
         if (cancelled) return;
         if (json.error) {
           metaKeyRef.current = null; // allow a retry on re-select
@@ -156,14 +164,16 @@ export default function CrucibleWorkbench() {
         } else metaDispatch({ type: "SUCCESS", inclusion: json.inclusionMap ?? {} });
       })
       .catch(() => {
+        settled = true;
         if (cancelled) return;
         metaKeyRef.current = null; // allow a retry on re-select
         metaDispatch({ type: "ERROR" });
       });
     return () => {
       cancelled = true;
+      if (!settled) metaKeyRef.current = null; // torn down mid-flight — allow re-fetch on re-select
     };
-  }, [lens, payload]);
+  }, [metaCommanderKey]);
 
   const targetByLabel = useMemo(() => {
     const map = new Map<string, { min: number; max: number }>();

@@ -65,7 +65,7 @@ export default function MetaPanel() {
         <div className={styles.empty} data-testid="meta-insufficient">
           <p className={styles.emptyTitle}>Not enough EDHREC data</p>
           <p className={styles.emptyBody}>
-            Only {meta.ratedCount} of your cards are in EDHREC&apos;s data for this
+            Only {`${meta.ratedCount} `}of your cards are in EDHREC&apos;s data for this
             commander — too few to read a reliable stock vs. spice picture. EDHREC
             only tracks a few hundred notable cards per commander.
           </p>
