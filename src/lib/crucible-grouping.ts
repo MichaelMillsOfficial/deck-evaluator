@@ -334,9 +334,10 @@ export function gameChangers(
 /**
  * Group the pool by EDHREC "stock ↔ spicy" standing for build-time triage:
  * Staples (inclusion ≥ 50%, safe keeps), Flex (10–50%, real choices), and
- * Spice (< 10% or unknown, the builder's call). Basic lands get their own
- * group (no meaningful meta signal); names enrichment could not resolve fall
- * into Unresolved. Empty groups are omitted.
+ * Spice (< 10%, the builder's call). Cards with no EDHREC data fall into their
+ * own Unrated group rather than Spice. Basic lands get their own group (no
+ * meaningful meta signal); names enrichment could not resolve fall into
+ * Unresolved. Empty groups are omitted.
  */
 export function groupByMeta(
   pool: DeckCard[],

@@ -20,7 +20,7 @@ covered by 408 e2e tests + 2473 unit tests. Mark these as done in the
 - ✅ Domain components — `<ManaCost>`, `<ColorPie>`, `<CurveConstellation>`,
   `<CardRow>`, `<DeckHero>` exposed via `src/components/deck/`.
 - ✅ Screens — every route below the table now exists, including the
-  ritual loader (`/ritual`), the verdict hero on `/reading`, and the ten
+  ritual loader (`/ritual`), the verdict hero on `/reading`, and the eleven
   shell sub-routes under `/reading/(shell)/`.
 - ✅ `prefers-reduced-motion` honored across CosmicLoader, ReadingOverview,
   DeckReadingShell, DeckSidebar, share page, and CosmosBackground.

@@ -51,6 +51,7 @@ src/
 │   │       ├── layout.tsx         # DeckReadingShell + CandidatesProvider
 │   │       ├── cards/page.tsx
 │   │       ├── composition/page.tsx
+│   │       ├── meta/page.tsx
 │   │       ├── synergy/page.tsx
 │   │       ├── interactions/page.tsx
 │   │       ├── hands/page.tsx
@@ -152,7 +153,7 @@ Design details: `docs/plans/crucible-deck-builder.md`.
 - `DeckData` -- `{ name, source, url, commanders[], mainboard[], sideboard[] }`
 - `EnrichedCard` -- Full card data from Scryfall (mana cost, oracle text, type line, keywords, power/toughness, etc.)
 - `DeckSessionPayload` -- `{ id, deck, cardMap?, parseWarnings, notFoundCount, ... }`
-- `ViewTab` -- union of 10 sub-route keys; `TAB_ROUTES[tab]` → `/reading/<slug>`
+- `ViewTab` -- union of 11 sub-route keys; `TAB_ROUTES[tab]` → `/reading/<slug>`
 - Source can be `"moxfield" | "archidekt" | "text"`
 
 ### Design System (Astral)
