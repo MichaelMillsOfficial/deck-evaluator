@@ -423,9 +423,9 @@ test.describe("Additions tab", () => {
     const tablist = page.getByRole("tablist", { name: "Deck view" });
     const tabs = tablist.getByRole("tab");
 
-    // Phase 4: 10 tabs total (added Compare + Share alongside the
-    // existing 8). Additions is no longer the last tab.
-    await expect(tabs).toHaveCount(10);
+    // Phase 4: 10 tabs (added Compare + Share); the Meta tab later made 11.
+    // Additions is no longer the last tab.
+    await expect(tabs).toHaveCount(11);
 
     const additionsTab = tablist.getByRole("tab", { name: "Additions" });
     await expect(additionsTab).toBeVisible();

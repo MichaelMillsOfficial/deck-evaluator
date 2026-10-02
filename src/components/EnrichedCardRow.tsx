@@ -5,6 +5,7 @@ import type { CardFace, EnrichedCard } from "@/lib/types";
 import ManaCost from "@/components/ManaCost";
 import CardTags from "@/components/CardTags";
 import OracleText from "@/components/OracleText";
+import { CardHoverPreview } from "@/components/ui";
 import { formatUSD } from "@/lib/budget-analysis";
 import { getFaceDisplayMode } from "@/lib/card-layout";
 import styles from "./EnrichedCardRow.module.css";
@@ -123,116 +124,122 @@ export default memo(function EnrichedCardRow({
   );
 
   return (
-    <>
-      <tr className={styles.row}>
-        <td className={styles.tdQty}>
-          <span className="sr-only">{quantity}x </span>
-          {quantity}
-        </td>
-        <td className={styles.tdCost}>
-          <ManaCost cost={card.manaCost} />
-        </td>
-        <td className={styles.tdName}>
-          <div className={styles.nameCell}>
-            <button
-              type="button"
-              aria-expanded={open}
-              aria-controls={detailId}
-              onClick={() => setOpen(!open)}
-              onKeyDown={handleKeyDown}
-              className={styles.nameButton}
-            >
-              <svg
-                data-testid="expand-chevron"
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className={[styles.chevron, open && styles.chevronOpen]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <span className={styles.nameLabel}>
-                {card.name}
-                {card.flavorName && (
-                  <span className={styles.flavorName}>
-                    ({card.flavorName})
+    <CardHoverPreview name={card.name} enriched={card} data-testid="enriched-card-preview">
+      {({ anchorRef, anchorProps, focusProps }) => (
+        <>
+          <tr className={styles.row}>
+            <td className={styles.tdQty}>
+              <span className="sr-only">{quantity}x </span>
+              {quantity}
+            </td>
+            <td className={styles.tdCost}>
+              <ManaCost cost={card.manaCost} />
+            </td>
+            {/* anchorRef + anchorProps: hovering the name cell reveals the card art. */}
+            <td className={styles.tdName} ref={anchorRef} {...anchorProps}>
+              <div className={styles.nameCell}>
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-controls={detailId}
+                  onClick={() => setOpen(!open)}
+                  onKeyDown={handleKeyDown}
+                  {...focusProps}
+                  className={styles.nameButton}
+                >
+                  <svg
+                    data-testid="expand-chevron"
+                    aria-hidden="true"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className={[styles.chevron, open && styles.chevronOpen]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span className={styles.nameLabel}>
+                    {card.name}
+                    {card.flavorName && (
+                      <span className={styles.flavorName}>
+                        ({card.flavorName})
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
-            </button>
-            <CardTags card={card} />
-          </div>
-        </td>
-        <td className={styles.tdType}>{card.typeLine}</td>
-      </tr>
-      {open && (
-        <tr id={detailId} className={styles.detailRow}>
-          <td colSpan={4}>
-            {/* Multi-face: tabs or inline based on layout */}
-            {isMultiFace && displayMode === "tabs" && (
-              <TabsFaceDetail
-                faces={card.cardFaces}
-                activeFace={activeFace}
-                setActiveFace={setActiveFace}
-              />
-            )}
-            {isMultiFace && displayMode === "inline" && (
-              <InlineFaceDetail faces={card.cardFaces} />
-            )}
-
-            {/* Single-face or fallback: original rendering */}
-            {(!isMultiFace || displayMode === "single") && (
-              <div className={styles.detailBlock}>
-                {/* Type line (visible on mobile since column is hidden) */}
-                <p className={styles.detailMobileType}>{card.typeLine}</p>
-
-                {/* Oracle text */}
-                {card.oracleText && <OracleText text={card.oracleText} />}
-
-                {/* Stats row */}
-                <div className={styles.statRow}>
-                  {card.power !== null && card.toughness !== null && (
-                    <span>
-                      P/T: {card.power}/{card.toughness}
-                    </span>
-                  )}
-                  {card.loyalty !== null && <span>Loyalty: {card.loyalty}</span>}
-                  {card.keywords.length > 0 && (
-                    <span>Keywords: {card.keywords.join(", ")}</span>
-                  )}
-                  <span>Rarity: {card.rarity}</span>
-                  {card.prices.usd != null && (
-                    <span data-testid="card-price">
-                      Price: {formatUSD(card.prices.usd)}
-                    </span>
-                  )}
-                </div>
+                </button>
+                <CardTags card={card} />
               </div>
-            )}
+            </td>
+            <td className={styles.tdType}>{card.typeLine}</td>
+          </tr>
+          {open && (
+            <tr id={detailId} className={styles.detailRow}>
+              <td colSpan={4}>
+                {/* Multi-face: tabs or inline based on layout */}
+                {isMultiFace && displayMode === "tabs" && (
+                  <TabsFaceDetail
+                    faces={card.cardFaces}
+                    activeFace={activeFace}
+                    setActiveFace={setActiveFace}
+                  />
+                )}
+                {isMultiFace && displayMode === "inline" && (
+                  <InlineFaceDetail faces={card.cardFaces} />
+                )}
 
-            {/* Shared stats for multi-face cards (keywords, rarity, price) */}
-            {isMultiFace && displayMode !== "single" && (
-              <div className={styles.statRow} style={{ marginTop: "var(--space-5)" }}>
-                {card.keywords.length > 0 && (
-                  <span>Keywords: {card.keywords.join(", ")}</span>
+                {/* Single-face or fallback: original rendering */}
+                {(!isMultiFace || displayMode === "single") && (
+                  <div className={styles.detailBlock}>
+                    {/* Type line (visible on mobile since column is hidden) */}
+                    <p className={styles.detailMobileType}>{card.typeLine}</p>
+
+                    {/* Oracle text */}
+                    {card.oracleText && <OracleText text={card.oracleText} />}
+
+                    {/* Stats row */}
+                    <div className={styles.statRow}>
+                      {card.power !== null && card.toughness !== null && (
+                        <span>
+                          P/T: {card.power}/{card.toughness}
+                        </span>
+                      )}
+                      {card.loyalty !== null && <span>Loyalty: {card.loyalty}</span>}
+                      {card.keywords.length > 0 && (
+                        <span>Keywords: {card.keywords.join(", ")}</span>
+                      )}
+                      <span>Rarity: {card.rarity}</span>
+                      {card.prices.usd != null && (
+                        <span data-testid="card-price">
+                          Price: {formatUSD(card.prices.usd)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 )}
-                <span>Rarity: {card.rarity}</span>
-                {card.prices.usd != null && (
-                  <span data-testid="card-price">
-                    Price: {formatUSD(card.prices.usd)}
-                  </span>
+
+                {/* Shared stats for multi-face cards (keywords, rarity, price) */}
+                {isMultiFace && displayMode !== "single" && (
+                  <div className={styles.statRow} style={{ marginTop: "var(--space-5)" }}>
+                    {card.keywords.length > 0 && (
+                      <span>Keywords: {card.keywords.join(", ")}</span>
+                    )}
+                    <span>Rarity: {card.rarity}</span>
+                    {card.prices.usd != null && (
+                      <span data-testid="card-price">
+                        Price: {formatUSD(card.prices.usd)}
+                      </span>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
-          </td>
-        </tr>
+              </td>
+            </tr>
+          )}
+        </>
       )}
-    </>
+    </CardHoverPreview>
   );
 });

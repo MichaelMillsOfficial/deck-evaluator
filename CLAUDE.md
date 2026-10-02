@@ -51,6 +51,7 @@ src/
 │   │       ├── layout.tsx         # DeckReadingShell + CandidatesProvider
 │   │       ├── cards/page.tsx
 │   │       ├── composition/page.tsx
+│   │       ├── meta/page.tsx
 │   │       ├── synergy/page.tsx
 │   │       ├── interactions/page.tsx
 │   │       ├── hands/page.tsx
@@ -70,6 +71,7 @@ src/
 │       ├── deck-parse/            # POST — text decklist parser
 │       ├── deck-enrich/           # POST — Scryfall enrichment
 │       ├── deck-combos/           # POST — Commander Spellbook lookup
+│       ├── deck-meta/             # POST — EDHREC stock↔spicy meta read
 │       ├── card-autocomplete/
 │       ├── card-suggestions/
 │       ├── commander-rules/
@@ -141,6 +143,7 @@ Design details: `docs/plans/crucible-deck-builder.md`.
 - `POST /api/deck-parse` — raw text → `DeckData`
 - `POST /api/deck-enrich` — card names → `EnrichedCard` map (Scryfall)
 - `POST /api/deck-combos` — card names → Commander Spellbook combos
+- `POST /api/deck-meta` — commander name(s) → EDHREC inclusion envelope (stock↔spicy)
 - `GET  /api/card-autocomplete` — typeahead for `/reading/add`
 - `GET  /api/card-suggestions` — themed candidate suggestions
 
@@ -150,7 +153,7 @@ Design details: `docs/plans/crucible-deck-builder.md`.
 - `DeckData` -- `{ name, source, url, commanders[], mainboard[], sideboard[] }`
 - `EnrichedCard` -- Full card data from Scryfall (mana cost, oracle text, type line, keywords, power/toughness, etc.)
 - `DeckSessionPayload` -- `{ id, deck, cardMap?, parseWarnings, notFoundCount, ... }`
-- `ViewTab` -- union of 10 sub-route keys; `TAB_ROUTES[tab]` → `/reading/<slug>`
+- `ViewTab` -- union of 11 sub-route keys; `TAB_ROUTES[tab]` → `/reading/<slug>`
 - Source can be `"moxfield" | "archidekt" | "text"`
 
 ### Design System (Astral)
@@ -190,6 +193,7 @@ Inventory of primitives that must be reused (current as of this writing — run
 | Panel / surface / bordered container | `<Card>` from `src/components/ui/Card.tsx` — never raw `rounded-xl border bg-slate-800/50` |
 | Modal / drawer / focus-trapped overlay | `<Sheet>` from `src/components/ui/Sheet.tsx` — never a hand-rolled `<dialog>` |
 | Anchored, non-modal dropdown / filterable list popover | `<Popover>` from `src/components/ui/Popover.tsx` — never a hand-rolled absolutely-positioned dropdown |
+| Hover/focus card-art preview on a row or name cell | `<CardHoverPreview>` from `src/components/ui/CardHoverPreview.tsx` (portals to `document.body`, side-anchored with flip) — never a per-row absolutely-positioned art tooltip |
 | Mono uppercase label / kicker | `<Eyebrow>` from `src/components/ui/Eyebrow.tsx` |
 | Pill / chip / category label | `<Tag>` from `src/components/ui/Tag.tsx` (or `<CardTag>` for card-tag-specific styling) |
 | Button (primary / secondary / ghost) | `<Button>` from `src/components/ui/Button.tsx` |

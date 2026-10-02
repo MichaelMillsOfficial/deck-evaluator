@@ -1,5 +1,6 @@
 import type { DeckData, EnrichedCard } from "@/lib/types";
 import type { SpellbookCombo } from "@/lib/commander-spellbook";
+import type { DeckMetaResult } from "@/lib/edhrec-meta";
 
 const SESSION_KEY = "astral.deck-session.v1";
 
@@ -29,6 +30,8 @@ export interface DeckSessionPayload {
     exactCombos: SpellbookCombo[];
     nearCombos: SpellbookCombo[];
   } | null;
+  /** EDHREC "stock ↔ spicy" meta read. Null until /api/deck-meta resolves. */
+  deckMeta: DeckMetaResult | null;
   /** Wall-clock timestamp at import. Used for the "READING · 04.27.26" eyebrow. */
   createdAt: number;
 }

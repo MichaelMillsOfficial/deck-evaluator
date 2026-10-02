@@ -57,6 +57,7 @@ function TrackerContent() {
       cardMap: null,
       notFoundCount: 0,
       spellbookCombos: null,
+      deckMeta: null,
       createdAt: Date.now(),
     };
     setPayload(readingPayload);

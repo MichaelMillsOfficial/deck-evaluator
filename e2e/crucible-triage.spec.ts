@@ -262,4 +262,32 @@ test.describe("Crucible triage", () => {
     await expect(preview).toBeVisible();
     await expect(preview).toContainText("Artifact");
   });
+
+  test("hovering anywhere on the row (not just the name) reveals the preview", async ({
+    page,
+    crucible,
+  }) => {
+    await crucible.importPile(SAMPLE_PILE);
+
+    // Hover the row container itself — the hit-area now spans the whole row,
+    // not only the card-name text button.
+    await crucible.row("Sol Ring").first().hover();
+    const preview = page.getByTestId("crucible-card-preview");
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText("Artifact");
+  });
+
+  test("the preview is portaled to the document body (escapes the row stacking context)", async ({
+    page,
+    crucible,
+  }) => {
+    await crucible.importPile(SAMPLE_PILE);
+
+    await crucible.row("Sol Ring").first().hover();
+    const preview = page.getByTestId("crucible-card-preview");
+    await expect(preview).toBeVisible();
+    // Portaled previews are direct children of <body>, not nested in a row.
+    const parentTag = await preview.evaluate((el) => el.parentElement?.tagName);
+    expect(parentTag).toBe("BODY");
+  });
 });

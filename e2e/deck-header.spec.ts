@@ -57,8 +57,9 @@ test.describe("Deck Header", () => {
 
     const header = deckPage.page.getByTestId("deck-header");
     const tabs = header.getByRole("tab");
-    // Phase 4 added Compare + Share alongside the existing 8.
-    await expect(tabs).toHaveCount(10);
+    // Phase 4 added Compare + Share alongside the existing 8; the Meta tab
+    // (EDHREC stock/spicy) later brought the total to 11.
+    await expect(tabs).toHaveCount(11);
 
     await expect(header.getByRole("tab", { name: "Deck List" })).toBeVisible();
     await expect(header.getByRole("tab", { name: "Analysis" })).toBeVisible();

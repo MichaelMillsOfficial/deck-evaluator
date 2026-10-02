@@ -8,6 +8,7 @@ export type CrucibleLens =
   | "type"
   | "mv"
   | "color"
+  | "meta"
   | "list"
   | "gamechangers"
   | "charts"
@@ -21,6 +22,7 @@ const LENSES: { id: CrucibleLens; label: string }[] = [
   { id: "type", label: "By Type Line" },
   { id: "mv", label: "By Mana Value" },
   { id: "color", label: "By Color Identity" },
+  { id: "meta", label: "By Meta (Stock ↔ Spicy)" },
   { id: "list", label: "Flat List" },
   { id: "gamechangers", label: "Game Changers" },
 ];
