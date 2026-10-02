@@ -6,6 +6,7 @@ import CardLookupInput from "@/components/CardLookupInput";
 import ArchidektSynopsis from "@/components/ArchidektSynopsis";
 import { Button, Input, Textarea } from "@/components/ui";
 import { isArchidektUrl } from "@/lib/archidekt";
+import { EXAMPLE_DECKLIST } from "@/lib/example-deck";
 import type { DeckData } from "@/lib/types";
 import styles from "./DeckInput.module.css";
 
@@ -37,20 +38,6 @@ interface DeckInputProps {
   loading: boolean;
   mode?: DeckInputMode;
 }
-
-const EXAMPLE_DECKLIST = `COMMANDER:
-1 Atraxa, Praetors' Voice
-
-1 Sol Ring
-1 Command Tower
-1 Arcane Signet
-1 Swords to Plowshares
-1 Counterspell
-1 Cultivate
-1 Kodama's Reach
-1 Beast Within
-1 Anguished Unmaking
-1 Deepglow Skate`;
 
 const tabs: { key: ImportTab; label: string }[] = [
   { key: "manual", label: "Manual Import" },
